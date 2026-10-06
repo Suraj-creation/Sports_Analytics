@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.py[cod]
+.env
+.kilo/
+output/
+*.mp4
+*.mp3
+*.wav
+*.avi
+*.mov
+*.log
