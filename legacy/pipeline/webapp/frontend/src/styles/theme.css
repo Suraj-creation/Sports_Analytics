@@ -1,0 +1,73 @@
+/* theme.css -- shared design tokens + generic components, used by every
+   page (index.html, login.html, admin.html, tasks.html, court_task.html).
+   Page-specific styles stay inline in each page's own <style> block. */
+
+:root {
+  --paper: #F6F4EE; --paper-raised: #FFFFFF; --ink: #1A1F1B; --ink-soft: #58635C; --ink-faint: #8B9389;
+  --court: #1F6B4F; --court-strong: #17563F; --court-soft: #DCEAE2; --line: #DCD7C8; --line-strong: #C6C0AE;
+  --amber: #A6701A; --amber-soft: #F5E3C4; --coral: #A83A2D; --coral-soft: #F5D9D4;
+  --slate: #3E5C76; --slate-soft: #DCE4EC; --p1: #3468C0; --p2: #C97A2E;
+  --shadow: 0 1px 2px rgba(26,31,27,0.06), 0 6px 20px -8px rgba(26,31,27,0.18);
+  --radius-sm: 6px; --radius-md: 10px;
+  --font-head: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #12150F; --paper-raised: #1A1E17; --ink: #ECE8DC; --ink-soft: #A6A99B; --ink-faint: #6B6F63;
+    --court: #4FAE84; --court-strong: #6BC49B; --court-soft: #1D3A2C; --line: #33372C; --line-strong: #454A3B;
+    --amber: #E0A54B; --amber-soft: #3A2E17; --coral: #E37A6A; --coral-soft: #3A211D;
+    --slate: #8CADCC; --slate-soft: #1E2C38; --p1: #7BA3E8; --p2: #E8A15E;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 10px 30px -10px rgba(0,0,0,0.5);
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body { background: var(--paper); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+.app { max-width: 1180px; margin: 0 auto; padding: 0 20px 120px; }
+button { font-family: inherit; }
+button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid var(--court); outline-offset: 2px; }
+
+.topbar { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--paper) 92%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+.topbar-inner { max-width: 1180px; margin: 0 auto; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand-mark { width: 26px; height: 26px; border-radius: 5px; background: var(--court); display: grid; place-items: center; flex-shrink: 0; }
+.brand-mark svg { width: 15px; height: 15px; }
+.brand-name { font-family: var(--font-head); font-weight: 800; font-size: 14.5px; }
+.brand-sub { font-size: 12px; color: var(--ink-faint); }
+.topbar-user { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--ink-soft); }
+.topbar-user a { color: var(--ink-soft); text-decoration: none; }
+.topbar-user a:hover { color: var(--court); }
+.topbar-user .role-pill { font-family: var(--font-head); font-size: 10.5px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; padding: 3px 9px; border-radius: 999px; background: var(--court-soft); color: var(--court-strong); }
+
+.btn { font-family: var(--font-head); font-weight: 700; font-size: 13.5px; letter-spacing: 0.01em; padding: 11px 20px; border-radius: var(--radius-sm); border: 1px solid var(--line-strong); background: var(--paper-raised); color: var(--ink); cursor: pointer; }
+.btn:hover { border-color: var(--ink-faint); }
+.btn-primary { background: var(--court); border-color: var(--court); color: #fff; }
+.btn-primary:hover { background: var(--court-strong); border-color: var(--court-strong); }
+.btn-primary:disabled { background: var(--line-strong); border-color: var(--line-strong); color: var(--ink-faint); cursor: not-allowed; }
+.btn-sm { padding: 6px 12px; font-size: 12.5px; }
+.btn-danger { border-color: var(--coral); color: var(--coral); }
+.btn-danger:hover { background: var(--coral-soft); }
+
+.card { background: var(--paper-raised); border: 1px solid var(--line); border-radius: var(--radius-md); box-shadow: var(--shadow); }
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 20px; border-bottom: 1px solid var(--line); }
+.card-head h2 { font-family: var(--font-head); font-size: 11.5px; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-faint); margin: 0; }
+
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; font-size: 12px; font-weight: 700; font-family: var(--font-head); }
+.pill-amber { background: var(--amber-soft); color: var(--amber); }
+.pill-court { background: var(--court-soft); color: var(--court-strong); }
+.pill-slate { background: var(--slate-soft); color: var(--slate); }
+.pill-coral { background: var(--coral-soft); color: var(--coral); }
+.pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+.field label { display: block; font-family: var(--font-head); font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 6px; }
+.field input[type="text"], .field input[type="password"], .field select { width: 100%; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--paper-raised); color: var(--ink); font-size: 14px; font-family: inherit; }
+
+.form-error { color: var(--coral); font-size: 13px; margin-top: 10px; }
+
+.toast { position: fixed; bottom: 84px; left: 50%; transform: translateX(-50%) translateY(10px); background: var(--ink); color: var(--paper); padding: 11px 18px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; opacity: 0; pointer-events: none; transition: all .25s ease; display: flex; align-items: center; gap: 8px; z-index: 40; box-shadow: var(--shadow); }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast.err { background: var(--coral); }
+
+@media (prefers-reduced-motion: reduce) { * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; } }

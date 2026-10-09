@@ -1,0 +1,25 @@
+[project]
+name = "bai-research"
+version = "0.1.0"
+description = "Benchmark harness, dataset loaders, evaluation and training jobs (never imported by the runtime)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "bai-engine",
+    "bai-badminton",
+    "pandas>=2.2",
+    "huggingface-hub>=0.26",
+]
+
+[project.optional-dependencies]
+train = ["torch>=2.5", "scikit-learn>=1.5"]
+
+[project.scripts]
+bai-bench = "bai_research.bench.cli:main"
+bai-eval = "bai_research.eval.cli:main"
+
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/bai_research"]

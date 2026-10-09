@@ -1,0 +1,142 @@
+# Badminton event & stroke ontology — the single vocabulary shared by models, rules, analytics,
+# exports, agents and the UI.  Model outputs and dataset labels are *mapped* onto this ontology;
+# nothing downstream sees raw model class names.
+version: 1
+
+confidence_bands:          # event confidence → user-facing band
+  confirmed: 0.85
+  probable: 0.60
+
+event_types:
+  contact:        "Racket–shuttle contact (hit)"
+  stroke:         "Classified stroke attached to a contact"
+  serve:          "First stroke of a rally"
+  rally_start:    "Rally begins (serve contact)"
+  rally_end:      "Rally ends (shuttle down / fault)"
+  point:          "Point awarded; carries the match state after the rally"
+  game_end:       "Game won"
+  match_end:      "Match won"
+  interval:       "Mid-game or between-game interval"
+  side_switch:    "Players change ends"
+  camera_cut:     "Broadcast cut to another camera"
+  replay_start:   "Replay / slow motion begins (perception suppressed)"
+  replay_end:     "Replay ends"
+  highlight:      "Highlight candidate with category and score"
+  insight:        "Grounded natural-language insight from an agent"
+  degraded:       "Pipeline degradation (missing modality / model failure)"
+  calibration:    "Court calibration (homography) for a camera shot"
+
+# Canonical stroke types (12, aligned with BST's merged ShuttleSet classes) and families
+strokes:
+  short_serve:  {family: serve,   attacking: false, label: "Short serve"}
+  long_serve:   {family: serve,   attacking: false, label: "Long serve"}
+  smash:        {family: attack,  attacking: true,  label: "Smash"}
+  drop:         {family: attack,  attacking: true,  label: "Drop"}
+  clear:        {family: lift,    attacking: false, label: "Clear"}
+  lift:         {family: lift,    attacking: false, label: "Lift"}
+  drive:        {family: flat,    attacking: true,  label: "Drive"}
+  push:         {family: flat,    attacking: false, label: "Push"}
+  rush:         {family: net,     attacking: true,  label: "Net kill"}
+  net_shot:     {family: net,     attacking: false, label: "Net shot"}
+  cross_net:    {family: net,     attacking: false, label: "Cross-court net shot"}
+  block:        {family: defence, attacking: false, label: "Block / return net"}
+  unknown:      {family: unknown, attacking: false, label: "Unknown"}
+
+# Derived stroke subtypes (evidence fusion, not a classifier class)
+subtypes:
+  jump_smash:   {parent: smash, label: "Jump smash"}
+  wrist_smash:  {parent: smash, label: "Wrist smash"}
+
+# BST merged-ShuttleSet class names → canonical stroke (top/bottom prefix is stripped)
+bst_class_map:
+  "net shot": net_shot
+  "return net": block
+  "smash": smash
+  "wrist smash": smash
+  "lob": lift
+  "defensive return lob": lift
+  "clear": clear
+  "drive": drive
+  "driven flight": drive
+  "back-court drive": drive
+  "drop": drop
+  "passive drop": drop
+  "push": push
+  "rush": rush
+  "defensive return drive": drive
+  "cross-court net shot": cross_net
+  "short service": short_serve
+  "long service": long_serve
+  "unknown": unknown
+
+# FineBadminton "hit type" → canonical stroke (dataset evaluation mapping)
+finebadminton_map:
+  "serve": unknown            # resolved to short/long serve by subtype below
+  "high serve": long_serve
+  "short serve": short_serve
+  "long serve": long_serve
+  "flick serve": long_serve
+  "clear": clear
+  "lob": lift
+  "lift": lift
+  "smash": smash
+  "kill": smash
+  "jump smash": smash
+  "drop": drop
+  "drop shot": drop
+  "drive": drive
+  "push": push
+  "net shot": net_shot
+  "net kill": rush
+  "rush": rush
+  "cross-court net shot": cross_net
+  "block": block
+  "net lift": lift
+  "defensive": block
+
+# Legacy Stage-2 vocabulary → canonical (for importing old CSVs)
+legacy_map:
+  "smash": smash
+  "wrist smash": smash
+  "jump smash": smash
+  "net shot": net_shot
+  "net_shot": net_shot
+  "cross-court net shot": cross_net
+  "cross_court": cross_net
+  "return net": block
+  "push": push
+  "lob": lift
+  "lift": lift
+  "flick": long_serve
+  "drop": drop
+  "drive": drive
+  "back-court drive": drive
+  "defensive return drive": drive
+  "defensive return lob": lift
+  "defensive_return": block
+  "rush": rush
+  "clear": clear
+
+rally_outcomes:            # how a rally ended (from the rule engine)
+  out:          "Shuttle landed out"
+  net:          "Shuttle hit the net / failed to cross"
+  winner:       "Shuttle landed in (clean winner)"
+  fault:        "Service or other fault"
+  unknown:      "Unknown"
+
+highlight_categories:
+  longest_rally:   "Longest rally"
+  smash_winner:    "Smash winner"
+  jump_smash:      "Jump smash"
+  best_defence:    "Best defence"
+  net_battle:      "Net battle"
+  comeback:        "Comeback"
+  momentum_shift:  "Momentum shift"
+  deuce:           "Deuce"
+  game_point:      "Game point"
+  match_point:     "Match point"
+  clutch:          "Clutch point"
+
+court_zones:               # per half, from the hitter's perspective (3 depth × 3 width)
+  depth: [front, mid, rear]
+  width: [left, centre, right]

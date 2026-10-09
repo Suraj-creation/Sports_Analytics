@@ -1,0 +1,99 @@
+{
+    "name": "badminton",
+    "description": "Badminton match analysis configuration",
+    "required_columns": {
+        "start_time": "time",
+        "end_time": "time",
+        "win_point_player": "string",
+        "win_reason": "string",
+        "ball_types": "string",
+        "lose_reason": "string",
+        "roundscore_A": "integer",
+        "roundscore_B": "integer"
+    },
+    "terminology": {
+        "player1": "e.g., Viktor Axelsen",
+        "player2": "e.g., Kento Momota",
+        "question": "e.g., How was the player's smash technique in the second game?",
+        "point": "point",
+        "match": "match",
+        "player": "player",
+        "score": "score",
+        "highlight": "rally highlight",
+        "game_unit": "rally",
+        "scoring_unit": "point",
+        "period": "game",
+        "competition": "match"
+    },
+    "game_structure": {
+        "type": "rally",
+        "scoring": "rally_point",
+        "periods": "games",
+        "max_score": 21,
+        "win_condition": "best_of_three_games",
+        "deuce_rule": true
+    },
+    "analysis": {
+        "excitement_factors": [
+            "rally_duration",
+            "shot_variety",
+            "point_importance",
+            "game_phase",
+            "win_reason_quality"
+        ],
+        "key_metrics": [
+            "duration",
+            "shot_variety",
+            "score_importance",
+            "game_phase",
+            "excitement_score"
+        ],
+        "default_queries": [
+            "badminton match analysis",
+            "badminton rally highlights",
+            "badminton performance summary",
+            "badminton technique analysis"
+        ],
+        "exciting_shots": {
+            "smash": 1.0,
+            "jump smash": 1.5,
+            "around the head": 1.2,
+            "tumbling net shot": 1.3,
+            "dive": 1.4,
+            "cross-court net shot": 1.1,
+            "backhand smash": 1.2
+        },
+        "win_bonuses": {
+            "smash": 0.8,
+            "drop": 0.5,
+            "net shot": 0.6,
+            "clear": 0.3,
+            "drive": 0.4
+        },
+        "highlights_prompt": "Analyze this badminton rally and explain why it deserves to be a highlight in exactly 120 words or less.\nFocus on what made this rally exciting and spectacular for viewers.\n\nConsider these factors:\n- Shot variety and complexity (smashes, drops, net kills, deceptive shots)\n- Player movement and court coverage (diving saves, quick recoveries)\n- Rally length and intensity (long exchanges, high pace)\n- Technical brilliance (perfect placement, power, timing)\n- Dramatic moments (comeback shots, impossible saves)\n- Entertainment value for spectators\n\nRally Data:\n{rally_data}\n\nReturn a JSON with:\n- score: number from 0-10 (excitement level)\n- reasoning: explain in 60 words why this rally is highlight-worthy, focusing on the spectacular moments, technical skills, and entertainment value that make viewers excited\n- highlight_worthy: boolean",
+        "summarization_prompt": "You are an expert badminton analyst creating a concise yet comprehensive match summary.\n\nMATCH DATA:\n{semantics_analysis}\n\nCONTEXT:\n{retrieved_context}\n\nGenerate a single, well-structured paragraph (approximately 350-400 words) that captures the essence of the badminton match. Focus on:\n- Key moments and turning points in the match\n- Player performances and standout shots (smashes, drops, net plays, etc.)\n- Tactical approaches and their effectiveness\n- The overall flow and outcome of the match\n\nWrite in a clear, engaging narrative style suitable for badminton enthusiasts. Highlight the most exciting rallies, player strategies, and how the match unfolded. Avoid bullet points and section headers - just one cohesive paragraph that tells the story of the match.\n\nFormat your response as a JSON object with a single field called summary",  
+        "qa_prompt": "You are an expert badminton analyst answering questions about a badminton match with deep technical knowledge and analytical insights.\n\nUsing the provided match data, performance analysis, and historical context, answer the user's question with:\n\n1. **Technical Accuracy**: Provide precise, technically correct information about badminton techniques, tactics, and rules\n2. **Data-Driven Insights**: Reference specific rallies, shot types, and performance metrics from the match data\n3. **Strategic Analysis**: Explain the tactical significance and decision-making behind specific plays\n4. **Player Context**: Consider individual player styles, strengths, and historical performance\n5. **Educational Value**: Help users understand badminton concepts, techniques, and strategies\n\nAvailable Match Data:\n- Rally details with timestamps, shot types, and outcomes\n- Player performance statistics and key metrics\n- Technical analysis of shots, footwork, and court coverage\n- Historical context and player background information\n\nQuestion:\n{question}\n\nMatch Data:\n{enhanced_semantics}\n\nHistorical Context:\n{retrieved_context}\n\nPlayer Names:\n{player_names}\n\nProvide a comprehensive, technically accurate answer that combines match-specific insights with general badminton knowledge."
+    },
+    "ui_elements": {
+        "color_scheme": "blue",
+        "icons": {
+            "main": "badminton",
+            "highlight": "target",
+            "summary": "chart",
+            "question": "question"
+        },
+        "placeholders": {
+            "player1": "e.g., Viktor Axelsen",
+            "player2": "e.g., Kento Momota",
+            "question": "e.g., How was the player technique in the first game?"
+        }
+    },
+    "validation_rules": {
+        "min_rally_duration": 1,
+        "max_rally_duration": 300,
+        "required_score_range": [0, 30],
+        "valid_shot_types": [
+            "clear", "smash", "drop", "drive", "net", "lob", "slice", "winner"
+        ]
+    }
+}

@@ -1,0 +1,44 @@
+# Development laptop (no CUDA). Sub-real-time by design: playback is gated by the lead buffer.
+description: CPU development profile — ONNX Runtime, reduced rates, no racket model
+device: cpu
+analysis_height: 720
+chunk_frames: 64
+lead_buffer_s: 8.0
+
+shuttle:
+  model: tracknetv3
+  backend: torch-cpu
+  precision: fp32
+  batch: 1
+  input_size: [512, 288]
+  params: {seq_len: 8, bg_mode: concat, threshold: 0.5, step: 8}
+player_detector:
+  model: rfdetr_nano
+  backend: onnx-cpu
+  precision: fp32
+  input_size: [384, 384]
+  params: {score_threshold: 0.35, court_roi: true}
+pose:
+  model: rtmpose_m_body7
+  backend: onnx-cpu
+  precision: fp32
+  batch: 2
+  input_size: [192, 256]
+stroke:
+  model: bst_cg_ap_shuttleset
+  backend: torch-cpu
+  params: {window: fixed}
+contact:
+  model: contact_fusion_v0
+  backend: none
+ocr:
+  model: rapidocr_v4
+  backend: onnx-cpu
+
+detector_rates: {in_play: 3, idle: 15, replay: 0}
+pose_rates:     {in_play: 3, idle: 15, replay: 0}
+shuttle_rates:  {in_play: 1, idle: 1, replay: 0}
+ocr_every_s: 2.0
+court_verify_every_s: 5.0
+escalation_budget: 0.0
+racket_window: 0

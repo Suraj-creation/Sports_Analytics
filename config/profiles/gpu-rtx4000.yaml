@@ -1,0 +1,58 @@
+# Primary target: Ubuntu + NVIDIA RTX 4000 Ada (20 GB). Report Option B (multi-rate, cascaded,
+# event-triggered). All model choices are re-validated by the Phase-1 benchmark (docs/benchmarks).
+description: RTX 4000 Ada — TensorRT FP16, multi-rate, event-triggered specialists
+device: cuda
+analysis_height: 720
+chunk_frames: 64          # multiple of the TrackNet window (8)
+lead_buffer_s: 5.0
+
+shuttle:                  # VOD: TrackNetV3, non-overlapping 8-frame windows, per-shot median bg
+  model: tracknetv3
+  backend: tensorrt
+  precision: fp16
+  batch: 4                # windows per forward
+  input_size: [512, 288]
+  params: {seq_len: 8, bg_mode: concat, threshold: 0.5, step: 8}
+shuttle_live:             # causal model for live sources (E3 decides; balltrack is the default)
+  model: racketvision_balltrack
+  backend: tensorrt
+  precision: fp16
+shuttle_second_opinion:   # disagreement oracle on low-confidence windows
+  model: wasb_badminton
+  backend: tensorrt
+  precision: fp16
+player_detector:
+  model: rfdetr_small
+  backend: tensorrt
+  precision: fp16
+  input_size: [640, 640]
+  params: {score_threshold: 0.35, court_roi: true}
+pose:
+  model: rtmpose_m_body7
+  backend: tensorrt
+  precision: fp16
+  batch: 2
+  input_size: [192, 256]
+racket:
+  model: racketvision_racketpose
+  backend: tensorrt
+  precision: fp16
+stroke:
+  model: bst_cg_ap_shuttleset
+  backend: torch-cuda
+  precision: fp32
+  params: {window: fixed}  # "adaptive" for the VOD refinement pass
+contact:
+  model: contact_fusion_v0  # deterministic until T1 contact model is trained
+  backend: none
+ocr:
+  model: rapidocr_v4
+  backend: onnx-cuda
+
+detector_rates: {in_play: 2, idle: 6, replay: 0}
+pose_rates:     {in_play: 1, idle: 6, replay: 0}
+shuttle_rates:  {in_play: 1, idle: 1, replay: 0}
+ocr_every_s: 1.0
+court_verify_every_s: 2.0
+escalation_budget: 0.15
+racket_window: 6

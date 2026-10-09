@@ -1,0 +1,43 @@
+start_time,end_time,win_point_player,win_reason,ball_types,lose_reason,roundscore_A,roundscore_B
+07:00,07:22,Ratchanok Intanon,opponent goes out of bounds,lob,goes out of bounds,0,1
+07:32,07:49,An Se Young,opponent hits the net,push,hits the net,1,1
+08:04,08:22,Ratchanok Intanon,wins by landing,smash,opponent wins by landing,1,2
+08:24,08:29,Ratchanok Intanon,opponent hits the net,smash,hits the net,1,3
+08:43,08:55,Ratchanok Intanon,wins by landing,push,opponent wins by landing,1,4
+09:08,09:22,Ratchanok Intanon,opponent goes out of bounds,lob,goes out of bounds,1,5
+09:32,10:07,Ratchanok Intanon,wins by landing,smash,opponent wins by landing,1,6
+10:09,10:20,An Se Young,opponent hits the net,net shot,hits the net,2,6
+10:30,10:48,Ratchanok Intanon,opponent hits the net,net shot,hits the net,2,7
+10:50,11:28,Ratchanok Intanon,opponent goes out of bounds,push,goes out of bounds,2,8
+11:45,11:52,An Se Young,opponent hits the net,return net,hits the net,3,8
+12:12,12:46,An Se Young,opponent fails to clear the net,net shot,fails to clear the net,4,8
+12:51,13:25,An Se Young,opponent hits the net,net shot,hits the net,5,8
+13:29,13:34,An Se Young,wins by landing,back-court drive,opponent wins by landing,6,8
+13:46,14:08,Ratchanok Intanon,wins by landing,smash,opponent wins by landing,7,8
+14:08,14:49,Ratchanok Intanon,opponent goes out of bounds,lob,goes out of bounds,7,9
+14:48,15:00,Ratchanok Intanon,opponent hits the net,net shot,hits the net,7,10
+15:07,15:55,Ratchanok Intanon,opponent fails to clear the net,return net,fails to clear the net,7,11
+16:40,17:25,An Se Young,wins by landing,smash,opponent wins by landing,8,11
+17:25,17:36,An Se Young,opponent goes out of bounds,push,goes out of bounds,9,11
+17:40,18:12,Ratchanok Intanon,wins by landing,cross-court net shot,opponent wins by landing,9,12
+18:15,18:20,An Se Young,opponent goes out of bounds,push,goes out of bounds,10,12
+18:34,18:50,An Se Young,opponent hits the net,drop,hits the net,11,12
+19:05,19:33,An Se Young,opponent goes out of bounds,smash,goes out of bounds,12,12
+20:47,21:03,An Se Young,opponent goes out of bounds,cross-court net shot,goes out of bounds,13,12
+21:18,21:30,An Se Young,opponent hits the net,cross-court net shot,hits the net,14,12
+21:54,22:18,An Se Young,opponent goes out of bounds,defensive return lob,goes out of bounds,15,12
+22:21,22:26,Ratchanok Intanon,opponent hits the net,net shot,hits the net,15,13
+22:45,23:13,An Se Young,wins by landing,drop,opponent wins by landing,16,13
+23:14,23:52,Ratchanok Intanon,opponent hits the net,return net,hits the net,16,14
+23:54,24:25:00,Ratchanok Intanon,wins by landing,cross-court net shot,opponent wins by landing,16,15
+24:38:00,25:06:00,An Se Young,opponent hits the net,rush,hits the net,17,15
+25:06:00,25:38:00,Ratchanok Intanon,opponent goes out of bounds,defensive return drive,goes out of bounds,17,16
+25:43:00,26:14:00,An Se Young,wins by landing,smash,opponent wins by landing,18,16
+26:14:00,26:40:00,Ratchanok Intanon,wins by landing,lob,opponent wins by landing,18,17
+26:45:00,26:58:00,An Se Young,wins by landing,push,opponent wins by landing,19,17
+27:32:00,28:00:00,Ratchanok Intanon,wins by landing,cross-court net shot,opponent wins by landing,19,18
+28:00:00,28:15:00,An Se Young,wins by landing,push,opponent wins by landing,20,18
+28:35:00,28:45:00,Ratchanok Intanon,opponent goes out of bounds,push,goes out of bounds,20,19
+28:58:00,29:25:00,Ratchanok Intanon,opponent fails to clear the net,return net,fails to clear the net,20,20
+29:32:00,30:15:00,An Se Young,opponent hits the net,net shot,hits the net,21,20
+30:15:00,31:22:00,An Se Young,opponent fails to clear the net,net shot,fails to clear the net,22,20

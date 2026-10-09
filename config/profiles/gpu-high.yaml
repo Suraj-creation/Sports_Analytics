@@ -1,0 +1,56 @@
+# Future: high-end GPU (e.g. RTX 4090 / L40S). Quality-first choices, every-frame detection.
+description: High-end GPU — quality models, adaptive BST window, continuous refinement budget
+device: cuda
+analysis_height: 720
+chunk_frames: 64
+lead_buffer_s: 5.0
+
+shuttle:
+  model: tracknetv3
+  backend: tensorrt
+  precision: fp16
+  batch: 8
+  input_size: [512, 288]
+  params: {seq_len: 8, bg_mode: concat, threshold: 0.5, step: 4, inpaint: true}
+shuttle_live:
+  model: racketvision_balltrack
+  backend: tensorrt
+  precision: fp16
+shuttle_second_opinion:
+  model: wasb_badminton
+  backend: tensorrt
+  precision: fp16
+player_detector:
+  model: rfdetr_medium
+  backend: tensorrt
+  precision: fp16
+  input_size: [640, 640]
+  params: {score_threshold: 0.3, court_roi: true}
+pose:
+  model: rtmpose_x_halpe26
+  backend: tensorrt
+  precision: fp16
+  batch: 2
+  input_size: [288, 384]
+racket:
+  model: racketvision_racketpose
+  backend: tensorrt
+  precision: fp16
+stroke:
+  model: bst_cg_ap_shuttleset
+  backend: torch-cuda
+  params: {window: adaptive}
+contact:
+  model: contact_fusion_v0
+  backend: none
+ocr:
+  model: rapidocr_v4
+  backend: onnx-cuda
+
+detector_rates: {in_play: 1, idle: 3, replay: 0}
+pose_rates:     {in_play: 1, idle: 3, replay: 0}
+shuttle_rates:  {in_play: 1, idle: 1, replay: 0}
+ocr_every_s: 1.0
+court_verify_every_s: 1.0
+escalation_budget: 0.3
+racket_window: 8

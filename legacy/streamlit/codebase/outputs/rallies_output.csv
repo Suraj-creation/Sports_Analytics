@@ -1,0 +1,9 @@
+video_id,rally_id,start_time,end_time,duration
+Sample,1,00:00,00:05,4.6
+Sample,2,00:05,00:44,39.3
+Sample,3,00:44,00:47,2.6
+Sample,4,00:47,00:50,3.3
+Sample,5,00:50,01:02,12.2
+Sample,6,01:06,01:08,2.1
+Sample,7,01:08,01:11,3.4
+Sample,8,01:11,01:16,4.8

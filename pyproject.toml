@@ -1,0 +1,97 @@
+[project]
+name = "badminton-ai"
+version = "0.1.0"
+description = "Real-time, video-native badminton intelligence platform"
+requires-python = ">=3.12,<3.13"
+readme = "README.md"
+license = { text = "MIT" }
+dependencies = [
+    "bai-engine",
+    "bai-badminton",
+    "bai-agents",
+    "bai-api",
+]
+
+[project.optional-dependencies]
+# CPU inference stack (development laptop, CI smoke tests)
+cpu = ["bai-engine[cpu]", "bai-badminton[perception]"]
+# NVIDIA GPU inference stack (Ubuntu + RTX 4000 Ada). TensorRT is installed in the engine image.
+gpu = ["bai-engine[gpu]", "bai-badminton[perception]"]
+
+[tool.uv.workspace]
+members = ["engine", "sports/badminton", "agents", "apps/api", "research"]
+
+[tool.uv.sources]
+bai-engine = { workspace = true }
+bai-badminton = { workspace = true }
+bai-agents = { workspace = true }
+bai-api = { workspace = true }
+bai-research = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0",
+    "hypothesis>=6.120",
+    "httpx>=0.28",
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "pre-commit>=4.0",
+]
+
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+bypass-selection = true
+
+# ---------------------------------------------------------------- tooling
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = ["legacy", "third_party", "apps/web"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "N", "S", "PTH", "TID"]
+ignore = [
+    "S101",   # assert is fine in tests and invariants
+    "RUF001", "RUF002", "RUF003",  # unicode in docstrings (× · –)
+    "N812",   # lowercase imported as non-lowercase
+    "RUF046", # int(round(x)) kept for readability
+    "SIM108", # explicit if/else preferred in geometry code
+]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S", "PTH", "N802", "N806", "RUF005", "RUF007", "RUF059"]
+"research/**" = ["S603", "S607"]
+"**/court.py" = ["N802", "N806"]  # H / H_inv: homography notation
+"**/perception/tracknet.py" = ["N806"]  # L = seq_len (paper notation)
+"**/runtime/runner.py" = ["N806"]  # F = frames per segment
+"agents/src/bai_agents/tools.py" = ["E501"]  # tool descriptions
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"legacy".msg = "The new platform must not import legacy code."
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+ignore_missing_imports = true
+exclude = ["legacy/", "third_party/", "apps/web/", "research/"]
+
+[tool.pytest.ini_options]
+testpaths = ["engine/tests", "sports/badminton/tests", "agents/tests", "apps/api/tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "-ra --strict-markers"
+markers = [
+    "gpu: requires an NVIDIA GPU (run with `make gpu-test`)",
+    "slow: slow tests (model downloads, real video decode)",
+    "network: requires network access",
+]
+filterwarnings = ["ignore::DeprecationWarning:pkg_resources.*"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["bai_engine", "bai_badminton", "bai_agents", "bai_api", "bai_research"]
