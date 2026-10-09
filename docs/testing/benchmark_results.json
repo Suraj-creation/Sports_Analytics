@@ -1,0 +1,100 @@
+{
+  "hardware": {
+    "gpu": "NVIDIA GeForce RTX 4080 SUPER",
+    "cuda_version": "13.0",
+    "torch_version": "2.14.1+cu130",
+    "total_vram_mb": 15937.19
+  },
+  "profile": "gpu-rtx4000",
+  "device": "cuda",
+  "timestamp": "2026-10-09T11:03:09Z",
+  "decode": {
+    "total_frames": 500,
+    "n_segments": 10,
+    "total_time_s": 2.2702,
+    "throughput_fps": 220.24,
+    "latency_per_segment_ms": {
+      "mean": 227.02,
+      "p50": 228.88,
+      "p95": 295.97,
+      "p99": 296.27
+    },
+    "latency_per_frame_ms": 4.54
+  },
+  "shuttle_tracknetv3": {
+    "model": "tracknetv3",
+    "backend": "torch-cuda",
+    "precision": "fp16",
+    "batch": 4,
+    "load_time_s": 0.096,
+    "vram_load_mb": 22.54,
+    "vram_peak_mb": 22.54,
+    "throughput_fps": 351.97,
+    "latency_per_8frame_window_ms": {
+      "mean": 22.73,
+      "p50": 22.61,
+      "p95": 24.32,
+      "p99": 24.89
+    },
+    "effective_per_frame_ms": 2.841
+  },
+  "player_detector_rfdetr": {
+    "model": "rfdetr_small",
+    "backend": "onnx-cuda",
+    "input_size": [
+      512,
+      512
+    ],
+    "load_time_s": 0.322,
+    "throughput_fps": 122.39,
+    "latency_per_frame_ms": {
+      "mean": 8.17,
+      "p50": 8.09,
+      "p95": 9.43,
+      "p99": 9.56
+    }
+  },
+  "pose_rtmpose": {
+    "model": "rtmpose_m_body7",
+    "backend": "onnx-cuda",
+    "batch_players": 2,
+    "load_time_s": 0.106,
+    "throughput_fps": 254.96,
+    "latency_per_frame_2players_ms": {
+      "mean": 3.92,
+      "p50": 3.88,
+      "p95": 4.59,
+      "p99": 5.07
+    }
+  },
+  "pipeline_in_play": {
+    "chunk_frames": 50,
+    "in_play": true,
+    "init_time_s": 0.904,
+    "throughput_fps": 59.63,
+    "effective_ratio_to_realtime_25fps": 2.39,
+    "effective_ratio_to_realtime_30fps": 1.99,
+    "latency_per_chunk_ms": {
+      "mean": 838.47,
+      "p50": 792.71,
+      "p95": 979.97,
+      "p99": 991.65
+    },
+    "per_frame_ms": 16.77
+  },
+  "pipeline_idle": {
+    "chunk_frames": 50,
+    "in_play": false,
+    "init_time_s": 0.561,
+    "throughput_fps": 139.59,
+    "effective_ratio_to_realtime_25fps": 5.58,
+    "effective_ratio_to_realtime_30fps": 4.65,
+    "latency_per_chunk_ms": {
+      "mean": 358.2,
+      "p50": 348.62,
+      "p95": 388.76,
+      "p99": 389.6
+    },
+    "per_frame_ms": 7.16
+  }
+}

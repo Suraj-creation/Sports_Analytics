@@ -148,16 +148,19 @@ class SessionRunner(threading.Thread):
     # ================================================================== ingest
     def _ensure_media(self) -> None:
         s = self.session
-        mp = self.repo.media_paths(s.source.sha256 or "")
-        if s.media is not None and hls_status(mp).ended:
-            self.plan = ProxyPlan(
-                fps=s.media.fps,
-                height=s.media.height,
-                frames_per_segment=int(s.meta["frames_per_segment"]),
-                encoder="existing",
-                audio=s.media.has_audio,
-            )
-            return
+        # Only attempt the fast-exit path when we already have a valid SHA-256
+        # (YouTube sessions start with sha256=None until the video is downloaded).
+        if s.source.sha256 and len(s.source.sha256) == 64:
+            mp = self.repo.media_paths(s.source.sha256)
+            if s.media is not None and hls_status(mp).ended:
+                self.plan = ProxyPlan(
+                    fps=s.media.fps,
+                    height=s.media.height,
+                    frames_per_segment=int(s.meta["frames_per_segment"]),
+                    encoder="existing",
+                    audio=s.media.has_audio,
+                )
+                return
         self._status(SessionStatus.INGESTING, "Preparing video")
         src = Path(s.source.uri)
         if s.source.kind is SourceKind.YOUTUBE and not src.exists():
@@ -181,6 +184,9 @@ class SessionRunner(threading.Thread):
             s = self.session
             src = stored.path
             mp = self.repo.media_paths(stored.sha256)
+        else:
+            # Uploaded file — sha256 was set at upload time, always valid here
+            mp = self.repo.media_paths(s.source.sha256)
         pr = probe(src, self.tools, self.settings.ffprobe_timeout_s)
         validate(pr, self.settings.max_duration_s)
         plan = plan_proxy(pr, self.tools, max_height=self.settings.proxy_height, prefer_gpu=True)

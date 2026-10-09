@@ -56,10 +56,12 @@ def create_app(settings: Settings | None = None, bus: Bus | None = None, start_e
     app = FastAPI(
         title="Badminton AI", version="0.1.0", lifespan=lifespan, docs_url="/api/docs", openapi_url="/api/openapi.json"
     )
+    _cors_origins = settings.cors_origins
+    _allow_all = "*" in _cors_origins
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origins,
-        allow_credentials=True,
+        allow_origins=["*"] if _allow_all else _cors_origins,
+        allow_credentials=not _allow_all,  # credentials not allowed with wildcard
         allow_methods=["*"],
         allow_headers=["*"],
     )

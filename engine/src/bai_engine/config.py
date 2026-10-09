@@ -51,6 +51,10 @@ class Settings(BaseSettings):
     # LLM
     llm_provider: str = "azure_openai"
     llm_budget_tokens_per_session: int = 400_000
+    # Local / Ollama / LM Studio endpoint (used when llm_provider == "local")
+    local_llm_url: str = "http://127.0.0.1:1234/v1"
+    local_llm_model: str = "local-model"
+    local_llm_key: str = "local"
 
     @property
     def is_loopback(self) -> bool:

@@ -52,3 +52,4 @@ mlruns/
 .superpowers/
 .DS_Store
 *.log
+env

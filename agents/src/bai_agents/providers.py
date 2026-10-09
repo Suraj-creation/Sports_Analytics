@@ -266,13 +266,27 @@ class OpenAICompatProvider:
 
 
 def make_provider(name: str | None = None) -> LLMProvider:
-    """Build the configured provider from environment variables."""
-    name = (name or os.getenv("BAI_LLM_PROVIDER") or os.getenv("LLM_PROVIDER") or "azure_openai").lower()
-    if name in ("anthropic", "claude"):
+    """Build the configured provider from environment variables / .env (via pydantic-settings)."""
+    try:
+        from bai_engine.config import get_settings
+
+        cfg = get_settings()
+        _name = (name or cfg.llm_provider or "azure_openai").lower()
+        _local_url = cfg.local_llm_url
+        _local_model = cfg.local_llm_model
+        _local_key = cfg.local_llm_key
+    except Exception:
+        # Fallback to raw env vars (e.g. when called outside the server process)
+        _name = (name or os.getenv("BAI_LLM_PROVIDER") or os.getenv("LLM_PROVIDER") or "azure_openai").lower()
+        _local_url = os.getenv("BAI_LOCAL_LLM_URL") or os.getenv("LM_STUDIO_BASE_URL") or "http://127.0.0.1:1234/v1"
+        _local_model = os.getenv("BAI_LOCAL_LLM_MODEL") or os.getenv("LM_STUDIO_MODEL") or "local-model"
+        _local_key = os.getenv("BAI_LOCAL_LLM_KEY", "local")
+
+    if _name in ("anthropic", "claude"):
         return AnthropicProvider(effort=os.getenv("ANTHROPIC_EFFORT", "medium"))
     import openai
 
-    if name in ("azure", "azure_openai"):
+    if _name in ("azure", "azure_openai"):
         endpoint, key = os.getenv("AZURE_OPENAI_ENDPOINT"), os.getenv("AZURE_OPENAI_API_KEY")
         if not endpoint or not key:
             raise LLMError("Azure OpenAI is selected but AZURE_OPENAI_ENDPOINT / AZURE_OPENAI_API_KEY are not set")
@@ -282,13 +296,12 @@ def make_provider(name: str | None = None) -> LLMProvider:
             api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2025-04-01-preview"),
         )
         return OpenAICompatProvider(client, os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4.1-mini"), "azure_openai")
-    if name in ("openai", "chatgpt"):
+    if _name in ("openai", "chatgpt"):
         if not os.getenv("OPENAI_API_KEY"):
             raise LLMError("OpenAI is selected but OPENAI_API_KEY is not set")
         return OpenAICompatProvider(openai.OpenAI(), os.getenv("OPENAI_MODEL", "gpt-4o-mini"), "openai")
-    if name in ("local", "lm_studio", "ollama", "vllm"):
-        base = os.getenv("BAI_LOCAL_LLM_URL") or os.getenv("LM_STUDIO_BASE_URL") or "http://127.0.0.1:1234/v1"
-        model = os.getenv("BAI_LOCAL_LLM_MODEL") or os.getenv("LM_STUDIO_MODEL") or "local-model"
-        client = openai.OpenAI(base_url=base, api_key=os.getenv("BAI_LOCAL_LLM_KEY", "local"))
-        return OpenAICompatProvider(client, model, "local")
-    raise LLMError(f"unknown LLM provider {name!r} (anthropic | openai | azure_openai | local)")
+    if _name in ("local", "lm_studio", "ollama", "vllm"):
+        client = openai.OpenAI(base_url=_local_url, api_key=_local_key)
+        return OpenAICompatProvider(client, _local_model, "local")
+    raise LLMError(f"unknown LLM provider {_name!r} (anthropic | openai | azure_openai | local)")
+
