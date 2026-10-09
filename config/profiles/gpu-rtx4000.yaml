@@ -8,34 +8,34 @@ lead_buffer_s: 5.0
 
 shuttle:                  # VOD: TrackNetV3, non-overlapping 8-frame windows, per-shot median bg
   model: tracknetv3
-  backend: tensorrt
+  backend: torch-cuda
   precision: fp16
   batch: 4                # windows per forward
   input_size: [512, 288]
   params: {seq_len: 8, bg_mode: concat, threshold: 0.5, step: 8}
 shuttle_live:             # causal model for live sources (E3 decides; balltrack is the default)
   model: racketvision_balltrack
-  backend: tensorrt
+  backend: torch-cuda
   precision: fp16
 shuttle_second_opinion:   # disagreement oracle on low-confidence windows
   model: wasb_badminton
-  backend: tensorrt
+  backend: torch-cuda
   precision: fp16
 player_detector:
   model: rfdetr_small
-  backend: tensorrt
+  backend: onnx-cuda
   precision: fp16
-  input_size: [640, 640]
+  input_size: [512, 512]
   params: {score_threshold: 0.35, court_roi: true}
 pose:
   model: rtmpose_m_body7
-  backend: tensorrt
+  backend: onnx-cuda
   precision: fp16
   batch: 2
   input_size: [192, 256]
 racket:
   model: racketvision_racketpose
-  backend: tensorrt
+  backend: onnx-cuda
   precision: fp16
 stroke:
   model: bst_cg_ap_shuttleset
