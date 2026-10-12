@@ -271,16 +271,19 @@ def make_provider(name: str | None = None) -> LLMProvider:
         from bai_engine.config import get_settings
 
         cfg = get_settings()
-        _name = (name or cfg.llm_provider or "azure_openai").lower()
-        _local_url = cfg.local_llm_url
-        _local_model = cfg.local_llm_model
-        _local_key = cfg.local_llm_key
     except Exception:
-        # Fallback to raw env vars (e.g. when called outside the server process)
-        _name = (name or os.getenv("BAI_LLM_PROVIDER") or os.getenv("LLM_PROVIDER") or "azure_openai").lower()
-        _local_url = os.getenv("BAI_LOCAL_LLM_URL") or os.getenv("LM_STUDIO_BASE_URL") or "http://127.0.0.1:1234/v1"
-        _local_model = os.getenv("BAI_LOCAL_LLM_MODEL") or os.getenv("LM_STUDIO_MODEL") or "local-model"
-        _local_key = os.getenv("BAI_LOCAL_LLM_KEY", "local")
+        cfg = None  # outside the server process: raw env vars only
+
+    def pick(field: str, *envs: str, default: str) -> str:
+        # Explicit BAI_* settings (env or .env) win; otherwise honour the legacy unprefixed env vars.
+        if cfg is not None and field in cfg.model_fields_set:
+            return getattr(cfg, field)
+        return next((v for e in envs if (v := os.getenv(e))), default)
+
+    _name = (name or pick("llm_provider", "BAI_LLM_PROVIDER", "LLM_PROVIDER", default="azure_openai")).lower()
+    _local_url = pick("local_llm_url", "BAI_LOCAL_LLM_URL", "LM_STUDIO_BASE_URL", default="http://127.0.0.1:1234/v1")
+    _local_model = pick("local_llm_model", "BAI_LOCAL_LLM_MODEL", "LM_STUDIO_MODEL", default="local-model")
+    _local_key = pick("local_llm_key", "BAI_LOCAL_LLM_KEY", default="local")
 
     if _name in ("anthropic", "claude"):
         return AnthropicProvider(effort=os.getenv("ANTHROPIC_EFFORT", "medium"))
