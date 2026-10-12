@@ -159,6 +159,17 @@ class BadmintonSession:
                 command["rally_event_id"], command["winner"], Provenance(model="human", worker="review-ui")
             )
             return {"ok": True, "events": len(evs), "state": self.engine.public_state()}
+        if cmd == "set_rally_official":
+            evs = self.engine.set_rally_official(
+                command["rally_event_id"], bool(command["official"]), Provenance(model="human", worker="review-ui")
+            )
+            return {"ok": True, "events": len(evs), "state": self.engine.public_state()}
+        if cmd == "set_match_start":
+            frame = command.get("frame")
+            evs = self.engine.set_match_start(
+                None if frame is None else int(frame), Provenance(model="human", worker="review-ui")
+            )
+            return {"ok": True, "events": len(evs), "state": self.engine.public_state()}
         if cmd == "verify_event":
             ev = self.store.get(command["event_id"])
             if ev is None:

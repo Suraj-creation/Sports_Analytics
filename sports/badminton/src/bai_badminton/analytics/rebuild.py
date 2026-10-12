@@ -45,7 +45,7 @@ def rally_records(store: EventStore) -> list[RallyRecord]:
         out.append(
             RallyRecord(
                 rally_id=r.event_id,
-                rally_no=int(pay.get("rally_no", len(out) + 1)),
+                rally_no=int(pay.get("rally_no") or 0),
                 start=r.frame_start,
                 end=r.frame_end,
                 winner=pay.get("winner"),
@@ -56,6 +56,7 @@ def rally_records(store: EventStore) -> list[RallyRecord]:
                 game_no=game_no,
                 flags_before=flags,
                 duration_s=float(pay.get("duration_s", 0.0)),
+                official=bool(pay.get("official", True)),
             )
         )
     return out
@@ -63,10 +64,13 @@ def rally_records(store: EventStore) -> list[RallyRecord]:
 
 def build(store: EventStore, tracks: TrackStore | None, fps: float) -> MatchAnalytics:
     a = MatchAnalytics(fps)
+    records = rally_records(store)
+    unofficial = {s.get("event_id") for r in records if not r.official for s in r.shots}
     for ev in store.query(types=["stroke"]):
-        a.on_stroke(ev)
-    for rec in rally_records(store):
-        if tracks is not None:
+        if ev.event_id not in unofficial:
+            a.on_stroke(ev)
+    for rec in records:
+        if tracks is not None and rec.official:
             t = tracks.read([TrackObject.PLAYER], rec.start, rec.end)
             if t.num_rows:
                 pid = np.asarray(t["player_id"].to_pylist(), dtype=object)

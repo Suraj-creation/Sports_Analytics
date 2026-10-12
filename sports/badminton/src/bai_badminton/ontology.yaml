@@ -25,6 +25,7 @@ event_types:
   insight:        "Grounded natural-language insight from an agent"
   degraded:       "Pipeline degradation (missing modality / model failure)"
   calibration:    "Court calibration (homography) for a camera shot"
+  match_phase:    "Match phase change (warm-up / match play / completed) or a reviewer match-start marker"
 
 # Canonical stroke types (12, aligned with BST's merged ShuttleSet classes) and families
 strokes:

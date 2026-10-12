@@ -61,6 +61,29 @@ class ScoreReconciler:
             prev = val
         return None
 
+    def stable_before(self, frame: int, since: int) -> tuple[int, int] | None:
+        """Last value read identically twice in a row within ``[since, frame)``."""
+        prev: tuple[int, int] | None = None
+        last: tuple[int, int] | None = None
+        for r in self.readings:
+            if r.frame_idx < since or r.frame_idx >= frame:
+                continue
+            val = (r.rows[0][1], r.rows[1][1])
+            if val == prev:
+                last = val
+            prev = val
+        return last
+
+    def board_change(self, start: int, end: int, until: int, lookback: int) -> str | None:
+        """Did the scoreboard change across a rally? ``"changed"`` / ``"unchanged"`` / ``None``
+        (no stable reading on one side). Independent of the row→player mapping, so it works from
+        the first rally — a rally the board did not count was warm-up, a let or a replay."""
+        a = self.stable_before(start, start - lookback)
+        b = self.stable_after(end, until)
+        if a is None or b is None:
+            return None
+        return "unchanged" if a == b else "changed"
+
     def winner_from_ocr(
         self, before: dict[str, int], end_frame: int, until: int, geometry_winner: str | None
     ) -> tuple[str | None, str]:

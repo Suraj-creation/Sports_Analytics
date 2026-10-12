@@ -307,4 +307,3 @@ def make_provider(name: str | None = None) -> LLMProvider:
         client = openai.OpenAI(base_url=_local_url, api_key=_local_key)
         return OpenAICompatProvider(client, _local_model, "local")
     raise LLMError(f"unknown LLM provider {_name!r} (anthropic | openai | azure_openai | local)")
-

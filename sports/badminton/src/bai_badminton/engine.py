@@ -28,6 +28,14 @@ import numpy as np
 from bai_badminton.analytics.match import MatchAnalytics, RallyRecord
 from bai_badminton.court import Homography
 from bai_badminton.events.contact import CONTACT_MODEL, ContactCandidate, detect_contacts
+from bai_badminton.events.match_phase import (
+    MatchPhaseTracker,
+    Phase,
+    PhaseDecision,
+    PhaseParams,
+    RallyEvidence,
+    serve_formation,
+)
 from bai_badminton.events.rally_fsm import RallyFSM, RallyParams, RallySegment
 from bai_badminton.events.rally_outcome import CourtImageGeometry, Outcome, analyze_rally_end, outcome_confidence
 from bai_badminton.events.stroke import (
@@ -43,7 +51,16 @@ from bai_badminton.ontology import get_ontology
 from bai_badminton.perception.keypoints import KP
 from bai_badminton.perception.shuttle_post import Track, process
 from bai_badminton.perception_types import ChunkPerception, FramePerception, ScoreReading
-from bai_badminton.rules import MatchConfig, MatchState, RallyResult, Transition, apply_rally, initial_state, other
+from bai_badminton.rules import (
+    PLAYERS,
+    MatchConfig,
+    MatchState,
+    RallyResult,
+    Transition,
+    apply_rally,
+    initial_state,
+    other,
+)
 from bai_badminton.score_ocr import ScoreReconciler
 from bai_engine.schema import (
     Actors,
@@ -75,6 +92,7 @@ class EngineConfig:
     highlight_min_score: float = 4.0
     checkpoint_every_s: float = 10.0
     match: MatchConfig = field(default_factory=MatchConfig)
+    phase: PhaseParams = field(default_factory=PhaseParams)
     profile: str = "unknown"
 
 
@@ -108,6 +126,10 @@ class _RallyEvents:
     record: RallyRecord
     geometry_winner: str | None
     outcome: str
+    evidence: RallyEvidence = field(default_factory=RallyEvidence)
+    observed_winner: str | None = None  # winner seen by OCR/geometry, whether or not the rally counted
+    override: bool | None = None  # human official / not-official mark
+    presence: dict[str, list[tuple[float, float]]] = field(default_factory=dict)
 
 
 class BadmintonMatchEngine:
@@ -132,7 +154,10 @@ class BadmintonMatchEngine:
         self.analytics = MatchAnalytics(cfg.fps)
         self.ocr = ScoreReconciler(player_names=player_names or {})
         self.state: MatchState = initial_state(cfg.match)
+        self._base_state: MatchState = self.state  # score the first official rally is played from
         self.match_cfg = cfg.match
+        self.phase = MatchPhaseTracker(cfg.phase)
+        self._last_rally_end: int | None = None
         self.calibration: dict[int, _Calib] = {}
         self._main_calib: _Calib | None = None
         self._track_out: list[TrackSample] = []
@@ -295,7 +320,9 @@ class BadmintonMatchEngine:
         keep_from = min(self._final - self.cfg.history, self._final - self.cfg.context_back - 1)
         pend = [p.seg.start for p in self._pending] + [c.cand.frame for c in self._open_contacts]
         if pend:
-            keep_from = min(keep_from, min(pend) - 60)
+            ph = self.cfg.phase
+            margin = max(60, int(max(ph.post_cut_s, ph.still_window_s) * self.cfg.fps) + 10)
+            keep_from = min(keep_from, min(pend) - margin)
         drop = keep_from - self._buf0
         if drop <= 0:
             return
@@ -560,7 +587,12 @@ class BadmintonMatchEngine:
         if fault in ("near", "far"):
             loser = next(pid for pid, e in before.ends.items() if e.value == fault)
             geometry_winner = other(loser)  # type: ignore[arg-type]
-        winner, source = self.ocr.winner_from_ocr(dict(before.score), seg.end, until, geometry_winner)
+        evidence = self._phase_evidence(seg, until)
+        phase_before = self.phase.phase
+        decision = self.phase.decide(seg.start, evidence, match_finished=before.finished)
+        observed, source = self.ocr.winner_from_ocr(dict(before.score), seg.end, until, geometry_winner)
+        self._last_rally_end = seg.end
+        winner = observed if decision.official else None
         loser_pid = other(winner) if winner in ("P1", "P2") else None  # type: ignore[arg-type]
         shots = [
             {
@@ -573,7 +605,7 @@ class BadmintonMatchEngine:
             }
             for c in p.contacts
         ]
-        rally_no = before.rally_no + 1
+        rally_no = before.rally_no + 1 if decision.official else None
         conf = conf_s if source == "geometry" else 0.97
         rally_end = self._event(
             "rally_end",
@@ -587,12 +619,14 @@ class BadmintonMatchEngine:
                 "fault_side": fault,
                 "winner": winner,
                 "loser": loser_pid,
+                "observed_winner": observed,
                 "winner_source": source,
                 "rule_check": check,
                 "n_shots": len(shots),
                 "shots": shots,
                 "rally_start_event_id": p.start_event.event_id if p.start_event else None,
                 "duration_s": round((seg.end - seg.start + 1) / self.cfg.fps, 2),
+                **self._phase_payload(decision, evidence, None),
             },
             confidence=conf if winner else 0.2,
             evidence=(
@@ -607,9 +641,11 @@ class BadmintonMatchEngine:
             status=EventStatus.CONFIRMED,
         )
         self._emit([rally_end])
+        if decision.phase is not phase_before:
+            self._emit_phase(decision, phase_before, seg.start, rally_end.event_id)
         record = RallyRecord(
             rally_id=rally_end.event_id,
-            rally_no=rally_no,
+            rally_no=rally_no or 0,
             start=seg.start,
             end=seg.end,
             winner=winner,
@@ -620,17 +656,19 @@ class BadmintonMatchEngine:
             game_no=before.game_no,
             flags_before=before.flags(self.match_cfg),
             duration_s=(seg.end - seg.start + 1) / self.cfg.fps,
+            official=decision.official,
         )
+        if not decision.official:
+            # practice / replayed hitting stays on the timeline but out of the official statistics
+            for c in p.contacts:
+                if c.stroke_event is not None:
+                    self.analytics.on_stroke_retracted(c.stroke_event)
         point, transitions = None, []
         if winner in ("P1", "P2") and not before.finished:
             res = apply_rally(before, winner, self.match_cfg)  # type: ignore[arg-type]
             point, transitions = self._point_events(res, rally_end, seg, source)
             self.state = res.after
-            record.score_after = (
-                dict(res.after.score)
-                if Transition.GAME_END not in res.transitions
-                else {"P1": res.after.completed_games[-1][0], "P2": res.after.completed_games[-1][1]}
-            )
+            record.score_after = self._score_after(res)
             self.store.put_state(
                 StateSnapshot(
                     session_id=self.session_id,
@@ -639,9 +677,18 @@ class BadmintonMatchEngine:
                     event_seq=point.seq,
                 )
             )
-        self._presence_analytics(seg)
+        presence = self._presence(seg)
+        if decision.official:
+            for pid, pts in presence.items():
+                self.analytics.on_presence(pid, pts)
         self.analytics.on_rally(record)
-        self._rallies.append(_RallyEvents(rally_end, point, transitions, record, geometry_winner, outcome))
+        self._rallies.append(
+            _RallyEvents(
+                rally_end, point, transitions, record, geometry_winner, outcome, evidence, observed, None, presence
+            )
+        )
+        if not decision.official:
+            return
         h = self.analytics.score_rally(record)
         if h.score >= self.cfg.highlight_min_score:
             self._emit(
@@ -659,6 +706,74 @@ class BadmintonMatchEngine:
                     )
                 ]
             )
+
+    # ================================================================== match phase
+    def _phase_evidence(self, seg: RallySegment, until: int) -> RallyEvidence:
+        """Evidence for "was this rally official play?" (see :mod:`bai_badminton.events.match_phase`)."""
+        ph, fps = self.cfg.phase, self.cfg.fps
+        lo = max(self._buf0, seg.start - int(ph.still_window_s * fps))
+        a, b = lo - self._buf0, seg.start - self._buf0 + 1
+        pos: dict[str, tuple[float, float]] = {}
+        spread: list[float] = []
+        for pid in PLAYERS:
+            pts = [c for c in self._players[pid]["court"][a:b] if c is not None]
+            if len(pts) < max(2, (b - a) // 3):
+                continue
+            arr = np.asarray(pts, dtype=float)
+            med = np.median(arr, axis=0)
+            pos[pid] = (float(med[0]), float(med[1]))
+            # robust extent of the feet track (detector jitter on the far player is large)
+            spread.append(float(np.linalg.norm(np.percentile(arr, 90, axis=0) - np.percentile(arr, 10, axis=0))))
+        both = len(pos) == 2
+        cut_lo = max(self._buf0, seg.start - int(ph.post_cut_s * fps)) - self._buf0
+        recent_shots = {*self._shot[cut_lo : b - 1], self._shot_at(seg.start)}
+        return RallyEvidence(
+            calibrated=self._calib(self._shot_at(seg.start)) is not None,
+            formation=serve_formation(pos.get("P1"), pos.get("P2"), ph.court_tol_m) if both else None,
+            still=all(x <= ph.still_max_m for x in spread) if both else None,
+            gap_s=(seg.start - self._last_rally_end) / fps if self._last_rally_end is not None else None,
+            after_cut=any(self._replay[cut_lo : b - 1]) or len(recent_shots) > 1,
+            scoreboard=self.ocr.board_change(seg.start, seg.end, until, lookback=int(30 * fps)),
+        )
+
+    @staticmethod
+    def _phase_payload(d: PhaseDecision, ev: RallyEvidence, override: bool | None) -> dict[str, Any]:
+        return {
+            "official": d.official,
+            "phase": d.phase.value,
+            "phase_reason": d.reason,
+            "phase_basis": d.basis,
+            "phase_evidence": ev.to_public(),
+            "phase_override": override,
+        }
+
+    def _emit_phase(self, d: PhaseDecision, previous: Phase, frame: int, rally_event_id: str | None) -> None:
+        self._emit(
+            [
+                self._event(
+                    "match_phase",
+                    frame,
+                    frame,
+                    payload={
+                        "phase": d.phase.value,
+                        "previous": previous.value,
+                        "reason": d.reason,
+                        "basis": d.basis,
+                        "rally_event_id": rally_event_id,
+                    },
+                    confidence=1.0 if d.basis in ("human", "scoreboard") else 0.7,
+                    model="match_phase_v1",
+                    status=EventStatus.CONFIRMED,
+                )
+            ]
+        )
+
+    @staticmethod
+    def _score_after(res: RallyResult) -> dict[str, int]:
+        if Transition.GAME_END in res.transitions:
+            g = res.after.completed_games[-1]
+            return {"P1": g[0], "P2": g[1]}
+        return dict(res.after.score)
 
     def _outcome(self, seg: RallySegment) -> tuple[str, str, str, float]:
         calib = self._calib(self._shot_at(seg.end))
@@ -678,12 +793,14 @@ class BadmintonMatchEngine:
         i = frame - self._buf0
         return self._shot[i] if 0 <= i < len(self._shot) else 0
 
-    def _presence_analytics(self, seg: RallySegment) -> None:
-        a, b = seg.start - self._buf0, seg.end - self._buf0 + 1
+    def _presence(self, seg: RallySegment) -> dict[str, list[tuple[float, float]]]:
+        a, b = max(0, seg.start - self._buf0), max(0, seg.end - self._buf0 + 1)
+        out = {}
         for pid, buf in self._players.items():
-            pts = [c for c in buf["court"][max(0, a) : b] if c is not None]
+            pts = [c for c in buf["court"][a:b] if c is not None]
             if pts:
-                self.analytics.on_presence(pid, pts)
+                out[pid] = pts
+        return out
 
     def _point_events(
         self, res: RallyResult, rally_end: Event, seg: RallySegment, source: str
@@ -743,53 +860,123 @@ class BadmintonMatchEngine:
 
     # ================================================================== corrections
     def correct_rally_winner(self, rally_event_id: str, winner: str, provenance: Provenance) -> list[Event]:
-        """Human (or OCR) correction of a rally winner: re-fold the match from that rally."""
-        idx = next((i for i, r in enumerate(self._rallies) if r.rally_end.event_id == rally_event_id), None)
-        if idx is None:
-            raise KeyError(rally_event_id)
-        winners = [r.record.winner for r in self._rallies]
-        winners[idx] = winner
-        state = initial_state(self.match_cfg)
-        for w in winners[:idx]:
-            if w in ("P1", "P2") and not state.finished:
-                state = apply_rally(state, w, self.match_cfg).after  # type: ignore[arg-type]
+        """Human (or OCR) correction of a rally winner: re-fold the match from that rally.
+
+        Naming a winner says the rally was played for a point, so it also marks it official."""
+        idx = self._rally_index(rally_event_id)
+        r = self._rallies[idx]
+        r.observed_winner, r.override = winner, True
+        return self._refold(provenance, human={idx: {"winner_source": "human"}})
+
+    def set_rally_official(self, rally_event_id: str, official: bool, provenance: Provenance) -> list[Event]:
+        """Reviewer decision that a rally was (or was not) official play; re-scores what follows."""
+        idx = self._rally_index(rally_event_id)
+        self._rallies[idx].override = official
+        return self._refold(provenance, human={idx: {}})
+
+    def set_match_start(self, frame: int | None, provenance: Provenance) -> list[Event]:
+        """Reviewer marker: rallies starting at/after ``frame`` are the match, earlier ones are not
+        (``None`` removes the marker). Recorded as a human-verified ``match_phase`` event so it
+        survives a re-analysis."""
+        self.phase.match_start_frame = frame
+        f = max(frame or 0, 0)
+        marker = self._event(
+            "match_phase",
+            f,
+            f,
+            payload={"marker": "match_start", "frame": frame, "phase": "match_play", "basis": "human"},
+            confidence=1.0,
+            model="human",
+            status=EventStatus.HUMAN_VERIFIED,
+        )
+        out = self._emit([marker.model_copy(update={"provenance": provenance})])
+        return out + self._refold(provenance)
+
+    def _rally_index(self, rally_event_id: str) -> int:
+        for i, r in enumerate(self._rallies):
+            if rally_event_id == r.rally_end.event_id or rally_event_id in self._lineage(r.rally_end):
+                return i
+        raise KeyError(rally_event_id)
+
+    def _lineage(self, ev: Event) -> set[str]:
+        from bai_badminton.analytics.rebuild import lineage_ids
+
+        return set(lineage_ids(self.store, ev))
+
+    def _refold(self, provenance: Provenance, human: dict[int, dict[str, Any]] | None = None) -> list[Event]:
+        """Re-decide every rally's phase and re-fold the score; re-emit only what changed.
+
+        Rallies before the first change keep their events; from the first change on, points and
+        transitions are retracted and regenerated (the score after it may differ)."""
+        human = human or {}
+        cfg = self.match_cfg
+        tracker = MatchPhaseTracker(self.cfg.phase, match_start_frame=self.phase.match_start_frame)
+        state = self._base_state
         new_events: list[Event] = []
         retractions: list[Event] = []
-        for i in range(idx, len(self._rallies)):
-            r = self._rallies[i]
-            w = winners[i]
-            if i == idx:
-                corr = r.rally_end.correct(
-                    payload={**r.rally_end.payload, "winner": w, "loser": other(w), "winner_source": "human"},  # type: ignore[arg-type]
-                    status=EventStatus.HUMAN_VERIFIED,
-                    provenance=provenance,
-                    confidence=1.0,
-                )
-                corr = self._emit([corr])[0]  # stored before the point events that reference it
-                new_events.append(corr)
-                r.rally_end = corr
-                r.record.winner, r.record.loser = w, other(w)  # type: ignore[arg-type]
-            for old in ([r.point] if r.point else []) + r.transitions:
-                retractions.append(old.retract(provenance, "re-folded after winner correction"))
-            if w in ("P1", "P2") and not state.finished:
-                res = apply_rally(state, w, self.match_cfg)  # type: ignore[arg-type]
-                seg = RallySegment(r.record.start, r.record.end, None, "correction")
-                point, trans = self._point_events(res, r.rally_end, seg, "human" if i == idx else "refold")
-                new_events.extend([point, *trans])
-                r.point, r.transitions = point, trans
+        dirty = False
+        for i, r in enumerate(self._rallies):
+            phase_before = tracker.phase
+            d = tracker.decide(r.record.start, r.evidence, match_finished=state.finished, override=r.override)
+            winner = r.observed_winner if d.official else None
+            loser = other(winner) if winner in PLAYERS else None  # type: ignore[arg-type]
+            rally_no = state.rally_no + 1 if d.official else None
+            pay = r.rally_end.payload
+            changed = (
+                pay.get("official", True) != d.official
+                or pay.get("winner") != winner
+                or pay.get("rally_no") != rally_no
+                or pay.get("phase_override") != r.override
+            )
+            if changed or i in human:
+                dirty = True
+                payload = {
+                    **pay,
+                    **self._phase_payload(d, r.evidence, r.override),
+                    **human.get(i, {}),
+                    "winner": winner,
+                    "loser": loser,
+                    "observed_winner": r.observed_winner,
+                    "rally_no": rally_no,
+                }
+                kw: dict[str, Any] = {"payload": payload, "provenance": provenance}
+                if i in human:
+                    kw.update(status=EventStatus.HUMAN_VERIFIED, confidence=1.0)
+                elif r.rally_end.status is EventStatus.HUMAN_VERIFIED:
+                    kw.update(status=EventStatus.HUMAN_VERIFIED)
+                r.rally_end = self._emit([r.rally_end.correct(**kw)])[0]  # stored before its points
+                new_events.append(r.rally_end)
+                if d.phase is not phase_before:
+                    self._emit_phase(d, phase_before, r.record.start, r.rally_end.event_id)
+            rec = r.record
+            rec.rally_id, rec.official, rec.winner, rec.loser = r.rally_end.event_id, d.official, winner, loser
+            rec.rally_no, rec.game_no, rec.flags_before = rally_no or 0, state.game_no, state.flags(cfg)
+            if dirty:
+                retractions.extend(old.retract(provenance, "re-folded") for old in [r.point, *r.transitions] if old)
+                r.point, r.transitions = None, []
+            if winner in PLAYERS and not state.finished:
+                res = apply_rally(state, winner, cfg)  # type: ignore[arg-type]
+                if dirty:
+                    seg = RallySegment(rec.start, rec.end, None, "correction")
+                    r.point, r.transitions = self._point_events(
+                        res, r.rally_end, seg, "human" if i in human else "refold"
+                    )
+                    new_events.extend([r.point, *r.transitions])
                 state = res.after
+                rec.score_after = self._score_after(res)
+            else:
+                rec.score_after = dict(state.score)
+            if dirty:  # overwrite the snapshot of the previous fold at this frame
+                seq = r.point.seq if r.point else self.store.last_seq()
                 self.store.put_state(
                     StateSnapshot(
-                        session_id=self.session_id,
-                        frame_idx=r.record.end,
-                        state=state.to_public(self.match_cfg),
-                        event_seq=point.seq,
+                        session_id=self.session_id, frame_idx=rec.end, state=state.to_public(cfg), event_seq=seq
                     )
                 )
+        self.phase.phase = tracker.phase
         self.state = state
         new_events.extend(self._emit(retractions))
-        # analytics are a fold: rebuild from the corrected rally records
-        self._rebuild_analytics()
+        self._rebuild_analytics()  # analytics are a fold: rebuild from the corrected rally records
         return new_events
 
     def on_superseded(self, ev: Event) -> None:
@@ -798,6 +985,7 @@ class BadmintonMatchEngine:
         for r in self._rallies:
             if r.rally_end.event_id == ev.supersedes:
                 r.rally_end = ev
+                r.record.rally_id = ev.event_id
 
     # ================================================================== restart / re-analysis
     def restore_from_log(self, last_frame: int) -> int:
@@ -812,14 +1000,27 @@ class BadmintonMatchEngine:
         trans_by_parent: dict[str | None, list[Event]] = {}
         for t in self.store.query(types=[t.value for t in Transition if t is not Transition.POINT]):
             trans_by_parent.setdefault(t.parent_id, []).append(t)
-        state = initial_state(self.match_cfg)
+        for ph in self.store.query(types=["match_phase"]):
+            if ph.payload.get("marker") == "match_start":
+                self.phase.match_start_frame = ph.payload.get("frame")
+            elif ph.payload.get("phase"):
+                self.phase.phase = Phase(ph.payload["phase"])
+        state = self._base_state
         self._rallies = []
         for ev, rec in zip(rallies, records, strict=True):
+            pay = ev.payload
             point = next((point_by_parent[i] for i in lineage_ids(self.store, ev) if i in point_by_parent), None)
-            if rec.winner in ("P1", "P2") and not state.finished:
+            if rec.official and rec.winner in PLAYERS and not state.finished:
                 state = apply_rally(state, rec.winner, self.match_cfg).after  # type: ignore[arg-type]
             transitions = trans_by_parent.get(point.event_id, []) if point else []
-            self._rallies.append(_RallyEvents(ev, point, transitions, rec, ev.payload.get("winner"), rec.outcome))
+            evidence = RallyEvidence(**pay["phase_evidence"]) if pay.get("phase_evidence") else RallyEvidence()
+            # logs from before match-phase gating counted every rally: keep that decision on re-fold
+            override = pay["phase_override"] if "official" in pay else True
+            observed = pay.get("observed_winner", pay.get("winner"))
+            self._rallies.append(
+                _RallyEvents(ev, point, transitions, rec, pay.get("winner"), rec.outcome, evidence, observed, override)
+            )
+            self._last_rally_end = rec.end
         self.state = state
         self._rebuild_analytics()
         self._last_frame = self._final = last_frame
@@ -834,13 +1035,22 @@ class BadmintonMatchEngine:
         for h in sorted(events, key=lambda e: e.frame_start):
             if h.status is not EventStatus.HUMAN_VERIFIED:
                 continue
+            if h.type == "match_phase":
+                if h.payload.get("marker") == "match_start" and self.phase.match_start_frame != h.payload.get("frame"):
+                    self.set_match_start(h.payload.get("frame"), provenance)
+                    applied += 1
+                continue
             if h.type == "rally_end":
                 tgt = self._match_rally(h.frame_start, h.frame_end)
                 if tgt is None:
                     continue
                 w = h.payload.get("winner")
+                override = h.payload.get("phase_override")
                 if w in ("P1", "P2") and tgt.rally_end.payload.get("winner") != w:
                     self.correct_rally_winner(tgt.rally_end.event_id, w, provenance)
+                    applied += 1
+                elif override is not None and tgt.override != override:
+                    self.set_rally_official(tgt.rally_end.event_id, override, provenance)
                     applied += 1
                 elif tgt.rally_end.status is not EventStatus.HUMAN_VERIFIED:
                     corr = tgt.rally_end.correct(
@@ -850,6 +1060,7 @@ class BadmintonMatchEngine:
                         confidence=1.0,
                     )
                     tgt.rally_end = self._emit([corr])[0]
+                    tgt.record.rally_id = tgt.rally_end.event_id
                     applied += 1
                 continue
             cur = self._nearest(h.type, h.frame_start, tol=3)
@@ -886,9 +1097,14 @@ class BadmintonMatchEngine:
 
     def _rebuild_analytics(self) -> None:
         self.analytics = MatchAnalytics(self.cfg.fps)
+        unofficial = {s.get("event_id") for r in self._rallies if not r.record.official for s in r.record.shots}
         for ev in self.store.query(types=["stroke"]):
-            self.analytics.on_stroke(ev)
+            if ev.event_id not in unofficial:
+                self.analytics.on_stroke(ev)
         for r in self._rallies:
+            if r.record.official:
+                for pid, pts in r.presence.items():
+                    self.analytics.on_presence(pid, pts)
             self.analytics.on_rally(r.record)
 
     # ================================================================== helpers

@@ -32,6 +32,7 @@ class RallyRecord:
     game_no: int
     flags_before: dict[str, Any]
     duration_s: float
+    official: bool = True  # False: warm-up / practice / replayed hitting (see events.match_phase)
 
     @property
     def n_shots(self) -> int:
@@ -101,7 +102,8 @@ class Highlight:
 class MatchAnalytics:
     def __init__(self, fps: float) -> None:
         self.fps = fps
-        self.rallies: list[RallyRecord] = []
+        self.rallies: list[RallyRecord] = []  # official rallies only
+        self.unofficial: list[RallyRecord] = []  # warm-up / practice / replays: timeline only
         self.players: dict[str, PlayerStats] = defaultdict(PlayerStats)
         self.heatmaps = HeatmapSet()
         self.momentum: list[dict[str, Any]] = []  # per point: {rally_no, value, leader}
@@ -156,6 +158,9 @@ class MatchAnalytics:
         self.players[player].distance_m += self.heatmaps.add_path(player, arr)
 
     def on_rally(self, rally: RallyRecord) -> None:
+        if not rally.official:
+            self.unofficial.append(rally)
+            return
         self.rallies.append(rally)
         if rally.winner is None or rally.loser is None:
             return
@@ -298,6 +303,11 @@ class MatchAnalytics:
     def to_public(self) -> dict[str, Any]:
         return {
             "rallies": len(self.rallies),
+            "unofficial_rallies": len(self.unofficial),
+            # operational definitions: sums of segmented rally durations (shuttle in play), not
+            # player time on court or video length
+            "active_play_s": round(sum(r.duration_s for r in self.rallies), 1),
+            "unofficial_play_s": round(sum(r.duration_s for r in self.unofficial), 1),
             "players": {p: s.to_public() for p, s in sorted(self.players.items())},
             "momentum": self.momentum[-60:],
             "momentum_shifts": self.momentum_shifts,

@@ -278,15 +278,34 @@ def calibration_proposal(session: SessionDep, r: Repo, segment: Annotated[int, Q
 
 # ---------------------------------------------------------------------- corrections
 class Correction(BaseModel):
-    kind: Literal["winner", "verify"]
+    kind: Literal["winner", "verify", "official", "match_start"]
     rally_event_id: str | None = None
     winner: Literal["P1", "P2"] | None = None
+    official: bool | None = None  # kind="official": the rally was (not) official play
+    frame: int | None = Field(default=None, ge=0)  # kind="match_start": first frame of official play
     event_id: str | None = None
     payload: dict[str, Any] | None = None
 
 
 @router.post("/{session_id}/corrections", status_code=202)
 def correct(session: SessionDep, body: Correction, b: BusDep) -> dict[str, str]:
+    sid = session.session_id
+    if body.kind == "official":
+        if not body.rally_event_id or body.official is None:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "rally_event_id and official are required")
+        b.send_command(
+            {
+                "cmd": "set_rally_official",
+                "session_id": sid,
+                "rally_event_id": body.rally_event_id,
+                "official": body.official,
+            }
+        )
+        return {"status": "accepted"}
+    if body.kind == "match_start":
+        # frame=None clears the marker and returns the decision to the automatic phase evidence
+        b.send_command({"cmd": "set_match_start", "session_id": sid, "frame": body.frame})
+        return {"status": "accepted"}
     if body.kind == "winner":
         if not body.rally_event_id or not body.winner:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "rally_event_id and winner are required")

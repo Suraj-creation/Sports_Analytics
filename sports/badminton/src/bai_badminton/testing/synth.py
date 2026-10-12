@@ -95,11 +95,15 @@ def make_rally(
     jump_at_shot: int | None = None,
     noise_px: float = 0.0,
     seed: int = 0,
+    near_xy: tuple[float, float] = (0.3, -HALF_LEN + 1.8),
+    far_xy: tuple[float, float] = (-0.2, HALF_LEN - 1.8),
 ) -> SynthRally:
+    """One rally. The default player positions are a legal serve set-up (both in their own right
+    service court); pass others to simulate warm-up hitting."""
     rng = np.random.default_rng(seed)
     hom = broadcast_homography()
-    near_court = np.array([0.3, -HALF_LEN + 1.8])
-    far_court = np.array([-0.2, HALF_LEN - 1.8])
+    near_court = np.array(near_xy, dtype=float)
+    far_court = np.array(far_xy, dtype=float)
     total = lead_in + n_shots * shot_frames + tail
     sx = np.full(total, np.nan)
     sy = np.full(total, np.nan)
