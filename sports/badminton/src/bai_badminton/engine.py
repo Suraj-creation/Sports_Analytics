@@ -158,6 +158,7 @@ class BadmintonMatchEngine:
         self.match_cfg = cfg.match
         self.phase = MatchPhaseTracker(cfg.phase)
         self._last_rally_end: int | None = None
+        self._seed_checked = False  # mid-match start: base score read from the scoreboard (once)
         self.calibration: dict[int, _Calib] = {}
         self._main_calib: _Calib | None = None
         self._track_out: list[TrackSample] = []
@@ -234,6 +235,8 @@ class BadmintonMatchEngine:
         if chunk.start != self._last_frame + 1:
             raise ValueError(f"chunk starts at {chunk.start}, expected {self._last_frame + 1}")
         self._provenance.update(chunk.models)
+        for r in chunk.ocr:
+            self.on_ocr(r)
         for fp in chunk.frames:
             self._append(fp)
         self._last_frame = chunk.end
@@ -575,6 +578,7 @@ class BadmintonMatchEngine:
         for p in ready:
             self._pending.remove(p)
             self._finalize_rally(p, until=p.seg.end + wait)
+            self._maybe_seed_from_board()
 
     def _finalize_rally(self, p: _PendingRally, until: int) -> None:
         seg = p.seg
@@ -590,7 +594,9 @@ class BadmintonMatchEngine:
         evidence = self._phase_evidence(seg, until)
         phase_before = self.phase.phase
         decision = self.phase.decide(seg.start, evidence, match_finished=before.finished)
-        observed, source = self.ocr.winner_from_ocr(dict(before.score), seg.end, until, geometry_winner)
+        observed, source = self.ocr.winner_from_ocr(
+            dict(before.score), seg.start, seg.end, until, geometry_winner, lookback=int(30 * self.cfg.fps)
+        )
         self._last_rally_end = seg.end
         winner = observed if decision.official else None
         loser_pid = other(winner) if winner in ("P1", "P2") else None  # type: ignore[arg-type]
@@ -663,7 +669,8 @@ class BadmintonMatchEngine:
             for c in p.contacts:
                 if c.stroke_event is not None:
                     self.analytics.on_stroke_retracted(c.stroke_event)
-        point, transitions = None, []
+        point: Event | None = None
+        transitions: list[Event] = []
         if winner in ("P1", "P2") and not before.finished:
             res = apply_rally(before, winner, self.match_cfg)  # type: ignore[arg-type]
             point, transitions = self._point_events(res, rally_end, seg, source)
@@ -767,6 +774,49 @@ class BadmintonMatchEngine:
                 )
             ]
         )
+
+    def _maybe_seed_from_board(self) -> None:
+        """Video starting mid-game: once the scoreboard rows are mapped to players, take the score
+        before the first official rally from the board instead of assuming 0-0, and re-fold.
+
+        Only the current game's points are known (not earlier games or the server), so the match
+        state is a partial observation; the ``match_phase`` event records the basis."""
+        if self._seed_checked or self.ocr.row_map is None:
+            return
+        first = next((r for r in self._rallies if r.record.official), None)
+        if first is None:
+            return
+        self._seed_checked = True
+        val = self.ocr.stable_before(first.record.start, first.record.start - int(30 * self.cfg.fps))
+        cfg = self.match_cfg
+        if val is None or val == (0, 0) or max(val) >= cfg.point_cap:
+            return
+        hi, lo = max(val), min(val)
+        if hi >= cfg.points_to_win and hi - lo >= 2:
+            return  # a finished game's score: not a starting point
+        score = {self.ocr.row_map[0]: val[0], self.ocr.row_map[1]: val[1]}
+        self._base_state = self._base_state.model_copy(update={"score": score})
+        f = first.record.start
+        self._emit(
+            [
+                self._event(
+                    "match_phase",
+                    f,
+                    f,
+                    payload={
+                        "phase": self.phase.phase.value,
+                        "basis": "scoreboard",
+                        "reason": "video starts mid-game: starting score read from the scoreboard",
+                        "base_state": self._base_state.model_dump(mode="json"),
+                        "server_known": False,
+                    },
+                    confidence=0.9,
+                    model="score_ocr",
+                    status=EventStatus.CONFIRMED,
+                )
+            ]
+        )
+        self._refold(self._prov("score_ocr"), force=True)
 
     @staticmethod
     def _score_after(res: RallyResult) -> dict[str, int]:
@@ -903,7 +953,9 @@ class BadmintonMatchEngine:
 
         return set(lineage_ids(self.store, ev))
 
-    def _refold(self, provenance: Provenance, human: dict[int, dict[str, Any]] | None = None) -> list[Event]:
+    def _refold(
+        self, provenance: Provenance, human: dict[int, dict[str, Any]] | None = None, *, force: bool = False
+    ) -> list[Event]:
         """Re-decide every rally's phase and re-fold the score; re-emit only what changed.
 
         Rallies before the first change keep their events; from the first change on, points and
@@ -914,12 +966,12 @@ class BadmintonMatchEngine:
         state = self._base_state
         new_events: list[Event] = []
         retractions: list[Event] = []
-        dirty = False
+        dirty = force  # e.g. a new base score: every point changes
         for i, r in enumerate(self._rallies):
             phase_before = tracker.phase
             d = tracker.decide(r.record.start, r.evidence, match_finished=state.finished, override=r.override)
             winner = r.observed_winner if d.official else None
-            loser = other(winner) if winner in PLAYERS else None  # type: ignore[arg-type]
+            loser = other(winner) if winner in PLAYERS else None
             rally_no = state.rally_no + 1 if d.official else None
             pay = r.rally_end.payload
             changed = (
@@ -955,7 +1007,7 @@ class BadmintonMatchEngine:
                 retractions.extend(old.retract(provenance, "re-folded") for old in [r.point, *r.transitions] if old)
                 r.point, r.transitions = None, []
             if winner in PLAYERS and not state.finished:
-                res = apply_rally(state, winner, cfg)  # type: ignore[arg-type]
+                res = apply_rally(state, winner, cfg)
                 if dirty:
                     seg = RallySegment(rec.start, rec.end, None, "correction")
                     r.point, r.transitions = self._point_events(
@@ -1001,6 +1053,9 @@ class BadmintonMatchEngine:
         for t in self.store.query(types=[t.value for t in Transition if t is not Transition.POINT]):
             trans_by_parent.setdefault(t.parent_id, []).append(t)
         for ph in self.store.query(types=["match_phase"]):
+            if ph.payload.get("base_state"):
+                self._base_state = MatchState.model_validate(ph.payload["base_state"])
+                self._seed_checked = True
             if ph.payload.get("marker") == "match_start":
                 self.phase.match_start_frame = ph.payload.get("frame")
             elif ph.payload.get("phase"):
@@ -1011,7 +1066,7 @@ class BadmintonMatchEngine:
             pay = ev.payload
             point = next((point_by_parent[i] for i in lineage_ids(self.store, ev) if i in point_by_parent), None)
             if rec.official and rec.winner in PLAYERS and not state.finished:
-                state = apply_rally(state, rec.winner, self.match_cfg).after  # type: ignore[arg-type]
+                state = apply_rally(state, rec.winner, self.match_cfg).after
             transitions = trans_by_parent.get(point.event_id, []) if point else []
             evidence = RallyEvidence(**pay["phase_evidence"]) if pay.get("phase_evidence") else RallyEvidence()
             # logs from before match-phase gating counted every rally: keep that decision on re-fold

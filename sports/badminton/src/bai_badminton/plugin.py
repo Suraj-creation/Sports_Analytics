@@ -12,7 +12,7 @@ from bai_badminton.engine import BadmintonMatchEngine, EngineConfig
 from bai_badminton.events.rally_fsm import RallyState
 from bai_badminton.perception.pipeline import BadmintonPerception
 from bai_badminton.perception.scene import propose_corners
-from bai_badminton.perception_types import ChunkPerception, FramePerception, PersonObs
+from bai_badminton.perception_types import ChunkPerception, FramePerception, PersonObs, ScoreReading
 from bai_engine.config import Profile, get_settings
 from bai_engine.decode import DecodedChunk
 from bai_engine.obs import get_logger
@@ -223,7 +223,15 @@ class BadmintonSession:
                 }
             )
         out = msgpack.packb(
-            {"v": 1, "start": p.start, "end": p.end, "models": p.models, "frames": frames}, use_bin_type=True
+            {
+                "v": 1,
+                "start": p.start,
+                "end": p.end,
+                "models": p.models,
+                "frames": frames,
+                "ocr": [{"f": r.frame_idx, "r": [list(x) for x in r.rows], "c": r.conf} for r in p.ocr],
+            },
+            use_bin_type=True,
         )
         assert isinstance(out, bytes)
         return out
@@ -250,7 +258,13 @@ class BadmintonSession:
             )
             for f in d["frames"]
         ]
-        return ChunkPerception(start=d["start"], end=d["end"], frames=frames, models=d.get("models", {}))
+        ocr = [
+            ScoreReading(
+                frame_idx=o["f"], rows=((o["r"][0][0], o["r"][0][1]), (o["r"][1][0], o["r"][1][1])), conf=o["c"]
+            )
+            for o in d.get("ocr", [])
+        ]
+        return ChunkPerception(start=d["start"], end=d["end"], frames=frames, models=d.get("models", {}), ocr=ocr)
 
 
 class BadmintonPlugin:

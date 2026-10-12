@@ -73,6 +73,10 @@ function RallyRow({ r, session, current }: { r: RallyView; session: Session; cur
     mutationFn: (winner: PlayerId) => api.correctWinner(session.session_id, r.end.event_id, winner),
   });
   const confirm = useMutation({ mutationFn: () => api.verifyEvent(session.session_id, r.end.event_id) });
+  const official = useMutation({
+    mutationFn: (v: boolean) => api.setRallyOfficial(session.session_id, r.end.event_id, v),
+  });
+  const matchStart = useMutation({ mutationFn: () => api.setMatchStart(session.session_id, r.start) });
 
   return (
     <li className={clsx("px-3 py-2.5", current && "bg-stand-raised/60")}>
@@ -85,10 +89,19 @@ function RallyRow({ r, session, current }: { r: RallyView; session: Session; cur
         >
           {clock(r.start, session.media)}
         </button>
-        <span className="w-16 shrink-0 text-sm font-medium">Rally {r.no}</span>
-        <BandChip band={verified ? "confirmed" : r.end.band} color={playerColor(r.winner)}>
-          {r.winner ? `${shortName(session, r.winner)} wins` : "Winner unclear"}
-        </BandChip>
+        <span className="w-16 shrink-0 text-sm font-medium">{r.official ? `Rally ${r.no}` : "Warm-up"}</span>
+        {r.official ? (
+          <BandChip band={verified ? "confirmed" : r.end.band} color={playerColor(r.winner)}>
+            {r.winner ? `${shortName(session, r.winner)} wins` : "Winner unclear"}
+          </BandChip>
+        ) : (
+          <span
+            className="rounded-full border border-seam px-2 py-0.5 text-xs text-line-3"
+            title={String(p.phase_reason ?? "")}
+          >
+            not scored
+          </span>
+        )}
         <span className="hidden truncate text-xs text-line-2 sm:inline">
           {p.n_shots ?? shots.length} shots
           {p.outcome && ` · shuttle ${OUTCOME_LABEL[p.outcome as string] ?? p.outcome}`}
@@ -129,6 +142,24 @@ function RallyRow({ r, session, current }: { r: RallyView; session: Session; cur
               Why the rally ended: {String(p.end_reason).replace(/_/g, " ")}
             </p>
           )}
+          {p.phase_reason && (
+            <p className="text-xs text-line-2">
+              {r.official ? "Counted" : "Not counted"}: {String(p.phase_reason)}
+            </p>
+          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              busy={official.isPending}
+              onClick={() => official.mutate(!r.official)}
+            >
+              {r.official ? "Not part of the match" : "Count this rally"}
+            </Button>
+            <Button size="sm" variant="ghost" busy={matchStart.isPending} onClick={() => matchStart.mutate()}>
+              Match starts here
+            </Button>
+          </div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-line-3">Is the winner right?</span>
             {!verified && r.winner && (
@@ -153,7 +184,7 @@ function RallyRow({ r, session, current }: { r: RallyView; session: Session; cur
               Changing the winner re-scores every point after this one.
             </span>
           </div>
-          <ErrorNote error={fix.error ?? confirm.error} />
+          <ErrorNote error={fix.error ?? confirm.error ?? official.error ?? matchStart.error} />
         </div>
       )}
     </li>

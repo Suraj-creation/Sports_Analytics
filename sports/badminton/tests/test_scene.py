@@ -53,3 +53,22 @@ def test_rejects_a_region_cut_off_by_the_frame_edge() -> None:
     img = np.full((720, 1280, 3), FLOOR_BGR, np.uint8)
     cv2.fillPoly(img, [np.array([[300, 200], [980, 200], [1279, 719], [0, 719]], np.int32)], MAT_BGR)
     assert propose_corners(img) is None
+
+
+def test_non_green_mats_are_proposed_and_gate_learns_the_colour() -> None:
+    from bai_badminton.perception.scene import CourtPresence, small_hsv
+
+    for mat in ((150, 70, 20), (120, 40, 110), (60, 120, 190)):  # blue, purple, wood (BGR)
+        img, truth = _broadcast_frame()
+        quad = np.array([truth[k] for k in ("far_left", "far_right", "near_right", "near_left")], np.int32)
+        img[:] = (25, 25, 25)
+        cv2.fillPoly(img, [quad], mat)
+        prop = propose_corners(img)
+        assert prop is not None, mat
+        assert all(abs(prop[0][k][0] - x) < 6 and abs(prop[0][k][1] - y) < 6 for k, (x, y) in truth.items())
+        gate = CourtPresence(quad.astype(np.float32))
+        assert not gate.is_main_camera(img)  # the old green-only gate called this a replay
+        close_up = np.full_like(img, (90, 90, 200))
+        band = gate.learn([small_hsv(img)] * 3 + [small_hsv(close_up)])
+        assert band is not None and band.name != "green"
+        assert gate.is_main_camera(img) and not gate.is_main_camera(close_up)

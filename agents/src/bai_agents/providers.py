@@ -277,7 +277,7 @@ def make_provider(name: str | None = None) -> LLMProvider:
     def pick(field: str, *envs: str, default: str) -> str:
         # Explicit BAI_* settings (env or .env) win; otherwise honour the legacy unprefixed env vars.
         if cfg is not None and field in cfg.model_fields_set:
-            return getattr(cfg, field)
+            return str(getattr(cfg, field))
         return next((v for e in envs if (v := os.getenv(e))), default)
 
     _name = (name or pick("llm_provider", "BAI_LLM_PROVIDER", "LLM_PROVIDER", default="azure_openai")).lower()

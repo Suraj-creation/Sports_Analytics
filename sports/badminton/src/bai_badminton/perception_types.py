@@ -36,6 +36,7 @@ class ChunkPerception:
     end: int
     frames: list[FramePerception]
     models: dict[str, str] = field(default_factory=dict)  # stage → model@version (provenance)
+    ocr: list[ScoreReading] = field(default_factory=list)  # scoreboard readings inside the chunk
 
     def __post_init__(self) -> None:
         if len(self.frames) != self.end - self.start + 1:

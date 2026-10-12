@@ -26,7 +26,7 @@
 | **POS-01** | Perception | Pose Estimation (RTMPose-M) | 192×256 player crops (2 players) | ONNX Runtime CUDA FP16 17 COCO keypoints | **PASS** (254.96 FPS, 3.92 ms for 2 players) | P1 |
 | **CRT-01** | Court | Auto-Court Proposal | Broadcast keyframes | Green-mat contour detection and 4-corner proposal | **PASS** (Auto score 0.9–1.0 on broadcast view) | P2 |
 | **CRT-02** | Court | Homography Calibration | Proposed 4 court corners | Planar homography fit, RANSAC outlier rejection | **PASS** (Reprojection error 0.00002 px) | P1 |
-| **CRT-03** | Court | Court Color Invariance | Non-green courts (blue/red mats) | Detect court regardless of mat color | **FAIL** (Hardcoded green HSV ranges [30,35,35]-[90,255,255]) | P2 |
+| **CRT-03** | Court | Court Color Invariance | Non-green courts (blue/red mats) | Detect court regardless of mat color | **PASS (synthetic)** — learned mat hue; `test_scene.py::test_non_green_mats_*` (was FAIL: hardcoded green) | P2 |
 | **RCK-01** | Perception | Racket Pose Specialist | Contact window player crop | Racket localization around impact | **NOT RUN / UNWIRED** (Candidate in manifest, not in pipeline) | P3 |
 | **CNT-01** | Events | Contact Detection Fusion | 4-cue logistic fusion (`contact_fusion_v0`) | Detect hit frame and attribute player | **PASS** (F1=0.941, Mean error=0.88 frames / 29.2 ms) | P1 |
 | **STR-01** | Events | Rule Stroke Classifier | Kinematic & pose features | Classify smash, clear, drop, drive, lift, net_shot, serve | **PASS** (Deterministic rule classifier active) | P2 |
@@ -62,3 +62,20 @@
 - **FAIL / MISSING ARCHITECTURE:** 2 (5.0%)
 - **BLOCKED / PLACEHOLDER:** 3 (7.5%)
 - **NOT RUN / UNWIRED:** 4 (10.0%)
+
+## Added in the October 2026 remediation (CPU, deterministic)
+
+| Test ID | Capability | Test | Status |
+|---|---|---|---|
+| **PHS-01** | Serve-formation geometry & phase decisions | `sports/badminton/tests/test_match_phase.py::test_serve_formation_is_diagonal`, `test_tracker_*`, `test_human_marker_*` | PASS |
+| **PHS-02** | Warm-up rallies not scored, kept on timeline, out of stats/highlights | `test_match_phase.py::test_warmup_rallies_are_not_scored` | PASS |
+| **PHS-03** | Scoreboard unchanged ⇒ rally not scored (replay/let) | `test_match_phase.py::test_unchanged_scoreboard_rejects_rally_in_play` | PASS |
+| **PHS-04** | Match-start marker / per-rally marks re-fold and survive restore | `test_match_phase.py::test_match_start_marker_*`, `test_reviewer_*`, `test_winner_correction_on_warmup_*` | PASS |
+| **PHS-05** | Video starting mid-game takes its score from the board | `test_match_phase.py::test_video_starting_mid_game_*` | PASS |
+| **OCR-01** | Board-delta winner, game reset, unchanged board, vote mapping | `sports/badminton/tests/test_score_ocr.py` | PASS |
+| **OCR-02** | Score-bug parsing, corner search, ROI lock, rate limit | `sports/badminton/tests/test_scoreboard.py` | PASS |
+| **OCR-03** | Real RapidOCR on a rendered score bug | `test_scoreboard.py::test_real_ocr_reads_a_rendered_scoreboard` | PASS |
+| **AGT-01** | Warm-up vs official in tools; `get_rally` by number / unknown | `agents/tests/test_agent.py::test_tools_*`, `test_get_rally_*` | PASS |
+| **AGT-02** | Abstentions with ordinals pass; hallucinated numbers fail | `test_agent.py::test_validator_*` | PASS |
+| **AGT-03** | Text tool calls executed; raw JSON never shown; duplicate calls cached; placeholder citations repaired | `test_agent.py::test_tool_calls_*`, `test_raw_tool_json_*`, `test_repeated_*`, `test_unrepairable_*` | PASS |
+| **API-09** | `official` / `match_start` corrections validated and dispatched | `apps/api/tests/test_api.py::test_phase_corrections_*` | PASS |

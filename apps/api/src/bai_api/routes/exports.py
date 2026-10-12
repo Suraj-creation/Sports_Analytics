@@ -49,6 +49,8 @@ def _rally_rows(session: Any, r: Any) -> list[dict[str, Any]]:
     names = {p.player_id: p.name or p.player_id for p in session.players}
     rows = []
     for rec in rally_records(store):
+        if not rec.official:  # warm-up / replayed exchanges are not rallies of the match
+            continue
         rows.append(
             {
                 "match_id": session.session_id,

@@ -382,3 +382,26 @@ All supporting machine-readable results, test scripts, and defect analyses have 
 
 ---
 *Report certified by Principal Evaluation Engineering & Quality Architecture.*
+
+---
+
+## 16. Post-Validation Remediation (October 2026)
+
+The defects in §11–§12 were addressed on the `upgrading` branch; details, design and known ceilings
+are in [`failure_cases.md` → Remediation log](failure_cases.md#remediation-log-october-2026-upgrading-branch)
+and the new tests in [`test_inventory.md`](test_inventory.md).
+
+| Finding | Change | Verified by |
+|---|---|---|
+| DEF-01 warm-up scored (P0) | Per-rally match-phase decision (reviewer > scoreboard > BWF serve formation + tempo); unofficial rallies kept on the timeline but out of score and statistics; reviewer `official` / `match_start` corrections | synthetic warm-up → match tests |
+| DEF-03 OCR unwired (P1) | RapidOCR score-bug reader in the perception pipeline (between rallies, corner search + ROI lock); readings cached with perception | rendered-board OCR test; parser/reader tests |
+| DEF-10/11/15 OCR logic | Winner from the board's own delta; majority row mapping; mid-game base score from the board | reconciler + mid-game engine tests |
+| DEF-04/05/13 agent | Number-grounding validator, text tool-call execution, call cache, citation repair, phase/observation-aware tools | scripted-provider tests replaying the Q1–Q7 failure modes |
+| DEF-06 green-only court gate | Multi-family court proposal; learned mat hue | blue / purple / wood synthetic mats |
+| DEF-12 stale re-fold analytics | Single re-fold path updates records, snapshots and keeps per-rally presence | marker / correction tests |
+
+**What this section does not claim.** No figure in §1–§10 has been re-measured: the GPU benchmark,
+the 36-rally ground-truth comparison (rally recall 61.1 %, winner accuracy 61.5 %, 5 false warm-up
+rallies) and the 8B agent run must be repeated on the target host against this branch before the
+acceptance matrix (§13) or readiness ratings (§1.3, §14) are updated. The expected effect of the
+fixes on those numbers is a hypothesis until then.

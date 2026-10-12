@@ -20,8 +20,9 @@ import numpy as np
 
 from bai_badminton.court import REFERENCE_POINTS, Homography
 from bai_badminton.perception.players import CourtROI, PlayerDetector, PlayerPerception, PoseEstimator
-from bai_badminton.perception.scene import CourtPresence, CutDetector
-from bai_badminton.perception_types import ChunkPerception, FramePerception
+from bai_badminton.perception.scene import CourtPresence, CutDetector, small_hsv
+from bai_badminton.perception.scoreboard import ScoreboardReader
+from bai_badminton.perception_types import ChunkPerception, FramePerception, ScoreReading
 from bai_engine.config import ModelChoice, Profile
 from bai_engine.decode import DecodedChunk
 from bai_engine.obs import INFERENCE_FPS, get_logger, timed
@@ -43,6 +44,8 @@ class PerceptionStats:
     shuttle_frames: int = 0
     det_calls: int = 0
     pose_calls: int = 0
+    ocr_calls: int = 0
+    ocr_readings: int = 0
     seconds: dict[str, float] = field(default_factory=dict)
 
 
@@ -54,11 +57,13 @@ class BadmintonPerception:
         self.models: dict[str, str] = {}
         self.cuts = CutDetector()
         self.presence: CourtPresence | None = None
+        self._court_samples: list[tuple[np.ndarray, tuple[int, int]]] = []  # small HSV keyframes
         self.stats = PerceptionStats()
         cache = engine_cache_dir(models_dir)
         self.shuttle = self._load_shuttle(profile.shuttle, registry, cache)
         det = self._load_detector(profile.player_detector, registry, cache)
         pose = self._load_pose(profile.pose, registry, cache)
+        self.scoreboard = self._load_ocr(profile.ocr, registry, fps)
         self.players = PlayerPerception(
             det, pose, fps, det_stride=profile.detector_rates.in_play, pose_stride=profile.pose_rates.in_play
         )
@@ -120,6 +125,17 @@ class BadmintonPerception:
             self._degrade("pose", f"{c.model}: {e}")
             return None
 
+    def _load_ocr(self, c: ModelChoice | None, reg: ModelRegistry, fps: float) -> ScoreboardReader | None:
+        if c is None or c.model == "none":
+            return None
+        try:
+            r = ScoreboardReader.load(every=max(1, int(round(self.profile.ocr_every_s * fps))))
+            self.models["ocr"] = reg.get(c.model).ref
+            return r
+        except (ModelError, OSError, ValueError, ImportError, RuntimeError) as e:
+            self._degrade("ocr", f"{c.model}: {e}")
+            return None
+
     def _degrade(self, stage: str, reason: str) -> None:
         log.warning("perception.degraded", stage=stage, reason=reason)
         self.degraded.append(Degradation(stage, reason))
@@ -130,8 +146,18 @@ class BadmintonPerception:
         poly = h.court_to_image(np.array([REFERENCE_POINTS[n] for n in names])).astype(np.float32)
         self.players.set_roi(CourtROI(poly))
         self.presence = CourtPresence(poly)
+        self._learn_court_colour()
+
+    def _learn_court_colour(self) -> None:
+        if self.presence is None or not self._court_samples:
+            return
+        band = self.presence.learn(self._court_samples)
+        log.info("court.colour", band=band.name if band else None, kept=self.presence.band.name)
 
     def seed_background(self, frames_bgr: list[np.ndarray]) -> None:
+        if frames_bgr:
+            self._court_samples = [small_hsv(f) for f in frames_bgr]
+            self._learn_court_colour()
         if self.shuttle is None or not frames_bgr:
             return
         import cv2
@@ -184,9 +210,30 @@ class BadmintonPerception:
                     )
                 )
         self._rate("players", n, t0)
+        ocr = self._read_scoreboard(chunk, replay, in_play)
         self.stats.frames += n
         self.stats.shuttle_frames += sum(1 for s in shuttle if s is not None)
-        return ChunkPerception(start=chunk.start, end=chunk.end, frames=frames, models=dict(self.models))
+        return ChunkPerception(start=chunk.start, end=chunk.end, frames=frames, models=dict(self.models), ocr=ocr)
+
+    def _read_scoreboard(self, chunk: DecodedChunk, replay: list[bool], in_play: bool) -> list[ScoreReading]:
+        """Read the score bug between rallies only (it cannot change during one), on main-camera
+        frames (replay graphics often hide or freeze it)."""
+        if self.scoreboard is None or in_play:
+            return []
+        out = []
+        t0 = _now()
+        with timed("ocr"):
+            for i, img in enumerate(chunk.frames):
+                if replay[i]:
+                    continue
+                calls = self.scoreboard.calls
+                r = self.scoreboard.maybe_read(chunk.start + i, img)
+                self.stats.ocr_calls += self.scoreboard.calls - calls
+                if r is not None:
+                    out.append(r)
+        self._rate("ocr", len(chunk.frames), t0)
+        self.stats.ocr_readings += len(out)
+        return out
 
     def _rate(self, stage: str, n: int, t0: float) -> None:
         dt = _now() - t0

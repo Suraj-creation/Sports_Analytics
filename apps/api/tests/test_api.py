@@ -169,6 +169,26 @@ def test_analytics_exports_and_corrections(settings: Settings) -> None:
         assert state["state"]["score"] == {"P1": 5, "P2": 3} and len(state["states"]) == 8
 
 
+def test_phase_corrections_are_validated_and_dispatched(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> None:
+    from bai_api.app import create_app
+
+    sid = _seed_match(settings)
+    sent: list[dict] = []  # type: ignore[type-arg]
+    with TestClient(create_app(settings)) as client:
+        monkeypatch.setattr(client.app.state.bus, "send_command", sent.append)  # type: ignore[attr-defined]
+        url = f"/api/sessions/{sid}/corrections"
+        assert client.post(url, json={"kind": "official", "rally_event_id": "x"}).status_code == 422
+        assert client.post(url, json={"kind": "match_start", "frame": -5}).status_code == 422
+        assert client.post(url, json={"kind": "official", "rally_event_id": "x", "official": False}).status_code == 202
+        assert client.post(url, json={"kind": "match_start", "frame": 120}).status_code == 202
+        assert client.post(url, json={"kind": "match_start", "frame": None}).status_code == 202
+    assert [(c["cmd"], c.get("official"), c.get("frame")) for c in sent] == [
+        ("set_rally_official", False, None),
+        ("set_match_start", None, 120),
+        ("set_match_start", None, None),
+    ]
+
+
 class _FakeProvider:
     """Calls a tool, then answers citing what the tool returned (exercises the grounded loop)."""
 

@@ -37,6 +37,8 @@ export interface RallyView {
   start: number;
   stop: number;
   winner: PlayerId | null;
+  /** false: warm-up / practice / replayed exchange — on the timeline, not in the score */
+  official: boolean;
 }
 
 export function rallies(events: EventLog): RallyView[] {
@@ -46,6 +48,7 @@ export function rallies(events: EventLog): RallyView[] {
     start: e.frame_start,
     stop: e.frame_end,
     winner: (e.payload.winner as PlayerId | null) ?? null,
+    official: e.payload.official !== false,
   }));
 }
 

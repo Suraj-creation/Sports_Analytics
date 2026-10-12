@@ -89,6 +89,16 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ kind: "winner", rally_event_id, winner }),
     }),
+  setRallyOfficial: (id: string, rally_event_id: string, official: boolean) =>
+    req(`/api/sessions/${id}/corrections`, {
+      method: "POST",
+      body: JSON.stringify({ kind: "official", rally_event_id, official }),
+    }),
+  setMatchStart: (id: string, frame: number | null) =>
+    req(`/api/sessions/${id}/corrections`, {
+      method: "POST",
+      body: JSON.stringify({ kind: "match_start", frame }),
+    }),
   verifyEvent: (id: string, event_id: string, payload?: Record<string, unknown>) =>
     req(`/api/sessions/${id}/corrections`, {
       method: "POST",

@@ -191,7 +191,8 @@ function Overview({ session }: { session: Session }) {
             <p className="tabular font-medium">{clock(hover, session.media)}</p>
             {hoverRally && (
               <p className="text-line-2">
-                Rally {hoverRally.no} · {hoverRally.end.payload.n_shots ?? 0} shots
+                {hoverRally.official ? `Rally ${hoverRally.no}` : "Warm-up (not scored)"} ·{" "}
+                {hoverRally.end.payload.n_shots ?? 0} shots
                 {hoverRally.winner && ` · ${shortName(session, hoverRally.winner)}`}
               </p>
             )}

@@ -85,7 +85,9 @@ function FeedItem({ e, session }: { e: BaiEvent; session: Session }) {
           <span className="flex items-center gap-2">
             <PlayerDot pid={w} />
             <span className="font-medium">
-              Rally {e.payload.rally_no} · {w ? `${shortName(session, w)} wins` : "winner unclear"}
+              {e.payload.official === false
+                ? "Warm-up exchange · not scored"
+                : `Rally ${e.payload.rally_no} · ${w ? `${shortName(session, w)} wins` : "winner unclear"}`}
             </span>
             {corrected && <span className="text-xs text-signal">corrected</span>}
           </span>

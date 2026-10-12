@@ -22,12 +22,13 @@ def _rally(winner: str, seed: int, lead_in: int = 30, **kw: object):  # type: ig
     return make_rally(n_shots=n, fps=FPS, lead_in=lead_in, land_court=land, seed=seed, **kw)  # type: ignore[arg-type]
 
 
-def _run(tmp_path: Path, rallies: list, ocr: list[ScoreReading] | None = None):  # type: ignore[no-untyped-def]
+def _run(tmp_path: Path, rallies: list, ocr: list[ScoreReading] | None = None, names: dict | None = None):  # type: ignore[no-untyped-def,type-arg]
     frames: list[FramePerception] = []
     for r in rallies:
         frames.extend(to_frames(r, len(frames)))
     store = EventStore(tmp_path / "e.sqlite", "S1")
-    eng = BadmintonMatchEngine("S1", EngineConfig(fps=FPS, frame_width=1280, frame_height=720), store)
+    cfg = EngineConfig(fps=FPS, frame_width=1280, frame_height=720)
+    eng = BadmintonMatchEngine("S1", cfg, store, player_names=names)
     eng.set_calibration(0, broadcast_homography())
     pending = sorted(ocr or [], key=lambda r: r.frame_idx)
     for s in range(0, len(frames), 64):
@@ -175,3 +176,28 @@ def test_winner_correction_on_warmup_rally_makes_it_official(tmp_path: Path) -> 
 def test_video_starting_at_the_serve_is_scored(tmp_path: Path, pos: dict) -> None:  # type: ignore[type-arg]
     eng, _ = _run(tmp_path, [_rally("P1", 1, **pos), _rally("P1", 2, **pos)])
     assert eng.public_state()["score"] == {"P1": 2, "P2": 0}
+
+
+def test_video_starting_mid_game_takes_the_score_from_the_board(tmp_path: Path) -> None:
+    rallies = [_rally("P1", 1), _rally("P2", 2)]
+    starts, n = [], 0
+    for r in rallies:
+        starts.append(n)
+        n += r.obs.n
+
+    def read(f: int, a: int, b: int) -> list[ScoreReading]:
+        return [ScoreReading(frame_idx=f + k, rows=(("AXELSEN", a), ("LEE", b)), conf=0.9) for k in (0, 5)]
+
+    ocr = read(starts[0] + 2, 11, 9) + read(starts[1] + 2, 12, 9) + read(n - 12, 12, 10)
+    names = {"P1": "Viktor Axelsen", "P2": "Lee Zii Jia"}
+    eng, store = _run(tmp_path, rallies, ocr, names)
+    assert eng.public_state()["score"] == {"P1": 12, "P2": 10}
+    ends = store.query(types=["rally_end"])
+    assert [e.payload["winner_source"] for e in ends] == ["ocr", "ocr"]
+    pts = store.query(types=["point"])
+    assert [p.payload["state_after"]["score"] for p in pts] == [{"P1": 12, "P2": 9}, {"P1": 12, "P2": 10}]
+    base = [e for e in store.query(types=["match_phase"]) if e.payload.get("base_state")]
+    assert base and base[0].payload["base_state"]["score"] == {"P1": 11, "P2": 9}
+    eng2 = BadmintonMatchEngine("S1", EngineConfig(fps=FPS, frame_width=1280, frame_height=720), store)
+    eng2.restore_from_log(10**6)
+    assert eng2.public_state()["score"] == {"P1": 12, "P2": 10}
