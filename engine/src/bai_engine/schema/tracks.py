@@ -17,6 +17,7 @@ class TrackObject(StrEnum):
     SHUTTLE = "shuttle"
     PLAYER = "player"
     RACKET = "racket"
+    CAMERA = "camera"  # per-frame camera pose (one row per frame): see TrackSample.cam
 
 
 N_KEYPOINTS = 17  # COCO-17 layout (see bai_badminton.perception.keypoints)
@@ -40,6 +41,9 @@ class TrackSample(BaseModel):
     visible: bool = True
     conf: float = 0.0
     model: str = ""
+    # CAMERA rows: 3x3 homography (row-major) from the calibration's reference-frame px to this frame's px;
+    # ``visible=False`` (and ``cam=None``) when the camera is tracked but the court is not in view
+    cam: tuple[float, ...] | None = None
 
 
 TRACK_ARROW_SCHEMA = pa.schema(
@@ -57,6 +61,7 @@ TRACK_ARROW_SCHEMA = pa.schema(
         pa.field("visible", pa.bool_(), nullable=False),
         pa.field("conf", pa.float32(), nullable=False),
         pa.field("model", pa.dictionary(pa.int8(), pa.string())),
+        pa.field("cam", pa.list_(pa.float64())),  # 9 values, CAMERA rows only
     ]
 )
 
@@ -80,6 +85,7 @@ def samples_to_table(samples: list[TrackSample]) -> pa.Table:
         cols["visible"].append(s.visible)
         cols["conf"].append(s.conf)
         cols["model"].append(s.model or None)
+        cols["cam"].append(list(s.cam) if s.cam is not None else None)
     arrays = [pa.array(cols[f.name], type=f.type) for f in TRACK_ARROW_SCHEMA]
     return pa.Table.from_arrays(arrays, schema=TRACK_ARROW_SCHEMA)
 
@@ -103,6 +109,7 @@ def table_to_samples(table: pa.Table) -> list[TrackSample]:
                 visible=row["visible"],
                 conf=row["conf"],
                 model=row["model"] or "",
+                cam=tuple(row["cam"]) if row.get("cam") is not None else None,
             )
         )
     return out

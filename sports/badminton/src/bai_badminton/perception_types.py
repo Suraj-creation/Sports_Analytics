@@ -26,6 +26,12 @@ class FramePerception:
     persons: list[PersonObs] = field(default_factory=list)
     replay: bool = False
     shot_id: int = 0  # camera shot (cut index); calibration is per shot
+    # Camera pose: ``cam`` maps the calibration's reference-frame px to this frame's px (3×3), so the
+    # court → image homography here is ``cam @ H``.  ``None`` with ``cam_lost`` means the camera is being
+    # tracked but the court is not (verifiably) in view — a close-up, another camera; with neither set
+    # the camera is not tracked at all (a fixed calibration is assumed, as before).
+    cam: NDArray[np.float64] | None = None
+    cam_lost: bool = False
 
 
 @dataclass
@@ -37,6 +43,7 @@ class ChunkPerception:
     frames: list[FramePerception]
     models: dict[str, str] = field(default_factory=dict)  # stage → model@version (provenance)
     ocr: list[ScoreReading] = field(default_factory=list)  # scoreboard readings inside the chunk
+    cam_ref: int | None = None  # id of the reference view ``FramePerception.cam`` is relative to (None: untracked)
 
     def __post_init__(self) -> None:
         if len(self.frames) != self.end - self.start + 1:

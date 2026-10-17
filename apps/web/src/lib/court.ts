@@ -97,3 +97,11 @@ export const REFERENCE_LABEL: Record<string, string> = {
   net_left: "Net post, left (on the floor)",
   net_right: "Net post, right (on the floor)",
 };
+
+/** 3×3 matrix product A·B (compose homographies: apply B first, then A). */
+export function mul3(A: number[][], B: number[][]): number[][] {
+  const at = (M: number[][], i: number, j: number) => (M[i] as number[])[j] as number;
+  return [0, 1, 2].map((i) =>
+    [0, 1, 2].map((j) => at(A, i, 0) * at(B, 0, j) + at(A, i, 1) * at(B, 1, j) + at(A, i, 2) * at(B, 2, j)),
+  );
+}

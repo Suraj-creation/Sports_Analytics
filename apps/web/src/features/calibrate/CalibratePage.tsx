@@ -90,7 +90,7 @@ export function CalibratePage() {
   }, [points, ref]);
 
   const save = useMutation({
-    mutationFn: () => api.calibrate(sessionId, points),
+    mutationFn: () => api.calibrate(sessionId, points, prop.data?.frame),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["session", sessionId] });
       navigate({ to: "/sessions/$sessionId", params: { sessionId } });

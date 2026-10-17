@@ -1,4 +1,4 @@
-import { COURT_LINES, NET, project } from "@/lib/court";
+import { COURT_LINES, mul3, NET, project } from "@/lib/court";
 import type { EventLog } from "@/lib/events";
 import type { TrackBuffer } from "@/lib/tracks";
 import type { Calibration, PlayerId } from "@/lib/types";
@@ -59,7 +59,14 @@ export function drawOverlay(o: OverlayCtx, frame: number): void {
   g.setTransform(dpr * s, 0, 0, dpr * s, dpr * ox, dpr * oy);
   const px = 1 / s; // one CSS pixel in video units
 
-  if (layers.court && o.calibration?.H) drawCourt(g, o.calibration.H, px);
+  if (layers.court && o.calibration?.H) {
+    // The calibration holds for one camera pose; the engine measures the pose of every frame, so the court
+    // is drawn where it is *in this frame* — and not at all where the court is not in view (close-ups,
+    // other cameras).  Sessions analysed without camera tracking keep the fixed court.
+    const pose = tracks.tracksCamera ? tracks.camera(frame) : undefined;
+    if (pose === undefined) drawCourt(g, o.calibration.H, px);
+    else if (pose) drawCourt(g, mul3(pose, o.calibration.H), px);
+  }
 
   if (layers.players) {
     for (const pid of ["P1", "P2"] as PlayerId[]) {

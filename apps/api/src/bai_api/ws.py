@@ -96,7 +96,7 @@ async def session_ws(ws: WebSocket, session_id: str) -> None:
     async def track_window(center: int) -> None:
         a = max(0, center - int(WINDOW_BEFORE_S * fps))
         b = center + int(WINDOW_AFTER_S * fps)
-        table = repo.tracks(session_id).read([TrackObject.SHUTTLE, TrackObject.PLAYER], a, b)
+        table = repo.tracks(session_id).read([TrackObject.SHUTTLE, TrackObject.PLAYER, TrackObject.CAMERA], a, b)
         if table.num_rows:
             await send({"type": "tracks", "from": a, "to": b, "bin": encode_tracks(table_to_samples(table), a, b)})
         snap = store.state_at(center)
@@ -139,7 +139,8 @@ async def session_ws(ws: WebSocket, session_id: str) -> None:
             elif kind == "tracks":
                 a, b = int(msg.get("from", 0)), int(msg.get("to", 0))
                 if 0 <= a <= b and b - a <= 60 * fps:
-                    table = repo.tracks(session_id).read([TrackObject.SHUTTLE, TrackObject.PLAYER], a, b)
+                    objs = [TrackObject.SHUTTLE, TrackObject.PLAYER, TrackObject.CAMERA]
+                    table = repo.tracks(session_id).read(objs, a, b)
                     await send(
                         {"type": "tracks", "from": a, "to": b, "bin": encode_tracks(table_to_samples(table), a, b)}
                     )

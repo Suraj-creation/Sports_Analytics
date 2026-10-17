@@ -164,6 +164,9 @@ export interface Calibration {
   n_points: number;
   net_ground_y?: number;
   net_top_y?: number;
+  /** reference view the camera is tracked against (null: the calibration is taken to hold for the whole shot) */
+  cam_ref?: number | null;
+  ref_frame?: number | null;
 }
 
 export interface AskAnswer {

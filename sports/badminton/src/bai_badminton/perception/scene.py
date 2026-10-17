@@ -107,16 +107,28 @@ class CourtPresence:
             self._masks[size] = m > 0
         return self._masks[size]
 
-    def _fraction(self, hsv: NDArray[Any], size: tuple[int, int], band: MatBand) -> float:
-        inside = self._inside(size)
+    @staticmethod
+    def _mask_of(polygon: NDArray[np.floating], size: tuple[int, int]) -> NDArray[np.bool_]:
+        sx, sy = SMALL[0] / size[0], SMALL[1] / size[1]
+        m = np.zeros((SMALL[1], SMALL[0]), np.uint8)
+        pts = np.clip(np.asarray(polygon, dtype=np.float64) * [sx, sy], -1e5, 1e5)
+        cv2.fillPoly(m, [pts.astype(np.int32)], 255)
+        return m > 0
+
+    def _fraction(
+        self, hsv: NDArray[Any], size: tuple[int, int], band: MatBand, polygon: NDArray[np.floating] | None = None
+    ) -> float:
+        inside = self._inside(size) if polygon is None else self._mask_of(polygon, size)
         return float((band.mask(hsv)[inside] > 0).mean()) if inside.any() else 0.0
 
-    def score(self, frame: NDArray[np.uint8]) -> float:
+    def score(self, frame: NDArray[np.uint8], polygon: NDArray[np.floating] | None = None) -> float:
+        """Court-colour fraction inside the court polygon — ``polygon`` is where the court is *in this
+        frame* when the camera moves (default: the calibrated one)."""
         hsv, size = small_hsv(frame)
-        return self._fraction(hsv, size, self.band)
+        return self._fraction(hsv, size, self.band, polygon)
 
-    def is_main_camera(self, frame: NDArray[np.uint8]) -> bool:
-        return self.score(frame) >= self.min_fraction
+    def is_main_camera(self, frame: NDArray[np.uint8], polygon: NDArray[np.floating] | None = None) -> bool:
+        return self.score(frame, polygon) >= self.min_fraction
 
     def learn(self, samples: list[tuple[NDArray[Any], tuple[int, int]]]) -> MatBand | None:
         """Pick the mat colour family that fills the calibrated court in most keyframes (most
@@ -197,8 +209,11 @@ def _propose_from_mask(
     h, w = shape[:2]
     margin = max(2.0, 0.01 * min(h, w))
     on_edge = sum(x <= margin or y <= margin or x >= w - 1 - margin or y >= h - 1 - margin for x, y in quad)
-    if on_edge >= 2 or frac > MAX_COURT_FRAC:
-        return None
+    if on_edge >= 1 or frac > MAX_COURT_FRAC:
+        return None  # even one corner on the border is an image corner, not a court corner
+    far_w, near_w = float(np.linalg.norm(quad[1] - quad[0])), float(np.linalg.norm(quad[2] - quad[3]))
+    if far_w > 1.15 * near_w:
+        return None  # the far edge cannot be wider than the near one: this is not a court seen in perspective
     names = ("far_left", "far_right", "near_right", "near_left")
     pts = {n: (float(x), float(y)) for n, (x, y) in zip(names, quad, strict=True)}
     # score: how rectangular-in-perspective is it (parallel near/far edges, convex)

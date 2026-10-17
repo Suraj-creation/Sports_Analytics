@@ -79,10 +79,11 @@ export const api = {
       current: Calibration | null;
       reference_points: Record<string, [number, number]>;
     }>(`/api/sessions/${id}/calibration/proposal?segment=${segment}`),
-  calibrate: (id: string, points: Record<string, [number, number]>) =>
+  /** `frame`: the video frame the points were placed on — the camera is tracked from it */
+  calibrate: (id: string, points: Record<string, [number, number]>, frame?: number) =>
     req<{ reprojection_error_px: number; n_points: number }>(`/api/sessions/${id}/calibration`, {
       method: "POST",
-      body: JSON.stringify({ points }),
+      body: JSON.stringify({ points, frame }),
     }),
   correctWinner: (id: string, rally_event_id: string, winner: "P1" | "P2") =>
     req(`/api/sessions/${id}/corrections`, {

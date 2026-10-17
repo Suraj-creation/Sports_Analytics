@@ -10,6 +10,8 @@ interface WireWindow {
     string,
     { f: number[]; t: number[]; b: number[]; k: number[]; cx: (number | null)[]; cy: (number | null)[] }
   >;
+  /** camera pose per frame: 3×3 row-major, reference px → frame px; all zeros = court not in view */
+  cam?: { f: number[]; g: number[] };
 }
 
 export interface ShuttlePoint {
@@ -32,6 +34,10 @@ export interface PlayerFrame {
 export class TrackBuffer {
   readonly shuttle = new Map<number, ShuttlePoint>();
   readonly players: Record<PlayerId, Map<number, PlayerFrame>> = { P1: new Map(), P2: new Map() };
+  /** per-frame camera pose (null: tracked, but the court is not in view); empty when the camera is untracked */
+  private readonly cams = new Map<number, number[][] | null>();
+  /** true once any camera pose has arrived: the overlay then follows the camera instead of a fixed court */
+  tracksCamera = false;
   /** frame ranges known to be analysed (so "no shuttle" means invisible, not "not yet analysed") */
   private covered: [number, number][] = [];
   version = 0;
@@ -69,8 +75,25 @@ export class TrackBuffer {
         });
       }
     }
+    for (let f = win.from; f <= win.to; f++) this.cams.delete(f);
+    const c = win.cam;
+    if (c) {
+      this.tracksCamera = true;
+      for (let i = 0; i < c.f.length; i++) {
+        const g = c.g.slice(i * 9, i * 9 + 9);
+        this.cams.set(
+          c.f[i] as number,
+          g[8] ? [g.slice(0, 3), g.slice(3, 6), g.slice(6, 9)] : null,
+        );
+      }
+    }
     this.cover(win.from, win.to);
     this.version++;
+  }
+
+  /** Camera pose at `frame` (reference px → frame px), or null when the court is not (known to be) in view. */
+  camera(frame: number): number[][] | null {
+    return this.cams.get(frame) ?? null;
   }
 
   private cover(a: number, b: number): void {
@@ -123,6 +146,8 @@ export class TrackBuffer {
     this.shuttle.clear();
     this.players.P1.clear();
     this.players.P2.clear();
+    this.cams.clear();
+    this.tracksCamera = false;
     this.covered = [];
     this.version++;
   }

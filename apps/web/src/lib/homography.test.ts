@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { project } from "./court";
+import { mul3, project } from "./court";
 import { fitHomography, reprojectionError } from "./homography";
 
 const TRUE_H = [
@@ -40,5 +40,27 @@ describe("fitHomography", () => {
       [3, 0],
     ];
     expect(fitHomography(line, line)).toBeNull();
+  });
+});
+
+describe("camera pose composition", () => {
+  it("court → image under a panned/zoomed camera is G·H, not H", () => {
+    // the camera zooms 1.3× about the frame centre and pans 90 px right
+    const G = [
+      [1.3, 0, 90 + (1 - 1.3) * 640],
+      [0, 1.3, (1 - 1.3) * 360],
+      [0, 0, 1],
+    ];
+    const GH = mul3(G, TRUE_H);
+    for (const c of COURT) {
+      const [u, v] = project(TRUE_H, c);
+      const [gu, gv] = project(GH, c);
+      expect(gu).toBeCloseTo(1.3 * u + 90 + (1 - 1.3) * 640, 6);
+      expect(gv).toBeCloseTo(1.3 * v + (1 - 1.3) * 360, 6);
+    }
+    // …so a court drawn with the fixed H would sit hundreds of px off the one the camera sees
+    const [u0] = project(TRUE_H, [3.05, 6.7]);
+    const [u1] = project(GH, [3.05, 6.7]);
+    expect(Math.abs(u1 - u0)).toBeGreaterThan(50);
   });
 });

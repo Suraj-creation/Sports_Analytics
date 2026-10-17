@@ -48,9 +48,10 @@ from bai_badminton.events.stroke import (
 from bai_badminton.identity import IdentityResolver
 from bai_badminton.observations import PlayerSeries, WindowObs
 from bai_badminton.ontology import get_ontology
+from bai_badminton.perception.camera import project
 from bai_badminton.perception.keypoints import KP
 from bai_badminton.perception.shuttle_post import Track, process
-from bai_badminton.perception_types import ChunkPerception, FramePerception, ScoreReading
+from bai_badminton.perception_types import ChunkPerception, FramePerception, PersonObs, ScoreReading
 from bai_badminton.rules import (
     PLAYERS,
     MatchConfig,
@@ -94,6 +95,23 @@ class EngineConfig:
     match: MatchConfig = field(default_factory=MatchConfig)
     phase: PhaseParams = field(default_factory=PhaseParams)
     profile: str = "unknown"
+
+
+def _stabilise(p: PersonObs, Ginv: Any) -> PersonObs:
+    """``p`` seen through the reference view: box corners and skeleton mapped by G⁻¹ (a copy)."""
+    x1, y1, x2, y2 = (float(v) for v in p.bbox)
+    q = project(Ginv, [[x1, y1], [x2, y1], [x2, y2], [x1, y2]])
+    kps = None
+    if p.kps is not None:
+        kps = np.array(p.kps, dtype=np.float64, copy=True)
+        kps[:, :2] = project(Ginv, kps[:, :2])
+    return PersonObs(
+        track_id=p.track_id,
+        bbox=np.array([q[:, 0].min(), q[:, 1].min(), q[:, 0].max(), q[:, 1].max()]),
+        conf=p.conf,
+        kps=kps,
+        appearance=p.appearance,
+    )
 
 
 @dataclass
@@ -161,6 +179,13 @@ class BadmintonMatchEngine:
         self._seed_checked = False  # mid-match start: base score read from the scoreboard (once)
         self.calibration: dict[int, _Calib] = {}
         self._main_calib: _Calib | None = None
+        # Camera tracking: while ``_cam_ref`` matches the perception's reference view every frame carries
+        # the camera pose ``G`` (reference px → frame px).  All geometry below (shuttle, player boxes and
+        # skeletons) is kept *stabilised* — mapped through G⁻¹ into the reference view, where the one
+        # calibration (court homography, net line, in/out geometry) is valid — and mapped back (``_raw_xy``)
+        # wherever a pixel position leaves the engine for the screen.
+        self._cam_ref: int | None = None
+        self._cam: list[Any] = []  # per frame: G (3×3) or None; aligned with the buffers
         self._track_out: list[TrackSample] = []
 
         # dense buffers (absolute frame = _buf0 + index)
@@ -187,6 +212,11 @@ class BadmintonMatchEngine:
         self._provenance = {"perception": "unknown"}
 
     # ================================================================== inputs
+    def set_camera_reference(self, cam_ref: int | None) -> None:
+        """Tracking (re)started against reference view ``cam_ref`` (a restart / re-analysis restoring the
+        calibration; ``None``: not tracked)."""
+        self._cam_ref = cam_ref
+
     def set_calibration(
         self,
         shot_id: int,
@@ -196,13 +226,18 @@ class BadmintonMatchEngine:
         *,
         emit: bool = True,
         source: str = "auto",
+        cam_ref: int | None = None,
+        ref_frame: int | None = None,
     ) -> Event | None:
         """Install the court calibration for a camera shot (``emit=False`` when restoring).
 
         ``source`` is ``"human"`` for a calibration placed in the UI — those survive a re-analysis.
+        ``cam_ref`` identifies the reference view the camera tracker measures poses against (``None``:
+        the camera is not tracked and the calibration is taken to hold for the whole shot).
         """
         geom = CourtImageGeometry.from_homography(homography, net_top_left, net_top_right)
         self.calibration[shot_id] = _Calib(homography, geom)
+        self._cam_ref = cam_ref
         self._main_calib = self.calibration[shot_id]  # broadcasts return to the main camera after cuts
         if shot_id == 0 or self.identity.net_image_y is None:
             self.identity.net_image_y = geom.net_ground_y
@@ -219,6 +254,8 @@ class BadmintonMatchEngine:
                 "net_ground_y": geom.net_ground_y,
                 "net_top_y": geom.net_top_y,
                 "source": source,
+                "cam_ref": cam_ref,
+                "ref_frame": ref_frame,
             },
             confidence=float(np.clip(1.0 - homography.reprojection_error_px / 20.0, 0.0, 1.0)),
             status=EventStatus.CONFIRMED,
@@ -237,8 +274,9 @@ class BadmintonMatchEngine:
         self._provenance.update(chunk.models)
         for r in chunk.ocr:
             self.on_ocr(r)
+        tracked = chunk.cam_ref is not None and chunk.cam_ref == self._cam_ref
         for fp in chunk.frames:
-            self._append(fp)
+            self._append(fp, tracked)
         self._last_frame = chunk.end
         self._advance(self._last_frame - self.cfg.lookahead)
         self._finalize_pending(self._last_frame)
@@ -255,10 +293,17 @@ class BadmintonMatchEngine:
         self._finalize_pending(self._last_frame + 10**9)
 
     # ================================================================== buffering
-    def _append(self, fp: FramePerception) -> None:
-        if fp.shuttle_xy is not None:
-            self._sx.append(float(fp.shuttle_xy[0]))
-            self._sy.append(float(fp.shuttle_xy[1]))
+    def _append(self, fp: FramePerception, tracked: bool = False) -> None:
+        G = fp.cam if tracked else None
+        self._cam.append(G)
+        Ginv = np.linalg.inv(G) if G is not None else None
+        sxy = fp.shuttle_xy
+        if sxy is not None and Ginv is not None:
+            sx, sy = project(Ginv, [sxy])[0]
+            sxy = (float(sx), float(sy))
+        if sxy is not None:
+            self._sx.append(float(sxy[0]))
+            self._sy.append(float(sxy[1]))
             self._svis.append(True)
         else:
             self._sx.append(np.nan)
@@ -267,21 +312,23 @@ class BadmintonMatchEngine:
         self._sconf.append(fp.shuttle_conf)
         self._replay.append(fp.replay)
         self._shot.append(fp.shot_id)
-        calib = self._calib(fp.shot_id)
-        for p in fp.persons:
+        # a tracked camera has one calibration (in the reference view) wherever the court is in view
+        calib = (self._main_calib if G is not None else None) if tracked else self._calib(fp.shot_id)
+        persons = [_stabilise(p, Ginv) for p in fp.persons] if Ginv is not None else fp.persons
+        for p in persons:
             if p.court_xy is None and calib is not None:
                 feet = np.array([[(p.bbox[0] + p.bbox[2]) / 2, p.bbox[3]]])
                 cx, cy = calib.homography.image_to_court(feet)[0]
                 p.court_xy = (float(cx), float(cy))
         assigned = (
-            self.identity.assign(fp.persons, {k: v.value for k, v in self.state.ends.items()}) if not fp.replay else {}
+            self.identity.assign(persons, {k: v.value for k, v in self.state.ends.items()}) if not fp.replay else {}
         )
         for pid, buf in self._players.items():
             p = assigned.get(pid)
             buf["bbox"].append(p.bbox if p is not None else None)
             buf["kps"].append(p.kps if p is not None and p.kps is not None else None)
             buf["court"].append(p.court_xy if p is not None else None)
-        # identity-resolved track samples for the track store / live overlays
+        # identity-resolved track samples for the track store / live overlays (raw frame pixels)
         self._track_out.append(
             TrackSample(
                 frame_idx=fp.frame_idx,
@@ -293,23 +340,45 @@ class BadmintonMatchEngine:
                 model=self._provenance.get("shuttle", ""),
             )
         )
+        raw = {q.track_id: q for q in fp.persons}
         for pid, p in assigned.items():
+            r = raw.get(p.track_id, p)
             self._track_out.append(
                 TrackSample(
                     frame_idx=fp.frame_idx,
                     obj=TrackObject.PLAYER,
                     track_id=p.track_id,
                     player_id=pid,
-                    x=float((p.bbox[0] + p.bbox[2]) / 2),
-                    y=float(p.bbox[3]),
+                    x=float((r.bbox[0] + r.bbox[2]) / 2),
+                    y=float(r.bbox[3]),
                     court_x=p.court_xy[0] if p.court_xy else None,
                     court_y=p.court_xy[1] if p.court_xy else None,
-                    bbox=tuple(float(v) for v in p.bbox),  # type: ignore[arg-type]
-                    keypoints=tuple(tuple(float(v) for v in row) for row in p.kps) if p.kps is not None else None,
+                    bbox=tuple(float(v) for v in r.bbox),  # type: ignore[arg-type]
+                    keypoints=tuple(tuple(float(v) for v in row) for row in r.kps) if r.kps is not None else None,
                     conf=float(p.conf),
                     model=self._provenance.get("pose", self._provenance.get("player_detector", "")),
                 )
             )
+        if tracked:
+            self._track_out.append(
+                TrackSample(
+                    frame_idx=fp.frame_idx,
+                    obj=TrackObject.CAMERA,
+                    visible=G is not None,
+                    cam=tuple(float(v) for v in G.ravel()) if G is not None else None,
+                )
+            )
+
+    def _raw_xy(self, frame: int, xy: tuple[float, float] | None) -> tuple[float, float] | None:
+        """A stabilised (reference-view) image point as it appears in frame ``frame``'s pixels."""
+        if xy is None:
+            return None
+        i = frame - self._buf0
+        G = self._cam[i] if 0 <= i < len(self._cam) else None
+        if G is None:
+            return xy
+        x, y = project(G, [xy])[0]
+        return float(x), float(y)
 
     def _calib(self, shot_id: int) -> _Calib | None:
         return self.calibration.get(shot_id) or self._main_calib
@@ -329,7 +398,7 @@ class BadmintonMatchEngine:
         drop = keep_from - self._buf0
         if drop <= 0:
             return
-        for lst in (self._sx, self._sy, self._svis, self._sconf, self._replay, self._shot):
+        for lst in (self._sx, self._sy, self._svis, self._sconf, self._replay, self._shot, self._cam):
             del lst[:drop]
         for buf in self._players.values():
             for lst in buf.values():
@@ -424,7 +493,7 @@ class BadmintonMatchEngine:
             c.frame,
             c.frame,
             actors=Actors(player_id=c.player_id),
-            payload={"shuttle_xy": list(c.shuttle_xy) if c.shuttle_xy else None},
+            payload={"shuttle_xy": list(self._raw_xy(c.frame, c.shuttle_xy) or ()) or None},
             confidence=c.p,
             evidence=(
                 Evidence(kind=EvidenceKind.COMPONENT_SCORES, scores=c.components),
@@ -438,12 +507,27 @@ class BadmintonMatchEngine:
         if prev is not None and prev.stroke_event is None:
             self._classify(prev, next_frame=c.frame, is_serve=len(self._open_contacts) == 2, receiver=c)
 
+    def _shuttle_around(self, frame: int) -> tuple[Track, int] | None:
+        """Processed shuttle track covering ``frame`` and ``frame``'s index in it.
+
+        ``_proc`` is only the *latest* window.  A rally is finalised ``ocr_wait_s`` after it ends (once
+        the scoreboard OCR is live), by which time that window has moved past its last contact — a
+        negative index there either wraps silently or raises.  Re-derive a window around the frame
+        from the dense buffers instead; ``None`` when the frame has left them."""
+        if self._proc is not None and 0 <= frame - self._proc0 < len(self._proc):
+            return self._proc, frame - self._proc0
+        if not self._buf0 <= frame <= self._last_frame:
+            return None
+        lo = max(self._buf0, frame - self.cfg.context_back)
+        w = self._window(lo, min(self._last_frame, frame + self.cfg.lookahead))
+        return w.shuttle, frame - lo
+
     def _post_contact_kinematics(self, frame: int) -> tuple[float | None, float | None]:
         """Initial shuttle speed (px/s) and vertical velocity over the 4 frames after contact."""
-        if self._proc is None:
+        located = self._shuttle_around(frame)
+        if located is None:
             return None, None
-        i = frame - self._proc0
-        t = self._proc
+        t, i = located
         idx = [j for j in range(i + 1, min(len(t), i + 6)) if t.vis[j]]
         if len(idx) < 2:
             return None, None

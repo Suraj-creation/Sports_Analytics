@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
+import cv2
 import msgpack
 import numpy as np
 
@@ -23,6 +26,12 @@ from bai_engine.store import EventStore
 
 log = get_logger(__name__)
 AUTO_CALIBRATION_MIN_SCORE = 0.6
+REF_FILE = "camera_ref.png"  # the frame the calibration was made on (lossless: its id is a content hash)
+CODEC_VERSION = 2  # 2: per-frame camera pose + the reference it is relative to
+
+
+class StaleCacheError(ValueError):
+    """A cached perception chunk that no longer matches the calibration (the runner recomputes it)."""
 
 
 class BadmintonSession:
@@ -45,7 +54,36 @@ class BadmintonSession:
         self.perception = BadmintonPerception(profile, registry, fps, get_settings().models_dir)
         self.calibration: Homography | None = None
         self._emit = emit
+        self._frame_at: Callable[[int], np.ndarray] | None = None
+        self._ref_dir: Path | None = None
+        self._restored_cam_ref: int | None = None  # reference view id the restored calibration was tracked against
         self._restore_calibration()
+
+    # ------------------------------------------------------------------ frame access (camera tracking)
+    def attach_frames(self, frame_at: Callable[[int], np.ndarray], ref_dir: Path) -> None:
+        """Give the session access to decoded frames (a human calibration names the frame it was made on)
+        and a directory for the reference frame, which makes camera tracking survive a restart."""
+        self._frame_at, self._ref_dir = frame_at, ref_dir
+        if self.calibration is not None and self._restored_cam_ref is not None and not self.perception.camera.ready:
+            ref = self._load_ref()  # a re-analysis / restart: resume tracking against the saved reference
+            if ref is not None:
+                self.perception.set_calibration(self.calibration, ref)
+                if self.perception.camera.ref_id == self._restored_cam_ref:
+                    self.engine.set_camera_reference(self._restored_cam_ref)
+                else:  # not the frame the calibration was tracked against: do not track
+                    log.warning(
+                        "camera.reference_mismatch", saved=self.perception.camera.ref_id, wanted=self._restored_cam_ref
+                    )
+                    self.perception.set_calibration(self.calibration)
+
+    def _save_ref(self, img: np.ndarray) -> None:
+        if self._ref_dir is not None:
+            self._ref_dir.mkdir(parents=True, exist_ok=True)
+            cv2.imwrite(str(self._ref_dir / REF_FILE), img)
+
+    def _load_ref(self) -> np.ndarray | None:
+        f = None if self._ref_dir is None else self._ref_dir / REF_FILE
+        return cv2.imread(str(f)) if f is not None and f.exists() else None
 
     # ------------------------------------------------------------------ calibration
     def _restore_calibration(self) -> None:
@@ -53,7 +91,8 @@ class BadmintonSession:
         cal = self.store.query(types=["calibration"])
         if cal:
             h = Homography.from_json(cal[-1].payload)
-            self._apply_calibration(h, emit=False)
+            self._restored_cam_ref = cal[-1].payload.get("cam_ref")
+            self._apply_calibration(h, emit=False)  # tracking resumes in attach_frames (needs the reference)
 
     def _apply_calibration(
         self,
@@ -61,10 +100,20 @@ class BadmintonSession:
         emit: bool = True,
         net_top: tuple[tuple[float, float], tuple[float, float]] | None = None,
         source: str = "auto",
+        reference: np.ndarray | None = None,
+        ref_frame: int | None = None,
     ) -> None:
+        """``reference`` is the frame ``h`` was fitted on; with it the camera is tracked from there."""
         self.calibration = h
-        self.perception.set_calibration(h)
-        self.engine.set_calibration(0, h, *(net_top or (None, None)), emit=emit, source=source)
+        self.perception.set_calibration(h, reference)
+        cam_ref = self.perception.camera.ref_id
+        if reference is not None and cam_ref is not None:
+            self._save_ref(reference)
+        elif self._ref_dir is not None:  # untracked: a reference left by an older calibration must not be reused
+            (self._ref_dir / REF_FILE).unlink(missing_ok=True)
+        self.engine.set_calibration(
+            0, h, *(net_top or (None, None)), emit=emit, source=source, cam_ref=cam_ref, ref_frame=ref_frame
+        )
 
     def seed(self, keyframes: list[Any]) -> None:
         self.perception.seed_background(keyframes)
@@ -74,7 +123,7 @@ class BadmintonSession:
         for f in keyframes:
             prop = propose_corners(f)
             if prop is not None and (best is None or prop[1] > best[1]):
-                best = prop
+                best = (prop[0], prop[1], f)
         if best is None or best[1] < AUTO_CALIBRATION_MIN_SCORE:
             log.info("calibration.auto_failed", score=None if best is None else round(best[1], 2))
             return
@@ -83,7 +132,7 @@ class BadmintonSession:
         except CalibrationError as e:
             log.info("calibration.auto_invalid", error=str(e))
             return
-        self._apply_calibration(h)
+        self._apply_calibration(h, reference=best[2])
         log.info("calibration.auto", score=round(best[1], 2), err=round(h.reprojection_error_px, 2))
 
     # ------------------------------------------------------------------ perception / temporal
@@ -112,6 +161,15 @@ class BadmintonSession:
                     conf=fp.shuttle_conf,
                 )
             )
+            if p.cam_ref is not None and p.cam_ref == self.perception.camera.ref_id:
+                out.append(
+                    TrackSample(
+                        frame_idx=fp.frame_idx,
+                        obj=TrackObject.CAMERA,
+                        visible=fp.cam is not None,
+                        cam=tuple(float(v) for v in fp.cam.ravel()) if fp.cam is not None else None,
+                    )
+                )
             for side, person in self.engine.identity.select_players(fp.persons).items():
                 pid = next((k for k, v in self.engine.state.ends.items() if v.value == side), None)
                 out.append(
@@ -152,8 +210,22 @@ class BadmintonSession:
             h = fit_homography(pts)
             net = command.get("net_top")
             net_top = ((float(net[0][0]), float(net[0][1])), (float(net[1][0]), float(net[1][1]))) if net else None
-            self._apply_calibration(h, net_top=net_top, source="human")
-            return {"ok": True, "reprojection_error_px": h.reprojection_error_px, "n_points": h.n_points}
+            frame = command.get("frame")
+            reference = None
+            if frame is not None and self._frame_at is not None:
+                try:
+                    reference = self._frame_at(int(frame))
+                except (OSError, ValueError, RuntimeError) as e:  # the segment is not decodable (yet)
+                    log.warning("calibration.reference_unavailable", frame=frame, error=str(e))
+            self._apply_calibration(
+                h, net_top=net_top, source="human", reference=reference, ref_frame=None if frame is None else int(frame)
+            )
+            return {
+                "ok": True,
+                "reprojection_error_px": h.reprojection_error_px,
+                "n_points": h.n_points,
+                "camera_tracking": self.perception.camera.ready,
+            }
         if cmd == "correct_winner":
             evs = self.engine.correct_rally_winner(
                 command["rally_event_id"], command["winner"], Provenance(model="human", worker="review-ui")
@@ -210,6 +282,8 @@ class BadmintonSession:
                     "c": fp.shuttle_conf,
                     "r": fp.replay,
                     "sh": fp.shot_id,
+                    "g": [float(v) for v in fp.cam.ravel()] if fp.cam is not None else None,
+                    "l": fp.cam_lost,
                     "p": [
                         {
                             "t": q.track_id,
@@ -224,8 +298,9 @@ class BadmintonSession:
             )
         out = msgpack.packb(
             {
-                "v": 1,
+                "v": CODEC_VERSION,
                 "start": p.start,
+                "cr": p.cam_ref,
                 "end": p.end,
                 "models": p.models,
                 "frames": frames,
@@ -238,6 +313,13 @@ class BadmintonSession:
 
     def decode_perception(self, data: bytes) -> ChunkPerception:
         d = msgpack.unpackb(data, raw=False)
+        ref_id = self.perception.camera.ref_id
+        if ref_id is not None and (d.get("v", 1) < CODEC_VERSION or d.get("cr") != ref_id):
+            # made before camera tracking existed, or against another reference view: its poses (and the
+            # court-presence gating they fed) do not match the current calibration
+            raise StaleCacheError(
+                f"perception segment {d['start']} was made against reference {d.get('cr')}, not {ref_id}"
+            )
         frames = [
             FramePerception(
                 frame_idx=f["f"],
@@ -245,6 +327,8 @@ class BadmintonSession:
                 shuttle_conf=f["c"],
                 replay=f["r"],
                 shot_id=f["sh"],
+                cam=np.asarray(f["g"], dtype=np.float64).reshape(3, 3) if f.get("g") else None,
+                cam_lost=bool(f.get("l", False)),
                 persons=[
                     PersonObs(
                         track_id=q["t"],
@@ -264,7 +348,9 @@ class BadmintonSession:
             )
             for o in d.get("ocr", [])
         ]
-        return ChunkPerception(start=d["start"], end=d["end"], frames=frames, models=d.get("models", {}), ocr=ocr)
+        return ChunkPerception(
+            start=d["start"], end=d["end"], frames=frames, models=d.get("models", {}), ocr=ocr, cam_ref=d.get("cr")
+        )
 
 
 class BadmintonPlugin:

@@ -220,7 +220,9 @@ def tracks(
 ) -> Response:
     if frame_to - frame_from > 30 * 60 * 60:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "window too large (max 1 h of frames)")
-    table = r.tracks(session.session_id).read([TrackObject.SHUTTLE, TrackObject.PLAYER], frame_from, frame_to)
+    table = r.tracks(session.session_id).read(
+        [TrackObject.SHUTTLE, TrackObject.PLAYER, TrackObject.CAMERA], frame_from, frame_to
+    )
     return Response(encode_tracks(table_to_samples(table), frame_from, frame_to), media_type="application/msgpack")
 
 
@@ -228,6 +230,9 @@ def tracks(
 class Calibration(BaseModel):
     points: dict[str, tuple[float, float]]
     net_top: tuple[tuple[float, float], tuple[float, float]] | None = None
+    # the video frame the points were clicked on: the camera is tracked from it (the court calibration
+    # holds only for that camera pose; without it the calibration is assumed to hold for the whole shot)
+    frame: int | None = Field(default=None, ge=0)
 
 
 @router.post("/{session_id}/calibration", status_code=202)
@@ -244,6 +249,7 @@ def calibrate(session: SessionDep, body: Calibration, b: BusDep) -> dict[str, An
             "session_id": session.session_id,
             "points": body.points,
             "net_top": body.net_top,
+            "frame": body.frame,
             "reply_to": topic(session.session_id, "replies"),
         }
     )

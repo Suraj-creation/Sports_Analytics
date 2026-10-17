@@ -118,3 +118,31 @@ def test_cancelled_short_rally_retracts_contacts_and_strokes(tmp_path: Path) -> 
     assert store.query(types=["rally_end"]) == []
     assert store.query(types=["contact"]) == []
     assert store.query(types=["stroke"]) == [], "strokes of a cancelled rally must be retracted"
+
+
+def _stroke_speeds(tmp_path: Path, name: str, *, ocr: bool) -> dict[int, float | None]:
+    from bai_badminton.perception_types import ScoreReading
+
+    m = make_match(WINNERS, fps=60.0)  # a 4 s OCR wait is 240 frames: longer than the ~150-frame window
+    store = EventStore(tmp_path / f"{name}.sqlite", "S1")
+    eng = BadmintonMatchEngine("S1", EngineConfig(fps=m.fps, frame_width=1280, frame_height=720), store)
+    eng.set_calibration(0, m.homography)
+    if ocr:
+        eng.on_ocr(ScoreReading(frame_idx=0, rows=(("A", 0), ("B", 0)), conf=0.9))
+    for ch in m.chunks:
+        eng.ingest(ch)
+    eng.flush()
+    return {s.frame_start: s.payload.get("speed_px_s") for s in store.query(types=["stroke"])}
+
+
+def test_late_classification_reads_the_right_shuttle_samples(tmp_path: Path) -> None:
+    """Regression ("index -235 is out of bounds for axis 0 with size 135"): once the scoreboard OCR has
+    spoken a rally is only finalised ``ocr_wait_s`` after it ends, by which time the shuttle window has
+    moved on.  The last stroke's post-contact kinematics were read at a *negative* index — a crash when
+    the index outran the window, silent wrap-around garbage when it did not.  Speed is a property of the
+    shuttle track, so it must not depend on when the stroke happens to be classified."""
+    prompt = _stroke_speeds(tmp_path, "prompt", ocr=False)
+    late = _stroke_speeds(tmp_path, "late", ocr=True)
+    assert prompt.keys() == late.keys() and prompt
+    for f, v in prompt.items():
+        assert late[f] == pytest.approx(v, rel=1e-6), f"stroke at frame {f}"

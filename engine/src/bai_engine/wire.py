@@ -6,7 +6,11 @@ a list of objects and trivially decoded into typed arrays in the browser::
     {"v": 1, "from": 1200, "to": 1259,
      "shuttle": {"f": [...], "x": [...], "y": [...], "c": [...]},          # visible frames only
      "players": {"P1": {"f": [...], "b": [x1,y1,x2,y2,...], "k": [x,y,s × 17 ...] | null,
-                        "cx": [...], "cy": [...]}, "P2": {...}}}
+                        "cx": [...], "cy": [...]}, "P2": {...}},
+     "cam": {"f": [...], "g": [3×3 row-major × n]}}      # absent when the camera is not tracked
+
+``cam.g`` maps the calibration's reference-frame px to the frame's px (court → image = g · H); all
+zeros marks a frame where the camera is tracked but the court is not in view.
 
 Coordinates are rounded to 0.1 px / 1 cm to keep payloads small.
 """
@@ -29,6 +33,7 @@ def _r(v: float | None, nd: int = 1) -> float | None:
 def encode_tracks(samples: list[TrackSample], frame_from: int, frame_to: int) -> bytes:
     shuttle: dict[str, list[Any]] = {"f": [], "x": [], "y": [], "c": []}
     players: dict[str, dict[str, list[Any]]] = {}
+    cam: dict[str, list[Any]] = {"f": [], "g": []}
     for s in samples:
         if s.obj is TrackObject.SHUTTLE:
             if s.visible and s.x is not None and s.y is not None:
@@ -36,6 +41,9 @@ def encode_tracks(samples: list[TrackSample], frame_from: int, frame_to: int) ->
                 shuttle["x"].append(_r(s.x))
                 shuttle["y"].append(_r(s.y))
                 shuttle["c"].append(_r(s.conf, 2))
+        elif s.obj is TrackObject.CAMERA:
+            cam["f"].append(s.frame_idx)
+            cam["g"].extend(s.cam if s.cam is not None else (0.0,) * 9)
         elif s.obj is TrackObject.PLAYER and s.player_id:
             p = players.setdefault(s.player_id, {"f": [], "b": [], "k": [], "cx": [], "cy": [], "t": []})
             p["f"].append(s.frame_idx)
@@ -48,7 +56,9 @@ def encode_tracks(samples: list[TrackSample], frame_from: int, frame_to: int) ->
                 p["k"].extend([0.0] * 51)
             p["cx"].append(_r(s.court_x, 2))
             p["cy"].append(_r(s.court_y, 2))
-    payload = {"v": VERSION, "from": frame_from, "to": frame_to, "shuttle": shuttle, "players": players}
+    payload: dict[str, Any] = {"v": VERSION, "from": frame_from, "to": frame_to, "shuttle": shuttle, "players": players}
+    if cam["f"]:
+        payload["cam"] = cam
     out = msgpack.packb(payload, use_bin_type=True)
     assert isinstance(out, bytes)
     return out

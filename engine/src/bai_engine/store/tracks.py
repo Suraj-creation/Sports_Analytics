@@ -21,6 +21,14 @@ from bai_engine.schema.tracks import TRACK_ARROW_SCHEMA, TrackObject
 _NAME_RE = re.compile(r"^f(\d{9})-(\d{9})\.v(\d+)\.parquet$")
 
 
+def _conform(t: pa.Table) -> pa.Table:
+    """Cast to the current schema, filling columns that older files do not have with nulls."""
+    for f in TRACK_ARROW_SCHEMA:
+        if f.name not in t.column_names:
+            t = t.append_column(f, pa.nulls(t.num_rows, f.type))
+    return t.select(TRACK_ARROW_SCHEMA.names).cast(TRACK_ARROW_SCHEMA)
+
+
 class TrackStore:
     def __init__(self, root: Path | str) -> None:
         self.root = Path(root)
@@ -80,7 +88,7 @@ class TrackStore:
                 tables.append(t.filter(mask))
         if not tables:
             return TRACK_ARROW_SCHEMA.empty_table()
-        out = pa.concat_tables([t.cast(TRACK_ARROW_SCHEMA) for t in tables])
+        out = pa.concat_tables([_conform(t) for t in tables])
         return out.sort_by([("frame_idx", "ascending"), ("track_id", "ascending")])
 
     def covered_ranges(self, obj: TrackObject) -> list[tuple[int, int]]:

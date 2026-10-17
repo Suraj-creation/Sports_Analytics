@@ -280,7 +280,10 @@ class SessionRunner(threading.Thread):
         assert self.sport is not None
         cp = self._cache_path(k)
         if cp.exists():
-            return self.sport.decode_perception(cp.read_bytes())
+            try:
+                return self.sport.decode_perception(cp.read_bytes())
+            except ValueError as e:  # stale (made against another calibration reference) or unreadable
+                log.info("perception.cache_stale", segment=k, reason=str(e))
         chunk: DecodedChunk = dec.decode_segment(k)
         p = self.sport.perceive(chunk)
         tmp = cp.with_suffix(".tmp")
@@ -293,7 +296,7 @@ class SessionRunner(threading.Thread):
             return
         if write:
             ts = self.repo.tracks(self.session_id)
-            for obj in (TrackObject.SHUTTLE, TrackObject.PLAYER):
+            for obj in (TrackObject.SHUTTLE, TrackObject.PLAYER, TrackObject.CAMERA):
                 part = [x for x in samples if x.obj is obj and start <= x.frame_idx <= end]
                 if part:
                     ts.write_chunk(obj, start, end, samples_to_table(part))
@@ -398,7 +401,17 @@ class SessionRunner(threading.Thread):
         s = self.session
         profile: Profile = load_profile(s.profile, self.settings.profiles_dir)
         store = self.repo.events(self.session_id)
-        return get_plugin(s.sport).create_session(s, store, profile, self.registry, self._emit_events)
+        sport = get_plugin(s.sport).create_session(s, store, profile, self.registry, self._emit_events)
+        attach = getattr(sport, "attach_frames", None)
+        if attach is not None:  # lets a calibration name its reference frame (camera tracking)
+            attach(self._decode_frame, self.repo.paths(self.session_id).root)
+        return sport
+
+    def _decode_frame(self, frame_idx: int) -> Any:
+        """One frame of the analysis proxy (what perception sees), by absolute index."""
+        assert self.plan is not None
+        mp = self.repo.media_paths(self.session.source.sha256 or "")
+        return SegmentDecoder(mp, self.plan.frames_per_segment).decode_frame(frame_idx)
 
     def _attach(self) -> None:
         """Re-attach to a finished analysis: rebuild the sport session's state from the log so

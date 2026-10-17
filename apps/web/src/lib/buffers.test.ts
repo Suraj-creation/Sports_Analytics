@@ -96,3 +96,38 @@ describe("TrackBuffer", () => {
     expect(t.player("P1", 4)).toBeUndefined();
   });
 });
+
+describe("TrackBuffer camera poses", () => {
+  const eye = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+  const withCam = (from: number, to: number, frames: number[], g: number[][]) => ({
+    ...win(from, to, []),
+    cam: { f: frames, g: g.flat() },
+  });
+
+  it("is untracked until a pose arrives (the overlay then keeps the fixed court)", () => {
+    const tb = new TrackBuffer();
+    tb.ingest(win(0, 9, [1, 2]));
+    expect(tb.tracksCamera).toBe(false);
+  });
+
+  it("stores the pose per frame; an all-zero pose means the court is not in view", () => {
+    const tb = new TrackBuffer();
+    tb.ingest(withCam(0, 9, [3, 4], [eye, new Array(9).fill(0)]));
+    expect(tb.tracksCamera).toBe(true);
+    expect(tb.camera(3)).toEqual([
+      [1, 0, 0],
+      [0, 1, 0],
+      [0, 0, 1],
+    ]);
+    expect(tb.camera(4)).toBeNull();
+    expect(tb.camera(5)).toBeNull(); // frames without a pose never draw a stale court
+  });
+
+  it("a refreshed window replaces the poses it covers", () => {
+    const tb = new TrackBuffer();
+    tb.ingest(withCam(0, 9, [3], [eye]));
+    tb.ingest(withCam(0, 9, [4], [eye]));
+    expect(tb.camera(3)).toBeNull();
+    expect(tb.camera(4)).not.toBeNull();
+  });
+});

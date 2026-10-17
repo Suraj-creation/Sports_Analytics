@@ -55,6 +55,20 @@ def test_rejects_a_region_cut_off_by_the_frame_edge() -> None:
     assert propose_corners(img) is None
 
 
+def test_rejects_a_region_touching_the_frame_edge_at_a_single_corner() -> None:
+    # a broadcast close-up whose (crowd / stage) colour region reaches the left border: that corner is the
+    # image's, so the "court" it implies is wrong however convincing the rest of the quad looks
+    img = np.full((720, 1280, 3), FLOOR_BGR, np.uint8)
+    cv2.fillPoly(img, [np.array([[0, 180], [1100, 170], [1000, 520], [150, 560]], np.int32)], MAT_BGR)
+    assert propose_corners(img) is None
+
+
+def test_rejects_a_region_whose_far_edge_is_wider_than_its_near_edge() -> None:
+    img = np.full((720, 1280, 3), FLOOR_BGR, np.uint8)
+    cv2.fillPoly(img, [np.array([[200, 150], [1000, 150], [850, 600], [350, 600]], np.int32)], MAT_BGR)
+    assert propose_corners(img) is None
+
+
 def test_non_green_mats_are_proposed_and_gate_learns_the_colour() -> None:
     from bai_badminton.perception.scene import CourtPresence, small_hsv
 

@@ -18,7 +18,8 @@ from typing import Any
 
 import numpy as np
 
-from bai_badminton.court import REFERENCE_POINTS, Homography
+from bai_badminton.court import REFERENCE_POINTS, WIDTH_DOUBLES, Homography
+from bai_badminton.perception.camera import CameraTracker, project
 from bai_badminton.perception.players import CourtROI, PlayerDetector, PlayerPerception, PoseEstimator
 from bai_badminton.perception.scene import CourtPresence, CutDetector, small_hsv
 from bai_badminton.perception.scoreboard import ScoreboardReader
@@ -57,6 +58,8 @@ class BadmintonPerception:
         self.models: dict[str, str] = {}
         self.cuts = CutDetector()
         self.presence: CourtPresence | None = None
+        self.camera = CameraTracker()  # keeps the calibration locked to a panning / zooming camera
+        self._ref_poly: np.ndarray | None = None  # court polygon in the reference view (px)
         self._court_samples: list[tuple[np.ndarray, tuple[int, int]]] = []  # small HSV keyframes
         self.stats = PerceptionStats()
         cache = engine_cache_dir(models_dir)
@@ -141,12 +144,23 @@ class BadmintonPerception:
         self.degraded.append(Degradation(stage, reason))
 
     # ------------------------------------------------------------------ calibration
-    def set_calibration(self, h: Homography) -> None:
+    def set_calibration(self, h: Homography, reference: np.ndarray | None = None) -> None:
+        """Install the court calibration.  ``reference`` is the frame ``h`` was fitted on: with it the camera
+        is tracked (pan / tilt / zoom) and the court polygon, player ROI and court-presence gate follow it;
+        without it the calibration is taken to hold for the whole shot (the legacy fixed-camera behaviour)."""
         names = ("far_left", "far_right", "near_right", "near_left")
         poly = h.court_to_image(np.array([REFERENCE_POINTS[n] for n in names])).astype(np.float32)
         self.players.set_roi(CourtROI(poly))
         self.presence = CourtPresence(poly)
+        self._ref_poly = poly
         self._learn_court_colour()
+        self.camera.clear()
+        if reference is not None:
+            # poses are verified against the court plane: the court plus its run-off (lines, decals, mat)
+            hw, hl = WIDTH_DOUBLES / 2 + 0.9, REFERENCE_POINTS["far_left"][1] + 0.9
+            floor = h.court_to_image(np.array([[-hw, hl], [hw, hl], [hw, -hl], [-hw, -hl]]))
+            if self.camera.set_reference(reference, floor=floor) is None:
+                log.warning("camera.untrackable", reason="reference frame has too little texture")
 
     def _learn_court_colour(self) -> None:
         if self.presence is None or not self._court_samples:
@@ -174,12 +188,29 @@ class BadmintonPerception:
     def process(self, chunk: DecodedChunk, in_play: bool) -> ChunkPerception:
         p = self.profile
         n = len(chunk.frames)
-        shots, replay = [], []
+        shots, cut_flags = [], []
         for f in chunk.frames:
-            if self.cuts.update(f):
-                self.players.on_cut()
+            cut_flags.append(self.cuts.update(f))
             shots.append(self.cuts.shot_id)
-            replay.append(self.presence is not None and not self.presence.is_main_camera(f))
+
+        # Where the camera is: the pose of every frame relative to the calibration's reference view.  A frame
+        # whose pose is None does not show the court (close-up, another camera) — it is treated like a replay.
+        poses = self.camera.track(chunk.frames, cut_flags, chunk.start) if self.camera.ready else None
+        replay: list[bool] = []
+        polys: list[np.ndarray | None] = []
+        for i, f in enumerate(chunk.frames):
+            poly = None
+            if self.presence is None:
+                replay.append(False)
+            elif poses is None:
+                replay.append(not self.presence.is_main_camera(f))
+            else:
+                G = poses[i]
+                poly = project(G, self._ref_poly) if G is not None and self._ref_poly is not None else None
+                if poly is not None and not np.isfinite(poly).all():
+                    poly = None
+                replay.append(poly is None or not self.presence.is_main_camera(f, poly))
+            polys.append(poly)
 
         rates_det = p.detector_rates.in_play if in_play else p.detector_rates.idle
         rates_pose = p.pose_rates.in_play if in_play else p.pose_rates.idle
@@ -197,8 +228,14 @@ class BadmintonPerception:
         with timed("players"):
             for i, img in enumerate(chunk.frames):
                 fidx = chunk.start + i
+                if cut_flags[i]:
+                    self.players.on_cut()
+                poly = polys[i]
+                if poly is not None:  # the player ROI follows the court as the camera moves
+                    self.players.set_roi(CourtROI(poly.astype(np.float32)))
                 persons = [] if replay[i] else self.players.process(fidx, img, (rates_det, rates_pose))
                 s = shuttle[i] if not replay[i] else None
+                G = poses[i] if poses is not None and not replay[i] else None
                 frames.append(
                     FramePerception(
                         frame_idx=fidx,
@@ -207,13 +244,22 @@ class BadmintonPerception:
                         persons=persons,
                         replay=replay[i],
                         shot_id=shots[i],
+                        cam=G,
+                        cam_lost=poses is not None and G is None,
                     )
                 )
         self._rate("players", n, t0)
         ocr = self._read_scoreboard(chunk, replay, in_play)
         self.stats.frames += n
         self.stats.shuttle_frames += sum(1 for s in shuttle if s is not None)
-        return ChunkPerception(start=chunk.start, end=chunk.end, frames=frames, models=dict(self.models), ocr=ocr)
+        return ChunkPerception(
+            start=chunk.start,
+            end=chunk.end,
+            frames=frames,
+            models=dict(self.models),
+            ocr=ocr,
+            cam_ref=self.camera.ref_id if poses is not None else None,
+        )
 
     def _read_scoreboard(self, chunk: DecodedChunk, replay: list[bool], in_play: bool) -> list[ScoreReading]:
         """Read the score bug between rallies only (it cannot change during one), on main-camera
