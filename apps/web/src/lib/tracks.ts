@@ -81,10 +81,7 @@ export class TrackBuffer {
       this.tracksCamera = true;
       for (let i = 0; i < c.f.length; i++) {
         const g = c.g.slice(i * 9, i * 9 + 9);
-        this.cams.set(
-          c.f[i] as number,
-          g[8] ? [g.slice(0, 3), g.slice(3, 6), g.slice(6, 9)] : null,
-        );
+        this.cams.set(c.f[i] as number, g[8] ? [g.slice(0, 3), g.slice(3, 6), g.slice(6, 9)] : null);
       }
     }
     this.cover(win.from, win.to);
