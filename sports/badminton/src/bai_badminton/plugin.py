@@ -198,7 +198,11 @@ class BadmintonSession:
 
     def seed(self, keyframes: list[Any]) -> None:
         self.perception.seed_background(keyframes)
-        if self.calibration is not None or not keyframes:
+        if not keyframes:
+            return
+        if self.calibration is not None and self.perception.mode != "lines" and self._upgrade_legacy(keyframes):
+            return
+        if self.calibration is not None:
             return
         if self._auto_calibrate(keyframes):
             return
@@ -217,6 +221,34 @@ class BadmintonSession:
             return
         self._apply_calibration(h, reference=best[2], source="mat_contour_v0")
         log.info("calibration.auto", method="mat_contour", score=round(best[1], 2))
+
+    def _upgrade_legacy(self, keyframes: list[np.ndarray]) -> bool:
+        """A new analysis restored a calibration made before court-line tracking (one homography for one
+        camera pose).  A hand-placed one is refined onto the painted lines of its own frame when they confirm
+        it (and kept as it was otherwise); an automatic one (the mat outline) is replaced by court-line
+        detection when that finds the court.  Returns whether a calibration is now installed."""
+        cal = self.store.query(types=["calibration"])
+        if not cal or self.calibration is None:
+            return False
+        pay = cal[-1].payload
+        if pay.get("source") != "human":
+            return self._auto_calibrate(keyframes)
+        ref_frame = pay.get("ref_frame")
+        img = None
+        if ref_frame is not None and self._frame_at is not None:
+            try:
+                img = self._frame_at(int(ref_frame))
+            except (OSError, ValueError, RuntimeError, IndexError):
+                img = None
+        if img is None:
+            img = self._load_ref()
+        if img is None:
+            return True  # nothing to check it against: keep it as it was restored
+        net = pay.get("net_top")
+        net_top = ((net[0][0], net[0][1]), (net[1][0], net[1][1])) if net else None
+        self._apply_calibration(self.calibration, net_top=net_top, source="human", reference=img, ref_frame=ref_frame)
+        log.info("calibration.upgraded", mode=self.perception.mode)
+        return True
 
     def _auto_calibrate(self, frames: list[np.ndarray], ref_frames: list[int] | None = None) -> bool:
         """Calibrate from the painted lines of sampled frames: the camera seen most often becomes the main

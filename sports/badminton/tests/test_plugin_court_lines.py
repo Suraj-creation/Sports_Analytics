@@ -184,6 +184,27 @@ def test_a_clicked_calibration_is_refined_onto_the_painted_lines(tmp_path: Path)
     assert err(np.asarray(p["H"]), MAIN.H) < 2.0  # better than the clicks
 
 
+@pytest.mark.parametrize("source", ["human", "auto"])
+def test_a_calibration_from_before_court_lines_is_upgraded_on_reanalysis(
+    tmp_path: Path, keyframes: list[np.ndarray], source: str
+) -> None:
+    """An analysis log from the old pipeline: one homography, no mode. Re-analysing must not keep a fixed court
+    (the overlay slid off the court and was drawn on close-ups): a hand-placed calibration is refined onto the
+    lines of its frame, an automatic one is replaced by court-line detection."""
+    from bai_badminton.court import Homography
+
+    s, store = make_session(tmp_path)
+    shifted = np.array([[1, 0, 4.0], [0, 1, -3.0], [0, 0, 1]]) @ MAIN.H  # clicked a few px off
+    s.engine.set_calibration(0, Homography(shifted, 1.0, 4), source=source, ref_frame=10 if source == "human" else None)
+    assert "mode" not in store.query(types=["calibration"])[-1].payload
+    again = open_session(s.session, store, tmp_path)  # the runner of the re-analysis
+    again.seed(keyframes)
+    p = store.query(types=["calibration"])[-1].payload
+    assert again.perception.mode == "lines" and p["mode"] == "lines"
+    assert p["method"] == ("human+court_lines_v1" if source == "human" else "court_lines_v1")
+    assert err(np.asarray(p["H"]), MAIN.H) < 2.0
+
+
 def test_a_chunk_cached_against_another_calibration_is_stale(tmp_path: Path, keyframes: list[np.ndarray]) -> None:
     s, _ = make_session(tmp_path)
     s.seed(keyframes)
