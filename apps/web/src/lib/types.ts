@@ -167,6 +167,27 @@ export interface Calibration {
   /** reference view the camera is tracked against (null: the calibration is taken to hold for the whole shot) */
   cam_ref?: number | null;
   ref_frame?: number | null;
+  source?: string;
+  /** lines: the court is measured from its painted lines in every frame; camera: tracked from the reference
+   *  frame by the background; static: one homography for the whole video */
+  mode?: "lines" | "camera" | "static";
+  method?: string;
+  validity?: string;
+  calibration_id?: string | null;
+  quality?: { precision: number; support: number; lines: [number, number]; area: number; rms_px: number };
+  camera?: { focal_px: number; centre_m: [number, number, number] } | null;
+  coverage?: number;
+  adjusted_px?: number;
+  lines_check?: string;
+}
+
+/** Scene segment (a `scene` event's payload): which camera shot that stretch of video */
+export interface ScenePayload {
+  view: "main" | "alt" | "none";
+  camera: number | null;
+  analysed: boolean;
+  court_quality: number | null;
+  duration_s: number;
 }
 
 export interface AskAnswer {

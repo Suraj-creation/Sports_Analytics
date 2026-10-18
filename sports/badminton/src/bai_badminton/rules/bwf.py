@@ -44,6 +44,9 @@ class ServiceCourt(StrEnum):
 class MatchConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
+    # The court the rallies are judged on (in/out). Only singles scoring/service is implemented; doubles
+    # changes the in/out court (wider) here and needs its own service rules before it can be scored.
+    discipline: Literal["singles", "doubles"] = "singles"
     games_to_win: int = 2  # best of 3
     points_to_win: int = 21
     point_cap: int = 30

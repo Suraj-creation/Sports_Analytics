@@ -32,6 +32,20 @@ class FramePerception:
     # the camera is not tracked at all (a fixed calibration is assumed, as before).
     cam: NDArray[np.float64] | None = None
     cam_lost: bool = False
+    # Scene: which camera shot this frame — "main" (the calibration's camera: analysed), "alt" (another camera
+    # that shows the court: calibrated for display, not analysed — replays, reverse angles), "none" (no court
+    # in view: close-ups, crowd, graphics).  ``head`` numbers the physical cameras (0 = main); ``court_q`` is
+    # the court-line fit's precision (fraction of the projected court lines found painted in the frame).
+    view: str | None = None
+    head: int | None = None
+    court_q: float | None = None
+
+    @property
+    def scene(self) -> str:
+        """The frame's view, inferred for perception made before scenes were recorded."""
+        if self.view is not None:
+            return self.view
+        return "none" if self.replay else "main"
 
 
 @dataclass

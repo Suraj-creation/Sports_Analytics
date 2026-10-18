@@ -257,8 +257,18 @@ def calibrate(session: SessionDep, body: Calibration, b: BusDep) -> dict[str, An
 
 
 @router.get("/{session_id}/calibration/proposal")
-def calibration_proposal(session: SessionDep, r: Repo, segment: Annotated[int, Query(ge=0)] = 0) -> dict[str, Any]:
+def calibration_proposal(
+    session: SessionDep,
+    r: Repo,
+    segment: Annotated[int, Query(ge=0)] = 0,
+    frame: Annotated[int | None, Query(ge=0, description="exact frame (default: the segment's first)")] = None,
+) -> dict[str, Any]:
+    """The court as detected on one frame (from its painted lines; the mat outline as a fallback), for the
+    calibration page to show and adjust."""
+    import numpy as np
+
     from bai_badminton.court import REFERENCE_POINTS
+    from bai_badminton.perception.court_lines import detect_court
     from bai_badminton.perception.scene import propose_corners
     from bai_engine.decode import SegmentDecoder
 
@@ -266,20 +276,52 @@ def calibration_proposal(session: SessionDep, r: Repo, segment: Annotated[int, Q
         raise HTTPException(status.HTTP_409_CONFLICT, "The video is still being prepared")
     mp = r.media_paths(session.source.sha256)
     fps_seg = int(session.meta.get("frames_per_segment", 60))
+    dec = SegmentDecoder(mp, fps_seg)
     try:
-        frame = SegmentDecoder(mp, fps_seg).keyframe(segment)
-    except FileNotFoundError as e:
+        img = dec.decode_frame(frame) if frame is not None else dec.keyframe(segment)
+    except (FileNotFoundError, IndexError, ValueError, RuntimeError) as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "That part of the video is not ready yet") from e
-    prop = propose_corners(frame)
+    h, w = img.shape[:2]
+    proposal: dict[str, Any] | None = None
+    fit = detect_court(img)
+    if fit is not None and fit.ok:
+        names = list(REFERENCE_POINTS)
+        court = np.array([REFERENCE_POINTS[n] for n in names], np.float64)
+        q = np.concatenate([court, np.ones((len(names), 1))], axis=1) @ fit.H.T
+        pts = {}
+        for n, (x, y, z) in zip(names, q, strict=True):
+            if z > 0 and 0 <= x / z < w and 0 <= y / z < h:
+                pts[n] = [round(float(x / z), 1), round(float(y / z), 1)]
+        if len(pts) >= 4:
+            proposal = {
+                "points": pts,
+                "score": round(fit.precision, 3),
+                "method": "court_lines_v1",
+                "lines": list(fit.lines),
+                "camera": fit.pose.to_json() if fit.pose else None,
+            }
+    if proposal is None:
+        prop = propose_corners(img)
+        if prop is not None:
+            proposal = {"points": prop[0], "score": round(prop[1], 3), "method": "mat_contour_v0"}
     current = r.events(session.session_id).query(types=["calibration"])
     return {
-        "frame": segment * fps_seg,
-        "width": frame.shape[1],
-        "height": frame.shape[0],
-        "proposal": None if prop is None else {"points": prop[0], "score": round(prop[1], 3)},
+        "frame": frame if frame is not None else segment * fps_seg,
+        "width": w,
+        "height": h,
+        "proposal": proposal,
         "current": current[-1].payload if current else None,
         "reference_points": {k: list(v) for k, v in REFERENCE_POINTS.items()},
     }
+
+
+@router.post("/{session_id}/calibration/auto", status_code=202)
+def auto_calibrate(session: SessionDep, b: BusDep) -> dict[str, str]:
+    """Re-detect the court from the painted lines across the video (replaces the current calibration)."""
+    b.send_command(
+        {"cmd": "auto_calibrate", "session_id": session.session_id, "reply_to": topic(session.session_id, "replies")}
+    )
+    return {"status": "accepted"}
 
 
 # ---------------------------------------------------------------------- corrections

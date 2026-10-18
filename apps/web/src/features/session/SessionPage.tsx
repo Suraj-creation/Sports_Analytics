@@ -156,7 +156,21 @@ function Header({ session, onHelp }: { session: Session; onHelp: () => void }) {
   const status = useSession((s) => s.status);
   const connection = useSession((s) => s.connection);
   const progress = useSession((s) => s.ingestProgress);
+  const calibration = useSession((s) => s.calibration);
   const reanalyse = useMutation({ mutationFn: () => api.control(session.session_id, "reanalyse") });
+  const courtLabel = !calibration
+    ? "Calibrate court"
+    : calibration.mode === "lines"
+      ? calibration.source === "human"
+        ? "Court: set + tracked"
+        : "Court: auto"
+      : "Court: calibrated";
+  const courtTitle =
+    calibration?.mode === "lines"
+      ? `Measured from the court lines in every frame${
+          calibration.quality ? ` (${Math.round(calibration.quality.precision * 100)}% line match)` : ""
+        }. Click to check or adjust.`
+      : "Place the court on a frame";
   const n = session.media?.n_frames ?? 0;
   const pct = n ? Math.min(100, Math.round(((session.frontier_frame + 1) / n) * 100)) : 0;
   const busy = ["created", "ingesting", "analysing", "ready_to_play"].includes(session.status);
@@ -205,9 +219,10 @@ function Header({ session, onHelp }: { session: Session; onHelp: () => void }) {
         <Link
           to="/sessions/$sessionId/calibrate"
           params={{ sessionId: session.session_id }}
+          title={courtTitle}
           className="inline-flex h-8 items-center gap-2 rounded-lg border border-seam bg-stand-raised px-3 text-[13px] hover:border-line-3"
         >
-          <Crosshair className="size-4" aria-hidden /> Calibrate court
+          <Crosshair className="size-4" aria-hidden /> {courtLabel}
         </Link>
         {(session.status === "analysed" || session.status === "failed") && (
           <Button size="sm" busy={reanalyse.isPending} onClick={() => reanalyse.mutate()}>

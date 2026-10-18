@@ -130,4 +130,23 @@ describe("TrackBuffer camera poses", () => {
     expect(tb.camera(3)).toBeNull();
     expect(tb.camera(4)).not.toBeNull();
   });
+
+  it("knows which camera shot each frame: main (analysed), another camera, or no court", () => {
+    const tb = new TrackBuffer();
+    const zero = new Array(9).fill(0);
+    tb.ingest({
+      ...win(0, 9, []),
+      cam: { f: [1, 2, 3], g: [eye, eye, zero].flat(), h: [0, 2, -1], q: [0.93, 0.7, 0] },
+    });
+    expect(tb.view(1)).toEqual({ view: "main", camera: 0, quality: 0.93 });
+    expect(tb.view(2)?.view).toBe("alt");
+    expect(tb.view(3)?.view).toBe("none");
+    expect(tb.view(4)).toBeUndefined();
+  });
+
+  it("a pose from an analysis made before cameras were identified counts as the main camera", () => {
+    const tb = new TrackBuffer();
+    tb.ingest({ ...win(0, 9, []), cam: { f: [1], g: eye, h: [-1], q: [0] } });
+    expect(tb.view(1)?.view).toBe("main");
+  });
 });

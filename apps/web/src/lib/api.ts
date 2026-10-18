@@ -70,21 +70,31 @@ export const api = {
     req<{ highlights: Highlight[] }>(
       `/api/sessions/${id}/highlights?k=${k}${player ? `&player=${player}` : ""}`,
     ),
-  calibrationProposal: (id: string, segment = 0) =>
+  /** The court detected on one frame (`frame`; default: the first frame of `segment`). */
+  calibrationProposal: (id: string, segment = 0, frame?: number) =>
     req<{
       frame: number;
       width: number;
       height: number;
-      proposal: { points: Record<string, [number, number]>; score: number } | null;
+      proposal: {
+        points: Record<string, [number, number]>;
+        score: number;
+        method?: "court_lines_v1" | "mat_contour_v0";
+        lines?: [number, number];
+      } | null;
       current: Calibration | null;
       reference_points: Record<string, [number, number]>;
-    }>(`/api/sessions/${id}/calibration/proposal?segment=${segment}`),
-  /** `frame`: the video frame the points were placed on — the camera is tracked from it */
+    }>(
+      `/api/sessions/${id}/calibration/proposal?segment=${segment}${frame != null ? `&frame=${frame}` : ""}`,
+    ),
+  /** `frame`: the video frame the points were placed on — the court is followed from it */
   calibrate: (id: string, points: Record<string, [number, number]>, frame?: number) =>
     req<{ reprojection_error_px: number; n_points: number }>(`/api/sessions/${id}/calibration`, {
       method: "POST",
       body: JSON.stringify({ points, frame }),
     }),
+  /** Re-detect the court from its painted lines across the video. */
+  autoCalibrate: (id: string) => req(`/api/sessions/${id}/calibration/auto`, { method: "POST" }),
   correctWinner: (id: string, rally_event_id: string, winner: "P1" | "P2") =>
     req(`/api/sessions/${id}/corrections`, {
       method: "POST",

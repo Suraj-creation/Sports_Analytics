@@ -38,6 +38,7 @@ from bai_badminton.events.match_phase import (
 )
 from bai_badminton.events.rally_fsm import RallyFSM, RallyParams, RallySegment
 from bai_badminton.events.rally_outcome import CourtImageGeometry, Outcome, analyze_rally_end, outcome_confidence
+from bai_badminton.events.scene import SceneSegment, SceneSegmenter
 from bai_badminton.events.stroke import (
     RuleStrokeClassifier,
     StrokeClassifier,
@@ -95,6 +96,32 @@ class EngineConfig:
     match: MatchConfig = field(default_factory=MatchConfig)
     phase: PhaseParams = field(default_factory=PhaseParams)
     profile: str = "unknown"
+
+
+_OPPONENT = {"P1": "P2", "P2": "P1"}
+
+
+def box_tuple(b: Any) -> tuple[float, float, float, float]:
+    return float(b[0]), float(b[1]), float(b[2]), float(b[3])
+
+
+def keypoint_rows(k: Any) -> tuple[tuple[float, float, float], ...] | None:
+    """(x, y, score) rows as plain floats (track rows), or None."""
+    return None if k is None else tuple((float(r[0]), float(r[1]), float(r[2])) for r in k)
+
+
+def camera_sample(fp: FramePerception) -> TrackSample:
+    """The per-frame CAMERA track row: pose (reference px → frame px; ``None``: no court in view), the physical
+    camera that shot the frame (``track_id``: 0 = the main camera, -1 = none) and the court-line fit's
+    precision (``conf``)."""
+    return TrackSample(
+        frame_idx=fp.frame_idx,
+        obj=TrackObject.CAMERA,
+        visible=fp.cam is not None,
+        cam=tuple(float(v) for v in fp.cam.ravel()) if fp.cam is not None else None,
+        track_id=fp.head if fp.head is not None else (0 if fp.cam is not None else -1),
+        conf=float(fp.court_q) if fp.court_q is not None else 0.0,
+    )
 
 
 def _stabilise(p: PersonObs, Ginv: Any) -> PersonObs:
@@ -187,6 +214,7 @@ class BadmintonMatchEngine:
         self._cam_ref: int | None = None
         self._cam: list[Any] = []  # per frame: G (3×3) or None; aligned with the buffers
         self._track_out: list[TrackSample] = []
+        self.scenes = SceneSegmenter(min_frames=max(6, int(round(0.5 * cfg.fps))))
 
         # dense buffers (absolute frame = _buf0 + index)
         self._buf0 = 0
@@ -228,14 +256,18 @@ class BadmintonMatchEngine:
         source: str = "auto",
         cam_ref: int | None = None,
         ref_frame: int | None = None,
+        extra: dict[str, Any] | None = None,
     ) -> Event | None:
         """Install the court calibration for a camera shot (``emit=False`` when restoring).
 
         ``source`` is ``"human"`` for a calibration placed in the UI — those survive a re-analysis.
         ``cam_ref`` identifies the reference view the camera tracker measures poses against (``None``:
-        the camera is not tracked and the calibration is taken to hold for the whole shot).
+        the camera is not tracked and the calibration is taken to hold for the whole shot).  ``extra`` is
+        the rest of the calibration record (mode, method, validity, quality, camera, …).
         """
-        geom = CourtImageGeometry.from_homography(homography, net_top_left, net_top_right)
+        geom = CourtImageGeometry.from_homography(
+            homography, net_top_left, net_top_right, singles=self.match_cfg.discipline == "singles"
+        )
         self.calibration[shot_id] = _Calib(homography, geom)
         self._cam_ref = cam_ref
         self._main_calib = self.calibration[shot_id]  # broadcasts return to the main camera after cuts
@@ -244,11 +276,20 @@ class BadmintonMatchEngine:
         if not emit:
             return None
         frame = max(self._last_frame, 0)
+        quality = (extra or {}).get("quality") or {}
+        # confidence: the court-line fit's precision when there is one (it is measured against the frame's own
+        # lines); else the clicked points' fit error — exact for 4 points, so it says little
+        conf = (
+            float(quality["precision"])
+            if "precision" in quality
+            else float(np.clip(1.0 - homography.reprojection_error_px / 20.0, 0.0, 1.0))
+        )
         ev = self._event(
             "calibration",
             frame,
             frame,
             payload={
+                **(extra or {}),
                 "shot_id": shot_id,
                 **homography.to_json(),
                 "net_ground_y": geom.net_ground_y,
@@ -257,9 +298,9 @@ class BadmintonMatchEngine:
                 "cam_ref": cam_ref,
                 "ref_frame": ref_frame,
             },
-            confidence=float(np.clip(1.0 - homography.reprojection_error_px / 20.0, 0.0, 1.0)),
+            confidence=conf,
             status=EventStatus.CONFIRMED,
-            model="calibration",
+            model=str((extra or {}).get("method") or "calibration"),
         )
         self._emit([ev])
         return ev
@@ -278,6 +319,7 @@ class BadmintonMatchEngine:
         for fp in chunk.frames:
             self._append(fp, tracked)
         self._last_frame = chunk.end
+        self._emit_scenes(self.scenes.drain())
         self._advance(self._last_frame - self.cfg.lookahead)
         self._finalize_pending(self._last_frame)
         self._maybe_checkpoint()
@@ -287,10 +329,36 @@ class BadmintonMatchEngine:
         """End of stream: finalise everything."""
         if self._last_frame < 0:
             return
+        self._emit_scenes(self.scenes.flush())
         self._advance(self._last_frame)
         upd = self.fsm.flush(self._last_frame)
         self._handle_fsm(upd, self._last_frame)
         self._finalize_pending(self._last_frame + 10**9)
+
+    def _emit_scenes(self, segs: list[SceneSegment]) -> None:
+        """Scene timeline: one event per final segment (which camera, analysed or not, court-fit quality)."""
+        if not segs:
+            return
+        self._emit(
+            [
+                self._event(
+                    "scene",
+                    s.start,
+                    s.end,
+                    payload={
+                        "view": s.view,
+                        "camera": s.head,
+                        "analysed": s.view == "main",
+                        "court_quality": s.quality,
+                        "duration_s": round(s.frames / self.cfg.fps, 2),
+                    },
+                    confidence=s.quality,
+                    model="scene_v1",
+                    status=EventStatus.CONFIRMED,
+                )
+                for s in segs
+            ]
+        )
 
     # ================================================================== buffering
     def _append(self, fp: FramePerception, tracked: bool = False) -> None:
@@ -324,10 +392,10 @@ class BadmintonMatchEngine:
             self.identity.assign(persons, {k: v.value for k, v in self.state.ends.items()}) if not fp.replay else {}
         )
         for pid, buf in self._players.items():
-            p = assigned.get(pid)
-            buf["bbox"].append(p.bbox if p is not None else None)
-            buf["kps"].append(p.kps if p is not None and p.kps is not None else None)
-            buf["court"].append(p.court_xy if p is not None else None)
+            a = assigned.get(pid)
+            buf["bbox"].append(a.bbox if a is not None else None)
+            buf["kps"].append(a.kps if a is not None and a.kps is not None else None)
+            buf["court"].append(a.court_xy if a is not None else None)
         # identity-resolved track samples for the track store / live overlays (raw frame pixels)
         self._track_out.append(
             TrackSample(
@@ -353,21 +421,15 @@ class BadmintonMatchEngine:
                     y=float(r.bbox[3]),
                     court_x=p.court_xy[0] if p.court_xy else None,
                     court_y=p.court_xy[1] if p.court_xy else None,
-                    bbox=tuple(float(v) for v in r.bbox),  # type: ignore[arg-type]
-                    keypoints=tuple(tuple(float(v) for v in row) for row in r.kps) if r.kps is not None else None,
+                    bbox=box_tuple(r.bbox),
+                    keypoints=keypoint_rows(r.kps),
                     conf=float(p.conf),
                     model=self._provenance.get("pose", self._provenance.get("player_detector", "")),
                 )
             )
         if tracked:
-            self._track_out.append(
-                TrackSample(
-                    frame_idx=fp.frame_idx,
-                    obj=TrackObject.CAMERA,
-                    visible=G is not None,
-                    cam=tuple(float(v) for v in G.ravel()) if G is not None else None,
-                )
-            )
+            self._track_out.append(camera_sample(fp))
+        self.scenes.add(fp.frame_idx, fp.scene, fp.head, fp.court_q)
 
     def _raw_xy(self, frame: int, xy: tuple[float, float] | None) -> tuple[float, float] | None:
         """A stabilised (reference-view) image point as it appears in frame ``frame``'s pixels."""
@@ -609,9 +671,7 @@ class BadmintonMatchEngine:
             "stroke",
             cand.frame,
             cand.frame,
-            actors=Actors(
-                player_id=cand.player_id, opponent_id=other(cand.player_id) if cand.player_id in ("P1", "P2") else None
-            ),  # type: ignore[arg-type]
+            actors=Actors(player_id=cand.player_id, opponent_id=_OPPONENT.get(cand.player_id or "")),
             payload=payload,
             confidence=conf,
             band=band,

@@ -42,7 +42,9 @@ class TrackSample(BaseModel):
     conf: float = 0.0
     model: str = ""
     # CAMERA rows: 3x3 homography (row-major) from the calibration's reference-frame px to this frame's px;
-    # ``visible=False`` (and ``cam=None``) when the camera is tracked but the court is not in view
+    # ``visible=False`` (and ``cam=None``) when the camera is tracked but the court is not in view.  For
+    # CAMERA rows ``track_id`` is the physical camera (0 = the main camera, analysed; -1 = no court in view)
+    # and ``conf`` the court-line fit's precision.
     cam: tuple[float, ...] | None = None
 
 

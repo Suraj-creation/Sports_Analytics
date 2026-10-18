@@ -64,9 +64,15 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"**/tests/**" = ["S", "PTH", "N802", "N806", "RUF005", "RUF007", "RUF059"]
+"**/tests/**" = ["S", "PTH", "N802", "N803", "N806", "RUF005", "RUF007", "RUF059"]
 "research/**" = ["S603", "S607"]
 "**/court.py" = ["N802", "N806"]  # H / H_inv: homography notation
+# multi-view geometry notation: H (homography), G (pose), K / R / t (camera), C (centre)
+"**/perception/court_lines.py" = ["N802", "N803", "N806"]
+"**/perception/camera.py" = ["N802", "N803", "N806"]
+"**/perception/pipeline.py" = ["N803", "N806"]
+"**/bai_badminton/engine.py" = ["N803", "N806"]  # G / Ginv: camera pose
+"**/testing/court_render.py" = ["N802", "N803", "N806"]
 "**/perception/tracknet.py" = ["N806"]  # L = seq_len (paper notation)
 "**/runtime/runner.py" = ["N806"]  # F = frames per segment
 "agents/src/bai_agents/tools.py" = ["E501"]  # tool descriptions

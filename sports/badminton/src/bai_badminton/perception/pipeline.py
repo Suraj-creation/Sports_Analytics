@@ -1,17 +1,27 @@
-"""Badminton perception for one decoded chunk: cuts → court gate → shuttle → players → pose.
+"""Badminton perception for one decoded chunk: cuts → court & camera → shuttle → players → pose.
 
 Model loading is profile-driven and *degrades gracefully*: a model whose weights are missing or
 fail to load is disabled with a recorded reason (surfaced as a ``degraded`` event), and the rest
 of the pipeline keeps running — e.g. without the shuttle model the platform still tracks players
 and pose; without the detector it still tracks the shuttle.
 
+Court geometry has three modes (``BadmintonPerception.mode``):
+
+* ``lines`` — the court is *measured in every frame* from its painted lines
+  (:mod:`bai_badminton.perception.court_lines`), each frame's camera is identified, and only the main
+  camera (the calibration's) is analysed; other cameras are calibrated for display only.
+* ``camera`` — legacy fallback when the lines cannot be followed: the calibration's reference frame is
+  registered by its background (:class:`~bai_badminton.perception.camera.CameraTracker`).
+* ``static`` — one homography for every frame (no reference frame to track from).
+
 Rates: detector / pose strides depend on the rally state reported by the match engine
-(``in_play`` vs ``idle``) using the profile's ``Rates``; during replays (court gate failed)
-perception is skipped entirely.
+(``in_play`` vs ``idle``) using the profile's ``Rates``; on frames that are not analysed
+(other cameras, close-ups, replays) perception is skipped entirely.
 """
 
 from __future__ import annotations
 
+import zlib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -20,6 +30,7 @@ import numpy as np
 
 from bai_badminton.court import REFERENCE_POINTS, WIDTH_DOUBLES, Homography
 from bai_badminton.perception.camera import CameraTracker, project
+from bai_badminton.perception.court_lines import CameraRig, CourtTracker, camera_pose
 from bai_badminton.perception.players import CourtROI, PlayerDetector, PlayerPerception, PoseEstimator
 from bai_badminton.perception.scene import CourtPresence, CutDetector, small_hsv
 from bai_badminton.perception.scoreboard import ScoreboardReader
@@ -40,6 +51,15 @@ class Degradation:
 
 
 @dataclass
+class _Scene:
+    views: list[str]  # main | alt | none
+    heads: list[int | None]
+    quality: list[float | None]
+    poses: list[np.ndarray | None] | None  # None: the camera is not tracked
+    polys: list[np.ndarray | None]
+
+
+@dataclass
 class PerceptionStats:
     frames: int = 0
     shuttle_frames: int = 0
@@ -50,15 +70,34 @@ class PerceptionStats:
     seconds: dict[str, float] = field(default_factory=dict)
 
 
+def lines_ref_id(H: np.ndarray) -> int:
+    """Id of a court-line reference calibration (cached perception made against another is stale)."""
+    Hn = np.asarray(H, np.float64) / float(H[2][2])
+    return zlib.crc32(b"lines:" + np.round(Hn, 6).tobytes())
+
+
 class BadmintonPerception:
-    def __init__(self, profile: Profile, registry: ModelRegistry, fps: float, models_dir: Path) -> None:
+    def __init__(
+        self,
+        profile: Profile,
+        registry: ModelRegistry,
+        fps: float,
+        models_dir: Path,
+        frame_size: tuple[int, int] | None = None,
+    ) -> None:
         self.profile = profile
         self.fps = fps
+        self.frame_size = frame_size
         self.degraded: list[Degradation] = []
         self.models: dict[str, str] = {}
         self.cuts = CutDetector()
         self.presence: CourtPresence | None = None
-        self.camera = CameraTracker()  # keeps the calibration locked to a panning / zooming camera
+        self.camera = CameraTracker()  # legacy: keeps a calibration on a panning camera by its background
+        self.court = CourtTracker()  # measures the court in every frame from its painted lines
+        self.rig: CameraRig | None = None  # the production's cameras (head 0 = the calibration's)
+        self.mode = "static"
+        self._H_ref: np.ndarray | None = None  # court → reference-view px of the installed calibration
+        self._lines_id: int | None = None
         self._ref_poly: np.ndarray | None = None  # court polygon in the reference view (px)
         self._court_samples: list[tuple[np.ndarray, tuple[int, int]]] = []  # small HSV keyframes
         self.stats = PerceptionStats()
@@ -144,23 +183,48 @@ class BadmintonPerception:
         self.degraded.append(Degradation(stage, reason))
 
     # ------------------------------------------------------------------ calibration
-    def set_calibration(self, h: Homography, reference: np.ndarray | None = None) -> None:
-        """Install the court calibration.  ``reference`` is the frame ``h`` was fitted on: with it the camera
-        is tracked (pan / tilt / zoom) and the court polygon, player ROI and court-presence gate follow it;
-        without it the calibration is taken to hold for the whole shot (the legacy fixed-camera behaviour)."""
+    @property
+    def ref_id(self) -> int | None:
+        """Id of the view poses (``FramePerception.cam``) are relative to; ``None`` when untracked."""
+        if self.mode == "lines":
+            return self._lines_id
+        return self.camera.ref_id if self.mode == "camera" else None
+
+    def set_calibration(self, h: Homography, reference: np.ndarray | None = None, mode: str | None = None) -> str:
+        """Install the court calibration; returns the geometry mode actually used.
+
+        ``mode="lines"``: ``h`` is a court-line calibration of the main camera — every frame is measured from
+        its lines and frames from other cameras are not analysed (needs a plausible camera pose for ``h``).
+        Otherwise ``reference`` (the frame ``h`` was fitted on) enables background tracking of a panning
+        camera, and without it the calibration is taken to hold for the whole shot (fixed camera)."""
         names = ("far_left", "far_right", "near_right", "near_left")
         poly = h.court_to_image(np.array([REFERENCE_POINTS[n] for n in names])).astype(np.float32)
         self.players.set_roi(CourtROI(poly))
         self.presence = CourtPresence(poly)
         self._ref_poly = poly
+        self._H_ref = np.asarray(h.H, np.float64)
         self._learn_court_colour()
         self.camera.clear()
+        self.court.reset()
+        self.rig, self._lines_id, self.mode = None, None, "static"
+        size = self.frame_size or (None if reference is None else (reference.shape[1], reference.shape[0]))
+        if mode == "lines" and size is not None:
+            pose = camera_pose(h.H, size)
+            if pose is not None:
+                self.rig = CameraRig.from_main(h.H, pose)
+                self._lines_id = lines_ref_id(h.H)
+                self.mode = "lines"
+                return self.mode
+            log.warning("court.lines_unavailable", reason="no plausible camera explains the calibration")
         if reference is not None:
             # poses are verified against the court plane: the court plus its run-off (lines, decals, mat)
             hw, hl = WIDTH_DOUBLES / 2 + 0.9, REFERENCE_POINTS["far_left"][1] + 0.9
             floor = h.court_to_image(np.array([[-hw, hl], [hw, hl], [hw, -hl], [-hw, -hl]]))
             if self.camera.set_reference(reference, floor=floor) is None:
                 log.warning("camera.untrackable", reason="reference frame has too little texture")
+            else:
+                self.mode = "camera"
+        return self.mode
 
     def _learn_court_colour(self) -> None:
         if self.presence is None or not self._court_samples:
@@ -194,23 +258,10 @@ class BadmintonPerception:
             shots.append(self.cuts.shot_id)
 
         # Where the camera is: the pose of every frame relative to the calibration's reference view.  A frame
-        # whose pose is None does not show the court (close-up, another camera) — it is treated like a replay.
-        poses = self.camera.track(chunk.frames, cut_flags, chunk.start) if self.camera.ready else None
-        replay: list[bool] = []
-        polys: list[np.ndarray | None] = []
-        for i, f in enumerate(chunk.frames):
-            poly = None
-            if self.presence is None:
-                replay.append(False)
-            elif poses is None:
-                replay.append(not self.presence.is_main_camera(f))
-            else:
-                G = poses[i]
-                poly = project(G, self._ref_poly) if G is not None and self._ref_poly is not None else None
-                if poly is not None and not np.isfinite(poly).all():
-                    poly = None
-                replay.append(poly is None or not self.presence.is_main_camera(f, poly))
-            polys.append(poly)
+        # that is not analysed (no court in view, another camera) is treated like a replay.
+        scene = self._scene(chunk, cut_flags)
+        replay = [v != "main" for v in scene.views]
+        poses, polys = scene.poses, scene.polys
 
         rates_det = p.detector_rates.in_play if in_play else p.detector_rates.idle
         rates_pose = p.pose_rates.in_play if in_play else p.pose_rates.idle
@@ -235,7 +286,9 @@ class BadmintonPerception:
                     self.players.set_roi(CourtROI(poly.astype(np.float32)))
                 persons = [] if replay[i] else self.players.process(fidx, img, (rates_det, rates_pose))
                 s = shuttle[i] if not replay[i] else None
-                G = poses[i] if poses is not None and not replay[i] else None
+                # lines mode: every calibrated frame carries its pose (other cameras too: the court is drawn
+                # there); camera mode: only analysed frames (another camera's pose is not measured)
+                G = poses[i] if poses is not None and (self.mode == "lines" or not replay[i]) else None
                 frames.append(
                     FramePerception(
                         frame_idx=fidx,
@@ -246,6 +299,9 @@ class BadmintonPerception:
                         shot_id=shots[i],
                         cam=G,
                         cam_lost=poses is not None and G is None,
+                        view=scene.views[i],
+                        head=scene.heads[i],
+                        court_q=scene.quality[i],
                     )
                 )
         self._rate("players", n, t0)
@@ -258,8 +314,46 @@ class BadmintonPerception:
             frames=frames,
             models=dict(self.models),
             ocr=ocr,
-            cam_ref=self.camera.ref_id if poses is not None else None,
+            cam_ref=self.ref_id if poses is not None else None,
         )
+
+    def _scene(self, chunk: DecodedChunk, cut_flags: list[bool]) -> _Scene:
+        """Per-frame view, camera head, pose (reference px → frame px) and court polygon of a chunk."""
+        n = len(chunk.frames)
+        sc = _Scene(["main"] * n, [None] * n, [None] * n, None, [None] * n)
+        if self.presence is None:  # uncalibrated: everything is analysed (no geometry)
+            return sc
+        if self.mode == "lines" and self.rig is not None and self._H_ref is not None:
+            t0 = _now()
+            fits = self.court.track(chunk.frames, cut_flags, chunk.start)
+            self._rate("court", n, t0)
+            H_inv = np.linalg.inv(self._H_ref)
+            sc.poses = [None] * n
+            for i, fit in enumerate(fits):
+                if fit is None:
+                    sc.views[i] = "none"
+                    continue
+                head = self.rig.classify(fit)
+                G = fit.H @ H_inv
+                G = G / G[2, 2]
+                poly = project(G, self._ref_poly) if self._ref_poly is not None else None
+                sc.poses[i], sc.heads[i], sc.quality[i] = G, head, round(fit.precision, 3)
+                sc.views[i] = "main" if head == 0 else "alt"
+                sc.polys[i] = poly if poly is not None and np.isfinite(poly).all() else None
+            return sc
+        poses = self.camera.track(chunk.frames, cut_flags, chunk.start) if self.mode == "camera" else None
+        sc.poses = poses
+        for i, f in enumerate(chunk.frames):
+            if poses is None:
+                sc.views[i] = "main" if self.presence.is_main_camera(f) else "none"
+                continue
+            pose = poses[i]
+            poly = project(pose, self._ref_poly) if pose is not None and self._ref_poly is not None else None
+            if poly is not None and not np.isfinite(poly).all():
+                poly = None
+            sc.polys[i] = poly
+            sc.views[i] = "main" if poly is not None and self.presence.is_main_camera(f, poly) else "none"
+        return sc
 
     def _read_scoreboard(self, chunk: DecodedChunk, replay: list[bool], in_play: bool) -> list[ScoreReading]:
         """Read the score bug between rallies only (it cannot change during one), on main-camera

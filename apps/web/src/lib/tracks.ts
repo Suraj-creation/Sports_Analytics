@@ -10,8 +10,17 @@ interface WireWindow {
     string,
     { f: number[]; t: number[]; b: number[]; k: number[]; cx: (number | null)[]; cy: (number | null)[] }
   >;
-  /** camera pose per frame: 3×3 row-major, reference px → frame px; all zeros = court not in view */
-  cam?: { f: number[]; g: number[] };
+  /** camera pose per frame: 3×3 row-major, reference px → frame px; all zeros = court not in view.
+   *  `h`: physical camera (0 = main, analysed; -1 = no court); `q`: court-line fit precision */
+  cam?: { f: number[]; g: number[]; h?: number[]; q?: (number | null)[] };
+}
+
+/** What the camera shows at a frame. */
+export interface CameraView {
+  /** main: the analysed camera; alt: another camera (court drawn, not analysed); none: no court in view */
+  view: "main" | "alt" | "none";
+  camera: number;
+  quality: number | null;
 }
 
 export interface ShuttlePoint {
@@ -36,6 +45,7 @@ export class TrackBuffer {
   readonly players: Record<PlayerId, Map<number, PlayerFrame>> = { P1: new Map(), P2: new Map() };
   /** per-frame camera pose (null: tracked, but the court is not in view); empty when the camera is untracked */
   private readonly cams = new Map<number, number[][] | null>();
+  private readonly views = new Map<number, CameraView>();
   /** true once any camera pose has arrived: the overlay then follows the camera instead of a fixed court */
   tracksCamera = false;
   /** frame ranges known to be analysed (so "no shuttle" means invisible, not "not yet analysed") */
@@ -75,13 +85,23 @@ export class TrackBuffer {
         });
       }
     }
-    for (let f = win.from; f <= win.to; f++) this.cams.delete(f);
+    for (let f = win.from; f <= win.to; f++) {
+      this.cams.delete(f);
+      this.views.delete(f);
+    }
     const c = win.cam;
     if (c) {
       this.tracksCamera = true;
       for (let i = 0; i < c.f.length; i++) {
+        const f = c.f[i] as number;
         const g = c.g.slice(i * 9, i * 9 + 9);
-        this.cams.set(c.f[i] as number, g[8] ? [g.slice(0, 3), g.slice(3, 6), g.slice(6, 9)] : null);
+        this.cams.set(f, g[8] ? [g.slice(0, 3), g.slice(3, 6), g.slice(6, 9)] : null);
+        if (c.h) {
+          const cam = c.h[i] ?? -1;
+          // a pose without a camera id comes from an analysis made before cameras were identified: main
+          const view = !g[8] ? "none" : cam <= 0 ? "main" : "alt";
+          this.views.set(f, { view, camera: cam, quality: c.q?.[i] ?? null });
+        }
       }
     }
     this.cover(win.from, win.to);
@@ -91,6 +111,11 @@ export class TrackBuffer {
   /** Camera pose at `frame` (reference px → frame px), or null when the court is not (known to be) in view. */
   camera(frame: number): number[][] | null {
     return this.cams.get(frame) ?? null;
+  }
+
+  /** Which camera shot `frame` (undefined: not analysed yet, or analysed before cameras were identified). */
+  view(frame: number): CameraView | undefined {
+    return this.views.get(frame);
   }
 
   private cover(a: number, b: number): void {
@@ -144,6 +169,7 @@ export class TrackBuffer {
     this.players.P1.clear();
     this.players.P2.clear();
     this.cams.clear();
+    this.views.clear();
     this.tracksCamera = false;
     this.covered = [];
     this.version++;

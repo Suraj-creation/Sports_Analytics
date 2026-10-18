@@ -21,7 +21,7 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 
-from bai_badminton.court import HALF_LEN, WIDTH_DOUBLES, Homography
+from bai_badminton.court import HALF_LEN, WIDTH_DOUBLES, WIDTH_SINGLES, Homography
 
 RELIABLE_SPD_MIN = 40.0  # px/s
 HIGH_SPEED = 600.0  # px/s
@@ -39,7 +39,7 @@ class Outcome(StrEnum):
 class CourtImageGeometry:
     """Image-space court description used by the outcome cascade (analysis-proxy pixels)."""
 
-    corners: NDArray[np.float32]  # (4,2) doubles outer corners: far-left, far-right, near-right, near-left
+    corners: NDArray[np.float32]  # (4,2) in/out court corners: far-left, far-right, near-right, near-left
     net_ground_y: float  # image y of the net's floor line (at court centre)
     net_top_y: float  # image y of the net cable (top), from calibration or approximation
     net_x_min: float
@@ -69,9 +69,13 @@ class CourtImageGeometry:
         net_top_left: tuple[float, float] | None = None,
         net_top_right: tuple[float, float] | None = None,
         tol_m: float = 0.15,
+        singles: bool = True,
     ) -> CourtImageGeometry:
+        """``singles``: rallies are in/out against the singles sidelines (the long, narrow court) — the doubles
+        alleys are out in singles play. The net always spans the doubles width (its posts stand there)."""
         hw = WIDTH_DOUBLES / 2
-        corners = h.court_to_image(np.array([[-hw, HALF_LEN], [hw, HALF_LEN], [hw, -HALF_LEN], [-hw, -HALF_LEN]]))
+        iw = (WIDTH_SINGLES if singles else WIDTH_DOUBLES) / 2
+        corners = h.court_to_image(np.array([[-iw, HALF_LEN], [iw, HALF_LEN], [iw, -HALF_LEN], [-iw, -HALF_LEN]]))
         net = h.court_to_image(np.array([[-hw, 0.0], [hw, 0.0], [0.0, 0.0], [0.0, tol_m]]))
         net_ground_y = float(net[2, 1])
         if net_top_left is not None and net_top_right is not None:

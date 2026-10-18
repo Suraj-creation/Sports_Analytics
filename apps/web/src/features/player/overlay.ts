@@ -59,14 +59,17 @@ export function drawOverlay(o: OverlayCtx, frame: number): void {
   g.setTransform(dpr * s, 0, 0, dpr * s, dpr * ox, dpr * oy);
   const px = 1 / s; // one CSS pixel in video units
 
+  const view = tracks.view(frame);
   if (layers.court && o.calibration?.H) {
-    // The calibration holds for one camera pose; the engine measures the pose of every frame, so the court
-    // is drawn where it is *in this frame* — and not at all where the court is not in view (close-ups,
-    // other cameras).  Sessions analysed without camera tracking keep the fixed court.
+    // The calibration holds for one camera pose; the engine measures the court in every frame, so it is
+    // drawn where it is *in this frame* — in other cameras' views too (dimmer: shown, not analysed) — and not
+    // at all where no court is in view (close-ups, crowd).  Sessions analysed without camera tracking keep
+    // the fixed court.
     const pose = tracks.tracksCamera ? tracks.camera(frame) : undefined;
     if (pose === undefined) drawCourt(g, o.calibration.H, px);
-    else if (pose) drawCourt(g, mul3(pose, o.calibration.H), px);
+    else if (pose) drawCourt(g, mul3(pose, o.calibration.H), px, view?.view === "alt");
   }
+  if (layers.labels && view) drawSceneChip(g, view.view, px, video.videoHeight || 720);
 
   if (layers.players) {
     for (const pid of ["P1", "P2"] as PlayerId[]) {
@@ -98,9 +101,32 @@ export function drawOverlay(o: OverlayCtx, frame: number): void {
   }
 }
 
-function drawCourt(g: CanvasRenderingContext2D, H: number[][], px: number): void {
-  g.strokeStyle = "rgba(232,239,234,0.38)";
+const SCENE_LABEL: Record<"main" | "alt" | "none", string> = {
+  main: "Main camera · analysed",
+  alt: "Other camera · not analysed",
+  none: "No court in view",
+};
+
+/** Which camera this frame comes from, so a gap in the overlays reads as "not this view", not as a failure. */
+function drawSceneChip(g: CanvasRenderingContext2D, view: "main" | "alt" | "none", px: number, vh: number) {
+  if (view === "main") return; // the normal case needs no label
+  const fs = 11 * px;
+  g.font = `600 ${fs}px "Archivo Variable", system-ui, sans-serif`;
+  const text = SCENE_LABEL[view];
+  const tw = g.measureText(text).width;
+  const x = 12 * px;
+  const y = vh - fs - 22 * px;
+  g.fillStyle = "rgba(12,38,32,0.78)";
+  roundRect(g, x, y, tw + 14 * px, fs + 10 * px, 6 * px);
+  g.fill();
+  g.fillStyle = view === "alt" ? "#e8c46b" : "#9fb3aa";
+  g.fillText(text, x + 7 * px, y + fs + 3 * px);
+}
+
+function drawCourt(g: CanvasRenderingContext2D, H: number[][], px: number, other = false): void {
+  g.strokeStyle = other ? "rgba(232,196,107,0.32)" : "rgba(232,239,234,0.38)";
   g.lineWidth = 1.25 * px;
+  if (other) g.setLineDash([4 * px, 4 * px]);
   g.beginPath();
   for (const [a, b] of COURT_LINES) {
     const pa = project(H, a);
@@ -109,6 +135,7 @@ function drawCourt(g: CanvasRenderingContext2D, H: number[][], px: number): void
     g.lineTo(pb[0], pb[1]);
   }
   g.stroke();
+  g.setLineDash([]);
   const [na, nb] = [project(H, NET[0]), project(H, NET[1])];
   g.strokeStyle = "rgba(232,239,234,0.6)";
   g.setLineDash([6 * px, 5 * px]);

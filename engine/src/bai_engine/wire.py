@@ -7,10 +7,12 @@ a list of objects and trivially decoded into typed arrays in the browser::
      "shuttle": {"f": [...], "x": [...], "y": [...], "c": [...]},          # visible frames only
      "players": {"P1": {"f": [...], "b": [x1,y1,x2,y2,...], "k": [x,y,s × 17 ...] | null,
                         "cx": [...], "cy": [...]}, "P2": {...}},
-     "cam": {"f": [...], "g": [3×3 row-major × n]}}      # absent when the camera is not tracked
+     "cam": {"f": [...], "g": [3×3 row-major × n], "h": [...], "q": [...]}}  # absent when untracked
 
 ``cam.g`` maps the calibration's reference-frame px to the frame's px (court → image = g · H); all
-zeros marks a frame where the camera is tracked but the court is not in view.
+zeros marks a frame where the camera is tracked but the court is not in view.  ``cam.h`` is the
+physical camera of the frame (0 = the main camera, whose frames are analysed; -1 = no court in view)
+and ``cam.q`` the court-line fit's precision (0 when not measured).
 
 Coordinates are rounded to 0.1 px / 1 cm to keep payloads small.
 """
@@ -33,7 +35,7 @@ def _r(v: float | None, nd: int = 1) -> float | None:
 def encode_tracks(samples: list[TrackSample], frame_from: int, frame_to: int) -> bytes:
     shuttle: dict[str, list[Any]] = {"f": [], "x": [], "y": [], "c": []}
     players: dict[str, dict[str, list[Any]]] = {}
-    cam: dict[str, list[Any]] = {"f": [], "g": []}
+    cam: dict[str, list[Any]] = {"f": [], "g": [], "h": [], "q": []}
     for s in samples:
         if s.obj is TrackObject.SHUTTLE:
             if s.visible and s.x is not None and s.y is not None:
@@ -44,6 +46,8 @@ def encode_tracks(samples: list[TrackSample], frame_from: int, frame_to: int) ->
         elif s.obj is TrackObject.CAMERA:
             cam["f"].append(s.frame_idx)
             cam["g"].extend(s.cam if s.cam is not None else (0.0,) * 9)
+            cam["h"].append(s.track_id)
+            cam["q"].append(_r(s.conf, 3))
         elif s.obj is TrackObject.PLAYER and s.player_id:
             p = players.setdefault(s.player_id, {"f": [], "b": [], "k": [], "cx": [], "cy": [], "t": []})
             p["f"].append(s.frame_idx)

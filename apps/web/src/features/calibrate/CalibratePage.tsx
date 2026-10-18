@@ -63,12 +63,15 @@ export function CalibratePage() {
     video.currentTime = (prop.data.frame + 0.5) / fps;
   }, [video, hls, prop.data, fps]);
 
-  // seed from the existing calibration, else the automatic proposal (once)
+  // seed (once): the court detected from this frame's lines; else the existing calibration — which only holds
+  // on its own frame when the camera moves — else the mat-outline proposal
   useEffect(() => {
     if (seeded.current || !prop.data) return;
     seeded.current = true;
     const cur = prop.data.current?.H;
-    if (cur) {
+    if (prop.data.proposal?.method === "court_lines_v1") {
+      setPoints(prop.data.proposal.points);
+    } else if (cur) {
       const pts: Record<string, P> = {};
       for (const o of ORDER.slice(0, 6)) {
         const c = prop.data.reference_points[o.id];
@@ -96,6 +99,15 @@ export function CalibratePage() {
       navigate({ to: "/sessions/$sessionId", params: { sessionId } });
     },
   });
+  const redetect = useMutation({
+    mutationFn: () => api.autoCalibrate(sessionId),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["session", sessionId] });
+      navigate({ to: "/sessions/$sessionId", params: { sessionId } });
+    },
+  });
+  const detected = prop.data?.proposal;
+  const current = prop.data?.current;
 
   const toImage = (clientX: number, clientY: number): P | null => {
     const el = boxRef.current;
@@ -157,7 +169,9 @@ export function CalibratePage() {
         <div>
           <h1 className="text-lg font-semibold">Calibrate the court</h1>
           <p className="text-sm text-line-2">
-            Click each point on the floor where the lines meet. Drag a point to adjust it.
+            The court is found automatically from its painted lines in every frame, for every camera. Adjust
+            it here only if the overlay is wrong: click each point on the floor where the lines meet, or drag
+            a point.
           </p>
         </div>
       </div>
@@ -324,17 +338,35 @@ export function CalibratePage() {
             >
               <RotateCcw className="size-4" /> Clear
             </Button>
-            {prop.data?.proposal && (
-              <Button size="sm" variant="ghost" onClick={() => commit(prop.data?.proposal?.points ?? {})}>
+            {detected && (
+              <Button size="sm" variant="ghost" onClick={() => commit(detected.points)}>
                 <Sparkles className="size-4" /> Use detected
               </Button>
             )}
           </div>
           <div className="mt-auto space-y-3 border-t border-seam pt-4">
-            {prop.data?.proposal && (
+            {current?.mode && (
               <p className="text-xs text-line-3">
-                Automatic detection confidence: {Math.round(prop.data.proposal.score * 100)}%
+                Current: {current.source === "human" ? "placed by hand" : "automatic"}
+                {current.mode === "lines"
+                  ? ` · measured from the court lines in every frame${
+                      current.quality ? ` (${Math.round(current.quality.precision * 100)}% line match)` : ""
+                    }`
+                  : current.mode === "camera"
+                    ? " · followed by the camera's motion"
+                    : " · one fixed position for the whole video"}
               </p>
+            )}
+            {detected ? (
+              <p className="text-xs text-line-3">
+                {detected.method === "court_lines_v1"
+                  ? `On this frame: court lines found — ${Math.round(detected.score * 100)}% of the court's lines matched`
+                  : `On this frame: court outline guessed from the mat colour (${Math.round(detected.score * 100)}%) — check it`}
+              </p>
+            ) : (
+              prop.data && (
+                <p className="text-xs text-line-3">No court found on this frame — try another frame.</p>
+              )
             )}
             {fit ? (
               <p className={clsx("text-sm", fit.err > 8 ? "text-caution" : "text-line-2")}>
@@ -353,6 +385,15 @@ export function CalibratePage() {
               onClick={() => save.mutate()}
             >
               Save calibration
+            </Button>
+            <ErrorNote error={redetect.error} />
+            <Button
+              className="w-full"
+              variant="ghost"
+              busy={redetect.isPending}
+              onClick={() => redetect.mutate()}
+            >
+              <Sparkles className="size-4" /> Re-detect automatically for the whole video
             </Button>
             <p className="text-xs text-line-3">
               Saving applies from where the analysis has reached. To re-measure the whole match with it,

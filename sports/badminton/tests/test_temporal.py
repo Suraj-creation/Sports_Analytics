@@ -197,6 +197,18 @@ def test_outcome_cascade(land: tuple[float, float], expected_outcome: Outcome, e
     assert res.fault == expected_fault, res
 
 
+def test_the_doubles_alley_is_out_in_singles() -> None:
+    """Between the singles and doubles sidelines (x = 2.59 … 3.05 m): out in singles, in for doubles."""
+    r = make_rally(n_shots=5, land_court=(2.82, -4.0))
+    t = r.obs.shuttle
+    singles = CourtImageGeometry.from_homography(r.homography)  # type: ignore[arg-type]
+    doubles = CourtImageGeometry.from_homography(r.homography, singles=False)  # type: ignore[arg-type]
+    res_s = analyze_rally_end(r.obs.frames, t.x, t.y, t.vis, r.landing_frame + 10, singles, 30.0)
+    res_d = analyze_rally_end(r.obs.frames, t.x, t.y, t.vis, r.landing_frame + 10, doubles, 30.0)
+    assert (res_s.outcome, res_s.fault) == (Outcome.OUT, "far"), res_s
+    assert (res_d.outcome, res_d.fault) == (Outcome.WINNER, "near"), res_d
+
+
 # ------------------------------------------------------------------ stroke / smash / jump
 def test_rule_classifier_cases() -> None:
     clf = RuleStrokeClassifier()
