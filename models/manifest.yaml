@@ -1,0 +1,131 @@
+# Model registry — the runtime loads ONLY artifacts listed here.
+#
+# sha256: pinned digest of the downloaded file. "pin-on-first-fetch" means the digest is recorded
+# in models/cache/lock.json the first time the file is fetched; every later load verifies it.
+# Before a production deployment, run `bai models lock` and copy the digests here.
+#
+# license: of the weights/code as published. Mirror provenance is noted where the file is not
+# hosted by the original authors. See research report §17 (licensing) before commercial use.
+version: 1
+
+models:
+  tracknetv3:
+    task: shuttle
+    version: "3.0"
+    format: torch
+    source: {hf: "TanmaySarda/tracknetv3-weights", file: "TrackNet_best.pt"}
+    size: 136190877
+    sha256: pin-on-first-fetch
+    license: MIT (qaz812345/TrackNetV3 code + checkpoints); HF mirror of the official Google Drive release
+    input: {width: 512, height: 288, seq_len: 8, bg_mode: concat}
+
+  inpaintnet:
+    task: shuttle_refine
+    version: "3.0"
+    format: torch
+    source: {hf: "TanmaySarda/tracknetv3-weights", file: "InpaintNet_best.pt"}
+    size: 6264451
+    sha256: pin-on-first-fetch
+    license: MIT (qaz812345/TrackNetV3)
+    input: {seq_len: 16}
+
+  racketvision_balltrack:
+    task: shuttle_live
+    version: "1.0"
+    format: torch
+    source: {hf: "linfeng302/RacketVision-Models", file: "checkpoints/balltrack_best.pth"}
+    size: 46585585
+    sha256: pin-on-first-fetch
+    license: MIT (RacketVision, AAAI 2026); YouTube-sourced training data — check content rights
+    status: candidate  # E3 benchmark decides between this and TOTNet for the causal profile
+
+  rfdetr_nano:
+    task: person_detection
+    version: "1.4.2"
+    format: onnx
+    source: {hf: "saifkhichi96/opendetect", file: "rfdetr/rfdetr_n_v142_384x384.onnx"}
+    size: 112616995
+    sha256: pin-on-first-fetch
+    license: Apache-2.0 (RF-DETR N/S/M/L); ONNX export mirror
+    input: {width: 384, height: 384}
+
+  rfdetr_small:
+    task: person_detection
+    version: "1.4.2"
+    format: onnx
+    source: {hf: "saifkhichi96/opendetect", file: "rfdetr/rfdetr_s_v142_512x512.onnx"}
+    size: 119619156
+    sha256: pin-on-first-fetch
+    license: Apache-2.0 (RF-DETR); ONNX export mirror
+    input: {width: 512, height: 512}
+
+  rfdetr_medium:
+    task: person_detection
+    version: "1.4.2"
+    format: onnx
+    source: {hf: "saifkhichi96/opendetect", file: "rfdetr/rfdetr_m_v142_576x576.onnx"}
+    size: 126347989
+    sha256: pin-on-first-fetch
+    license: Apache-2.0 (RF-DETR); ONNX export mirror
+    input: {width: 576, height: 576}
+
+  yolox_m_humanart:
+    task: person_detection
+    version: "1.0"
+    format: onnx
+    source: {hf: "saifkhichi96/opendetect", file: "yolox/yolox_m_8xb8-300e_humanart-c2c7a14a.onnx"}
+    size: 101400344
+    sha256: pin-on-first-fetch
+    license: Apache-2.0 (MMPose / YOLOX)
+    input: {width: 640, height: 640}
+
+  rtmpose_m_body7:
+    task: pose
+    version: "1.0"
+    format: onnx-zip
+    source: {url: "https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/onnx_sdk/rtmpose-m_simcc-body7_pt-body7_420e-256x192-e48f03d0_20230504.zip"}
+    sha256: pin-on-first-fetch
+    license: Apache-2.0 (MMPose RTMPose)
+    input: {width: 192, height: 256}
+
+  rtmpose_x_halpe26:
+    task: pose
+    version: "1.0"
+    format: onnx-zip
+    source: {url: "https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/onnx_sdk/rtmpose-x_simcc-body7_pt-body7_700e-384x288-71d7b7e9_20230629.zip"}
+    sha256: pin-on-first-fetch
+    license: Apache-2.0 (MMPose RTMPose)
+    input: {width: 288, height: 384}
+    note: body7 384×288 variant; halpe26 heel/toe export to be added after E5
+
+  racketvision_racketpose:
+    task: racket_pose
+    version: "1.0"
+    format: torch
+    source: {hf: "linfeng302/RacketVision-Models", file: "checkpoints/best_PCK_epoch_90.pth"}
+    size: 106524759
+    sha256: pin-on-first-fetch
+    license: MIT (RacketVision); mmpose checkpoint — exported to ONNX in the research container
+    status: candidate
+
+  bst_cg_ap_shuttleset:
+    task: stroke
+    version: "1.0"
+    format: torch
+    source: {gdrive_folder: "1D4172WZDJWPvpJdpaHDhy_cA-s8F-zR5", file: "bst_CG_AP_JnB_bone_between_2_hits_with_max_limits_seq_100_merged_2.pt"}
+    sha256: pin-on-first-fetch
+    license: MIT (Va6lue/BST-Badminton-Stroke-type-Transformer)
+    status: candidate  # stroke_rules_v0 is used until installed (E7 decides fine-tuning)
+
+  rapidocr_v4:
+    task: ocr
+    version: "4"
+    format: package
+    source: {package: "rapidocr"}
+    license: Apache-2.0 (RapidOCR / PP-OCR models)
+
+  contact_fusion_v0:
+    task: contact
+    version: "0"
+    format: builtin
+    license: project

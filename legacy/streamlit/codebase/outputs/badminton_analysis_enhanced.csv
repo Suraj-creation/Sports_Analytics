@@ -1,0 +1,6 @@
+start_time,end_time,win_point_player,win_reason,ball_types,lose_reason,roundscore_A,roundscore_B
+00:00,00:03,Ratchanok Intanon,opponent fails to clear the net,net_shot,fails to clear the net,0,1
+00:06,00:13,Ratchanok Intanon,opponent fails to clear the net,net_shot,fails to clear the net,0,2
+00:13,00:19,An Se Young,wins by placement,net_shot,unable to reach shuttlecock,1,2
+00:33,01:04,Ratchanok Intanon,wins by placement,net_shot,unable to reach shuttlecock,1,3
+01:07,01:16,An Se Young,wins by placement,net_shot,unable to reach shuttlecock,2,3

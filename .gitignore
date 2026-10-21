@@ -1,12 +1,59 @@
-.venv/
+# ---- secrets
+.env
+.env.*
+!.env.example
+
+# ---- python
 __pycache__/
 *.py[cod]
-.env
-.kilo/
-output/
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+
+# ---- node / web
+node_modules/
+apps/web/dist/
+apps/web/.vite/
+apps/web/playwright-report/
+apps/web/test-results/
+apps/web/e2e/.tmp/
+*.tsbuildinfo
+
+# ---- runtime data (never commit media, sessions, weights, engines)
+/data/
+/output/
+/models/cache/
+/models/engines/
+*.pt
+*.pth
+*.onnx
+*.engine
+*.plan
 *.mp4
+*.mov
+*.mkv
+*.avi
+*.webm
+*.m3u8
+*.m4s
 *.mp3
 *.wav
-*.avi
-*.mov
+
+# ---- research outputs
+research/runs/
+research/datasets/cache/
+mlruns/
+
+# ---- tooling scratch
+.kilo/
+.superpowers/
+.DS_Store
 *.log
+env

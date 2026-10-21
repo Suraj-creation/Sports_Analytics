@@ -1,0 +1,6 @@
+.task-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 20px; border-bottom: 1px solid var(--line); }
+.task-row:last-child { border-bottom: none; }
+.task-row:hover { background: var(--court-soft); }
+.task-name { font-weight: 600; font-size: 14px; }
+.task-sub { font-size: 12px; color: var(--ink-faint); margin-top: 2px; }
+.empty-note { padding: 30px; text-align: center; color: var(--ink-faint); font-size: 13.5px; }

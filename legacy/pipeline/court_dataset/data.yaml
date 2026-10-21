@@ -1,0 +1,6 @@
+path: .
+train: images/train
+val: images/val
+kpt_shape: [8, 3]
+names:
+  0: court

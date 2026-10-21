@@ -1,0 +1,7 @@
+.ct-bar { padding: 12px 20px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.ct-next { font-weight: 700; font-family: var(--font-mono); font-size: 13px; }
+.candidates-row { display: flex; gap: 8px; flex-wrap: wrap; padding: 14px 20px; }
+.cand-thumb { width: 84px; height: 47px; object-fit: cover; border-radius: 4px; cursor: pointer; border: 2px solid transparent; opacity: 0.6; }
+.cand-thumb.active { border-color: var(--court); opacity: 1; }
+.cand-thumb:hover { opacity: 1; }
+.success-box { padding: 24px 20px; text-align: center; }

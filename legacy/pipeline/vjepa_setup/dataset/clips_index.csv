@@ -1,0 +1,133 @@
+start_time,end_time,win_point_player,win_reason,ball_types,lose_reason,roundscore_A,roundscore_B,video,rally,clip_path
+0:08,0:24,Player B,Opponent hit out of bounds,Lift shot,Hit out of bounds,0,1,Test1_Full_rev,1,dataset/clips\Test1_Full_rev\rally_001.mp4
+0:27,0:42,Player A,Opponent hit the net,Push shot,Hit the net,1,1,Test1_Full_rev,2,dataset/clips\Test1_Full_rev\rally_002.mp4
+0:44,0:56,Player B,Shot landed as winner,Push shot,Opponent failed to return,1,2,Test1_Full_rev,3,dataset/clips\Test1_Full_rev\rally_003.mp4
+1:00,1:12,Player B,Opponent hit out of bounds,Lift shot,Hit out of bounds,1,3,Test1_Full_rev,4,dataset/clips\Test1_Full_rev\rally_004.mp4
+1:15,1:24,Player B,Opponent hit out of bounds,Lift shot,Hit out of bounds,1,4,Test1_Full_rev,5,dataset/clips\Test1_Full_rev\rally_005.mp4
+1:26,1:34,Player B,Shot landed as winner,Smash,Opponent failed to return,1,5,Test1_Full_rev,6,dataset/clips\Test1_Full_rev\rally_006.mp4
+1:36,1:53,Player B,Shot landed as winner,Smash,Opponent failed to return,1,6,Test1_Full_rev,7,dataset/clips\Test1_Full_rev\rally_007.mp4
+1:55,2:03,Player A,Opponent hit the net,Drop shot,Hit the net,2,6,Test1_Full_rev,8,dataset/clips\Test1_Full_rev\rally_008.mp4
+2:06,2:15,Player B,Opponent hit out of bounds,Push shot,Hit out of bounds,2,7,Test1_Full_rev,9,dataset/clips\Test1_Full_rev\rally_009.mp4
+2:22,2:41,Player A,Opponent hit the net,Block shot,Hit the net,3,7,Test1_Full_rev,10,dataset/clips\Test1_Full_rev\rally_010.mp4
+2:43,2:47,Player B,Opponent failed to clear net,Block shot,Failed to clear net,3,8,Test1_Full_rev,11,dataset/clips\Test1_Full_rev\rally_011.mp4
+3:01,3:16,Player A,Shot landed as winner,Smash,Opponent failed to return,4,8,Test1_Full_rev,12,dataset/clips\Test1_Full_rev\rally_012.mp4
+3:18,3:30,Player A,Opponent hit the net,Slice shot,Hit the net,5,8,Test1_Full_rev,13,dataset/clips\Test1_Full_rev\rally_013.mp4
+3:33,3:42,Player B,Opponent hit out of bounds,Smash,Hit out of bounds,5,9,Test1_Full_rev,14,dataset/clips\Test1_Full_rev\rally_014.mp4
+3:45,3:50,Player A,Opponent hit out of bounds,Hook shot,Hit out of bounds,6,9,Test1_Full_rev,15,dataset/clips\Test1_Full_rev\rally_015.mp4
+3:53,4:09,Player A,Shot landed as winner,Slice shot,Opponent failed to return,7,9,Test1_Full_rev,16,dataset/clips\Test1_Full_rev\rally_016.mp4
+4:11,4:19,Player B,Shot landed as winner,Hook shot,Opponent failed to return,7,10,Test1_Full_rev,17,dataset/clips\Test1_Full_rev\rally_017.mp4
+4:24,4:28,Player B,Opponent hit out of bounds,Defensive drive,Hit out of bounds,7,11,Test1_Full_rev,18,dataset/clips\Test1_Full_rev\rally_018.mp4
+4:30,4:48,Player B,Shot landed as winner,Lift shot,Opponent failed to return,7,12,Test1_Full_rev,19,dataset/clips\Test1_Full_rev\rally_019.mp4
+4:49,5:32,Player B,Opponent hit out of bounds,Push shot,Hit out of bounds,7,13,Test1_Full_rev,20,dataset/clips\Test1_Full_rev\rally_020.mp4
+5:41,5:52,Player A,Opponent hit out of bounds,Slice shot,Hit out of bounds,8,13,Test1_Full_rev,21,dataset/clips\Test1_Full_rev\rally_021.mp4
+5:53,5:57,Player B,Opponent hit the net,Hook shot,Hit the net,8,14,Test1_Full_rev,22,dataset/clips\Test1_Full_rev\rally_022.mp4
+5:59,6:09,Player B,Opponent hit the net,Hook shot,Hit the net,8,15,Test1_Full_rev,23,dataset/clips\Test1_Full_rev\rally_023.mp4
+6:15,6:19,Player B,Opponent hit the net,Hook shot,Hit the net,8,16,Test1_Full_rev,24,dataset/clips\Test1_Full_rev\rally_024.mp4
+6:25,6:36,Player B,Opponent hit the net,Flat shot,Hit the net,8,17,Test1_Full_rev,25,dataset/clips\Test1_Full_rev\rally_025.mp4
+6:39,6:48,Player B,Opponent hit out of bounds,Smash,Hit out of bounds,8,18,Test1_Full_rev,26,dataset/clips\Test1_Full_rev\rally_026.mp4
+6:55,7:12,Player A,Shot landed as winner,Defensive drive,Opponent failed to return,9,18,Test1_Full_rev,27,dataset/clips\Test1_Full_rev\rally_027.mp4
+7:17,7:28,Player A,Opponent hit the net,Drop shot,Hit the net,10,18,Test1_Full_rev,28,dataset/clips\Test1_Full_rev\rally_028.mp4
+7:35,7:46,Player B,Opponent hit out of bounds,Push shot,Hit out of bounds,10,19,Test1_Full_rev,29,dataset/clips\Test1_Full_rev\rally_029.mp4
+7:54,7:58,Player A,Opponent hit the net,Defensive drive,Hit the net,11,19,Test1_Full_rev,30,dataset/clips\Test1_Full_rev\rally_030.mp4
+8:01,8:25,Player B,Opponent hit the net,Hook shot,Hit the net,11,20,Test1_Full_rev,31,dataset/clips\Test1_Full_rev\rally_031.mp4
+8:31,8:38,Player A,Opponent hit out of bounds,Lift shot,Hit out of bounds,12,20,Test1_Full_rev,32,dataset/clips\Test1_Full_rev\rally_032.mp4
+8:40,8:52,Player B,Opponent hit the net,Drop shot,Hit the net,12,21,Test1_Full_rev,33,dataset/clips\Test1_Full_rev\rally_033.mp4
+8:53,9:07,Player B,Shot landed as winner,Smash,Opponent failed to return,12,22,Test1_Full_rev,34,dataset/clips\Test1_Full_rev\rally_034.mp4
+9:10,9:27,Player B,Opponent hit the net,Slice shot,Hit the net,12,23,Test1_Full_rev,35,dataset/clips\Test1_Full_rev\rally_035.mp4
+9:29,9:33,Player B,Opponent hit the net,Drop shot,Hit the net,12,24,Test1_Full_rev,36,dataset/clips\Test1_Full_rev\rally_036.mp4
+0:05,0:15,Player B,Opponent hit net,Net Shot,Net Error,0,1,Test3_Full_Rev,1,dataset/clips\Test3_Full_Rev\rally_001.mp4
+0:19,0:41,Player A,Opponent hit out of bounds,Lift,Out,1,1,Test3_Full_Rev,2,dataset/clips\Test3_Full_Rev\rally_002.mp4
+0:43,0:49,Player B,Opponent hit out of bounds,Lift,Out,1,2,Test3_Full_Rev,3,dataset/clips\Test3_Full_Rev\rally_003.mp4
+0:53,1:04,Player B,Opponent hit out of bounds,Lift,Out,1,3,Test3_Full_Rev,4,dataset/clips\Test3_Full_Rev\rally_004.mp4
+1:05,1:09,Player B,Opponent hit out of bounds,Lift,Out,1,4,Test3_Full_Rev,5,dataset/clips\Test3_Full_Rev\rally_005.mp4
+1:13,1:18,Player A,Shot landed as winner,Smash,Opponent could not return,2,4,Test3_Full_Rev,6,dataset/clips\Test3_Full_Rev\rally_006.mp4
+1:22,1:30,Player A,Opponent hit out of bounds,Lift,Out,3,4,Test3_Full_Rev,7,dataset/clips\Test3_Full_Rev\rally_007.mp4
+1:30,1:39,Player A,Shot landed as winner,Smash,Opponent could not return,4,4,Test3_Full_Rev,8,dataset/clips\Test3_Full_Rev\rally_008.mp4
+1:39,1:42,Player B,Opponent hit net,Net Shot,Net Error,4,5,Test3_Full_Rev,9,dataset/clips\Test3_Full_Rev\rally_009.mp4
+1:46,1:55,Player B,Opponent hit net,Net Shot,Net Error,4,6,Test3_Full_Rev,10,dataset/clips\Test3_Full_Rev\rally_010.mp4
+2:02,2:19,Player B,Opponent hit net,Net Shot,Net Error,4,7,Test3_Full_Rev,11,dataset/clips\Test3_Full_Rev\rally_011.mp4
+2:24,2:35,Player A,Opponent hit out of bounds,Lift,Out,5,7,Test3_Full_Rev,12,dataset/clips\Test3_Full_Rev\rally_012.mp4
+2:40,3:01,Player B,Opponent hit out of bounds,Lift,Out,5,8,Test3_Full_Rev,13,dataset/clips\Test3_Full_Rev\rally_013.mp4
+3:03,3:10,Player B,Opponent hit out of bounds,Lift,Out,5,9,Test3_Full_Rev,14,dataset/clips\Test3_Full_Rev\rally_014.mp4
+3:13,3:24,Player B,Opponent hit out of bounds,Lift,Out,5,10,Test3_Full_Rev,15,dataset/clips\Test3_Full_Rev\rally_015.mp4
+3:25,3:30,Player A,Opponent hit out of bounds,Lift,Out,5,11,Test3_Full_Rev,16,dataset/clips\Test3_Full_Rev\rally_016.mp4
+3:33,3:39,Player A,Opponent hit out of bounds,Lift,Out,5,12,Test3_Full_Rev,17,dataset/clips\Test3_Full_Rev\rally_017.mp4
+3:43,3:50,Player B,Shot landed as winner,Smash,Opponent could not return,5,13,Test3_Full_Rev,18,dataset/clips\Test3_Full_Rev\rally_018.mp4
+3:50,3:59,Player B,Shot landed as winner,Smash,Opponent could not return,5,14,Test3_Full_Rev,19,dataset/clips\Test3_Full_Rev\rally_019.mp4
+4:00,4:02,Player B,Opponent hit net,Net Shot,Net Error,5,15,Test3_Full_Rev,20,dataset/clips\Test3_Full_Rev\rally_020.mp4
+4:07,4:15,Player B,Opponent hit net,Net Shot,Net Error,5,16,Test3_Full_Rev,21,dataset/clips\Test3_Full_Rev\rally_021.mp4
+4:23,4:40,Player B,Opponent hit net,Lift,Out,5,17,Test3_Full_Rev,22,dataset/clips\Test3_Full_Rev\rally_022.mp4
+0:04,0:21,Player B,Shot landed as winner,Push shot,Opponent hit out of bounds,0,1,Test6_Full,1,dataset/clips\Test6_Full\rally_001.mp4
+0:23,0:33,Player A,Opponent hit the net,Hook shot,Hit the net,1,1,Test6_Full,2,dataset/clips\Test6_Full\rally_002.mp4
+0:35,0:54,Player A,Opponent hit out of bounds,Lift shot,Hit out of bounds,2,1,Test6_Full,3,dataset/clips\Test6_Full\rally_003.mp4
+0:56,1:03,Player A,Opponent failed to clear net,Block shot,Failed to clear net,3,1,Test6_Full,4,dataset/clips\Test6_Full\rally_004.mp4
+1:05,1:23,Player A,Opponent hit out of bounds,Lift shot,Hit out of bounds,4,1,Test6_Full,5,dataset/clips\Test6_Full\rally_005.mp4
+1:32,1:45,Player A,Opponent hit out of bounds,Lift shot,Hit out of bounds,5,1,Test6_Full,6,dataset/clips\Test6_Full\rally_006.mp4
+1:46,1:50,Player B,Opponent hit the net,Hook shot,Hit the net,5,2,Test6_Full,7,dataset/clips\Test6_Full\rally_007.mp4
+1:52,1:59,Player A,Shot landed as winner,Smash,Opponent failed to return,6,2,Test6_Full,8,dataset/clips\Test6_Full\rally_008.mp4
+2:00,2:01,Player B,Shot landed as winner,Jump smash,Opponent failed to return,6,3,Test6_Full,9,dataset/clips\Test6_Full\rally_009.mp4
+2:06,2:10,Player A,Opponent hit out of bounds,Drop shot,Hit out of bounds,7,3,Test6_Full,10,dataset/clips\Test6_Full\rally_010.mp4
+2:11,2:29,Player A,Opponent hit the net,Drop shot,Hit the net,8,3,Test6_Full,11,dataset/clips\Test6_Full\rally_011.mp4
+2:31,2:51,Player B,Shot landed as winner,Push shot,Opponent failed to return,8,4,Test6_Full,12,dataset/clips\Test6_Full\rally_012.mp4
+2:52,2:57,Player B,Opponent hit out of bounds,Lift shot,Hit out of bounds,8,5,Test6_Full,13,dataset/clips\Test6_Full\rally_013.mp4
+2:59,3:08,Player A,Opponent hit out of bounds,Lift shot,Hit out of bounds,9,5,Test6_Full,14,dataset/clips\Test6_Full\rally_014.mp4
+3:11,3:36,Player A,Opponent hit out of bounds,Clear shot,Hit out of bounds,10,5,Test6_Full,15,dataset/clips\Test6_Full\rally_015.mp4
+3:39,3:45,Player A,Shot landed as winner,Smash,Opponent failed to return,11,5,Test6_Full,16,dataset/clips\Test6_Full\rally_016.mp4
+3:47,3:54,Player A,Opponent hit out of bounds,Lift shot,Hit out of bounds,12,5,Test6_Full,17,dataset/clips\Test6_Full\rally_017.mp4
+3:57,4:02,Player A,Opponent hit the net,Drop shot,Hit the net,13,5,Test6_Full,18,dataset/clips\Test6_Full\rally_018.mp4
+4:04,4:07,Player B,Shot landed as winner,Jump smash,Opponent failed to return,13,6,Test6_Full,19,dataset/clips\Test6_Full\rally_019.mp4
+4:10,4:13,Player A,Opponent failed to clear net,Block shot,Failed to clear net,14,6,Test6_Full,20,dataset/clips\Test6_Full\rally_020.mp4
+4:14,4:34,Player A,Shot landed as winner,Smash,Opponent failed to return,15,6,Test6_Full,21,dataset/clips\Test6_Full\rally_021.mp4
+4:35,4:40,Player A,Opponent hit the net,Smash,Hit the net,16,6,Test6_Full,22,dataset/clips\Test6_Full\rally_022.mp4
+4:43,4:49,Player A,Shot landed as winner,Smash,Opponent failed to return,17,6,Test6_Full,23,dataset/clips\Test6_Full\rally_023.mp4
+5:03,5:25,Player A,Winner,Drive,Opponent could not return,18,6,Test6_Full,24,dataset/clips\Test6_Full\rally_024.mp4
+5:27,5:37,Player A,Opponent hit net,Net Block,Net Error,19,6,Test6_Full,25,dataset/clips\Test6_Full\rally_025.mp4
+5:39,5:42,Player B,Opponent hit net,Drop Shot,Net Error,19,7,Test6_Full,26,dataset/clips\Test6_Full\rally_026.mp4
+5:44,5:58,Player B,Opponent hit out,Lift,Out,19,8,Test6_Full,27,dataset/clips\Test6_Full\rally_027.mp4
+5:59,6:07,Player B,Opponent hit out,Smash,Out,19,9,Test6_Full,28,dataset/clips\Test6_Full\rally_028.mp4
+6:09,6:18,Player B,Opponent hit out,Lift,Out,19,10,Test6_Full,29,dataset/clips\Test6_Full\rally_029.mp4
+6:20,6:48,Player A,Winner,Smash,Opponent could not return,20,10,Test6_Full,30,dataset/clips\Test6_Full\rally_030.mp4
+6:52,6:55,Player A,Winner,Smash,Opponent could not return,21,10,Test6_Full,31,dataset/clips\Test6_Full\rally_031.mp4
+6:58,7:14,Player B,Opponent hit net,Net Shot,Net Error,21,11,Test6_Full,32,dataset/clips\Test6_Full\rally_032.mp4
+7:16,7:27,Player B,Opponent failed to cross net,Net Block,Failed to Cross Net,21,12,Test6_Full,33,dataset/clips\Test6_Full\rally_033.mp4
+7:29,7:40,Player A,Opponent hit out,Smash,Out,22,12,Test6_Full,34,dataset/clips\Test6_Full\rally_034.mp4
+7:43,7:56,Player B,Opponent hit net,Net Shot,Net Error,22,13,Test6_Full,35,dataset/clips\Test6_Full\rally_035.mp4
+7:59,8:23,Player B,Opponent hit out,Drop Shot,Out,22,14,Test6_Full,36,dataset/clips\Test6_Full\rally_036.mp4
+8:24,8:38,Player B,Opponent hit out,Clear,Out,22,15,Test6_Full,37,dataset/clips\Test6_Full\rally_037.mp4
+8:41,8:48,Player B,Opponent failed to cross net,Net Block,Failed to Cross Net,22,16,Test6_Full,38,dataset/clips\Test6_Full\rally_038.mp4
+8:50,8:59,Player B,Winner,Smash,Opponent could not return,22,17,Test6_Full,39,dataset/clips\Test6_Full\rally_039.mp4
+9:02,9:19,Player A,Opponent hit out,Lift,Out,23,17,Test6_Full,40,dataset/clips\Test6_Full\rally_040.mp4
+9:22,9:33,Player A,Opponent failed to cross net,Net Block,Failed to Cross Net,24,17,Test6_Full,41,dataset/clips\Test6_Full\rally_041.mp4
+9:34,9:36,Player B,Opponent hit net,Net Shot,Net Error,24,18,Test6_Full,42,dataset/clips\Test6_Full\rally_042.mp4
+9:38,9:56,Player B,Opponent hit out,Drop Shot,Out,24,19,Test6_Full,43,dataset/clips\Test6_Full\rally_043.mp4
+6,15,Player B,Opponent hit out of bounds,Lift shot,Hit out of bounds,0,1,Test7_Full,1,dataset/clips\Test7_Full\rally_001.mp4
+19,31,Player B,Opponent hit the net,Net Shot,Hit the net,0,2,Test7_Full,2,dataset/clips\Test7_Full\rally_002.mp4
+38,53,Player B,Opponent hit out of bounds,Push shot,Hit out of bounds,0,3,Test7_Full,3,dataset/clips\Test7_Full\rally_003.mp4
+55,65,Player A,Shot landed as winner,Smash,Opponent failed to return,1,3,Test7_Full,4,dataset/clips\Test7_Full\rally_004.mp4
+68,74,Player A,Opponent hit out of bounds,Drop shot,Hit out of bounds,2,3,Test7_Full,5,dataset/clips\Test7_Full\rally_005.mp4
+78,92,Player B,Opponent hit out of bounds,Lift shot,Hit out of bounds,2,4,Test7_Full,6,dataset/clips\Test7_Full\rally_006.mp4
+105,112,Player A,Opponent hit out of bounds,Hook shot,Hit out of bounds,3,4,Test7_Full,7,dataset/clips\Test7_Full\rally_007.mp4
+115,117,Player A,Opponent hit out of bounds,Clear shot,Hit out of bounds,4,4,Test7_Full,8,dataset/clips\Test7_Full\rally_008.mp4
+123,128,Player B,Opponent hit the net,Net Shot,Hit the net,4,5,Test7_Full,9,dataset/clips\Test7_Full\rally_009.mp4
+131,146,Player B,Opponent hit the net,Net Block,Hit the net,4,6,Test7_Full,10,dataset/clips\Test7_Full\rally_010.mp4
+146,150,Player B,Shot landed as winner,Smash,Opponent failed to return,4,7,Test7_Full,11,dataset/clips\Test7_Full\rally_011.mp4
+151,156,Player A,Opponent hit out of bounds,Slice shot,Hit out of bounds,5,7,Test7_Full,12,dataset/clips\Test7_Full\rally_012.mp4
+157,160,Player B,Opponent hit the net,Drop shot,Hit the net,5,8,Test7_Full,13,dataset/clips\Test7_Full\rally_013.mp4
+167,173,Player B,Shot landed as winner,Smash,Opponent failed to return,5,9,Test7_Full,14,dataset/clips\Test7_Full\rally_014.mp4
+175,180,Player B,Opponent hit the net,Net Shot,Hit the net,5,10,Test7_Full,15,dataset/clips\Test7_Full\rally_015.mp4
+184,187,Player A,Opponent hit the net,Drop shot,Hit the net,6,10,Test7_Full,16,dataset/clips\Test7_Full\rally_016.mp4
+192,201,Player A,Opponent hit the net,Lift shot,Hit the net,7,10,Test7_Full,17,dataset/clips\Test7_Full\rally_017.mp4
+205,208,Player A,Opponent hit out of bounds,Push shot,Hit out of bounds,8,10,Test7_Full,18,dataset/clips\Test7_Full\rally_018.mp4
+209,218,Player B,Opponent hit out of bounds,Push shot,Hit out of bounds,8,11,Test7_Full,19,dataset/clips\Test7_Full\rally_019.mp4
+220,223,Player B,Shot landed as winner,Smash,Opponent failed to return,8,12,Test7_Full,20,dataset/clips\Test7_Full\rally_020.mp4
+226,246,Player A,Opponent hit out of bounds,Lift shot,Hit out of bounds,9,12,Test7_Full,21,dataset/clips\Test7_Full\rally_021.mp4
+252,255,Player A,Shot landed as winner,Smash,Opponent failed to return,10,12,Test7_Full,22,dataset/clips\Test7_Full\rally_022.mp4
+259,262,Player B,Shot landed as winner,Push shot,Opponent failed to return,10,13,Test7_Full,23,dataset/clips\Test7_Full\rally_023.mp4
+266,275,Player B,Shot landed as winner,Smash,Opponent failed to return,10,14,Test7_Full,24,dataset/clips\Test7_Full\rally_024.mp4
+278,286,Player A,Opponent hit out of bounds,Drop shot,Hit out of bounds,11,14,Test7_Full,25,dataset/clips\Test7_Full\rally_025.mp4
+289,298,Player A,Opponent hit out of bounds,Lift shot,Hit out of bounds,12,14,Test7_Full,26,dataset/clips\Test7_Full\rally_026.mp4
+302,306,Player B,Opponent hit out of bounds,Push shot,Hit out of bounds,12,15,Test7_Full,27,dataset/clips\Test7_Full\rally_027.mp4
+308,320,Player A,Opponent hit the net,Net Shot,Hit the net,13,15,Test7_Full,28,dataset/clips\Test7_Full\rally_028.mp4
+324,328,Player A,Opponent hit out of bounds,Hook shot,Hit out of bounds,14,15,Test7_Full,29,dataset/clips\Test7_Full\rally_029.mp4
+341,347,Player B,Shot landed as winner,Smash,Opponent failed to return,14,16,Test7_Full,30,dataset/clips\Test7_Full\rally_030.mp4
+353,357,Player A,In hit,Hook shot,Player failed to return,15,16,Test7_Full,31,dataset/clips\Test7_Full\rally_031.mp4

@@ -1,0 +1,8 @@
+.login-wrap {
+  max-width: 360px;
+  margin: 12vh auto 0;
+  padding: 0 20px;
+}
+.login-wrap .field {
+  margin-top: 16px;
+}

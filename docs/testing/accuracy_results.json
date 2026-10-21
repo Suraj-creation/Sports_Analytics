@@ -1,0 +1,26 @@
+{
+  "rallies": {
+    "gt_rallies_count": 36,
+    "predicted_rallies_count": 41,
+    "temporally_matched": 22,
+    "temporal_recall": 0.611,
+    "winner_correct": 8,
+    "winner_evaluated": 13,
+    "winner_accuracy": 0.615,
+    "mean_start_error_s": 4.225,
+    "mean_end_error_s": 3.391
+  },
+  "calibration": {
+    "source": "auto",
+    "n_points": 4,
+    "reprojection_error_px": 1.9e-05,
+    "confidence": 1.0,
+    "status": "PASS"
+  },
+  "scoring_engine": {
+    "bwf_standard_rules": "PASS",
+    "bwf_deuce_rule": "PASS",
+    "bwf_30_point_cap": "PASS",
+    "server_rotation": "PASS"
+  }
+}

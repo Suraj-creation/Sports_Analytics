@@ -1,0 +1,26 @@
+[project]
+name = "bai-api"
+version = "0.1.0"
+description = "FastAPI service: REST + WebSocket gateway, ingest, media, exports, agents"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "bai-engine",
+    "bai-badminton",
+    "bai-agents[all]",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "python-multipart>=0.0.18",
+    "itsdangerous>=2.2",
+    "yt-dlp>=2025.1",
+    "reportlab>=4.2",
+]
+
+[project.scripts]
+bai = "bai_api.cli:main"
+
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/bai_api"]
