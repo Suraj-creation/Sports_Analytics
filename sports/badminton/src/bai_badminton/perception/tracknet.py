@@ -130,8 +130,14 @@ class ShuttleDetection:
     conf: float
 
 
-def heatmap_to_point(hm: NDArray[np.float32], threshold: float) -> tuple[float, float, float] | None:
+def heatmap_to_point(
+    hm: NDArray[np.float32], threshold: float, mask: NDArray[np.uint8] | None = None
+) -> tuple[float, float, float] | None:
     """Centroid (heatmap-weighted) of the blob containing the peak; ``conf`` = peak value."""
+    if mask is not None:
+        if mask.shape != hm.shape:
+            raise ValueError("shuttle mask must match the heatmap shape")
+        hm = np.where(mask, hm, 0.0)
     peak = float(hm.max())
     if peak < threshold:
         return None
@@ -231,7 +237,11 @@ class TrackNetV3:
             return self._torch(t).float().cpu().numpy()
 
     def detect(
-        self, frames_bgr: list[NDArray[np.uint8]], shots: list[int] | None = None, step: int | None = None
+        self,
+        frames_bgr: list[NDArray[np.uint8]],
+        shots: list[int] | None = None,
+        step: int | None = None,
+        masks: list[NDArray[np.uint8]] | None = None,
     ) -> list[ShuttleDetection | None]:
         """Detect the shuttle in every frame.
 
@@ -241,6 +251,8 @@ class TrackNetV3:
         """
         if not frames_bgr:
             return []
+        if masks is not None and len(masks) != len(frames_bgr):
+            raise ValueError("one shuttle mask is required per frame")
         L = self.seq_len
         step = L if step is None else max(1, min(step, L))
         shots = shots or [0] * len(frames_bgr)
@@ -273,6 +285,6 @@ class TrackNetV3:
                     cnt[i] += 1
         out: list[ShuttleDetection | None] = []
         for i in range(n):
-            pt = heatmap_to_point(acc[i] / max(cnt[i], 1.0), self.threshold)
+            pt = heatmap_to_point(acc[i] / max(cnt[i], 1.0), self.threshold, None if masks is None else masks[i])
             out.append(None if pt is None else ShuttleDetection(pt[0] * sx, pt[1] * sy, pt[2]))
         return out

@@ -10,13 +10,13 @@ import cv2
 import msgpack
 import numpy as np
 
-from bai_badminton.court import REFERENCE_POINTS, WIDTH_DOUBLES, CalibrationError, Homography, fit_homography
+from bai_badminton.court import REFERENCE_POINTS, WIDTH_DOUBLES, Homography, fit_homography
 from bai_badminton.engine import BadmintonMatchEngine, EngineConfig, box_tuple, camera_sample, keypoint_rows
 from bai_badminton.events.rally_fsm import RallyState
 from bai_badminton.perception.court_lines import METHOD as LINES_METHOD
 from bai_badminton.perception.court_lines import CourtFit, camera_pose, choose_main, detect_court, refine_court
-from bai_badminton.perception.pipeline import BadmintonPerception
-from bai_badminton.perception.scene import propose_corners
+from bai_badminton.perception.isolation import is_fixed_camera
+from bai_badminton.perception.pipeline import BadmintonPerception, lines_ref_id
 from bai_badminton.perception_types import ChunkPerception, FramePerception, PersonObs, ScoreReading
 from bai_engine.config import Profile, get_settings
 from bai_engine.decode import DecodedChunk
@@ -29,7 +29,7 @@ from bai_engine.store import EventStore
 log = get_logger(__name__)
 AUTO_CALIBRATION_MIN_SCORE = 0.6
 REF_FILE = "camera_ref.png"  # the frame the calibration was made on (lossless: its id is a content hash)
-CODEC_VERSION = 3  # 2: per-frame camera pose + the reference it is relative to; 3: scene view / camera head
+CODEC_VERSION = 6  # isolation geometry and camera policy are part of every cache identity
 MAX_ADJUST = 0.03  # a human calibration the court lines move by more than this (× frame width) is kept as is
 
 
@@ -82,6 +82,7 @@ class BadmintonSession:
             profile, registry, fps, get_settings().models_dir, frame_size=(m.width, m.height)
         )
         self.calibration: Homography | None = None
+        self._fixed_camera: bool | None = None  # None: legacy or not yet sampled
         self._emit = emit
         self._frame_at: Callable[[int], np.ndarray] | None = None
         self._ref_dir: Path | None = None
@@ -132,7 +133,11 @@ class BadmintonSession:
             # court-line calibrations resume at once; background tracking resumes in attach_frames (needs the
             # reference image)
             self._apply_calibration(
-                h, emit=False, net_top=net_top, mode="lines" if pay.get("mode") == "lines" else "static"
+                h,
+                emit=False,
+                net_top=net_top,
+                mode="lines" if pay.get("mode") == "lines" else "static",
+                record={"fixed_camera": pay.get("fixed_camera")},
             )
 
     def _apply_calibration(
@@ -152,6 +157,8 @@ class BadmintonSession:
         by its lines in every frame (refined onto them), otherwise the camera is tracked by its background
         from ``reference``.  Returns the calibration record's extra fields."""
         extra: dict[str, Any] = dict(record or {})
+        extra.setdefault("fixed_camera", self._fixed_camera)
+        self._fixed_camera = extra["fixed_camera"]
         size = (self.session.media.width, self.session.media.height) if self.session.media else None
         if mode is None and reference is not None:
             fit = refine_court(reference, h.H)
@@ -168,6 +175,8 @@ class BadmintonSession:
             extra.update(_fit_record(fit))
         self.calibration = h
         used = self.perception.set_calibration(h, reference, "lines" if mode == "lines" else None)
+        if used == "lines" and extra.get("fixed_camera"):
+            self.perception.court.lock(h.H)
         cam_ref = self.perception.ref_id
         if used == "camera" and reference is not None:
             self._save_ref(reference)
@@ -200,27 +209,31 @@ class BadmintonSession:
         self.perception.seed_background(keyframes)
         if not keyframes:
             return
+        if self._fixed_camera is None:
+            self._fixed_camera = is_fixed_camera(keyframes)
+            if self.calibration is not None and self.perception.mode == "lines":
+                # Existing line calibrations predate camera ownership. Keep the
+                # chosen court, classify the camera, and persist the decision.
+                records = self.store.query(types=["calibration"])
+                pay = records[-1].payload if records else {}
+                net = pay.get("net_top")
+                self._apply_calibration(
+                    self.calibration,
+                    mode="lines",
+                    source=pay.get("source", "auto"),
+                    ref_frame=pay.get("ref_frame"),
+                    net_top=((net[0][0], net[0][1]), (net[1][0], net[1][1])) if net else None,
+                    record={"fixed_camera": self._fixed_camera, "isolation_version": 1},
+                )
         if self.calibration is not None and self.perception.mode != "lines" and self._upgrade_legacy(keyframes):
             return
         if self.calibration is not None:
             return
         if self._auto_calibrate(keyframes):
             return
-        best = None  # legacy fallback: the court mat's outline (no painted lines found)
-        for f in keyframes:
-            prop = propose_corners(f)
-            if prop is not None and (best is None or prop[1] > best[1]):
-                best = (prop[0], prop[1], f)
-        if best is None or best[1] < AUTO_CALIBRATION_MIN_SCORE:
-            log.info("calibration.auto_failed", score=None if best is None else round(best[1], 2))
-            return
-        try:
-            h = fit_homography(best[0])
-        except CalibrationError as e:
-            log.info("calibration.auto_invalid", error=str(e))
-            return
-        self._apply_calibration(h, reference=best[2], source="mat_contour_v0")
-        log.info("calibration.auto", method="mat_contour", score=round(best[1], 2))
+        # A shared mat can include several courts: its outline is not a valid
+        # substitute for one court's painted landmarks.
+        self.perception._degrade("court", "Court not verified; select court landmarks before analysis")
 
     def _upgrade_legacy(self, keyframes: list[np.ndarray]) -> bool:
         """A new analysis restored a calibration made before court-line tracking (one homography for one
@@ -271,6 +284,9 @@ class BadmintonSession:
             return False
         i = next(i for i, f in found if f is main)
         extra = {"coverage": round(len(found) / len(frames), 3), "sampled_frames": len(frames)}
+        # Infer a fixed installation from the background, not competing court fits.
+        extra["fixed_camera"] = is_fixed_camera(frames)
+        extra["isolation_version"] = 1
         self._apply_calibration(
             Homography(main.H, main.rms_px, sum(main.lines)),
             reference=frames[i],
@@ -436,6 +452,13 @@ class BadmintonSession:
         return [{"stage": d.stage, "reason": d.reason} for d in self.perception.degraded]
 
     # ------------------------------------------------------------------ cache codec
+    def _isolation_id(self) -> dict[str, Any]:
+        return {
+            "court": lines_ref_id(self.calibration.H) if self.calibration is not None else None,
+            "mode": self.perception.mode,
+            "fixed_camera": self._fixed_camera,
+        }
+
     def encode_perception(self, p: ChunkPerception) -> bytes:
         frames = []
         for fp in p.frames:
@@ -468,6 +491,7 @@ class BadmintonSession:
                 "v": CODEC_VERSION,
                 "start": p.start,
                 "cr": p.cam_ref,
+                "ci": self._isolation_id(),
                 "end": p.end,
                 "models": p.models,
                 "frames": frames,
@@ -481,11 +505,12 @@ class BadmintonSession:
     def decode_perception(self, data: bytes) -> ChunkPerception:
         d = msgpack.unpackb(data, raw=False)
         ref_id = self.perception.ref_id
-        if ref_id is not None and (d.get("v", 1) < CODEC_VERSION or d.get("cr") != ref_id):
-            # made before camera tracking existed, or against another reference view: its poses (and the
-            # court-presence gating they fed) do not match the current calibration
+        if d.get("v", 1) != CODEC_VERSION or d.get("cr") != ref_id or d.get("ci") != self._isolation_id():
+            # A static calibration has no camera reference, but its geometry and
+            # lock policy still control both player admission and shuttle peaks.
             raise StaleCacheError(
-                f"perception segment {d['start']} was made against reference {d.get('cr')}, not {ref_id}"
+                f"perception segment {d['start']} has stale codec/calibration policy "
+                f"(version {d.get('v', 1)} vs {CODEC_VERSION}; reference {d.get('cr')} vs {ref_id})"
             )
         frames = [
             FramePerception(

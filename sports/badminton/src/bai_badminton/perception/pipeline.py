@@ -31,6 +31,7 @@ import numpy as np
 from bai_badminton.court import REFERENCE_POINTS, WIDTH_DOUBLES, Homography
 from bai_badminton.perception.camera import CameraTracker, project
 from bai_badminton.perception.court_lines import CameraRig, CourtTracker, camera_pose
+from bai_badminton.perception.isolation import flight_mask
 from bai_badminton.perception.players import CourtROI, PlayerDetector, PlayerPerception, PoseEstimator
 from bai_badminton.perception.scene import CourtPresence, CutDetector, small_hsv
 from bai_badminton.perception.scoreboard import ScoreboardReader
@@ -199,7 +200,8 @@ class BadmintonPerception:
         camera, and without it the calibration is taken to hold for the whole shot (fixed camera)."""
         names = ("far_left", "far_right", "near_right", "near_left")
         poly = h.court_to_image(np.array([REFERENCE_POINTS[n] for n in names])).astype(np.float32)
-        self.players.set_roi(CourtROI(poly))
+        self.players.on_cut()
+        self.players.set_roi(CourtROI(poly, homography=h))
         self.presence = CourtPresence(poly)
         self._ref_poly = poly
         self._H_ref = np.asarray(h.H, np.float64)
@@ -271,7 +273,17 @@ class BadmintonPerception:
             with timed("shuttle"):
                 t0 = _now()
                 step = int(p.shuttle.params.get("step", self.shuttle.seq_len))
-                shuttle = self.shuttle.detect(chunk.frames, shots, step=step)
+                from bai_badminton.perception.tracknet import HEIGHT, WIDTH
+
+                masks = None
+                if self._ref_poly is not None:
+                    masks = [
+                        flight_mask(poly, (img.shape[1], img.shape[0]), (WIDTH, HEIGHT))
+                        if poly is not None and not replay[i]
+                        else np.zeros((HEIGHT, WIDTH), np.uint8)
+                        for i, (img, poly) in enumerate(zip(chunk.frames, polys, strict=True))
+                    ]
+                shuttle = self.shuttle.detect(chunk.frames, shots, step=step, masks=masks)
                 self._rate("shuttle", n, t0)
 
         frames: list[FramePerception] = []
@@ -283,7 +295,11 @@ class BadmintonPerception:
                     self.players.on_cut()
                 poly = polys[i]
                 if poly is not None:  # the player ROI follows the court as the camera moves
-                    self.players.set_roi(CourtROI(poly.astype(np.float32)))
+                    H_now = self._H_ref
+                    if poses is not None and poses[i] is not None and H_now is not None:
+                        H_now = poses[i] @ H_now
+                    h_now = Homography(H_now, 0.0, 4) if H_now is not None else None
+                    self.players.set_roi(CourtROI(poly.astype(np.float32), homography=h_now))
                 persons = [] if replay[i] else self.players.process(fidx, img, (rates_det, rates_pose))
                 s = shuttle[i] if not replay[i] else None
                 # lines mode: every calibrated frame carries its pose (other cameras too: the court is drawn
@@ -321,7 +337,8 @@ class BadmintonPerception:
         """Per-frame view, camera head, pose (reference px → frame px) and court polygon of a chunk."""
         n = len(chunk.frames)
         sc = _Scene(["main"] * n, [None] * n, [None] * n, None, [None] * n)
-        if self.presence is None:  # uncalibrated: everything is analysed (no geometry)
+        if self.presence is None:  # court ownership is unknown: require calibration
+            sc.views = ["none"] * n
             return sc
         if self.mode == "lines" and self.rig is not None and self._H_ref is not None:
             t0 = _now()
@@ -345,6 +362,7 @@ class BadmintonPerception:
         sc.poses = poses
         for i, f in enumerate(chunk.frames):
             if poses is None:
+                sc.polys[i] = self._ref_poly
                 sc.views[i] = "main" if self.presence.is_main_camera(f) else "none"
                 continue
             pose = poses[i]

@@ -882,7 +882,7 @@ def search(feat: LineFeatures, full: tuple[int, int]) -> CourtFit | None:
     H = H[keep]
     scores = _score_batch(H, feat, COARSE, 4.0)
     order = np.argsort(-scores)
-    best: CourtFit | None = None
+    candidates: list[CourtFit] = []
     seen: list[Mat] = []
     for i in order[: REFINE_TOP * 3]:
         if scores[i] <= 0 or len(seen) >= REFINE_TOP:
@@ -895,9 +895,30 @@ def search(feat: LineFeatures, full: tuple[int, int]) -> CourtFit | None:
         if Hr is None or camera_pose(Hr, feat.size) is None:
             continue
         fit = _fit(Hr, feat, full, "search")
-        if best is None or _rank(fit) > _rank(best):
-            best = fit
-    return best
+        candidates.append(fit)
+    return select_primary(candidates, full)
+
+
+def select_primary(fits: Sequence[CourtFit], size: tuple[int, int]) -> CourtFit | None:
+    """Choose the dominant visible court, after rejecting weak geometric fits.
+
+    Area and centrality only break near-quality ties: otherwise a spurious
+    quadrilateral spanning several courts could defeat a measured court.
+    """
+    valid = [f for f in fits if f.ok]
+    if not valid:
+        return None
+    precision = max(f.precision for f in valid)
+    valid = [f for f in valid if f.precision >= precision - 0.05]
+    w, h = size
+
+    def score(f: CourtFit) -> float:
+        centre = _project(f.H, np.array([[0.0, 0.0]]))[0]
+        distance = float(np.linalg.norm((centre - [w / 2, h / 2]) / [w, h]))
+        centrality = max(0.0, 1.0 - distance)
+        return f.support * f.precision**2 * (1.0 + 0.5 * f.area + 0.3 * centrality)
+
+    return max(valid, key=score)
 
 
 def _rank(f: CourtFit) -> tuple[bool, float]:
@@ -994,9 +1015,16 @@ class CourtTracker:
     _st: _TrackState | None = None
     _lost: int = 0
     _run: int = 0  # length of the current run of fits (continues across chunks)
+    _locked: Mat | None = None
 
     def reset(self) -> None:
         self._st, self._lost, self._run = None, 0, 0
+        self._locked = None
+
+    def lock(self, H: Mat) -> None:
+        """Keep the selected court for a fixed camera; loss must not select a neighbor."""
+        self.reset()
+        self._locked = np.array(H, dtype=np.float64, copy=True)
 
     def track(self, frames: Sequence[Frame], cuts: Sequence[bool], start: int) -> list[CourtFit | None]:
         """The court fit of each frame (``None``: court not verifiably in view).  ``cuts[i]``: a camera
@@ -1038,6 +1066,19 @@ class CourtTracker:
         gray = np.asarray(cv2.cvtColor(small[0], cv2.COLOR_BGR2GRAY), dtype=np.uint8)
         thumb = _thumb(gray)
         fit: CourtFit | None
+        if self._locked is not None:
+            if st is not None and _still(st.thumb, thumb) and st.since_verify < self.verify_every:
+                self.stats.static += 1
+                return replace(st.fit, method="static"), _TrackState(f, gray, st.thumb, st.fit, st.since_verify + 1, 0)
+            fit = refine_court(frame, self._locked, self.search_width)
+            # A moving camera, changed scene or mismatched lines invalidate the
+            # lock. Do not search the frame for another equally plausible court.
+            if fit is None or not fit.ok or not _close(fit.H, self._locked, full, tol=0.02 * full[0]):
+                return None, None
+            self.stats.refined += 1
+            # Preserve the reference geometry instead of accumulating line jitter.
+            fit = replace(fit, H=self._locked, pose=camera_pose(self._locked, full))
+            return fit, _TrackState(f, gray, thumb, fit)
         if st is not None and _still(st.thumb, thumb) and st.since_verify < self.verify_every:
             self.stats.static += 1
             return replace(st.fit, method="static"), _TrackState(f, gray, st.thumb, st.fit, st.since_verify + 1, 0)
