@@ -22,6 +22,7 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 
+from bai_badminton.court import HALF_LEN, WIDTH_DOUBLES, Homography
 from bai_badminton.identity import hsv_signature
 from bai_badminton.perception_types import PersonObs
 
@@ -43,10 +44,22 @@ class CourtROI:
 
     polygon: NDArray[np.float32]  # (N, 2)
     pad_px: float = 60.0
+    homography: Homography | None = None
+    side_margin_m: float = 0.35
+    end_margin_m: float = 0.75
 
-    def contains_feet(self, bbox: NDArray[np.float64]) -> bool:
+    def contains_feet(self, bbox: NDArray[np.float64], *, allow_runoff: bool = True) -> bool:
         feet = (float((bbox[0] + bbox[2]) / 2), float(bbox[3]))
-        return cv2.pointPolygonTest(self.polygon.reshape(-1, 1, 2), feet, True) >= -self.pad_px
+        if self.homography is not None:
+            x, y = self.homography.image_to_court(np.array([feet]))[0]
+            return bool(
+                np.isfinite([x, y]).all()
+                and abs(x) <= WIDTH_DOUBLES / 2 + (self.side_margin_m if allow_runoff else 0.0)
+                and abs(y) <= HALF_LEN + (self.end_margin_m if allow_runoff else 0.0)
+            )
+        return cv2.pointPolygonTest(self.polygon.reshape(-1, 1, 2), feet, True) >= (
+            -self.pad_px if allow_runoff else 0.0
+        )
 
     def crop_box(self, w: int, h: int, top_margin: float = 0.25) -> tuple[int, int, int, int]:
         """Axis-aligned crop around the court, extended upwards for the far player's body/jumps."""
@@ -194,6 +207,8 @@ class PlayerPerception:
         self.max_players = max_players
         self.roi: CourtROI | None = None
         self._last: list[PersonObs] = []
+        self._admitted: dict[int, int] = {}
+        self.fps = fps
 
     def set_roi(self, roi: CourtROI | None) -> None:
         self.roi = roi
@@ -201,6 +216,7 @@ class PlayerPerception:
     def on_cut(self) -> None:
         self.tracker.reset()
         self._last = []
+        self._admitted.clear()
 
     def process(
         self, frame_idx: int, img: NDArray[np.uint8], strides: tuple[int, int] | None = None
@@ -223,6 +239,10 @@ class PlayerPerception:
             keep = np.array([self.roi.contains_feet(b) for b in boxes], bool)
             boxes, scores = boxes[keep], scores[keep]
         tracks = self.tracker.update(boxes, scores)
+        self._admitted = {tid: last for tid, last in self._admitted.items() if frame_idx - last <= 2 * self.fps}
+        if self.roi is not None:
+            tracks = [t for t in tracks if self.roi.contains_feet(t[1], allow_runoff=t[0] in self._admitted)]
+        self._admitted.update({t[0]: frame_idx for t in tracks})
         tracks.sort(key=lambda t: -t[2] * (t[1][3] - t[1][1]))
         persons = [PersonObs(track_id=tid, bbox=b, conf=c) for tid, b, c in tracks[: self.max_players + 2]]
         self._attach(frame_idx, img, persons, pose_stride)
@@ -230,7 +250,11 @@ class PlayerPerception:
         return persons
 
     def _carry(self, frame_idx: int, img: NDArray[np.uint8], pose_stride: int) -> list[PersonObs]:
-        persons = [PersonObs(track_id=p.track_id, bbox=p.bbox.copy(), conf=p.conf * 0.98) for p in self._last]
+        persons = [
+            PersonObs(track_id=p.track_id, bbox=p.bbox.copy(), conf=p.conf * 0.98)
+            for p in self._last
+            if self.roi is None or self.roi.contains_feet(p.bbox)
+        ]
         self._attach(frame_idx, img, persons, pose_stride)
         return persons
 
