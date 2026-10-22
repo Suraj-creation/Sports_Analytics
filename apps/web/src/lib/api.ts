@@ -14,7 +14,7 @@ export class ApiError extends Error {
   }
 }
 
-async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   const method = (init.method ?? "GET").toUpperCase();
   if (csrf && !["GET", "HEAD", "OPTIONS"].includes(method)) headers.set("X-CSRF-Token", csrf);
@@ -151,6 +151,7 @@ export function uploadVideo(
     };
     xhr.onerror = () =>
       reject(new ApiError(0, "The upload was interrupted — check your connection and try again"));
+    xhr.onabort = () => reject(new DOMException("Upload cancelled", "AbortError"));
     xhr.send(form);
   });
   return { promise, abort: () => xhr.abort() };

@@ -1,426 +1,429 @@
 import * as Dialog from "@radix-ui/react-dialog";
-import * as Tabs from "@radix-ui/react-tabs";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { Link, useParams, useSearch } from "@tanstack/react-router";
-import { clsx } from "clsx";
-import { ArrowLeft, CircleAlert, Crosshair, Keyboard, RotateCcw } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { Button, ErrorNote, IconButton, Kbd, Spinner } from "@/components/ui";
-import { CourtMinimap } from "@/features/court/CourtMinimap";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
+import { ArrowLeft, Crosshair, Download, RotateCcw } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ErrorNote, Spinner } from "@/components/ui";
+import { type AnalysisSearch, SessionAnalytics } from "@/features/analytics/SessionAnalytics";
+import { playEvidence } from "@/features/player/clip";
 import { VideoStage } from "@/features/player/VideoStage";
 import { Timeline } from "@/features/timeline/Timeline";
 import { api } from "@/lib/api";
-import { fps as fpsOf, playerName, STATUS_LABEL, shortName } from "@/lib/format";
-import { frameClock } from "@/lib/frameClock";
-import type { Session } from "@/lib/types";
+import { fps as fpsOf, STATUS_LABEL, shortName } from "@/lib/format";
+import type { PlayerId, Session } from "@/lib/types";
 import { usePlayback } from "@/stores/playback";
 import { useSession } from "@/stores/session";
-import { currentRally, isSmash, rallies, stateAt } from "./derive";
 import { LiveFeed } from "./LiveFeed";
-import { AskTab } from "./tabs/AskTab";
+import { ReanalysisFeedback } from "./ReanalysisFeedback";
 import { ExportTab } from "./tabs/ExportTab";
-import { HeatmapsTab } from "./tabs/HeatmapsTab";
-import { HighlightsTab } from "./tabs/HighlightsTab";
-import { RalliesTab } from "./tabs/RalliesTab";
-import { StatsTab } from "./tabs/StatsTab";
 
 const TABS = [
-  { id: "stats", label: "Stats" },
-  { id: "heatmaps", label: "Heatmaps" },
-  { id: "highlights", label: "Highlights" },
-  { id: "rallies", label: "Rallies" },
-  { id: "ask", label: "Ask" },
-  { id: "export", label: "Export" },
+  ["overview", "Overview"],
+  ["moments", "Moments"],
+  ["rallies", "Rallies"],
+  ["shots", "Shots"],
+  ["tactics", "Tactics"],
+  ["court", "Court"],
+  ["movement", "Movement"],
+  ["h2h", "Head to head"],
+  ["pair", "Your pair"],
+  ["ask", "Ask"],
 ] as const;
 
 export function SessionPage() {
-  const { sessionId } = useParams({ from: "/sessions/$sessionId" });
-  const search = useSearch({ from: "/sessions/$sessionId" });
+  const params = useParams({ strict: false }) as { sessionId?: string; matchId?: string };
+  const sessionId = params.matchId ?? params.sessionId ?? "";
+  const search = useSearch({ strict: false }) as AnalysisSearch;
+  const live = useSession((s) => s.session);
   const open = useSession((s) => s.open);
   const close = useSession((s) => s.close);
-  const live = useSession((s) => s.session);
-  const initial = useQuery({ queryKey: ["session", sessionId], queryFn: () => api.session(sessionId) });
-
+  const q = useQuery({
+    queryKey: ["session", sessionId],
+    queryFn: () => api.session(sessionId),
+    enabled: Boolean(sessionId),
+  });
   useEffect(() => {
     open(sessionId);
     return () => close();
   }, [sessionId, open, close]);
-
-  const session = live?.session_id === sessionId ? live : initial.data;
-  if (initial.error && !session) {
+  const session = live?.session_id === sessionId ? live : q.data;
+  if (q.error && !session)
     return (
-      <div className="mx-auto max-w-md space-y-4 px-4 py-16 text-center">
-        <ErrorNote error={initial.error} />
-        <Link to="/" className="text-sm text-signal hover:underline">
-          Back to the library
+      <div className="match-workspace">
+        <h1 className="text-2xl font-bold mb-4">We couldn't open that match</h1>
+        <ErrorNote error={q.error} />
+        <Link to="/matches" className="rally-action mt-4">
+          See your matches
         </Link>
       </div>
     );
-  }
-  if (!session) {
+  if (!session)
     return (
-      <div className="grid h-full place-items-center">
+      <div className="grid h-64 place-items-center">
         <Spinner className="size-6" />
       </div>
     );
-  }
-  return <SessionView session={session} deepLinkFrame={search.f} />;
+  return <SessionWorkspace key={sessionId} session={session} search={search} />;
 }
 
-function SessionView({ session, deepLinkFrame }: { session: Session; deepLinkFrame?: number }) {
-  const [tab, setTab] = useState<string>("stats");
-  const [help, setHelp] = useState(false);
-  useShortcuts(session, () => setHelp((h) => !h));
-  useDeepLink(session, deepLinkFrame);
-
-  return (
-    <div className="mx-auto max-w-[1680px] space-y-4 px-4 py-4 sm:px-6">
-      <Header session={session} onHelp={() => setHelp(true)} />
-      <Banners session={session} />
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(300px,360px)]">
-        <div className="min-w-0 space-y-3">
-          <div className="aspect-video max-h-[68vh] w-full">
-            <VideoStage session={session} />
-          </div>
-          <Timeline session={session} />
-          <RallyBar session={session} />
-        </div>
-        <aside className="flex min-w-0 flex-col gap-4 lg:max-h-[calc(68vh+220px)]">
-          <section className="panel p-3" aria-labelledby="court-h">
-            <h2 id="court-h" className="mb-2 text-sm font-semibold">
-              Court
-            </h2>
-            <CourtMinimap session={session} />
-          </section>
-          <section
-            className="panel flex min-h-[220px] flex-1 flex-col overflow-hidden"
-            aria-labelledby="feed-h"
-          >
-            <h2 id="feed-h" className="px-3 pt-3 pb-2 text-sm font-semibold">
-              Live feed
-            </h2>
-            <div className="min-h-0 flex-1 overflow-y-auto px-1 pb-2">
-              <LiveFeed session={session} />
-            </div>
-          </section>
-        </aside>
-      </div>
-
-      <Tabs.Root value={tab} onValueChange={setTab} className="panel">
-        <Tabs.List
-          className="flex gap-1 overflow-x-auto border-b border-seam px-2"
-          aria-label="Match analysis"
-        >
-          {TABS.map((t) => (
-            <Tabs.Trigger
-              key={t.id}
-              value={t.id}
-              className={clsx(
-                "relative h-11 shrink-0 px-3 text-sm text-line-2 transition-colors hover:text-line",
-                "data-[state=active]:text-line data-[state=active]:after:absolute data-[state=active]:after:inset-x-3",
-                "data-[state=active]:after:bottom-0 data-[state=active]:after:h-0.5 data-[state=active]:after:rounded-full",
-                "data-[state=active]:after:bg-line",
-              )}
-            >
-              {t.label}
-            </Tabs.Trigger>
-          ))}
-        </Tabs.List>
-        <div className="p-4">
-          <Tabs.Content value="stats">
-            <StatsTab session={session} />
-          </Tabs.Content>
-          <Tabs.Content value="heatmaps">
-            <HeatmapsTab session={session} />
-          </Tabs.Content>
-          <Tabs.Content value="highlights">
-            <HighlightsTab session={session} />
-          </Tabs.Content>
-          <Tabs.Content value="rallies">
-            <RalliesTab session={session} />
-          </Tabs.Content>
-          <Tabs.Content value="ask" className="h-[520px]">
-            <AskTab session={session} />
-          </Tabs.Content>
-          <Tabs.Content value="export">
-            <ExportTab session={session} />
-          </Tabs.Content>
-        </div>
-      </Tabs.Root>
-      <ShortcutHelp open={help} onOpenChange={setHelp} />
-    </div>
-  );
-}
-
-function Header({ session, onHelp }: { session: Session; onHelp: () => void }) {
-  const status = useSession((s) => s.status);
+function SessionWorkspace({ session, search }: { session: Session; search: AnalysisSearch }) {
+  const navigate = useNavigate();
+  const [showExports, setShowExports] = useState(false);
+  const [showQuality, setShowQuality] = useState(false);
+  const [shortcuts, setShortcuts] = useState(false);
   const connection = useSession((s) => s.connection);
-  const progress = useSession((s) => s.ingestProgress);
-  const calibration = useSession((s) => s.calibration);
-  const reanalyse = useMutation({ mutationFn: () => api.control(session.session_id, "reanalyse") });
-  const courtLabel = !calibration
-    ? "Calibrate court"
-    : calibration.mode === "lines"
-      ? calibration.source === "human"
-        ? "Court: set + tracked"
-        : "Court: auto"
-      : "Court: calibrated";
-  const courtTitle =
-    calibration?.mode === "lines"
-      ? `Measured from the court lines in every frame${
-          calibration.quality ? ` (${Math.round(calibration.quality.precision * 100)}% line match)` : ""
-        }. Click to check or adjust.`
-      : "Place the court on a frame";
-  const n = session.media?.n_frames ?? 0;
-  const pct = n ? Math.min(100, Math.round(((session.frontier_frame + 1) / n) * 100)) : 0;
-  const busy = ["created", "ingesting", "analysing", "ready_to_play"].includes(session.status);
-
-  return (
-    <div className="flex flex-wrap items-center gap-3">
-      <Link
-        to="/"
-        aria-label="Back to the library"
-        className="grid size-9 place-items-center rounded-lg text-line-2 hover:bg-stand-raised hover:text-line"
-      >
-        <ArrowLeft className="size-5" />
-      </Link>
-      <div className="min-w-0">
-        <h1 className="truncate text-lg font-semibold tracking-tight">{session.title}</h1>
-        <p className="text-sm text-line-2">
-          <span className="text-p1">●</span> {playerName(session, "P1")}{" "}
-          <span className="text-line-3">vs</span> <span className="text-p2">●</span>{" "}
-          {playerName(session, "P2")}
-        </p>
-      </div>
-      <div className="ml-auto flex flex-wrap items-center gap-2">
-        <span
-          className={clsx(
-            "inline-flex h-8 items-center gap-2 rounded-full border px-3 text-sm",
-            session.status === "failed" ? "border-alert/50 text-alert" : "border-seam",
-          )}
-          role="status"
-        >
-          {busy && <span className="size-2 animate-pulse rounded-full bg-signal" aria-hidden />}
-          {STATUS_LABEL[session.status] ?? session.status}
-          {session.status === "ingesting" && progress != null && (
-            <span className="tabular text-line-2">{Math.round(progress * 100)}%</span>
-          )}
-          {session.status === "analysing" && (
-            <span className="tabular text-line-2">
-              {pct}%{status?.rate_x ? ` · ${status.rate_x.toFixed(1)}× real time` : ""}
-            </span>
-          )}
-        </span>
-        {connection !== "open" && (
-          <span className="inline-flex h-8 items-center gap-2 rounded-full border border-caution/50 px-3 text-sm text-caution">
-            <Spinner className="size-3.5 text-caution" /> Reconnecting
-          </span>
-        )}
-        <Link
-          to="/sessions/$sessionId/calibrate"
-          params={{ sessionId: session.session_id }}
-          title={courtTitle}
-          className="inline-flex h-8 items-center gap-2 rounded-lg border border-seam bg-stand-raised px-3 text-[13px] hover:border-line-3"
-        >
-          <Crosshair className="size-4" aria-hidden /> {courtLabel}
-        </Link>
-        {(session.status === "analysed" || session.status === "failed") && (
-          <Button size="sm" busy={reanalyse.isPending} onClick={() => reanalyse.mutate()}>
-            <RotateCcw className="size-4" aria-hidden /> Analyse again
-          </Button>
-        )}
-        <IconButton label="Keyboard shortcuts (?)" onClick={onHelp}>
-          <Keyboard className="size-5" />
-        </IconButton>
-      </div>
-    </div>
-  );
-}
-
-function Banners({ session }: { session: Session }) {
   const status = useSession((s) => s.status);
-  const calibrated = useSession((s) => s.calibration != null);
-  const degraded = status?.degraded ?? [];
-  const analysingLong = session.status === "analysing" && session.frontier_frame > 30 * fpsOf(session.media);
+  const video = usePlayback((s) => s.video);
+  const frame = usePlayback((s) => s.frame);
+  const applied = useRef<number | null>(null);
+  const [editing, setEditing] = useState(false);
+  const fps = fpsOf(session.media);
+  const nFrames = session.media?.n_frames ?? 0;
+  const availablePlayers = session.players.filter((p) => p.player_id === "P1" || p.player_id === "P2");
+  const selected: PlayerId =
+    search.who && availablePlayers.some((p) => p.player_id === search.who)
+      ? search.who
+      : (availablePlayers[0]?.player_id ?? "P1");
+  const tab = TABS.some(([id]) => id === search.tab) ? search.tab : "overview";
+  const reanalyse = useMutation({ mutationFn: () => api.control(session.session_id, "reanalyse") });
+  const patch = (change: Partial<AnalysisSearch>) =>
+    void navigate({
+      to: ".",
+      search: ((old: Record<string, unknown>) => ({ ...old, ...change })) as never,
+      replace: true,
+    });
+
+  useEffect(() => {
+    const requested = Math.max(0, Math.min(nFrames - 1, search.f ?? 0));
+    if (!video || !session.media || applied.current === requested) return;
+    const cue = () => {
+      usePlayback.getState().seekFrame(requested, fps);
+      applied.current = requested;
+    };
+    if (video.readyState >= 1) cue();
+    else video.addEventListener("loadedmetadata", cue, { once: true });
+    return () => video.removeEventListener("loadedmetadata", cue);
+  }, [video, session.media, search.f, fps, nFrames]);
+
+  useEffect(() => {
+    const key = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement;
+      if (target.closest("input, textarea, select, button, a, [contenteditable=true]")) return;
+      if (event.key === "?") {
+        event.preventDefault();
+        setShortcuts(true);
+        return;
+      }
+      const player = usePlayback.getState();
+      if (!player.video) return;
+      if (event.code === "Space" || event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        if (player.video.paused) void player.video.play().catch(() => {});
+        else player.video.pause();
+      }
+      if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+        event.preventDefault();
+        const next =
+          player.frame + (event.key === "ArrowLeft" ? -1 : 1) * (event.shiftKey ? Math.round(fps) : 1);
+        player.seekFrame(Math.min(nFrames - 1, Math.max(0, next)), fps);
+      }
+      if (event.key.toLowerCase() === "j" || event.key.toLowerCase() === "l") {
+        const events = useSession.getState().events.ofType("rally_end");
+        const rally =
+          event.key.toLowerCase() === "l"
+            ? events.find((r) => r.frame_start > player.frame + 1)
+            : events.filter((r) => r.frame_start < player.frame - 1).at(-1);
+        if (rally) playEvidence(rally.frame_start, rally.frame_end, `Rally ${rally.payload.rally_no}`);
+      }
+      if (event.key.toLowerCase() === "f")
+        void document.querySelector<HTMLElement>("[data-testid=video-stage]")?.requestFullscreen?.();
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [fps, nFrames]);
+
+  const busy = ["created", "ingesting", "ready_to_play", "analysing"].includes(session.status);
+  const progress =
+    nFrames > 0 ? Math.min(100, Math.max(0, ((session.frontier_frame + 1) / nFrames) * 100)) : null;
   return (
-    <>
-      {session.status === "failed" && session.status_detail && (
-        <Banner tone="alert">
-          {session.status_detail}. Fix the cause (see the server log), then choose “Analyse again”.
-        </Banner>
-      )}
-      {!calibrated && analysingLong && (
-        <Banner tone="caution">
-          The court wasn't found automatically, so positions, heatmaps and in/out calls are off.{" "}
+    <div className="match-workspace">
+      <div className="mb-4">
+        <Link to="/matches" className="inline-flex min-h-9 items-center gap-2 text-sm text-line-2">
+          <ArrowLeft className="size-4" aria-hidden />
+          Your matches
+        </Link>
+      </div>
+      <header className="match-heading">
+        <div>
+          <h1>{session.title}</h1>
+          <p className="match-subtitle">
+            {new Date(session.created_at).toLocaleDateString(undefined, {
+              day: "numeric",
+              month: "long",
+              year: "numeric",
+            })}{" "}
+            · {availablePlayers.map((p) => shortName(session, p.player_id)).join(" vs ")}
+          </p>
+          <p className="match-subtitle">
+            {STATUS_LABEL[session.status] ?? session.status}
+            {busy && progress !== null ? ` · ${progress.toFixed(0)}% of source frames reached` : ""}
+            {connection !== "open" ? " · reconnecting to analysis" : ""}
+          </p>
+        </div>
+        <div className="match-actions">
+          <button type="button" className="rally-action" onClick={() => setEditing(true)}>
+            Edit match details
+          </button>
+          <button type="button" className="rally-action" onClick={() => setShowQuality((v) => !v)}>
+            Recording & quality
+          </button>
+          <button type="button" className="rally-action" onClick={() => setShowExports((v) => !v)}>
+            <Download className="size-4" aria-hidden />
+            Export
+          </button>
           <Link
             to="/sessions/$sessionId/calibrate"
             params={{ sessionId: session.session_id }}
-            className="font-medium underline underline-offset-4"
+            className="rally-action"
           >
-            Calibrate the court
-          </Link>{" "}
-          — it takes about a minute.
-        </Banner>
-      )}
-      {degraded.length > 0 && (
-        <Banner tone="caution">
-          Running with reduced analysis: {degraded.map((d) => `${d.stage} (${d.reason})`).join("; ")}.
-        </Banner>
-      )}
-    </>
-  );
-}
-
-function Banner({ tone, children }: { tone: "alert" | "caution"; children: React.ReactNode }) {
-  return (
-    <p
-      role={tone === "alert" ? "alert" : "status"}
-      className={clsx(
-        "flex gap-2 rounded-lg border px-3 py-2 text-sm",
-        tone === "alert" ? "border-alert/40 bg-alert/10" : "border-caution/40 bg-caution/10",
-      )}
-    >
-      <CircleAlert
-        className={clsx("mt-0.5 size-4 shrink-0", tone === "alert" ? "text-alert" : "text-caution")}
-        aria-hidden
+            <Crosshair className="size-4" aria-hidden />
+            Court
+          </Link>
+        </div>
+      </header>
+      <ReanalysisFeedback
+        accepted={reanalyse.isSuccess && !busy}
+        sessionDetail={session.status_detail}
+        liveDetail={status?.detail}
       />
-      <span>{children}</span>
-    </p>
+      {session.status === "failed" && (
+        <div role="alert" className="analysis-notice mt-5">
+          <p className="font-semibold text-alert">This analysis stopped before completion</p>
+          <p>
+            {session.status_detail ??
+              "The server recorded a processing failure. Any available measurements remain partial."}
+          </p>
+          <button
+            type="button"
+            className="rally-action mt-3"
+            disabled={reanalyse.isPending}
+            onClick={() => reanalyse.mutate()}
+          >
+            <RotateCcw className="size-4" aria-hidden />
+            Retry analysis
+          </button>
+          <ErrorNote error={reanalyse.error} />
+        </div>
+      )}
+      {busy && (
+        <p role="status" className="analysis-notice mt-5">
+          The video is being prepared or analysed. Recorded results appear as they arrive; the figures below
+          are partial.{status?.rate_x ? ` Processing at ${status.rate_x.toFixed(1)}× real time.` : ""}
+        </p>
+      )}
+      {showQuality && (
+        <section className="analysis-panel mt-5">
+          <h2>What this recording can tell us</h2>
+          <dl className="mt-4 grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <dt className="text-line-2">Source frames</dt>
+              <dd>{nFrames ? nFrames.toLocaleString() : "Media not prepared"}</dd>
+            </div>
+            <div>
+              <dt className="text-line-2">Analysed frames</dt>
+              <dd>{session.analysed_frames.toLocaleString()}</dd>
+            </div>
+            <div>
+              <dt className="text-line-2">Frame rate</dt>
+              <dd>{session.media ? `${fps.toFixed(3)} fps` : "Unavailable"}</dd>
+            </div>
+            <div>
+              <dt className="text-line-2">Identity capability</dt>
+              <dd>Two court-side identities</dd>
+            </div>
+          </dl>
+          <p className="analysis-panel-hint mt-4">
+            Frame processing is not rally coverage or labelled detection accuracy. Shot labels are heuristic;
+            placement uses receiver positions; measured distance can contain tracking jitter. Four-player
+            doubles attribution requires additional identity evidence.
+          </p>
+        </section>
+      )}
+      {showExports && (
+        <section className="analysis-panel mt-5">
+          <h2>Take your evidence with you</h2>
+          <div className="mt-4">
+            <ExportTab session={session} />
+          </div>
+        </section>
+      )}
+      <div className="match-video scroll-mt-4" data-match-player data-theme="dark">
+        <div className="match-video-stage">
+          <VideoStage session={session} />
+        </div>
+        <div className="px-3 pb-3">
+          <Timeline session={session} />
+          <p className="px-1 pt-2 text-xs text-line-2">
+            Source video · frame {frame.toLocaleString()} · Space/K play · ←/→ frame · J/L rally · F
+            fullscreen
+          </p>
+        </div>
+      </div>
+      <details className="analysis-panel mt-5">
+        <summary className="cursor-pointer text-sm font-medium">Live event feed</summary>
+        <div className="mt-4 max-h-64 overflow-y-auto">
+          <LiveFeed session={session} />
+        </div>
+      </details>
+      <div className="match-people">
+        <span className="mr-2 text-xs text-line-2">Showing numbers for</span>
+        {availablePlayers.map((p) => (
+          <button
+            type="button"
+            key={p.player_id}
+            className="match-person"
+            aria-pressed={selected === p.player_id}
+            aria-label={`Show ${shortName(session, p.player_id)} numbers`}
+            onClick={() => patch({ who: p.player_id })}
+          >
+            <span className={`match-person-glyph ${p.player_id === "P2" ? "other" : ""}`} aria-hidden>
+              {p.player_id === "P1" ? "●" : "■"}
+            </span>
+            {shortName(session, p.player_id)}
+          </button>
+        ))}
+      </div>
+      <nav className="match-tabs" aria-label="Match analysis">
+        {TABS.map(([id, label]) => (
+          <button
+            type="button"
+            key={id}
+            aria-current={tab === id ? "page" : undefined}
+            onClick={() => patch({ tab: id })}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+      <div className="match-analysis">
+        <SessionAnalytics
+          key={`${session.session_id}-${selected}-${tab}`}
+          session={session}
+          player={selected}
+          search={{ ...search, tab }}
+        />
+      </div>
+      <MetadataDialog session={session} open={editing} onOpenChange={setEditing} />
+      <Dialog.Root open={shortcuts} onOpenChange={setShortcuts}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40" />
+          <Dialog.Content className="panel fixed left-1/2 top-1/2 z-50 w-[min(440px,90vw)] -translate-x-1/2 -translate-y-1/2 p-6">
+            <Dialog.Title className="text-xl font-semibold">Keyboard shortcuts</Dialog.Title>
+            <Dialog.Description className="mt-2 text-sm text-line-2">
+              Control the source video while focus is outside a form control.
+            </Dialog.Description>
+            <dl className="mt-5 grid grid-cols-2 gap-3 text-sm">
+              <dt>Space / K</dt>
+              <dd>Play or pause</dd>
+              <dt>← / →</dt>
+              <dd>One frame</dd>
+              <dt>Shift + ← / →</dt>
+              <dd>One second</dd>
+              <dt>J / L</dt>
+              <dd>Previous / next rally</dd>
+              <dt>F</dt>
+              <dd>Fullscreen</dd>
+              <dt>Escape</dt>
+              <dd>Close this help</dd>
+            </dl>
+            <Dialog.Close className="rally-action mt-6">Close</Dialog.Close>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+    </div>
   );
 }
 
-/** "Rally 47 · 9 shots · P1 serving from the right" — the context line under the timeline. */
-function RallyBar({ session }: { session: Session }) {
-  const frame = usePlayback((s) => s.frame);
-  const events = useSession((s) => s.events);
-  const v = useSession((s) => s.eventsVersion);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: v signals mutation of the log
-  const info = useMemo(() => {
-    const r = currentRally(events, frame);
-    const { state, known } = stateAt(events, frame);
-    const shots = r
-      ? events.window(r.start, frame, ["stroke"]).filter((e) => e.frame_start <= frame).length
-      : 0;
-    return { r, state, known, shots };
-  }, [events, v, frame]);
-  const { r, state, known, shots } = info;
-  return (
-    <p className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-sm text-line-2" aria-live="off">
-      {r ? (
-        <span className="font-medium text-line">
-          {r.end ? `Rally ${r.end.payload.rally_no}` : `Rally ${state.rally_no + 1} in play`} · {shots} shot
-          {shots === 1 ? "" : "s"}
-        </span>
-      ) : (
-        <span>Between rallies</span>
-      )}
-      {known && (
-        <span>
-          {shortName(session, state.server)} serving from the {state.service_court}
-        </span>
-      )}
-      {known && (
-        <span className="tabular">
-          Game {state.game_no} · {state.score.P1}–{state.score.P2}
-        </span>
-      )}
-    </p>
-  );
-}
-
-function useDeepLink(session: Session, f?: number) {
-  const video = usePlayback((s) => s.video);
-  const seekFrame = usePlayback((s) => s.seekFrame);
-  useEffect(() => {
-    if (!video || f == null) return;
-    const go = () => seekFrame(f, fpsOf(session.media));
-    if (video.readyState >= 1) go();
-    else video.addEventListener("loadedmetadata", go, { once: true });
-    return () => video.removeEventListener("loadedmetadata", go);
-  }, [video, f, seekFrame, session.media]);
-}
-
-function useShortcuts(session: Session, toggleHelp: () => void) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (t && (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName))) return;
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-      const { video, seekFrame } = usePlayback.getState();
-      const { events } = useSession.getState();
-      const fps = fpsOf(session.media);
-      const n = session.media?.n_frames ?? 0;
-      const f = frameClock.frame;
-      const clamp = (x: number) => Math.max(0, Math.min(n - 1, x));
-      const seek = (x: number) => seekFrame(clamp(x), fps);
-      const k = e.key;
-      let handled = true;
-      if (k === " " || k === "k" || k === "K") {
-        if (!video) return;
-        if (video.paused) void video.play().catch(() => {});
-        else video.pause();
-      } else if (k === "ArrowLeft" || k === "ArrowRight") {
-        const d = k === "ArrowLeft" ? -1 : 1;
-        if (e.shiftKey) seek(f + d * Math.round(5 * fps));
-        else {
-          video?.pause();
-          seek(f + d);
-        }
-      } else if (k === "j" || k === "J") seek(f - Math.round(10 * fps));
-      else if (k === "l" || k === "L") seek(f + Math.round(10 * fps));
-      else if (k === "[" || k === "]") {
-        const rs = rallies(events);
-        const target =
-          k === "]"
-            ? rs.find((r) => r.start > f + 2)
-            : [...rs].reverse().find((r) => r.start < f - Math.round(fps));
-        if (target) seek(target.start - Math.round(fps));
-      } else if (k === "s" || k === "S") {
-        const next = events.ofType("stroke").find((ev) => isSmash(ev) && ev.frame_start > f + 2);
-        if (next) seek(next.frame_start - Math.round(1.5 * fps));
-      } else if (k === ".") window.dispatchEvent(new Event("bai:toggle-overlays"));
-      else if (k === "?") toggleHelp();
-      else handled = false;
-      if (handled) e.preventDefault();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [session.media, toggleHelp]);
-}
-
-const SHORTCUTS: [string[], string][] = [
-  [["Space"], "Play / pause"],
-  [["←", "→"], "Previous / next frame"],
-  [["Shift", "← →"], "Back / forward 5 seconds"],
-  [["J", "L"], "Back / forward 10 seconds"],
-  [["[", "]"], "Previous / next rally"],
-  [["S"], "Next smash"],
-  [["."], "Hide or show all overlays"],
-  [["?"], "This list"],
-];
-
-function ShortcutHelp({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
+function MetadataDialog({
+  session,
+  open,
+  onOpenChange,
+}: {
+  session: Session;
+  open: boolean;
+  onOpenChange: (value: boolean) => void;
+}) {
+  const qc = useQueryClient();
+  const [title, setTitle] = useState(session.title);
+  const [p1, setP1] = useState(session.players.find((p) => p.player_id === "P1")?.name ?? "");
+  const [p2, setP2] = useState(session.players.find((p) => p.player_id === "P2")?.name ?? "");
+  const save = useMutation({
+    mutationFn: () =>
+      api.patchSession(session.session_id, { title: title.trim(), player1: p1.trim(), player2: p2.trim() }),
+    onSuccess: (updated) => {
+      useSession.setState({ session: updated });
+      void qc.invalidateQueries();
+      onOpenChange(false);
+    },
+  });
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-black/60" />
-        <Dialog.Content className="panel fixed top-1/2 left-1/2 z-50 w-[min(92vw,380px)] -translate-x-1/2 -translate-y-1/2 p-5">
-          <Dialog.Title className="mb-3 font-semibold">Keyboard shortcuts</Dialog.Title>
-          <Dialog.Description className="sr-only">
-            Keys for controlling playback and navigation
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40" />
+        <Dialog.Content className="panel fixed left-1/2 top-1/2 z-50 w-[min(480px,90vw)] -translate-x-1/2 -translate-y-1/2 p-6">
+          <Dialog.Title className="text-xl font-semibold">Match details</Dialog.Title>
+          <Dialog.Description className="mt-2 text-sm text-line-2">
+            Names are labels you supply. The people view groups recordings by these names.
           </Dialog.Description>
-          <dl className="space-y-2 text-sm">
-            {SHORTCUTS.map(([keys, what]) => (
-              <div key={what} className="flex items-center justify-between gap-4">
-                <dt className="flex gap-1">
-                  {keys.map((x) => (
-                    <Kbd key={x}>{x}</Kbd>
-                  ))}
-                </dt>
-                <dd className="text-line-2">{what}</dd>
-              </div>
-            ))}
-          </dl>
+          <form
+            className="mt-5 space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              save.mutate();
+            }}
+          >
+            <label className="block text-sm">
+              Title
+              <input
+                value={title}
+                required
+                maxLength={200}
+                onChange={(e) => setTitle(e.target.value)}
+                className="mt-2 block min-h-11 w-full rounded-lg border border-seam bg-stand px-3"
+              />
+            </label>
+            <label className="block text-sm">
+              P1 name
+              <input
+                value={p1}
+                maxLength={100}
+                onChange={(e) => setP1(e.target.value)}
+                className="mt-2 block min-h-11 w-full rounded-lg border border-seam bg-stand px-3"
+              />
+            </label>
+            <label className="block text-sm">
+              P2 name
+              <input
+                value={p2}
+                maxLength={100}
+                onChange={(e) => setP2(e.target.value)}
+                className="mt-2 block min-h-11 w-full rounded-lg border border-seam bg-stand px-3"
+              />
+            </label>
+            <ErrorNote error={save.error} />
+            <div className="flex justify-end gap-3">
+              <Dialog.Close className="rally-action" type="button">
+                Cancel
+              </Dialog.Close>
+              <button
+                type="submit"
+                disabled={save.isPending || !title.trim()}
+                className="rally-action rally-action-primary"
+              >
+                {save.isPending ? "Saving…" : "Save details"}
+              </button>
+            </div>
+          </form>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

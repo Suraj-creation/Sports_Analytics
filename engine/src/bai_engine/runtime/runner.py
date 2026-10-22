@@ -481,6 +481,7 @@ class EngineService:
         self.settings = settings
         self.registry = ModelRegistry(settings.models_dir)
         self.runners: dict[str, SessionRunner] = {}
+        self._reanalysing: set[str] = set()
         self._lock = threading.Lock()
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._loop, name="engine-commands", daemon=True)
@@ -501,10 +502,14 @@ class EngineService:
     def stop_session(self, session_id: str, timeout: float = 15.0) -> None:
         """Stop a session's runner and wait for it (used before deleting a session)."""
         with self._lock:
-            r = self.runners.pop(session_id, None)
-        if r is not None:
-            r.stop()
-            r.join(timeout=timeout)
+            r = self.runners.get(session_id)
+            if r is not None:
+                r.stop()
+                r.join(timeout=timeout)
+                if r.is_alive():
+                    raise TimeoutError("The session writer did not stop")
+                self.runners.pop(session_id, None)
+                self._reanalysing.discard(session_id)
 
     def _loop(self) -> None:
         while not self._stop.is_set():
@@ -515,6 +520,25 @@ class EngineService:
                 self.dispatch(cmd)
             except Exception:
                 log.exception("engine.command_failed", cmd=cmd.get("cmd"))
+                if cmd.get("cmd") == "reanalyse":
+                    # Keep successful prior results available when a backup or
+                    # writer-stop guard rejects an asynchronously accepted command.
+                    sid = cmd.get("session_id")
+                    with contextlib.suppress(Exception):
+                        session = self.repo.get(sid) if isinstance(sid, str) else None
+                        if session is not None:
+                            detail = "Reanalysis could not start; existing results were preserved. Check server logs."
+                            self.repo.update(session.session_id, status_detail=detail)
+                            self.bus.publish(
+                                topic(session.session_id, "status"),
+                                {
+                                    "type": "status",
+                                    "status": session.status.value,
+                                    "detail": detail,
+                                    "n_frames": session.media.n_frames if session.media else 0,
+                                    "frontier_frame": session.frontier_frame,
+                                },
+                            )
 
     def dispatch(self, cmd: dict[str, Any]) -> None:
         sid = cmd.get("session_id")
@@ -524,14 +548,32 @@ class EngineService:
         with self._lock:
             runner = self.runners.get(sid)
             if name in ("start", "reanalyse"):
+                session = self.repo.get(sid)
+                if session is None:
+                    return
+                if name == "reanalyse" and sid in self._reanalysing:
+                    if (
+                        runner is not None
+                        and runner.is_alive()
+                        and session.status not in (SessionStatus.ANALYSED, SessionStatus.FAILED)
+                    ):
+                        log.info("reanalysis.coalesced", session=sid)
+                        return
+                    self._reanalysing.discard(sid)
                 if runner is not None and runner.is_alive():
                     if name == "start":
                         return
                     runner.stop()
                     runner.join(timeout=30)
+                    if runner.is_alive():
+                        raise RuntimeError(
+                            "The session writer did not stop; reanalysis was refused without resetting results"
+                        )
                 attach = False
                 if name == "reanalyse":
                     self._reset_semantics(sid)
+                    self.repo.set_status(sid, SessionStatus.ANALYSING, "Reanalysis starting from cached perception")
+                    self._reanalysing.add(sid)
                 else:
                     attach = self._prepare_start(sid)
                 runner = SessionRunner(sid, self.repo, self.bus, self.settings, self.registry, attach=attach)
@@ -541,6 +583,7 @@ class EngineService:
             if name == "stop":
                 if runner:
                     runner.stop()
+                self._reanalysing.discard(sid)
                 return
         if runner is None or not runner.is_alive():
             if name == "playhead":
@@ -578,7 +621,8 @@ class EngineService:
         carried = {(d["type"], d["frame_start"]): d for d in meta.get(CARRY_KEY) or []}
         for e in human:  # newer human input for the same moment wins
             carried[(e.type, e.frame_start)] = e.model_dump(mode="json")
-        self.repo.reset_analysis(sid)
+        backup = self.repo.reset_analysis(sid)
+        log.info("analysis.backed_up", session=sid, backup=str(backup))
         if manual_cal:
             c = manual_cal[-1]
             self.repo.events(sid).append(Event.model_validate(c.model_dump(exclude={"event_id", "seq", "supersedes"})))

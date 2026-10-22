@@ -10,6 +10,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from bai_api.deps import BusDep, Repo, SessionDep, SettingsDep, User
+from bai_api.public import public_session
 from bai_engine.bus import topic
 from bai_engine.config import load_profile
 from bai_engine.schema import PlayerInfo, Session, Source, SourceKind, TrackObject, table_to_samples
@@ -68,7 +69,7 @@ def create_upload(
         )
     )
     b.send_command({"cmd": "start", "session_id": session.session_id})
-    return session
+    return public_session(session)
 
 
 class YouTubeRequest(BaseModel):
@@ -103,17 +104,17 @@ def create_youtube(body: YouTubeRequest, r: Repo, b: BusDep, s: SettingsDep, _: 
         )
     )
     b.send_command({"cmd": "start", "session_id": session.session_id})
-    return session
+    return public_session(session)
 
 
 @router.get("")
 def list_sessions(r: Repo, _: User, limit: Annotated[int, Query(ge=1, le=500)] = 100) -> list[Session]:
-    return r.list(limit)
+    return [public_session(session) for session in r.list(limit)]
 
 
 @router.get("/{session_id}")
 def get_one(session: SessionDep) -> Session:
-    return session
+    return public_session(session)
 
 
 class SessionPatch(BaseModel):
@@ -133,14 +134,20 @@ def patch(session: SessionDep, body: SessionPatch, r: Repo) -> Session:
             body.player1 if body.player1 is not None else cur.get("P1"),
             body.player2 if body.player2 is not None else cur.get("P2"),
         )
-    return r.update(session.session_id, **changes) if changes else session
+    return public_session(r.update(session.session_id, **changes) if changes else session)
 
 
 @router.delete("/{session_id}", status_code=204)
 def delete(session: SessionDep, r: Repo, b: BusDep, request: Request) -> Response:
     engine = request.app.state.engine
     if engine is not None:
-        engine.stop_session(session.session_id)
+        try:
+            engine.stop_session(session.session_id)
+        except TimeoutError as error:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                "The recording is still processing. Wait for its worker to stop, then retry deletion.",
+            ) from error
     else:
         b.send_command({"cmd": "stop", "session_id": session.session_id})
     r.delete(session.session_id)

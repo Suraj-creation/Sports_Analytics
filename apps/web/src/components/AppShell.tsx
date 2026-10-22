@@ -1,108 +1,205 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link, Outlet } from "@tanstack/react-router";
-import { Activity, LibraryBig, LogOut } from "lucide-react";
+import { Link, Outlet, useRouterState } from "@tanstack/react-router";
+import {
+  Activity,
+  Clapperboard,
+  HelpCircle,
+  House,
+  LibraryBig,
+  LogOut,
+  Moon,
+  Settings,
+  Sun,
+  TrendingUp,
+  Upload,
+  Users,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { LoginPage } from "@/features/auth/LoginPage";
+import { applyDisplay, readDisplay } from "@/features/product/Settings";
 import { api, setCsrf } from "@/lib/api";
 import { Spinner } from "./ui";
 
+const NAV = [
+  { to: "/", label: "Home", icon: House },
+  { to: "/matches", label: "Matches", icon: LibraryBig },
+  { to: "/moments", label: "Moments", icon: Clapperboard },
+  { to: "/progress", label: "Progress", icon: TrendingUp },
+  { to: "/people", label: "People", icon: Users },
+] as const;
+
 export function Logo() {
-  // a shuttle seen from above: cork + skirt — the product mark
   return (
-    <svg viewBox="0 0 32 32" className="size-7" aria-hidden>
-      <rect width="32" height="32" rx="8" fill="#18221f" />
-      <path d="M9 10 L16 23 L23 10 Z" fill="none" stroke="#e8efea" strokeWidth="1.6" strokeLinejoin="round" />
-      <path d="M12.5 10 L16 23 M19.5 10 L16 23" stroke="#a9bab2" strokeWidth="1" />
-      <circle cx="16" cy="23.5" r="2.6" fill="#ffffff" />
-      <path d="M9 10 Q16 7 23 10" fill="none" stroke="#3ddc97" strokeWidth="1.6" />
+    <svg viewBox="0 0 32 32" className="size-8" aria-hidden>
+      <rect width="32" height="32" rx="9" fill="var(--c-primary)" />
+      <path
+        d="M9 9 16 23 23 9M12 9l4 14 4-14M9 9q7-3 14 0"
+        fill="none"
+        stroke="var(--c-on-primary)"
+        strokeWidth="1.5"
+      />
+      <circle cx="16" cy="24" r="2" fill="var(--c-on-primary)" />
     </svg>
   );
 }
 
-function NavLink({ to, children }: { to: "/" | "/system"; children: React.ReactNode }) {
+function NavItem({ to, label, icon: Icon }: { to: string; label: string; icon: typeof House }) {
+  const path = useRouterState({ select: (s) => s.location.pathname });
+  const active =
+    to === "/" ? path === "/" : path.startsWith(to) || (to === "/matches" && path.startsWith("/sessions/"));
   return (
     <Link
       to={to}
-      className="inline-flex h-8 items-center gap-2 rounded-lg px-3 text-sm text-line-2 transition-colors hover:bg-stand-raised hover:text-line"
-      activeProps={{ className: "bg-stand-raised text-line" }}
-      activeOptions={{ exact: to === "/" }}
+      aria-current={active ? "page" : undefined}
+      title={label}
+      className={`rally-nav-item ${active ? "is-active" : ""}`}
     >
-      {children}
+      <Icon className="size-5 shrink-0" aria-hidden />
+      <span>{label}</span>
     </Link>
   );
 }
 
 export function AppShell() {
   const me = useQuery({ queryKey: ["me"], queryFn: api.me, staleTime: 60_000 });
-  if (me.data) setCsrf(me.data.csrf);
+  const [theme, setTheme] = useState(() => readDisplay().theme);
+  const [logoutError, setLogoutError] = useState("");
+  const path = useRouterState({ select: (s) => s.location.pathname });
+  const main = useRef<HTMLElement>(null);
 
-  if (me.isPending) {
+  useEffect(() => {
+    if (me.data) setCsrf(me.data.csrf);
+  }, [me.data]);
+  useEffect(() => {
+    if (!path) return;
+    setTheme(readDisplay().theme);
+    const heading = main.current?.querySelector<HTMLElement>("h1");
+    heading?.setAttribute("tabindex", "-1");
+    heading?.focus({ preventScroll: true });
+  }, [path]);
+
+  if (me.isPending)
     return (
       <div className="grid h-full place-items-center">
         <Spinner className="size-6" />
       </div>
     );
-  }
-  if (me.isError) {
+  if (me.isError)
     return (
-      <div className="grid h-full place-items-center px-4 text-center">
-        <div className="space-y-2">
-          <p className="font-medium">Can't reach the Badminton AI server</p>
-          <p className="text-sm text-line-2">Start it with `bai serve`, then reload this page.</p>
+      <div className="grid h-full place-items-center p-6 text-center">
+        <div>
+          <h1 className="text-xl font-semibold">We couldn't reach the server</h1>
+          <p className="mt-2 text-line-2">Check your connection, then try again.</p>
+          <button type="button" className="rally-action mt-4" onClick={() => void me.refetch()}>
+            Try again
+          </button>
         </div>
       </div>
     );
-  }
   if (me.data.auth_required && !me.data.authenticated) return <LoginPage onDone={() => me.refetch()} />;
 
   return (
-    <div className="flex h-full flex-col">
-      <header className="flex h-13 shrink-0 items-center gap-3 border-b border-seam bg-mat-deep/60 px-4 backdrop-blur">
-        <Link
-          to="/"
-          className="flex items-center gap-2.5 rounded-lg pr-2"
-          aria-label="Badminton AI — library"
-        >
+    <div className="rally-app">
+      <a href="#content" className="rally-skip">
+        Skip to content
+      </a>
+      <aside className="rally-sidebar">
+        <Link to="/" className="rally-brand">
           <Logo />
-          <span className="text-[15px] font-semibold tracking-tight">Badminton AI</span>
+          <span>Rally</span>
         </Link>
-        <nav className="ml-4 flex items-center gap-1">
-          <NavLink to="/">
-            <LibraryBig className="size-4" aria-hidden /> Library
-          </NavLink>
-          <NavLink to="/system">
-            <Activity className="size-4" aria-hidden /> System
-          </NavLink>
+        <nav aria-label="Main">
+          {NAV.map((item) => (
+            <NavItem key={item.to} {...item} />
+          ))}
         </nav>
-        <div className="ml-auto" />
-        {me.data.auth_required && (
+        <div className="rally-sidebar-bottom">
+          <NavItem to="/library" label="Add a recording" icon={Upload} />
+          <NavItem to="/system" label="System" icon={Activity} />
           <button
             type="button"
-            className="inline-flex h-8 items-center gap-2 rounded-lg px-3 text-sm text-line-2 hover:bg-stand-raised hover:text-line"
-            onClick={async () => {
-              await api.logout();
-              me.refetch();
+            className="rally-nav-item"
+            onClick={() => {
+              const next = {
+                ...readDisplay(),
+                theme: theme === "dark" ? ("light" as const) : ("dark" as const),
+              };
+              applyDisplay(next);
+              setTheme(next.theme);
+              try {
+                localStorage.setItem("rally-display-v1", JSON.stringify(next));
+              } catch {
+                /* blocked storage */
+              }
             }}
+            aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
           >
-            <LogOut className="size-4" aria-hidden /> Sign out
+            {theme === "light" ? <Moon className="size-5" /> : <Sun className="size-5" />}
+            <span>{theme === "light" ? "Arena night" : "Court daylight"}</span>
           </button>
+          <NavItem to="/settings" label="Settings" icon={Settings} />
+        </div>
+      </aside>
+      <div className="rally-app-main">
+        <header className="rally-header">
+          <Link to="/" className="rally-mobile-brand">
+            <Logo />
+            <span>Rally</span>
+          </Link>
+          <div className="ml-auto flex items-center gap-2">
+            <Link to="/library" className="rally-header-link">
+              <Upload className="size-4" aria-hidden />
+              <span>Add recording</span>
+            </Link>
+            <Link to="/help" className="rally-header-link">
+              <HelpCircle className="size-4" aria-hidden />
+              <span>Help</span>
+            </Link>
+            {me.data.auth_required && (
+              <button
+                type="button"
+                className="rally-header-link"
+                onClick={async () => {
+                  try {
+                    await api.logout();
+                    await me.refetch();
+                  } catch {
+                    setLogoutError("Sign out failed. Please try again.");
+                  }
+                }}
+              >
+                <LogOut className="size-4" aria-hidden />
+                <span>Sign out</span>
+              </button>
+            )}
+          </div>
+        </header>
+        {logoutError && (
+          <p role="alert" className="px-6 py-3 text-alert">
+            {logoutError}
+          </p>
         )}
-      </header>
-      <main className="min-h-0 flex-1 overflow-auto">
-        <Outlet />
-      </main>
+        <main id="content" ref={main} className="min-w-0 flex-1">
+          <Outlet />
+        </main>
+      </div>
+      <nav className="rally-bottom-nav" aria-label="Main on mobile">
+        {NAV.map((item) => (
+          <NavItem key={item.to} {...item} />
+        ))}
+      </nav>
     </div>
   );
 }
 
 export function NotFound() {
   return (
-    <div className="grid h-full place-items-center px-4 text-center">
-      <div className="space-y-3">
-        <p className="font-medium">This page doesn't exist</p>
-        <Link to="/" className="text-sm text-signal underline-offset-4 hover:underline">
-          Back to the library
-        </Link>
-      </div>
+    <div className="mx-auto max-w-lg space-y-4 px-6 py-16">
+      <h1 className="text-2xl font-bold">We couldn't find that page</h1>
+      <p className="text-line-2">The link may be old, or the match may have been removed.</p>
+      <Link to="/matches" className="rally-action">
+        See your matches
+      </Link>
     </div>
   );
 }

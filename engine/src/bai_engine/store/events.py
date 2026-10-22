@@ -16,7 +16,7 @@ import json
 import sqlite3
 import threading
 from collections.abc import Iterable, Iterator
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from pathlib import Path
 
 from bai_engine.schema.events import Event, EventStatus, current_view
@@ -72,6 +72,14 @@ class EventStore:
     def close(self) -> None:
         with self._lock:
             self._conn.close()
+
+    def backup_to(self, path: Path) -> None:
+        """Write a consistent SQLite snapshot, including uncheckpointed WAL data."""
+        if path.exists():
+            raise FileExistsError(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with self._lock, closing(sqlite3.connect(path)) as destination:
+            self._conn.backup(destination)
 
     def __enter__(self) -> EventStore:
         return self

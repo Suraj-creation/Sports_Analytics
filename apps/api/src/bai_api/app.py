@@ -78,11 +78,12 @@ def create_app(settings: Settings | None = None, bus: Bus | None = None, start_e
     async def value_error(_: Request, exc: ValueError) -> JSONResponse:
         return JSONResponse({"detail": str(exc)}, status_code=422)
 
-    from bai_api.routes import agents, auth_routes, exports, media, sessions, system
+    from bai_api.routes import agents, auth_routes, exports, media, product_analytics, sessions, system
     from bai_api.ws import router as ws_router
 
     for r in (
         auth_routes.router,
+        product_analytics.router,
         sessions.router,
         media.router,
         exports.router,

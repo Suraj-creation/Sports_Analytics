@@ -357,8 +357,8 @@ function SessionCard({ s }: { s: Session }) {
           <Dialog.Content className="panel fixed top-1/2 left-1/2 z-50 w-[min(92vw,420px)] -translate-x-1/2 -translate-y-1/2 space-y-4 p-5">
             <Dialog.Title className="font-semibold">Delete “{s.title}”?</Dialog.Title>
             <Dialog.Description className="text-sm text-line-2">
-              This removes the analysis and your corrections for this match. The prepared video stays in the
-              media cache, so adding the same file again doesn't re-encode it.
+              Deletes the recording and current analysis. Existing reanalysis backups are retained on the
+              server.
             </Dialog.Description>
             <ErrorNote error={del.error} />
             <div className="flex justify-end gap-2">

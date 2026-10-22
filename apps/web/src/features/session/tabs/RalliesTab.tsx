@@ -1,192 +1,243 @@
-import { useMutation } from "@tanstack/react-query";
-import { clsx } from "clsx";
-import { Check, ChevronDown } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { BandChip, Button, Empty, ErrorNote, PlayerDot } from "@/components/ui";
-import { type RallyView, rallies } from "@/features/session/derive";
+import { Empty, ErrorNote } from "@/components/ui";
+import { Watch } from "@/features/analytics/components";
+import {
+  type EvidenceRally,
+  evidenceRallies,
+  filterRallies,
+  type RallyFilter,
+} from "@/features/analytics/evidence";
+import { playEvidence } from "@/features/player/clip";
 import { api } from "@/lib/api";
-import { clock, fps as fpsOf, OUTCOME_LABEL, playerColor, STROKE_LABEL, shortName } from "@/lib/format";
+import { clock, STROKE_LABEL, shortName } from "@/lib/format";
 import type { PlayerId, Session } from "@/lib/types";
-import { usePlayback } from "@/stores/playback";
 import { useSession } from "@/stores/session";
 
-/**
- * Review: every rally with its shots, outcome and the evidence behind the winner. Corrections
- * are written as human-verified events; the score and statistics refold from them.
- */
-export function RalliesTab({ session }: { session: Session }) {
+export function RalliesTab({
+  session,
+  selectedPlayer,
+  selectedRally,
+}: {
+  session: Session;
+  selectedPlayer?: PlayerId;
+  selectedRally?: number;
+}) {
   const events = useSession((s) => s.events);
-  const eventsVersion = useSession((s) => s.eventsVersion);
-  const frame = usePlayback((s) => s.frame);
-  const [onlyDoubtful, setOnlyDoubtful] = useState(false);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: eventsVersion signals mutation of the log
-  const list = useMemo(() => rallies(events).reverse(), [events, eventsVersion]);
-  const shown = onlyDoubtful
-    ? list.filter((r) => r.end.band !== "confirmed" && r.end.status !== "human_verified")
-    : list;
-
-  if (!list.length)
-    return <Empty title="No rallies yet">Rallies are listed here as soon as they finish.</Empty>;
+  const version = useSession((s) => s.eventsVersion);
+  const [filter, setFilter] = useState<RallyFilter>({});
+  const [limit, setLimit] = useState(50);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: version signals mutation of the event buffer.
+  const rows = useMemo(() => evidenceRallies(events), [events, version]);
+  const shown = filterRallies(rows, filter);
+  const set = (patch: RallyFilter) => {
+    setFilter((f) => ({ ...f, ...patch }));
+    setLimit(50);
+  };
+  if (!rows.length)
+    return (
+      <Empty title="No completed rallies yet">
+        The real event log fills this view as processing finishes.
+      </Empty>
+    );
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-3 text-sm">
-        <span className="text-line-2">{list.length} rallies</span>
-        <label className="ml-auto flex items-center gap-2 text-line-2">
-          <input
-            type="checkbox"
-            className="size-4 accent-[var(--color-signal)]"
-            checked={onlyDoubtful}
-            onChange={(e) => setOnlyDoubtful(e.target.checked)}
-          />
-          Only rallies that need a look
+    <section>
+      <h2 className="text-xl font-semibold">Every rally, and how it unfolded</h2>
+      <p className="analysis-panel-hint mb-5">
+        {rows.length} observed rallies. Warm-up and excluded exchanges stay visible and do not enter the
+        score.
+      </p>
+      <div className="analysis-filters">
+        <label>
+          Outcome
+          <select
+            value={filter.outcome ?? "all"}
+            onChange={(e) => set({ outcome: e.target.value as RallyFilter["outcome"] })}
+          >
+            <option value="all">All exchanges</option>
+            <option value="counted">Counted in the match</option>
+            <option value="excluded">Not counted</option>
+          </select>
         </label>
+        <label>
+          Winner
+          <select
+            value={filter.winner ?? "all"}
+            onChange={(e) => set({ winner: e.target.value as RallyFilter["winner"] })}
+          >
+            <option value="all">Either player</option>
+            {session.players.map((p) => (
+              <option key={p.player_id} value={p.player_id}>
+                {shortName(session, p.player_id)}
+                {p.player_id === selectedPlayer ? " · selected" : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Rally length
+          <select
+            value={filter.minimumShots ?? 0}
+            onChange={(e) => set({ minimumShots: Number(e.target.value) })}
+          >
+            <option value="0">Any number of shots</option>
+            <option value="4">4+ shots</option>
+            <option value="8">8+ shots</option>
+            <option value="12">12+ shots</option>
+          </select>
+        </label>
+        <span className="py-3 text-sm text-line-2" role="status">
+          {shown.length} shown
+        </span>
+        <button
+          type="button"
+          className="analysis-watch"
+          onClick={() => {
+            setFilter({});
+            setLimit(50);
+          }}
+        >
+          Clear filters
+        </button>
       </div>
-      <ul className="divide-y divide-seam rounded-[var(--radius-card)] border border-seam">
-        {shown.map((r) => (
-          <RallyRow
-            key={r.end.event_id}
-            r={r}
-            session={session}
-            current={frame >= r.start && frame <= r.stop}
-          />
-        ))}
-      </ul>
-    </div>
+      {shown.length === 0 && <Empty title="No rallies match these filters">Try clearing a filter.</Empty>}
+      {shown.slice(0, limit).map((r) => (
+        <RallyRow key={r.id} rally={r} session={session} open={selectedRally === r.no} />
+      ))}
+      {shown.length > limit && (
+        <button type="button" className="rally-action mt-5" onClick={() => setLimit((n) => n + 50)}>
+          Show 50 more rallies
+        </button>
+      )}
+    </section>
   );
 }
 
-function RallyRow({ r, session, current }: { r: RallyView; session: Session; current: boolean }) {
-  const [open, setOpen] = useState(false);
-  const seekFrame = usePlayback((s) => s.seekFrame);
-  const fps = fpsOf(session.media);
-  const p = r.end.payload;
-  const shots =
-    (p.shots as {
-      event_id: string | null;
-      frame: number;
-      player_id: PlayerId | null;
-      stroke: string;
-      subtype: string | null;
-    }[]) ?? [];
-  const verified = r.end.status === "human_verified" || r.end.status === "corrected";
+function RallyRow({ rally: r, session, open }: { rally: EvidenceRally; session: Session; open: boolean }) {
+  const qc = useQueryClient();
   const fix = useMutation({
-    mutationFn: (winner: PlayerId) => api.correctWinner(session.session_id, r.end.event_id, winner),
+    mutationFn: (
+      action:
+        | { kind: "winner"; player: PlayerId }
+        | { kind: "official" }
+        | { kind: "verify" }
+        | { kind: "start" },
+    ) => {
+      if (action.kind === "winner") return api.correctWinner(session.session_id, r.id, action.player);
+      if (action.kind === "official") return api.setRallyOfficial(session.session_id, r.id, !r.official);
+      if (action.kind === "verify") return api.verifyEvent(session.session_id, r.id);
+      return api.setMatchStart(session.session_id, r.start);
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries();
+    },
   });
-  const confirm = useMutation({ mutationFn: () => api.verifyEvent(session.session_id, r.end.event_id) });
-  const official = useMutation({
-    mutationFn: (v: boolean) => api.setRallyOfficial(session.session_id, r.end.event_id, v),
-  });
-  const matchStart = useMutation({ mutationFn: () => api.setMatchStart(session.session_id, r.start) });
-
   return (
-    <li className={clsx("px-3 py-2.5", current && "bg-stand-raised/60")}>
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          className="tabular w-12 shrink-0 text-left text-xs text-line-3 hover:text-line"
-          onClick={() => seekFrame(Math.max(0, r.start - Math.round(fps)), fps)}
-          aria-label={`Jump to rally ${r.no}`}
-        >
-          {clock(r.start, session.media)}
-        </button>
-        <span className="w-16 shrink-0 text-sm font-medium">{r.official ? `Rally ${r.no}` : "Warm-up"}</span>
-        {r.official ? (
-          <BandChip band={verified ? "confirmed" : r.end.band} color={playerColor(r.winner)}>
-            {r.winner ? `${shortName(session, r.winner)} wins` : "Winner unclear"}
-          </BandChip>
-        ) : (
-          <span
-            className="rounded-full border border-seam px-2 py-0.5 text-xs text-line-3"
-            title={String(p.phase_reason ?? "")}
-          >
-            not scored
-          </span>
-        )}
-        <span className="hidden truncate text-xs text-line-2 sm:inline">
-          {p.n_shots ?? shots.length} shots
-          {p.outcome && ` · shuttle ${OUTCOME_LABEL[p.outcome as string] ?? p.outcome}`}
-          {p.winner_source === "ocr" && " · from the scoreboard"}
+    <details className="rally-row" open={open || undefined}>
+      <summary>
+        <span className="font-semibold">Rally {r.no}</span>
+        <span className="text-sm text-line-2">
+          {clock(r.start, session.media)} · {r.shotCount ?? "—"} shots
         </span>
-        {verified && (
-          <span className="flex items-center gap-1 text-xs text-signal">
-            <Check className="size-3.5" aria-hidden /> checked
+        <span className="text-sm">
+          {!r.official
+            ? "Not counted"
+            : r.winner
+              ? `${shortName(session, r.winner)} won`
+              : "Winner not established"}
+        </span>
+        <span className="ml-auto text-xs text-line-3">{r.outcome.replaceAll("_", " ")}</span>
+      </summary>
+      <div className="rally-row-body">
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <Watch start={r.start} end={r.end} label={`Rally ${r.no}`} />
+          <span className="text-xs text-line-3">
+            Event {r.id.slice(0, 12)} · {r.event.status.replaceAll("_", " ")}
           </span>
+        </div>
+        <div className="rally-shot-list">
+          {r.shots.map((s) => (
+            <button
+              type="button"
+              key={s.event_id}
+              onClick={() =>
+                playEvidence(
+                  s.frame_start,
+                  Math.min(r.end, s.frame_start + 45),
+                  STROKE_LABEL[String(s.payload.stroke)] ?? "Shot",
+                )
+              }
+            >
+              <span className="mr-1" aria-hidden>
+                {s.actors.player_id === "P1" ? "●" : "■"}
+              </span>
+              {s.actors.player_id ? `${shortName(session, s.actors.player_id)} · ` : "Unassigned · "}
+              {STROKE_LABEL[String(s.payload.subtype ?? s.payload.stroke)] ??
+                String(s.payload.stroke ?? "Shot")}
+            </button>
+          ))}
+        </div>
+        {!r.shots.length && (
+          <p className="mt-4 text-sm text-line-2">No shot sequence was persisted for this rally.</p>
         )}
-        <button
-          type="button"
-          className="ml-auto grid size-7 place-items-center rounded-md text-line-2 hover:bg-stand-raised hover:text-line"
-          aria-expanded={open}
-          aria-label={open ? "Hide details" : "Show details"}
-          onClick={() => setOpen((o) => !o)}
-        >
-          <ChevronDown className={clsx("size-4 transition-transform", open && "rotate-180")} />
-        </button>
-      </div>
-      {open && (
-        <div className="mt-3 space-y-3 pl-[7.5rem]">
-          <div className="flex flex-wrap gap-1.5">
-            {shots.map((s, i) => (
+        {r.event.payload.end_reason && (
+          <p className="mt-3 text-sm text-line-2">
+            Why it ended: {String(r.event.payload.end_reason).replaceAll("_", " ")}
+          </p>
+        )}
+        <div className="rally-corrections">
+          <p>
+            Check this rally. Changing its winner re-scores the following points and updates the analysis.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {r.winner && (
               <button
-                key={s.event_id ?? `${s.frame}-${i}`}
                 type="button"
-                onClick={() => seekFrame(Math.max(0, s.frame - 10), fps)}
-                className="flex items-center gap-1.5 rounded-full border border-seam px-2 py-0.5 text-xs hover:border-line-3"
+                className="rally-action"
+                disabled={fix.isPending}
+                onClick={() => fix.mutate({ kind: "verify" })}
               >
-                <PlayerDot pid={s.player_id} />
-                {s.subtype === "jump_smash" ? "Jump smash" : (STROKE_LABEL[s.stroke] ?? s.stroke)}
+                Confirm winner
               </button>
-            ))}
-          </div>
-          {p.end_reason && (
-            <p className="text-xs text-line-2">
-              Why the rally ended: {String(p.end_reason).replace(/_/g, " ")}
-            </p>
-          )}
-          {p.phase_reason && (
-            <p className="text-xs text-line-2">
-              {r.official ? "Counted" : "Not counted"}: {String(p.phase_reason)}
-            </p>
-          )}
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              size="sm"
-              variant="ghost"
-              busy={official.isPending}
-              onClick={() => official.mutate(!r.official)}
+            )}
+            {session.players
+              .filter((p) => p.player_id !== r.winner)
+              .map((p) => (
+                <button
+                  type="button"
+                  className="rally-action"
+                  key={p.player_id}
+                  disabled={fix.isPending}
+                  onClick={() => fix.mutate({ kind: "winner", player: p.player_id })}
+                >
+                  {shortName(session, p.player_id)} won it
+                </button>
+              ))}
+            <button
+              type="button"
+              className="rally-action"
+              disabled={fix.isPending}
+              onClick={() => fix.mutate({ kind: "official" })}
             >
               {r.official ? "Not part of the match" : "Count this rally"}
-            </Button>
-            <Button size="sm" variant="ghost" busy={matchStart.isPending} onClick={() => matchStart.mutate()}>
+            </button>
+            <button
+              type="button"
+              className="rally-action"
+              disabled={fix.isPending}
+              onClick={() => fix.mutate({ kind: "start" })}
+            >
               Match starts here
-            </Button>
+            </button>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-line-3">Is the winner right?</span>
-            {!verified && r.winner && (
-              <Button size="sm" variant="secondary" busy={confirm.isPending} onClick={() => confirm.mutate()}>
-                Yes, {shortName(session, r.winner)} won
-              </Button>
-            )}
-            {(["P1", "P2"] as PlayerId[])
-              .filter((pid) => pid !== r.winner || !r.winner)
-              .map((pid) => (
-                <Button
-                  key={pid}
-                  size="sm"
-                  variant="ghost"
-                  busy={fix.isPending}
-                  onClick={() => fix.mutate(pid)}
-                >
-                  <PlayerDot pid={pid} /> {shortName(session, pid)} won it
-                </Button>
-              ))}
-            <span className="text-xs text-line-3">
-              Changing the winner re-scores every point after this one.
-            </span>
-          </div>
-          <ErrorNote error={fix.error ?? confirm.error ?? official.error ?? matchStart.error} />
+          <ErrorNote error={fix.error} />
+          {fix.isSuccess && (
+            <p role="status" className="mt-3">
+              Correction saved to the server. The score and analytics are refreshing.
+            </p>
+          )}
         </div>
-      )}
-    </li>
+      </div>
+    </details>
   );
 }

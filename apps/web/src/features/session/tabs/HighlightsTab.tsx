@@ -1,12 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import { Download, Play } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Empty, ErrorNote, PlayerDot, Spinner } from "@/components/ui";
+import { playEvidence } from "@/features/player/clip";
 import { api, exportUrl } from "@/lib/api";
-import { CATEGORY_LABEL, clock, fps as fpsOf, shortName } from "@/lib/format";
+import { CATEGORY_LABEL, clock, shortName } from "@/lib/format";
 import type { PlayerId, Session } from "@/lib/types";
-import { usePlayback } from "@/stores/playback";
 import { useSession } from "@/stores/session";
 
 const REASON_LABEL: Record<string, string> = {
@@ -22,39 +22,44 @@ const REASON_LABEL: Record<string, string> = {
   deuce: "deuce",
 };
 
-export function HighlightsTab({ session }: { session: Session }) {
-  const [player, setPlayer] = useState<PlayerId | undefined>();
+export function HighlightsTab({ session, selectedPlayer }: { session: Session; selectedPlayer?: PlayerId }) {
+  const [localPlayer, setPlayer] = useState<PlayerId | undefined>();
+  const player = selectedPlayer ?? localPlayer;
   const v = useSession((s) => s.analyticsVersion);
-  const seekFrame = usePlayback((s) => s.seekFrame);
-  const video = usePlayback((s) => s.video);
-  const fps = fpsOf(session.media);
+  const qc = useQueryClient();
+  useEffect(() => {
+    if (v > 0) void qc.invalidateQueries({ queryKey: ["highlights", session.session_id, player] });
+  }, [qc, session.session_id, player, v]);
   const q = useQuery({
-    queryKey: ["highlights", session.session_id, player, v],
+    queryKey: ["highlights", session.session_id, player],
     queryFn: () => api.highlights(session.session_id, 12, player),
-    placeholderData: (p) => p,
   });
 
   return (
     <div className="space-y-4">
-      <fieldset className="flex items-center gap-2">
-        <legend className="sr-only">Whose highlights</legend>
-        {([undefined, "P1", "P2"] as (PlayerId | undefined)[]).map((p) => (
-          <button
-            key={p ?? "all"}
-            type="button"
-            aria-pressed={player === p}
-            onClick={() => setPlayer(p)}
-            className={clsx(
-              "flex h-8 items-center gap-2 rounded-full border px-3 text-sm transition-colors",
-              player === p ? "border-line bg-line text-mat-deep" : "border-seam text-line-2 hover:text-line",
-            )}
-          >
-            {p && <PlayerDot pid={p} />}
-            {p ? shortName(session, p) : "Both players"}
-          </button>
-        ))}
-        <span className="ml-auto text-xs text-line-3">Ranked by excitement, kept varied</span>
-      </fieldset>
+      {!selectedPlayer && (
+        <fieldset className="flex items-center gap-2">
+          <legend className="sr-only">Whose highlights</legend>
+          {([undefined, "P1", "P2"] as (PlayerId | undefined)[]).map((p) => (
+            <button
+              key={p ?? "all"}
+              type="button"
+              aria-pressed={player === p}
+              onClick={() => setPlayer(p)}
+              className={clsx(
+                "flex h-8 items-center gap-2 rounded-full border px-3 text-sm transition-colors",
+                player === p
+                  ? "border-line bg-line text-mat-deep"
+                  : "border-seam text-line-2 hover:text-line",
+              )}
+            >
+              {p && <PlayerDot pid={p} />}
+              {p ? shortName(session, p) : "Both players"}
+            </button>
+          ))}
+          <span className="ml-auto text-xs text-line-3">Ranked by excitement, kept varied</span>
+        </fieldset>
+      )}
       {q.isPending && <Spinner />}
       <ErrorNote error={q.error} />
       {q.data?.highlights.length === 0 && (
@@ -92,15 +97,13 @@ export function HighlightsTab({ session }: { session: Session }) {
               </p>
             </div>
             <div className="flex flex-col items-end gap-1">
-              <span className="numerals text-lg">{h.score.toFixed(1)}</span>
               <div className="flex gap-1">
                 <button
                   type="button"
                   aria-label={`Play rally ${h.rally_no}`}
                   className="grid size-8 place-items-center rounded-lg bg-line text-mat-deep hover:bg-white"
                   onClick={() => {
-                    seekFrame(Math.max(0, h.frame_start - Math.round(fps)), fps);
-                    void video?.play().catch(() => {});
+                    playEvidence(h.frame_start, h.frame_end, `Rally ${h.rally_no}`);
                   }}
                 >
                   <Play className="size-4" />

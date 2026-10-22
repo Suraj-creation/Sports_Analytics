@@ -1,6 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { Empty, ErrorNote, Spinner } from "@/components/ui";
+import { useMeasuredMovement } from "@/features/analytics/useInsights";
 import { api } from "@/lib/api";
 import { STROKE_LABEL, shortName } from "@/lib/format";
 import type { Analytics, PlayerId, PlayerStats, Session } from "@/lib/types";
@@ -8,8 +9,12 @@ import { useSession } from "@/stores/session";
 
 export function useAnalytics(sessionId: string) {
   const v = useSession((s) => s.analyticsVersion);
+  const qc = useQueryClient();
+  useEffect(() => {
+    if (v > 0) void qc.invalidateQueries({ queryKey: ["analytics", sessionId] });
+  }, [qc, sessionId, v]);
   return useQuery({
-    queryKey: ["analytics", sessionId, v],
+    queryKey: ["analytics", sessionId],
     queryFn: () => api.analytics(sessionId),
     placeholderData: (prev) => prev,
   });
@@ -36,6 +41,8 @@ const ROWS: Row[] = [
 
 export function StatsTab({ session }: { session: Session }) {
   const q = useAnalytics(session.session_id);
+  const p1Positions = useMeasuredMovement(session, "P1");
+  const p2Positions = useMeasuredMovement(session, "P2");
   if (q.isPending) return <Spinner className="m-6" />;
   if (q.error) return <ErrorNote error={q.error} />;
   const a = q.data;
@@ -65,7 +72,20 @@ export function StatsTab({ session }: { session: Session }) {
           <caption className="sr-only">Statistics per player</caption>
           <tbody>
             {ROWS.map((r) => (
-              <H2HRow key={r.label} row={r} a={p1} b={p2} />
+              <H2HRow
+                key={r.label}
+                row={r}
+                a={
+                  r.label === "Distance covered" && !(p1Positions.data && p1Positions.data.total > 0)
+                    ? undefined
+                    : p1
+                }
+                b={
+                  r.label === "Distance covered" && !(p2Positions.data && p2Positions.data.total > 0)
+                    ? undefined
+                    : p2
+                }
+              />
             ))}
           </tbody>
         </table>
@@ -88,7 +108,7 @@ function H2HRow({ row, a, b }: { row: Row; a?: PlayerStats; b?: PlayerStats }) {
   const fmt = row.fmt ?? ((v: number) => String(v));
   return (
     <tr className="border-b border-seam/60 last:border-0">
-      <td className="tabular w-14 py-1.5 pr-2 text-right">{fmt(va)}</td>
+      <td className="tabular w-14 py-1.5 pr-2 text-right">{a ? fmt(va) : "—"}</td>
       <td className="w-[30%] py-1.5">
         <div className="flex justify-end">
           <div className="h-2 rounded-l-[4px] bg-p1" style={{ width: `${(va / max) * 100}%` }} />
@@ -100,7 +120,7 @@ function H2HRow({ row, a, b }: { row: Row; a?: PlayerStats; b?: PlayerStats }) {
       <td className="w-[30%] py-1.5">
         <div className="h-2 rounded-r-[4px] bg-p2" style={{ width: `${(vb / max) * 100}%` }} />
       </td>
-      <td className="tabular w-14 py-1.5 pl-2">{fmt(vb)}</td>
+      <td className="tabular w-14 py-1.5 pl-2">{b ? fmt(vb) : "—"}</td>
     </tr>
   );
 }

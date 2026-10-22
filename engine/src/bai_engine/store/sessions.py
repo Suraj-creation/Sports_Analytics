@@ -20,6 +20,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+from ulid import ULID
+
 from bai_engine.schema.session import Session, SessionStatus
 from bai_engine.store.events import EventStore
 from bai_engine.store.tracks import TrackStore
@@ -150,11 +152,38 @@ class SessionRepository:
             self._conn.execute("DELETE FROM sessions WHERE session_id=?", (session_id,))
         shutil.rmtree(self.paths(session_id).root, ignore_errors=True)
 
-    def reset_analysis(self, session_id: str) -> None:
-        """Delete the event log and tracks of a session, keeping media and the perception cache."""
+    def backup_analysis(self, session_id: str) -> Path:
+        """Preserve results before reset; the caller must first stop the session writer.
+
+        Backups live outside the session root so deleting a recording cannot also
+        erase its prior analyses. A failed backup remains ``.incomplete`` and the
+        original analysis is untouched. Media/perception caches remain in place.
+        """
         import shutil
 
         with self._lock:
+            session = self.get(session_id)
+            if session is None:
+                raise KeyError(session_id)
+            stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S.%fZ")
+            destination = self.data_dir / "backups" / session_id / f"{stamp}-{ULID()}"
+            pending = destination.with_name(f"{destination.name}.incomplete")
+            pending.mkdir(parents=True, exist_ok=False)
+            self.events(session_id).backup_to(pending / "events.sqlite")
+            paths = self.paths(session_id)
+            for name, source in (("tracks", paths.tracks), ("exports", paths.exports)):
+                if source.exists():
+                    shutil.copytree(source, pending / name, symlinks=True)
+            (pending / "session.json").write_text(session.model_dump_json(indent=2), encoding="utf-8")
+            pending.rename(destination)
+            return destination
+
+    def reset_analysis(self, session_id: str) -> Path:
+        """Back up then reset events/tracks, keeping media and the perception cache."""
+        import shutil
+
+        with self._lock:
+            backup = self.backup_analysis(session_id)
             es = self._event_stores.pop(session_id, None)
             if es:
                 es.close()
@@ -164,6 +193,7 @@ class SessionRepository:
             f.unlink(missing_ok=True)
         shutil.rmtree(p.tracks, ignore_errors=True)
         self.update(session_id, frontier_frame=0, analysed_frames=0)
+        return backup
 
     # ------------------------------------------------------------------ stores
     def events(self, session_id: str) -> EventStore:

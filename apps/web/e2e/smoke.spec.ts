@@ -7,7 +7,7 @@ test("upload → play with synced clock → analysis completes → tabs and expo
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
 
-  await page.goto("/");
+  await page.goto("/library");
   await expect(page.getByRole("heading", { name: "Analyse a match" })).toBeVisible();
 
   // upload
@@ -31,13 +31,22 @@ test("upload → play with synced clock → analysis completes → tabs and expo
   await page.keyboard.press("Space");
 
   // frame stepping is exact: → advances one frame
+  await expect.poll(async () => video.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+  // Seek a known paused frame; the final presented-frame callback after pause can
+  // arrive after React's throttled readout, so its in-flight value is not a baseline.
+  await video.evaluate((v: HTMLVideoElement) => {
+    v.currentTime = 45.5 / 30;
+  });
   const frameText = page.getByText(/^frame [\d,]+$/);
+  await expect(frameText).toHaveText("frame 45");
   const before = Number((await frameText.textContent())?.replace(/\D/g, ""));
   await page.keyboard.press("ArrowRight");
   await expect.poll(async () => Number((await frameText.textContent())?.replace(/\D/g, ""))).toBe(before + 1);
 
   // analysis finishes (model-free profile) and the status says so
-  await expect(page.getByRole("status").filter({ hasText: "Analysed" })).toBeVisible({ timeout: 90_000 });
+  await expect(page.locator(".match-subtitle").filter({ hasText: "Analysed" })).toBeVisible({
+    timeout: 90_000,
+  });
 
   await page.screenshot({ path: "test-results/screens/session.png", fullPage: true });
 
@@ -47,8 +56,11 @@ test("upload → play with synced clock → analysis completes → tabs and expo
   await page.keyboard.press("Escape");
 
   // tabs render; exports download real files
-  await page.getByRole("tab", { name: "Rallies" }).click();
-  await page.getByRole("tab", { name: "Export" }).click();
+  await page
+    .getByRole("navigation", { name: "Match analysis" })
+    .getByRole("button", { name: "Rallies", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Export", exact: true }).click();
   const [download] = await Promise.all([
     page.waitForEvent("download"),
     page.getByRole("link", { name: /Event log/ }).click(),
@@ -56,13 +68,13 @@ test("upload → play with synced clock → analysis completes → tabs and expo
   expect(download.suggestedFilename()).toMatch(/\.jsonl$/);
 
   // the library lists the match as analysed
-  await page.getByRole("link", { name: "Library", exact: true }).click();
+  await page.goto("/library");
   await expect(page.getByRole("link", { name: "clip" })).toBeVisible();
   await expect(page.getByText("Analysed").first()).toBeVisible();
   await page.screenshot({ path: "test-results/screens/library.png", fullPage: true });
 
   // system page
-  await page.getByRole("link", { name: "System", exact: true }).click();
+  await page.goto("/system");
   await expect(page.getByRole("heading", { name: "Models" })).toBeVisible();
   await page.screenshot({ path: "test-results/screens/system.png", fullPage: true });
 

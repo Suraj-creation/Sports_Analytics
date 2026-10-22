@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Empty, ErrorNote } from "@/components/ui";
@@ -15,13 +15,23 @@ const KINDS: { id: string; label: string; hint: string }[] = [
   {
     id: "landing",
     label: "Where their shots go",
-    hint: "Where the opponent played each shot back (or it landed)",
+    hint: "Where the receiver met the shuttle. Receiver-position proxy, not a measured landing point.",
   },
   { id: "targeting", label: "Targeting", hint: "Areas of the opponent's court this player attacks" },
 ];
 
-export function HeatmapsTab({ session }: { session: Session }) {
-  const [kind, setKind] = useState("presence");
+export function HeatmapsTab({
+  session,
+  selectedPlayer,
+  initialKind,
+}: {
+  session: Session;
+  selectedPlayer?: PlayerId;
+  initialKind?: string;
+}) {
+  const [kind, setKind] = useState(
+    initialKind && KINDS.some((k) => k.id === initialKind) ? initialKind : "presence",
+  );
   const v = useSession((s) => s.analyticsVersion);
   const calibrated = useSession((s) => s.calibration != null);
   if (!calibrated) {
@@ -43,8 +53,10 @@ export function HeatmapsTab({ session }: { session: Session }) {
             aria-pressed={kind === x.id}
             onClick={() => setKind(x.id)}
             className={clsx(
-              "h-8 rounded-full border px-3 text-sm transition-colors",
-              kind === x.id ? "border-line bg-line text-mat-deep" : "border-seam text-line-2 hover:text-line",
+              "min-h-11 rounded-full border px-3 text-sm transition-colors",
+              kind === x.id
+                ? "border-signal bg-signal text-on-primary"
+                : "border-seam text-line-2 hover:text-line",
             )}
           >
             {x.label}
@@ -53,7 +65,7 @@ export function HeatmapsTab({ session }: { session: Session }) {
       </fieldset>
       <p className="text-sm text-line-2">{k?.hint}</p>
       <div className="grid gap-4 lg:grid-cols-2">
-        {(["P1", "P2"] as PlayerId[]).map((pid) => (
+        {(selectedPlayer ? [selectedPlayer] : (["P1", "P2"] as PlayerId[])).map((pid) => (
           <HeatmapCard key={pid} session={session} pid={pid} kind={kind} version={v} />
         ))}
       </div>
@@ -72,13 +84,16 @@ function HeatmapCard({
   kind: string;
   version: number;
 }) {
+  const qc = useQueryClient();
+  useEffect(() => {
+    if (version > 0) void qc.invalidateQueries({ queryKey: ["heatmap", session.session_id, pid, kind] });
+  }, [qc, session.session_id, pid, kind, version]);
   const q = useQuery({
-    queryKey: ["heatmap", session.session_id, pid, kind, version],
+    queryKey: ["heatmap", session.session_id, pid, kind],
     queryFn: () => api.heatmap(session.session_id, pid, kind),
-    placeholderData: (p) => p,
   });
   return (
-    <figure className="space-y-2">
+    <figure className="min-w-0 space-y-2">
       <figcaption className="flex items-center gap-2 text-sm font-medium">
         <span className="size-2 rounded-full" style={{ background: PLAYER_HEX[pid] }} aria-hidden />
         {shortName(session, pid)}
@@ -87,7 +102,36 @@ function HeatmapCard({
         )}
       </figcaption>
       <ErrorNote error={q.error} />
-      {q.data && <HeatCanvas h={q.data} color={PLAYER_HEX[pid]} />}
+      {q.data && q.data.total > 0 ? (
+        <>
+          <HeatCanvas h={q.data} color={PLAYER_HEX[pid]} />
+          <details className="text-xs text-line-2">
+            <summary className="min-h-11 cursor-pointer py-3">Read heatmap as a data table</summary>
+            <div className="overflow-x-auto">
+              <table className="analysis-table">
+                <caption>Normalized intensity by court grid cell, {q.data.cell_m} m per cell</caption>
+                <tbody>
+                  {q.data.values.map((row, y) => (
+                    // biome-ignore lint/suspicious/noArrayIndexKey: the row identity is its fixed physical court coordinate.
+                    <tr key={`row-${q.data.origin_m[1] + y * q.data.cell_m}`}>
+                      {row.map((value, x) => (
+                        // biome-ignore lint/suspicious/noArrayIndexKey: columns are a fixed physical court grid, never reordered.
+                        <td key={`cell-${q.data.origin_m[0] + x * q.data.cell_m}`}>
+                          {Number.isFinite(value) ? value.toFixed(2) : "—"}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
+        </>
+      ) : q.data ? (
+        <Empty title="No measured positions">
+          No samples were recorded for this player and heatmap type.
+        </Empty>
+      ) : null}
       <div className="flex items-center gap-2 text-[11px] text-line-3">
         less
         <span
@@ -151,17 +195,17 @@ function HeatCanvas({ h, color }: { h: Heatmap; color: string }) {
   }, [h, color, view]);
 
   return (
-    <div ref={wrap} className="relative">
+    <div ref={wrap} className="relative min-w-0 w-full">
       <canvas
         ref={ref}
-        style={{ width: view.width, height: view.height }}
+        style={{ width: "100%", height: "auto", aspectRatio: `${view.width} / ${view.height}` }}
         className="block rounded-lg bg-mat-deep"
         role="img"
         aria-label={`${h.kind} heatmap`}
         onMouseMove={(e) => {
           const r = e.currentTarget.getBoundingClientRect();
-          const px = e.clientX - r.left;
-          const py = e.clientY - r.top;
+          const px = ((e.clientX - r.left) * view.width) / r.width;
+          const py = ((e.clientY - r.top) * view.height) / r.height;
           const [x, y] = view.unmap(px, py);
           const i = Math.floor((x - h.origin_m[0]) / h.cell_m);
           const j = Math.floor((y - h.origin_m[1]) / h.cell_m);

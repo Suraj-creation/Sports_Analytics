@@ -14,6 +14,7 @@ from fastapi import APIRouter, HTTPException, Query, Request, status
 from fastapi.responses import FileResponse, Response, StreamingResponse
 
 from bai_api.deps import Repo, SessionDep, SettingsDep
+from bai_api.public import public_session
 from bai_engine.media import Tools
 from bai_engine.timeline import format_clock
 
@@ -215,7 +216,7 @@ def report_pdf(session: SessionDep, r: Repo, request: Request) -> FileResponse:
 def summary_json(session: SessionDep, request: Request) -> Response:
     a = request.app.state.analytics.get(session.session_id)
     body = {
-        "session": session.model_dump(mode="json"),
+        "session": public_session(session).model_dump(mode="json"),
         "analytics": a.to_public(),
         "highlights": [h.to_public() for h in a.highlights(k=10)],
     }

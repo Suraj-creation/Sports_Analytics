@@ -27,6 +27,7 @@ import msgpack
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 
 from bai_api.auth import ws_user
+from bai_api.public import public_session
 from bai_engine.bus import Bus, topic
 from bai_engine.obs import WS_CLIENTS, get_logger
 from bai_engine.schema import TrackObject, table_to_samples
@@ -77,7 +78,7 @@ async def session_ws(ws: WebSocket, session_id: str) -> None:
     await send(
         {
             "type": "hello",
-            "session": session.model_dump(mode="json"),
+            "session": public_session(session).model_dump(mode="json"),
             "state": snap.state if snap else None,
             "calibration": cal[-1].payload if cal else None,
             "last_seq": store.last_seq(),

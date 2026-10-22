@@ -17,6 +17,7 @@ import { frameClock, timeToFrame } from "@/lib/frameClock";
 import type { Session } from "@/lib/types";
 import { type Layers, usePlayback } from "@/stores/playback";
 import { useSession } from "@/stores/session";
+import { normalizeClip } from "./clip";
 import { drawOverlay, type OverlayCtx } from "./overlay";
 import { ScoreBug } from "./ScoreBug";
 import { StrokeToast } from "./StrokeToast";
@@ -61,6 +62,36 @@ export function VideoStage({ session }: { session: Session }) {
   const [gated, setGated] = useState(false);
   const [muted, setMuted] = useState(true);
   const [rate, setRate] = useState(1);
+  const [clip, setClip] = useState<{ from: number; to: number; label: string } | null>(null);
+  const [clipLoop, setClipLoop] = useState(false);
+
+  useEffect(() => {
+    const onClip = (event: Event) => {
+      const { start, end, label } = (event as CustomEvent<{ start: number; end: number; label: string }>)
+        .detail;
+      const range = normalizeClip(start, end, fps, nFrames);
+      if (!range || !video) return;
+      setClip({ ...range, label });
+      setGated(false);
+      video.currentTime = (range.from + 0.5) / fps;
+      useSession.getState().socket?.seek(range.from);
+      void video.play().catch(() => {});
+    };
+    window.addEventListener("bai:play-clip", onClip);
+    return () => window.removeEventListener("bai:play-clip", onClip);
+  }, [fps, nFrames, video]);
+
+  useEffect(() => {
+    if (!video || !clip) return;
+    return frameClock.subscribe((frame) => {
+      if (frame < clip.to || video.paused) return;
+      if (clipLoop) video.currentTime = (clip.from + 0.5) / fps;
+      else {
+        video.pause();
+        video.currentTime = (clip.to + 0.5) / fps;
+      }
+    });
+  }, [video, clip, clipLoop, fps]);
 
   useEffect(() => {
     bindVideo(video);
@@ -236,11 +267,46 @@ export function VideoStage({ session }: { session: Session }) {
           className="absolute inset-0 size-full object-contain"
           playsInline
           muted={muted}
-          preload="auto"
+          preload="metadata"
           onClick={togglePlay}
           onDoubleClick={() => void stageRef.current?.requestFullscreen?.()}
         />
         <canvas ref={canvasRef} className="pointer-events-none absolute inset-0 size-full" aria-hidden />
+        {clip && (
+          <div className="absolute bottom-3 left-3 right-3 z-20 flex flex-wrap items-center gap-2 rounded-lg border border-white/20 bg-black/85 px-3 py-2 text-xs text-white">
+            <span className="mr-auto">{clip.label} · bounded clip</span>
+            <button
+              type="button"
+              className="min-h-9 px-2"
+              onClick={() => {
+                if (video) {
+                  video.currentTime = (clip.from + 0.5) / fps;
+                  void video.play().catch(() => {});
+                }
+              }}
+            >
+              Again
+            </button>
+            <button
+              type="button"
+              className="min-h-9 px-2"
+              aria-pressed={clipLoop}
+              onClick={() => setClipLoop((v) => !v)}
+            >
+              Loop {clipLoop ? "on" : "off"}
+            </button>
+            <button
+              type="button"
+              className="min-h-9 px-2"
+              onClick={() => {
+                setClip(null);
+                if (video) void video.play().catch(() => {});
+              }}
+            >
+              Watch on ›
+            </button>
+          </div>
+        )}
         {layers.scoreBug && !hidden && <ScoreBug session={session} />}
         {!hidden && <StrokeToast session={session} />}
 
