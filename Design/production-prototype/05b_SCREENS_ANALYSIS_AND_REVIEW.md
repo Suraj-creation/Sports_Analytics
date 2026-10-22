@@ -2,7 +2,7 @@
 
 **Scope:** Deep dive shell and its six sub-screens (**Story · Rallies · Shots · Court · Compare · Ask**), **Review & fix**, **Place your court**, the **Advanced workspace**, and the **Quality panel**.
 **Depends on:** `00` (D1–D18), `05a` (shared rules §0 apply here: state vocabulary, depth defaults, preset defaults, `PreviewTag`), `06`, `07`, `09`.
-**Theme:** Deep dive uses **Arena Night** (D13): video and court overlays need dark contrast. The rest of the app may be Court Daylight.
+**Theme:** Video theatre defaults to **Arena Night**; the Deep dive workspace respects the player's explicit Light, Dark or High contrast setting (D13, file 08 §16).
 
 > **The professional layer, made kind.** This is where the evidence lives. Every number is deterministic, versioned and traceable to events; the *presentation* is still plain, self-referenced ("you") and honest about what we could not see. Nothing here is hidden from an expert; nothing here is thrown at a beginner.
 
@@ -207,7 +207,7 @@ Each row opens its definition and the rallies behind it. Colours: **P1/P2 blue/o
 ### Copy
 - **Heading:** "What happened"
 - **Sentence:** "36 rallies; we followed 31. The longest was 14 shots."
-- **Score:** "Game 1 21–17, game 2 21–19 · Checked" (or "Score not confirmed — Fix it" if only *Looks right*/*Worth a look*)
+- **Score:** "Game 1 21–17, game 2 21–19 · Checked" (or "Score not checked — review rallies" if any dependency remains unverified)
 - **No scoreline:** "This was a social game, so there's no score — here are the rallies."
 - **Momentum caption (Advanced):** "How recent points leaned. This is a smoothed view of who won recent points, not a measure of who played better."
 - **Banned:** "Dominated", "collapsed", "choked".
@@ -765,18 +765,18 @@ Left: sticky clip; right: the question card with keyboard hints (`Y`/`N`, `1`/`2
 | Change winner | `api.correctWinner(sessionId, event_id, "P1"|"P2")` (re-scores every later point) |
 | Count / don't count rally | `api.setRallyOfficial(sessionId, event_id, bool)` |
 | Match starts here | `api.setMatchStart(sessionId, startFrame)` |
-| Wrong player / wrong shot / bad clip / not a rally | **new — see G-14/15** (shot and identity corrections are not exposed by the current API; the UI collects them as feedback and queues them) |
-| Undo | **new — see G-14/15** (the log is append-only with `supersedes`; undo issues a restoring correction) |
+| Wrong player / wrong shot / bad clip / not a rally | **new — G-15**; capture as feedback only if G-32 intake exists, with an honest receipt. Never say the result was fixed until a correction API applies and recomputes it |
+| Undo | **new — G-14** (the existing API has no undo token or restoring operation; hide Undo until end-to-end reversal and downstream recomputation work) |
 | Queue construction | derived client-side from events + `Highlight[]`; server-side ranking in G-29 |
 
 ### ChangeSummaryBanner (what changed)
-After every fix, a banner states **cause, effect, and undo**:
+After a persisted fix, a banner states **cause and the confirmed effect**. Show Undo only after G-14 provides a working reversal; otherwise offer "See what changed" without an undo promise:
 ```
 Fixed: Rahul won rally 22 (you said so).
 This re-counted 14 points after it. Score is now 21–18 (it was 21–17). Game 2 changed.
-Moments updated: hero moment unchanged · 1 new moment.   [Undo]  [See what changed]
+Moments updated: hero moment unchanged · 1 new moment.   [See what changed]
 ```
-It is computed by snapshotting `Analytics` + `MatchState` before/after (client-side now; server diff in G-14/15).
+For a prototype, compute a before/after diff only after refetching the persisted event fold and mark it "Updated results". The production contract is G-14; G-15 covers additional correction kinds. Do not claim that an optimistic client diff is a saved server result.
 
 ### Explanation of re-scoring (plain)
 > "Badminton scoring depends on every point before it — who serves, and from which side. So if one rally's winner is wrong, every point after it has to be counted again. That's why changing a winner can change the score."
@@ -809,7 +809,7 @@ It is computed by snapshotting `Analytics` + `MatchState` before/after (client-s
 | demo | "Demo action — nothing was saved" |
 
 ### Depth / Preset behaviour
-Quick: 3 items, yes/no wording. Guided: + "Why we're not sure". Advanced: full queue, event ids, evidence list, bulk "Mark all Looks-right as Checked" (confirm dialog). Compete preset surfaces **scoreline-critical** items first.
+Quick: 3 items, yes/no wording. Guided: + "Why we're not sure". Advanced: full queue, event ids and evidence list. There is **no bulk Checked action**: each dependent claim needs explicit evidence review. A bulk dismissal may clear reminders without changing trust state. Compete preset surfaces **scoreline-critical** items first.
 
 ### Accessibility
 One question per screen on mobile with a clear heading and focus management; buttons ≥ 44 px; keyboard shortcuts documented and optional; the clip has a text description; undo is announced (`aria-live`).
@@ -820,11 +820,11 @@ One question per screen on mobile with a clear heading and focus management; but
 ### Acceptance criteria
 - **AC-review-1** The queue starts with the hero moment's rally.
 - **AC-review-2** A batch contains at most three questions by default.
-- **AC-review-3** Every fix shows cause, effect (score/moments changed) and Undo.
+- **AC-review-3** A persisted fix shows its confirmed cause and effect after refetch; Undo appears only after G-14 implements a working reversal and downstream recomputation.
 - **AC-review-4** Changing a winner explains the re-count in plain language.
 - **AC-review-5** Skipping never penalises or nags.
 - **AC-review-6** Fixes persist and survive re-analysis (existing deterministic refold).
-- **AC-review-7** An offline fix is retained and applied later or clearly marked unsent.
+- **AC-review-7** Without a verified offline queue, an offline fix is not accepted and is clearly marked unsent. If a queue is built, it must reconcile against event versions before claiming success.
 
 ---
 
@@ -1097,11 +1097,11 @@ Each row is a definition list (`dt/dd`); status uses icon + word + shape; the sh
 
 | Gap | Used here for |
 |---|---|
-| G-04 | Match type (Social/Practice hide score surfaces) |
+| G-04 | True unscored processing for Social/Practice, including insights and exports; hiding scores alone is insufficient |
 | G-01 | "Which one is you" mapping used in every Deep dive sentence |
 | G-07 | Metric definitions/versions for Compare and MetricPopover |
 | G-29 | Insight/narration service behind StoryParagraph and Ask-adjacent claims |
-| G-14/15 | Fix history, undo, shot/identity corrections, server-side change diff |
+| G-14 / G-15 | G-14: saved change summary and reversible undo. G-15: extra correction kinds, including shot/identity; feedback alone never mutates results |
 | G-20 | Court-fit and coverage in plain language (Great/Good/Rough; followed N of M) |
 
 ## 14. Components named here that are not in `00 §6`

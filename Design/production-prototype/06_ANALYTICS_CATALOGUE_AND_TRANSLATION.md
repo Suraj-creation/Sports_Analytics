@@ -6,7 +6,7 @@
 
 | Symbol | Meaning |
 |---|---|
-| **A / P / N** | Readiness label per file 00 §7: **A**vailable · **P**review (shown with a *Preview* tag) · **N**ot yet (hidden, or a quiet "coming" note) |
+| **A / P / N** | Readiness label per file 00 §7: **A**vailable · **P**review (shown with a *Preview* tag) · **N**ot yet (hidden, or a quiet "coming" note). These table labels describe capability on supported footage; for amateur phone footage, G-11 validation and the claim gate still apply. A table's **A** never overrides D5 or a missing G-19/G-20 contract. |
 | **Q / G / Adv** | Lowest Depth at which a metric appears: Quick · Guided · Advanced. `Q+` = Quick and everything above |
 | **R E I C** | Preset visibility: **R**elax · **E**xplore · **I**mprove · **C**ompete (file 00 D3). A metric listed for a preset also needs its depth rule |
 | `field` | A real field in the code today. `new` = needs backend work (see file 11) |
@@ -28,7 +28,7 @@
 
 ### 1.2 The metric contract (from Amateur v2 §5.2 and Spec v1 doc 05 §1)
 
-A metric may be **player-facing** only if all of these are defined. If any is missing it stays internal or is labelled *experimental/Preview*.
+A metric may be **asserted as a player-facing fact** only if all of these are defined and its claim-type gate passes. Preview describes a supported but limited capability; it is not a substitute for a missing denominator, evidence link, identity mapping or validation. Otherwise show a question with the clip, a plainly labelled sample, or "Not enough to say".
 
 | # | Contract field | Where it lives |
 |---|---|---|
@@ -75,12 +75,12 @@ Rules: `value: null` + a `state` is how *missing*, *zero*, *insufficient* and *n
 
 | Engine today | `check` (UI word) | Rule |
 |---|---|---|
-| `status ∈ {human_verified, corrected}` | **Checked** | Always shown; claim may use "your" and "first" |
-| `band = confirmed` (conf ≥ 0.85) and `status = confirmed` | **Looks right** | Allowed for descriptive claims; **uncalibrated** (G-08) → surface-wide *Preview* tag until calibrated on target footage |
+| `status ∈ {human_verified, corrected}` | **Checked** only for the reviewed event and any claim whose complete dependency set was checked | A checked winner alone does not check a scoreline, pattern, personal best or shot classification |
+| `band = confirmed` (conf ≥ 0.85) and `status = confirmed` | **Looks right** only after G-08/G-11 validate that claim type and footage condition | Before that, winner and shot candidates are **Worth a look**; a Preview tag cannot upgrade trust |
 | `band = probable` (0.60–0.85) | **Worth a look** | Never in a headline; allowed in a list with a "check this" affordance |
 | `band = uncertain/unknown`, `provisional`, `retracted` | **Not enough to say** | Hidden from the recap; listed in Review & fix |
 
-Two facts from the code that this table must respect: **(a)** the rule classifier caps stroke confidence at `0.7` (`RuleStrokeClassifier.MAX_CONF`), so **no rule-classified shot can ever be "Looks right"** — shot claims are *Worth a look* until a person checks them; **(b)** `outcome_confidence` maps rule `HIGH` to 0.85 (→ *confirmed* band) while winner accuracy was measured at 61.5 % on the only real-video check, so "Looks right" for a **winner** is itself provisional until G-08 and G-11 land.
+Two facts from the code that this table must respect: **(a)** the rule classifier caps stroke confidence at `0.7` (`RuleStrokeClassifier.MAX_CONF`), so **no rule-classified shot can ever be "Looks right"** — shot claims are *Worth a look* until a person checks them; **(b)** `outcome_confidence` maps rule `HIGH` to 0.85 (→ *confirmed* band) while winner accuracy was measured at 61.5 % on the only real-video check, so **winner candidates are Worth a look**, irrespective of the raw band, until G-08 and G-11 land.
 
 ### 1.5 Definitions every metric shares
 
@@ -122,11 +122,11 @@ Each group has a **definition table** (what it is, how computed, where from) and
 |---|---|---|---|---|---|---|
 | `m.session.duration` | n/a | Q+ · R E I C | A | `MatchCard`, `RecapHeader` | VFR sources (proxy is CFR) | "{mm:ss} of video" |
 | `m.session.active_play_s` | Same match type, ≥ 80 % rallies followed | Q+ · R E I C | A | `FactTrio` | Rally over-segmentation (DEF-08: 41 predicted vs 36 true) inflates it; warm-up leakage | "The shuttle was in play for {mm} min of this {mm}-min video." |
-| `m.session.rally_count` | Same match type & discipline | Q+ · R E I C | A | `FactTrio`, `MatchCard` | Over/under-segmentation; replays | "{n} rallies" (never "{n} points" — that needs a verified score) |
-| `m.session.longest_rally` | §3.1; needs ≥ 5 rallies both matches | Q+ · R E I C | A | `HeroMoment` (as a Moment), `FactTrio`, `PersonalBestCard` | False-positive contacts inflate it (G-27); phrase as "{n} shots detected" in `MetricPopover` | "Your longest rally was {n} shots. Watch it." |
+| `m.session.rally_count` | Same match type & discipline | Q+ · R E I C | P on amateur phone footage until G-11 | `FactTrio`, `MatchCard` | Over/under-segmentation; replays | "{n} rallies" (never "{n} points" — that needs a verified score) |
+| `m.session.longest_rally` | §3.1; needs ≥ 5 rallies both matches | Q+ · R E I C | P on amateur phone footage until G-11/G-20 | `HeroMoment` (as a Moment), `FactTrio`, `PersonalBestCard` | False-positive contacts inflate it (G-27); phrase as "{n} shots detected" in `MetricPopover` | "Your longest rally was {n} shots. Watch it." |
 | `m.session.avg_rally` | §3.1 | G+ · E I C | A | `FactTrio` (Guided), `ProgressCard` | Small n; multimodal (many short + a few long) | "A typical rally ran {n} shots (middle value of {N} rallies)." |
 | `m.session.rally_length_dist` | §3.1 | G+ · E I C | A | `RallyTimeline` (strip) + small histogram in `ProgressCard` | Bin edges are arbitrary — show counts, not percentages | "{a} short, {b} medium and {c} long rallies." |
-| `m.session.rallies_followed` | n/a (it *is* coverage) | Q+ · R E I C | A | `CoverageBar` | Over-reporting if tracking gaps are not counted | "We followed {k} of {N} rallies." |
+| `m.session.rallies_followed` | n/a (it *is* coverage) | Q+ · R E I C | N until G-20 defines a reliable denominator | `CoverageBar` | Over-reporting if tracking gaps are not counted | "We followed {k} of {N} rallies." |
 | `m.session.not_counted` | n/a | Q+ (if > 0) · R E I C | A | `ReviewBanner` | Wrongly dropped casual rallies | "{n} rallies weren't counted ({reason}). Count them?" |
 | `m.session.court_found` | n/a | G+ · E I C | P | `CoverageBar` (detail) | Behind-baseline/high/side-on phone angles untested (G-11) | "We could see the court on {pct}% of the video." |
 
@@ -277,7 +277,7 @@ Never shown as a number to players. Not exported in the Match story. Keep in the
 
 | id | Plain label | Definition | Numerator / denominator | Exclusions · min sample | Engine source | Depth · presets | Label | Component | Failure modes | Copy |
 |---|---|---|---|---|---|---|---|---|---|---|
-| `m.story.scoreline` | Score (context chip) | Final games/points from the verified fold | — | Scored match only; winners Checked or marked Preview | `score_timeline[-1].score`, `state.completed_games` | Q+ · all (chip, never headline) | P → A once Checked | `RecapHeader` chip, `ScoreStory` | Winner accuracy (finding 4); mid-game start | "Final score {a}–{b}{ (preview)}" |
+| `m.story.scoreline` | Score (context chip) | Final games/points from the verified fold | — | Scored match only; all contributing winners, official flags and match start Checked; otherwise withhold the score | `score_timeline[-1].score`, `state.completed_games` | Q+ · all (chip, never headline) | P → A once Checked | `RecapHeader` chip, `ScoreStory` | Winner accuracy (finding 4); mid-game start | "Final score {a}–{b} (checked with you)" |
 | `m.story.games` | Games | `completed_games` list | — | Scored only | `MatchState.completed_games` | G+ · E I C | P | `ScoreStory` | Same | "{g1}, {g2}…" |
 | `m.story.points_won` | Points won (head-to-head) | `points_won` per player | — | Official, Checked winners | `PlayerStats.points_won/points_lost`, `win_rate` | Adv · C | P | `HeadToHead` | Win-centric; D6 | "{a} of {b} points." (no `%`, no crown) |
 | `m.story.momentum_series` | Momentum | EWMA (α 0.3) of ±1 per point; shifts when sign flips and |prev| > 0.25 | — | Scored + Checked · ≥ 10 points | `analytics.momentum`, `momentum_shifts` | Adv · C | P | `MomentumChart` | Implies who is "winning"; truncated to last 60 in `to_public()` (G-21) | "Runs of points: {player} took {n} in a row." |
@@ -429,7 +429,7 @@ If any rule fails the UI says **"Not directly comparable"** and gives the *first
 |---|---|---|---|
 | **Observation** | Bounded fact about this match | "The longest rally was 14 shots." | Looks right or better |
 | **Comparison** | Change vs a comparable baseline | "That's longer than your last similar match (11)." | Tier 1/2, E1–E10 |
-| **Milestone** | PB/first | "Your longest rally so far." | Checked or Looks right + history rule |
+| **Milestone** | PB/first | "Your longest rally so far." | Checked underlying event and identity, comparable history, stable definition and coverage rule |
 | **Opportunity** (hypothesis) | A pattern worth looking at — never a diagnosis | "Several long rallies ended after a short return to the middle. Worth a look?" | ≥ 2 independent examples, ≥ Looks right on position/shot data |
 | **Suggestion** | An optional experiment | "If you'd like something to try next time: …" | Only if a *Focus* is accepted or the preset is Improve; evidence-linked or labelled "general guidance" |
 | **Coverage note** | What we could not see | "We followed 22 of 24 rallies." | Always allowed |
@@ -645,7 +645,7 @@ A Moment is a clip (frame range) + a **lens** + **credited participants** + a on
 4. **Fill remaining slots** by Maximal Marginal Relevance over lenses:
    `pick = argmax [ (1 − d)·s* − d·overlap ]`, `d = 0.35` (today's default `diversity`), `overlap = Jaccard(lens set, chosen lens sets)` (0 or 1 here).
 5. **Per-participant exclusive guarantee when slots are scarce** (≤ 2 non-hero slots, e.g. Quick on a phone): prefer one exclusive Moment per participant over a shared one.
-6. **Consent filter last:** private by default; a funny clip never leaves the owner without approval; clips containing a non-consenting participant are suppressed from shareable outputs (V2 §5.1).
+6. **Consent filter before ranking and again before export:** only clips eligible for the intended audience enter the candidate set. Re-check participant and per-clip approval at share time (G-05); never rank a clip into a share preview and revoke it only after the player commits.
 7. **Explain** each Moment with the top reason from the lens (kept from today's `reasons`), in words, never a score.
 
 ### 7.5 Worked example (illustrative — invented numbers)

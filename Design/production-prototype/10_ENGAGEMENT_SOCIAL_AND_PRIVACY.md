@@ -166,7 +166,7 @@ Each mechanic considered across the three Design documents **and the user's past
 | Player has an account (not a guest) | "To share safely we need to know it's yours — add an email." |
 | "Share selected moments" consent is on | "Sharing is off. Turn it on in Privacy." (one tap, deep-linked) |
 | The clip's own sharing state allows it | "This clip is private. Approve it for sharing?" |
-| Clip is **Checked** or **Looks right** (not "Worth a look") | "We're not sure about this moment. Check it first, or share anyway as a rough cut." |
+| Clip attribution and all score/shot claims in the share card are **Checked**, or omitted; the video itself can be shared as an unlabelled clip after participant approval | "We cannot confirm that label. Share the clip without the claim, or check the claim first." |
 | Clip is flagged **fun/blooper** | **Explicit per-clip approval** — copy: "This might be embarrassing for someone. Share it only if everyone in it would be happy." Default: **blocked** until approved |
 | Clip contains another identifiable person | See §7 (opponents/bystanders) |
 
@@ -320,7 +320,7 @@ Some venues prohibit filming or require staff permission. The Record guide and c
 | # | Permission | What it allows | Default | Required to use the product |
 |---|---|---|---|---|
 | 1 | **Analyse** | Process this video to find rallies, shots, moments | On | **Yes** |
-| 2 | **Keep** | Store the video privately so Moments can play | On | Yes (to watch clips); can choose "delete after analysis" |
+| 2 | **Keep** | Store the video privately so Moments can play | On with an explicit explanation | Required for replay; delete-after-analysis choice appears only when G-05 actually deletes all media derivatives |
 | 3 | **Save to my history** | Keep derived stats for Progress/Journey/Records | **Off** | No |
 | 4 | **Share selected moments** | Allow creating share links per clip | **Off** | No |
 | 5 | **Help improve the product** (model improvement) | Use footage or derived data to improve models | **Off** — and **separate**, never bundled | No |
@@ -466,7 +466,7 @@ Each row: **harm → who → mitigation (design) → detection metric → kill c
 | # | Harm | Who | Mitigation (design) | Detection | Kill / rollback criterion |
 |---|---|---|---|---|---|
 | H1 | **Shame / embarrassment** from seeing oneself or a mistake highlighted | New/returning players | Private by default; user-selected clips; observation language, clip first; no "weakness" card forced; fun clips opt-in per clip; loss path = *Quick recap · Deep review · Review later* | In-product "this felt…" optional chip; interview probes; `harm_signal` events; share-removal rate | Any feature with shame reports above the pre-agreed threshold is disabled and redesigned |
-| H2 | **Unwanted exposure** of the player or others | Opponents, bystanders, minors | Four separated permissions; share preview; strip options; removal in one tap; adult-only pilot; bystander suppression; safe link previews | Removal requests, privacy complaints, blocked share attempts, consent-comprehension tests | Any public/default exposure incident → stop sharing launch; zero tolerance target |
+| H2 | **Unwanted exposure** of the player or others | Opponents, bystanders, minors | Five separated purpose decisions; share preview; strip options; removal in one tap; adult-only pilot; bystander suppression; safe link previews | Removal requests, privacy complaints, blocked share attempts, consent-comprehension tests | Any public/default exposure incident → stop sharing launch; zero tolerance target |
 | H3 | **Overtraining / playing through pain** | Anyone; older players | No load/readiness/injury claims; no calories; no "play more" nudges; self-reported energy only; no escalation after discomfort; no streak | Support/feedback terms ("pain", "injured"), reminder-dismissal patterns | Disable any activity-related surface that correlates with harm reports |
 | H4 | **False praise** (confident wrong highlight, false PB/First) | All; erodes trust | Evidence-gated: verified events only; coverage + `CheckChip` visible; no PB on first match; "Preview" label on shot-level; abstain when unsure | **False-highlight and false-record rate** (v1 KPI), correction rate, seeded-error detection | Exceeding the false-claim threshold → downgrade to Preview/hide that lens |
 | H5 | **Unhealthy comparison** | Beginners; lower-ranked | Self-reference default; opt-in bounded peers only; no leaderboards; never show others' weaknesses | Comparison-opt-out rate, qualitative pressure reports | Any comparison feature with net-negative well-being → remove; include low-ranked users in evaluation |

@@ -2,7 +2,7 @@
 
 **Purpose.** Turn the spec into an ordered build, make it testable without waiting for the backend, and define how we learn whether real amateur players value it. Build order follows **evidence readiness** (file 00 §7, file 11 §6), not feature glamour: *a privacy or accuracy foundation can outrank a promising feature* (Blueprint §15).
 
-> **What "production-grade design prototype" means here.** A clickable, accessible, responsive product in `apps/web` that (1) runs entirely on **deterministic fixtures** so every screen and state is demonstrable and testable, (2) is wired to the **real engine** for the subset the engine can already support (upload → rallies → Moments → Review & fix → Deep dive), and (3) labels everything else honestly (**Preview / Not yet / Sample**).
+> **What "production-grade design prototype" means here.** A clickable, accessible, responsive product in `apps/web` that (1) runs entirely on **deterministic fixtures** so every screen and state is demonstrable and testable, (2) can demonstrate the existing engine on explicitly supported test footage, with an isolated real-data path gated by consent and capability checks, and (3) labels everything else honestly (**Preview / Not yet / Sample**).
 
 ---
 
@@ -36,20 +36,20 @@ Sizes: S ≤ 1 week · M ≈ 2–3 weeks · L ≥ 4 weeks (one small team; treat
 
 **Exit:** every state of every primitive renders from fixtures; axe clean; banned-phrase test green; shell works at 360/768/1024/1440.
 
-### Phase 1 — The Joy loop on real engine data (M–L)  ← first thing a player can love
-**Goal:** upload a clip → watch while it analyses → see **Moments and a short, honest recap** → fix what's wrong → keep or share a Moment.
+### Phase 1 — The Joy loop on fixtures, then a gated scored-singles pilot (M–L)
+**Goal:** prove that a player can reach an inspectable Moment, understand its limits and correct a result. Fixture journeys come first. The real upload path opens only after G-01/G-05/G-11/G-12/G-18/G-19/G-20/G-25 meet their gates; real sharing waits for G-05/G-28, and real Social/Practice waits for G-04.
 
-| Slice | Real data it uses today | Fixture-only parts |
+| Slice | Existing technical-demo source (not proof of release readiness) | Fixture-only parts and release gate |
 |---|---|---|
 | Landing + sample recap | — (Sample is a fixture, labelled) | all |
-| Onboarding (value → optional purpose → record guide → test clip check) | court-line fit for test clip (new endpoint, G-12) or mocked verdict | verdict mocked until built |
-| New match (source, type, who's who, court, consent, go) | upload, `PATCH` players, calibration proposal/auto | consent ledger local; `Social/Practice` hide scores (G-04) |
+| Onboarding (value → optional purpose → record guide → local check → consent → optional probe) | on-device metadata only before consent | G-ONB-2 probe fixture until a server consent gate and G-11 validation exist |
+| New match (source, type, who's who, court, consent, go) | existing scored-singles upload only after server consent gate | guest/consent flow is fixture-only until G-01/G-05/G-12; Social/Practice fixture-only until G-04 |
 | Processing + progressive playback | `Session.status`, `StatusMsg`, HLS | stage names mapped (file 11 §5) |
 | **Recap** (Moments → My game) | `analytics`, `highlights`, events; client-derived `FactTrio` | lens ranking runs client-side first (file 06 §7) |
-| **Review & fix** | existing corrections API | `ChangeSummary` computed client-side by diffing before/after |
+| **Review & fix** | existing winner/official/match-start/verify calls | Refetch persisted before/after state for a provisional ChangeSummary; no Undo until G-14 |
 | Moments library + Clip detail | rallies + `clip.mp4?from&to` | favourite/visibility flags local |
-| Share (private link preview only) | `clip.mp4` download | link creation simulated + labelled |
-| Deep dive v1 (Story, Rallies, Court, Ask) | existing tabs reskinned into new IA | — |
+| Share preview | none on real user footage until G-05/G-28 | fixture-only link creation, persistently labelled Sample; no active external link |
+| Deep dive v1 (Story, Rallies, Court, Ask) | existing playback and events | Court metrics hidden until G-09/G-20; Ask limited to cited descriptive facts |
 
 **Exit (value):** ≥ 80 % of pilot players state the recap's main finding correctly unaided; median **active effort to first Moment ≤ 90 s** (target, to be validated); no critical privacy task failure; Review & fix completes a wrong-winner correction in ≤ 3 taps.
 **Exit (honesty):** zero un-tagged Preview surfaces; every claim opens evidence.
@@ -73,8 +73,9 @@ Compare matches, event table, filters, exports, coverage/limitations panel, coac
 ```
 Phase 0 ─► Phase 1 ─► Phase 2 ─► Phase 3
               │            └──────────► Phase 5
-              └─ (G-04, G-05 consent, G-07, G-09, G-11, G-12) must land inside Phase 1
+              └─ real scored-singles pilot needs G-01/G-05/G-11/G-12/G-18/G-19/G-20/G-25
 Phase 4 needs G-03 (doubles)  ·  Phase 2 needs G-02
+Social/Practice needs G-04; numeric Quick facts need G-07; court metrics need G-09; sharing needs G-05/G-28.
 ```
 
 ### 2.2 What not to build yet (copied from Blueprint §15.1, still binding)
@@ -96,12 +97,12 @@ Deterministic, versioned, reproducible; generated from the synthetic match gener
 
 | Fixture | Purpose | Key properties |
 |---|---|---|
-| **Sample match** (labelled *Sample*) | Landing and first-run | 3 good Moments, clear hero, full coverage, mixed shot types, scoreline Checked |
+| **Sample match** (labelled *Sample*) | Landing and first-run | 3 inspectable Moments and one honest uncertain item; scores, shot types and coverage marked as illustrative fixture values, not claimed engine performance |
 | **Alex — Weekend Social** (singles ×3 matches) | Core loop and Progress | M-A: ready · M-B: ready, lost, still has a verified positive Moment · M-C: partial (movement pending) |
 | **Match with no reliable hero** | Honest "why not" | Low confidence on all candidates; recap says why |
 | **Low-coverage match** | Capture failure UX | 40 % rallies analysed; court lost mid-match; "what we could see" |
 | **Unsupported footage** | Suitability result | Extreme angle; `not_supported` with fixes |
-| **Interrupted upload** | Resume | Stage `upload` partial → resumed |
+| **Interrupted upload** | Distinguish server-confirmed resumable draft from restart-only transfer | Stage `upload` partial → resumed only after G-12 |
 | **Failed analysis** | Failure copy and retry | Retryable; what was kept |
 | **Corrected match** | Review & fix | Wrong winner → `ChangeSummary` with rescored points and undo |
 | **Warm-up detected** | "Not counted" | Unofficial rallies reinstatable |
@@ -277,7 +278,7 @@ A feature is **downgraded or disabled** when false-claim, identity-error, privac
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
 | Engine is validated on broadcast, not amateur phone footage | **High** | Wrong rallies/winners erode trust | G-11 validation set; Preview labels; Review & fix; capture guide with test clip |
-| Winner attribution wrong without scoreboard | **High** | Scoreline arguments | Scoreline **Preview** until Checked; don't headline it; free-play mode (G-04) |
+| Winner attribution wrong without scoreboard | **High** | Scoreline arguments | Withhold scoreline until its complete dependency set is Checked; do not rely on Preview to excuse a wrong score; free-play mode (G-04) |
 | Shot types mislabelled | High | Cringe/distrust | Preview; per-shot Fix this; never in a headline |
 | Consent/analyse gate absent (upload auto-starts) | Certain today | Compliance/trust | G-12 draft state; client gate as stopgap |
 | Doubles absent but most amateur play is doubles | **High** | Product misses the central use case | Make G-03 an explicit P1 decision (Q5 in file 00); ship singles/social-game value first |

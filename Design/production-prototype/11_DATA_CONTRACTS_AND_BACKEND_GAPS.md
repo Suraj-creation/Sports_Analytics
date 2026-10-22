@@ -55,8 +55,8 @@ All DTOs carry `schema_version`, `generated_at` and `meta` (`demo`, `model_versi
 // ---------- trust primitives ----------
 type CheckState =            // D5. Derived server-side; the UI never maps engine bands itself.
   | "checked"                // EventStatus human_verified | corrected, or claim built only from such events
-  | "looks_right"            // Band confirmed  (UI shows a Preview tag until bands are calibrated, G-08)
-  | "worth_a_look"           // Band probable
+  | "looks_right"            // Claim type and footage condition validated under G-08/G-11; unchecked
+  | "worth_a_look"           // Unverified candidate, including raw confirmed winner/shot on unvalidated footage
   | "not_enough_to_say";     // Band uncertain|unknown, or sample below minimum → not shown in recap
 
 type Readiness = "available" | "preview" | "not_yet";            // file 00 D10 / §7
@@ -87,7 +87,7 @@ interface MetricValue {                                           // file 06 reg
   readiness: Readiness;
   check: CheckState;
   coverage: Coverage;
-  evidence: EvidenceRef[];                                        // may be empty only for pure descriptives
+  evidence: EvidenceRef[];                                        // required for player-facing match claims; otherwise withhold
   limitations: string[];                                          // plain language
   comparison?: { baseline: "self_comparable" | "previous_match" | "none";
                  baseline_value: number | null; baseline_n: number; comparable: boolean;
@@ -182,10 +182,11 @@ interface ConsentRecord {                                         // D15: four p
 
 | Engine | → | UI |
 |---|---|---|
-| `Band` `confirmed` | → | `looks_right` (+ Preview until calibrated) |
+| `Band` `confirmed` | → | `looks_right` only if claim-type and footage-condition validation passes G-08/G-11; otherwise `worth_a_look` for winner/shot candidates |
 | `Band` `probable` | → | `worth_a_look` |
 | `Band` `uncertain`/`unknown` | → | `not_enough_to_say` (not shown in recap; listed in Review) |
 | `EventStatus` `human_verified`, `corrected` | → | `checked` |
+| Derived score, comparison or milestone | → | `checked` only when **all** dependent events, identity and definition inputs are checked and recomputed; never inherit the chip from one event |
 | `EventStatus` `provisional` | → | excluded from recap; shown in Review queue as "needs a look" |
 | `EventStatus` `retracted` | → | never shown |
 | `Session.status` `created`/`ingesting` | → | `Uploading/Preparing` (separate from analysis) |
@@ -294,24 +295,24 @@ Effort: S ≤ 3 days · M ≈ 1–2 weeks · L ≥ 3 weeks. Priority: **P0** blo
 
 | ID | Gap | Why the UI needs it | Owner | Effort | Pri | **Prototype workaround** |
 |---|---|---|---|---|---|---|
-| **G-01** | **Player identity + accounts**: `PlayerRef`, "which track is me", nicknames, guest-first auth (today: shared passphrase; `P1/P2` are near/far tracks) | *Pick yourself*, "you" anchor (D8), history | API | M | **P0** | Local profile in browser storage; `players[].name` via PATCH |
+| **G-01** | **Player identity + accounts**: `PlayerRef`, "which track is me", nicknames, guest-first auth (today: shared passphrase; `P1/P2` are near/far tracks) | *Pick yourself*, "you" anchor (D8), history | API | M | **P0** | Fixture mapping only; local profile is not authenticated identity for a real upload |
 | **G-02** | **Cross-match store**: per-user match history, comparable-match selection, records, journey, focus | Progress, Records, Story, Explore | API/engine | L | P1 | `FixtureDataSource`; later SQLite tables keyed by user |
 | **G-03** | **Doubles / `PlayerId` generalisation** (ROADMAP #9: `Literal["P1","P2"]` in rules, identity, contact alternation, buffers, API, ~20 web files) | Together, Pair memory, doubles recap | engine+all | L | P2 (P1 if near-term) | Surfaces specced; labelled **Not yet** |
-| **G-04** | **Free-play (unscored) match type** + `Social game`/`Practice` | Most amateur sessions are unscored; BWF fold would fabricate a score (D12) | engine | M | **P0** | Hide score surfaces when `type != match`; count rallies only |
+| **G-04** | **Free-play (unscored) match type** + `Social game`/`Practice` | Most amateur sessions are unscored; BWF fold would fabricate a score (D12) | engine | M | **P0** | Fixture-only or disabled; hiding scores from a BWF-folded result is not a workaround |
 | **G-05** | **Consent ledger, retention, share links, deletion/export jobs** | Consent cards, Privacy Centre, sharing | API | M–L | **P0 (consent)** / P1 | Client ledger with "simulated" labels in demo |
 | **G-06** | **Moment entity**: saved/favourite/visibility/approved-to-share/per-clip consent | Moments, Clip detail, Share | API | M | P1 | Derive from highlights; store flags client-side in demo |
 | **G-07** | **Metric registry** (id, unit, numerator/denominator, `n`, coverage, status, evidence ids; one fold, not two) — ROADMAP #14 | Every number the UI renders (D16) | engine | M | **P0** | Client `derive.ts` computes the few Quick facts with explicit `n` |
-| **G-08** | **Calibrated confidence**: bands are raw model confidence (thresholds 0.85/0.60) | CheckState honesty (D5) | engine/ML | M | P1 | Show **Preview** on all `looks_right` claims |
+| **G-08** | **Calibrated confidence**: bands are raw model confidence (thresholds 0.85/0.60) | CheckState honesty (D5) | engine/ML | M | P1 | Downgrade unvalidated winner/shot candidates to **Worth a look**; Preview alone does not validate a claim |
 | **G-09** | **Geometry gates on metric analytics** (ROADMAP P0 #7): only validated main-camera frames feed distance/heatmaps/zones; foot-jitter smoothing; coverage reported | Court surfaces, distance | engine | S–M | **P0** | Court surfaces Preview; distance **Not yet** |
-| **G-10** | **True landing point from trajectory** (today `landing_court_xy` ≈ receiver's feet) | "Where your shots go" | engine | M | P2 | Preview with caveat copy |
-| **G-11** | **Amateur-footage validation set** (phone, behind-baseline / side-on / high; no scoreboard) with ground truth for rallies, winners, contacts | Capability labels (D10), release gates | ML/QA | L | **P0** | Honest Preview labels; capture guide |
-| **G-12** | **Stages API + draft state + resumable upload**: `POST` today auto-starts analysis; no draft/consent gate; upload is a single XHR | New match flow, honest processing | API | M | **P0** | Client gates consent before the POST; stage mapping from `StatusMsg` |
+| **G-10** | **True landing point from trajectory** (today `landing_court_xy` ≈ receiver's feet) | "Where your shots go" | engine | M | P2 | True landing maps **Not yet**; only an accurately named receiver-position map may be Preview |
+| **G-11** | **Amateur-footage validation set** (phone, behind-baseline / side-on / high; no scoreboard) with ground truth for rallies, winners, contacts | Capability labels (D10), release gates | ML/QA | L | **P0** | Label a technical demo Preview and withhold unsupported claims; a label is not a substitute for release validation |
+| **G-12** | **Stages API + draft state + resumable upload**: `POST` today auto-starts analysis; no draft/consent gate; upload is a single XHR | New match flow, honest processing | API | M | **P0** | Fixture flow; client-only consent is insufficient for a real pilot. Restart-only copy for existing upload |
 | **G-13** | **Notifications** (analysis-ready channel chosen at upload; coach comment; user-set reminder) | Opt-in notifications | API | M | P2 | In-app only |
 | G-14… | **Appended by the audit (file 02) and the analytics catalogue (file 06) — see §8** | | | | | |
 
 ### 6.1 Minimum backend set for a **credible first amateur release** (P0)
 
-G-01 (guest + identity link), G-04 (free play), G-05 (consent gate + share links), G-07 (metric registry for ≈12 Quick/Guided metrics), G-09 (geometry gates), G-11 (validation set + thresholds), G-12 (draft + stages + resumable upload). Everything else can ship as **Preview** or on fixtures.
+For a **real upload pilot**: G-01 (identity), G-05 (server consent and truthful retention/deletion), G-11 (amateur validation for each displayed claim type), G-12 (draft/consent gate and honest upload lifecycle), G-18 (fair Moment selection), G-19/G-20 (resolvable evidence and coverage) and G-25 (me-relative attribution). G-04 is required before real Social game/Practice; G-07 for quantitative claims; G-09 for court metrics; G-14 before promising Undo. Anything else remains fixture-only or hidden, not automatically Preview.
 
 ---
 
@@ -343,7 +344,7 @@ Merged from `02_CURRENT_STATE_AUDIT.md` (G-14 → G-28, with code locations ther
 | **G-17** | Duplicate/misleading heatmap kinds: `targeting` ≡ `landing`; `landing` is the receiver's feet (see G-10) | **H** |
 | **G-18** | **Highlight ranker excludes the loser** (`highlights(player=…)` filters by rally winner) and is pro-calibrated (`longest_rally` needs ≥ 12 shots; pressure/deuce/comeback need a verified score) | **B** |
 | **G-19** | Analytics numbers carry **no `evidence_ids`** (the class docstring promises it; `to_public()` doesn't deliver) | **H** |
-| **G-20** | **Session coverage** ("we followed X of Y rallies / court found on N % of frames") has inputs but no single API | **H** |
+| **G-20** | **Session coverage** needs an independent denominator: detected candidate rallies, tracked rallies, court-valid frames, and unknown/unobservable intervals. Do not calculate followed/(official + unofficial), because official status is not visual coverage. Define how partial rallies and replay cuts count. | **H** |
 | **G-21** | `momentum` truncated to 60 points in `to_public()` while `score_timeline` is full | L |
 | **G-22** | Developer-facing strings reach the UI (`.env`, `bai serve`, "server log", raw API `detail`) | M |
 | **G-23** | Name handling: `shortName` = last whitespace token; no nickname distinct from legal name | M |
@@ -353,7 +354,7 @@ Merged from `02_CURRENT_STATE_AUDIT.md` (G-14 → G-28, with code locations ther
 | **G-27** | Rally "shots" counts **detected contacts**, including misses/unknown strokes — "14-shot rally" can overstate (contact F1 0.941 is synthetic; unmeasured on amateur video) | M |
 | **G-28** | **Audio retained in exported clips** — bystander speech can be shared | M |
 
-Two findings from the audit that matter for trust copy: (1) rule-based stroke confidence is capped at 0.7 (`MAX_CONF`), below the 0.85 `confirmed` threshold, so **no shot can ever read "Looks right"** until a person checks it — shot claims are *Worth a look* at best; (2) rally outcomes score 0.85 (the `confirmed` band) while measured winner accuracy was 61.5 % — the band is miscalibrated (G-08). The delete dialog also states the prepared video stays in the media cache after "Delete match" — contradicts D15 and must be fixed under G-05.
+Two findings from the audit that matter for trust copy: (1) rule-based stroke confidence is capped at 0.7 (`MAX_CONF`), below the 0.85 `confirmed` threshold, so **no rule-classified shot can read "Looks right"** under the current raw band; a person checking the specific shot makes it "Checked" — shot claims are *Worth a look* at best; (2) rally outcomes score 0.85 (the `confirmed` band) while measured winner accuracy was 61.5 % — the band is miscalibrated (G-08). The delete dialog also states the prepared video stays in the media cache after "Delete match" — contradicts D15 and must be fixed under G-05.
 
 ### 8.2 From onboarding (file 03)
 

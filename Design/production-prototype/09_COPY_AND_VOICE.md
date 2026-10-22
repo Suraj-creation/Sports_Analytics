@@ -69,7 +69,7 @@ The player chooses a tone (default **Balanced**). Tone changes **wording and ord
 | 3 | Strength | "Strength: you returned 7 of 9 deep clears." | "You returned 7 of 9 deep clears we could follow. That's a solid part of your game." | "Where did you feel steady today? Here's one place it showed: 7 of 9 deep clears." |
 | 4 | Low evidence | "Too few shots to say." | "We don't have enough examples yet to say anything about this." | "There's too little here to draw a conclusion. Want to look at the clips anyway?" |
 | 5 | Preview shot names | "Shot names are a preview." | "Shot names are a preview — they can be wrong, so tap a rally to check." | "Shot names are still a preview. Does this one match what you remember?" |
-| 6 | After a loss | "Score: 17–21. 12 moments saved." | "Tough scoreline, but there are 12 moments here worth keeping. Start with the long rally." | "How did it feel out there? Whenever you're ready: the long rally, or a pattern to look at." |
+| 6 | After a loss (checked score only) | "The long rally is ready to watch." | "Here is a rally you might want to keep. The score is in Match story if you want it." | "How did that rally feel? Watch it whenever you want, or leave the recap here." |
 | 7 | Personal best | "New personal best: 14 shots." | "A new personal best — 14 shots, up from 11." | "You beat your own 11-shot record. What was different this time?" |
 | 8 | First | "First spotted: cross-court net shot." | "We spotted a cross-court net shot for the first time. Take a look and tell us if it's right." | "Is this your first cross-court net shot? Watch it and tell us." |
 | 9 | Fix prompt | "Check this rally's winner." | "Quick check: is this who won the rally?" | "Does the winner here match what you remember?" |
@@ -390,7 +390,7 @@ No confetti, no "You dominated", no crown.
 | `up.interrupted.resume` | Start again and we'll pick it up from the beginning. |
 | `up.interrupted.noresume` | Your connection dropped. Nothing was saved yet — start the upload again. |
 | `up.title.label` | Name this match (optional) |
-| `up.leave` | You can leave this page once the upload says "Received". |
+| `up.leave` | Once upload says "Received", follow the server-confirmed processing status. Keep this tab open unless it says processing will continue. |
 
 > `up.interrupted.resume` ("pick up from where it stopped") must only be used when resumable upload exists (G-12). Until then use `.noresume`.
 
@@ -523,7 +523,7 @@ No confetti, no "You dominated", no crown.
 | `fix.more.other` | Something else |
 | `fix.warn.score` | Changing the winner updates the score from this rally on. |
 | `fix.save` | Save fix |
-| `fix.ok` | Looks right already |
+| `fix.ok` | I checked this rally |
 | `fix.skip` | Skip |
 | `fix.saved.same` | Thanks — that matches what we found. |
 | `fix.saved.changed` | Thanks. Affected findings will update. |
@@ -704,7 +704,7 @@ No confetti, no "You dominated", no crown.
 |---|---|
 | `PreviewTag` | "Preview — this works, with limits. {reason}" Typical reasons: "Shot names can be wrong." · "Positions are estimates." · "We couldn't confirm the court fit." |
 | `CheckChip` Checked | "You or a reviewer confirmed this." |
-| `CheckChip` Looks right | "Our analysis is fairly sure. Not checked by a person yet." |
+| `CheckChip` Looks right | "This type of finding has been tested on footage like yours. No person checked this one." |
 | `CheckChip` Worth a look | "Our analysis isn't sure. Take a quick look." |
 | `CheckChip` Not enough | "We couldn't tell reliably, so we left it out of your recap." |
 | `CoverageBar` | "What we could see: the parts of the match we followed." |

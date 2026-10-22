@@ -8,7 +8,7 @@
 
 ## 0. The one-paragraph version
 
-An amateur player arrives curious and a little wary: *"Will this make me look bad? Is it a hassle? What are you doing with my video?"* The first run therefore does five things in this order: **(1)** show a realistic **sample recap** before asking anything (D9); **(2)** ask at most **two skippable questions**; **(3)** teach how to film so the footage is usable — as part of the product, not fine print; **(4)** after upload, ask only what the machine cannot know — **which one is you** and **where the court is** — in one tap each when possible; **(5)** get consent **at the moment it matters**, in four separated cards, and hand the player a **first Moment** while the rest of the match is still being analysed. Everything beyond that (nickname, partner, depth, notifications, account) is deferred until the player has seen something worth keeping.
+An amateur player arrives curious and a little wary: *"Will this make me look bad? Is it a hassle? What are you doing with my video?"* The first run shows a realistic sample, asks at most two skippable questions, helps them film, obtains five separate purpose decisions **before upload**, then asks which tracked person is the player and whether the court placement is right. A first Moment appears only when a playable, evidence-backed candidate exists; processing may take time. If none exists, explain why and let the player inspect or select a clip. Nickname, partner, notifications and account are deferred.
 
 > **Success is not "completed onboarding".** It is **activation (D9, Blueprint §1.3):** after the first usable match, the player either *saves a Moment they value* or can *correctly state one finding from its evidence*. Sign-up, tour completion and dashboard views are setup events, not success.
 
@@ -379,10 +379,10 @@ Goal: failures surface **before** a 2 GB upload (Blueprint §7.4).
 | Mode | How | Needs |
 |---|---|---|
 | **A. On-device pre-check (instant)** | Read file metadata: resolution, orientation, duration, size, codec. Warn: portrait video, < 720p, < 1 min, > server limit (`system.limits.max_upload_mb`), unsupported container. | Nothing new |
-| **B. 10-second probe (≈ 5–15 s)** | Upload only the **first 10 s after the first rally-like movement** (or a 10 s slice picked by the player scrubbing locally), call a probe that runs court-line fitting + person detection on ~24 sampled frames, returns a `SuitabilityResult`. | New endpoint (**G-ONB-2**): `POST /api/probe` → `{court: {found, precision, support, elevation_deg}, players: {n_on_court, both_visible}, scene: {main_share}, light: {line_yield}}`. Reuses `propose_corners` / `court_lines` and the 24-frame sampling in `_auto_calibrate`. |
+| **B. 10-second probe (after consent only)** | Once the player has accepted the Analyse/temporary Keep decisions in §6.2, upload a locally chosen 10 s slice to a bounded probe service. Explain that these bytes leave the device, their retention and deletion, and whether the probe can be cancelled. The result is a suitability *estimate*, not a promise of final accuracy. | New endpoint (**G-ONB-2**): `POST /api/probe` behind the same server consent gate as full upload; scoped temporary media with deletion policy. Reuses court/person checks only after phone-footage validation. |
 | **C. Skip** | "Just upload it" → analyse; if bad, `UnsupportedFootageState` appears after court detection with the same fixes | — |
 
-The player picks A+B by default; C is always available and unpunished.
+Before consent, the player gets A only. After consent, B is optional and can precede the full upload; C remains available without penalty. **The remote probe is specified in this capture section but appears in the actual wizard after the §6.2 consent cards.** If B is absent, show filming guidance rather than a fabricated suitability verdict.
 
 ### 5.4 `SuitabilityResult` — three outcomes, always with a fix
 
@@ -472,7 +472,7 @@ Diagram has a text alternative ("The phone sits two to three metres behind the m
 │        ( ) Practice                  │
 └──────────────────────────────────────┘
 ```
-Match type (D12): **Match (scored)** default; **Social game** and **Practice** are offered but, until the engine supports free play (**G-04**), they hide score-derived surfaces and the copy says so: *"We'll find your rallies and moments. We won't keep score."* Title defaults from the file name (existing behaviour: `name.replace(/\.[^.]+$/,"").replace(/[_-]+/g," ")`) and stays editable.
+Match type (D12): **Match (scored)** is the only real-data path today. **Social game** and **Practice** are selectable in a clearly labelled sample flow until G-04 adds true unscored processing. Do not submit either to the BWF scoring pipeline and merely hide its output. The production selector disables those choices with a reason until the backend gate passes. Title stays editable.
 
 YouTube import: kept for parity (`YouTubeCard`), moved behind a disclosure; requires the existing rights acknowledgement; **not** shown on the landing path to avoid implying that analysing other people's matches is the core use.
 
@@ -483,14 +483,14 @@ Shown **once, when the file is chosen and before any bytes are uploaded.** Five 
 ```
 ┌──────────────────────────────────────┐
 │ Before we upload                     │
-│ Four separate choices. Change them   │
+│ Five separate choices. Change them   │
 │ any time in Privacy.                 │
 │                                      │
 │ ┌ Analyse this video          [ON ]┐ │  required
 │ │ We find rallies, shots and       │ │
 │ │ moments. Needed to do anything.  │ │
 │ └──────────────────────────────────┘ │
-│ ┌ Keep the video so I can watch [ON]┐│  required (can choose "delete after analysis" in Privacy)
+│ ┌ Keep the video so I can watch [ON]┐│  required (delete-after-analysis available only after G-05 media-deletion verification)
 │ │ Stored privately so Moments can  │ │
 │ │ play. Only you can see it.       │ │
 │ └──────────────────────────────────┘ │
@@ -521,7 +521,7 @@ Shown **once, when the file is chosen and before any bytes are uploaded.** Five 
 | Card | Default | Required | What changes if declined |
 |---|---|---|---|
 | Analyse this video | On | **Yes** | Nothing is analysed; offer "Keep the video only" (needs card 2) or cancel |
-| Keep the video | On | **Yes** to watch Moments | If off: analyse then discard the video; Moments cannot play; Recap shows stats only; offered as "Delete after analysis" |
+| Keep the video | On | **Yes** to watch Moments | If off: this option is disabled until G-05 verifies deletion of originals, proxies, clips, thumbnails, caches and backups under the stated policy. Until then explain the temporary retention and allow cancel before upload |
 | Save to my history | **Off** | No | Match is analysed but excluded from Progress/Journey/Records; can be added later from the match |
 | Share selected moments | **Off** | No | Share buttons are disabled with a one-line reason + "Turn on in Privacy" (never silently enabled) |
 | Help improve the product | **Off** | No | No difference to the player; never bundled |
@@ -542,22 +542,22 @@ Reuses the current `UploadCard` upload (XHR multipart, `uploadVideo(form, onProg
 ┌──────────────────────────────────────┐
 │ Uploading "Sunday evening game"      │
 │ ████████░░░░░░░░  48%  ·  1.1 / 2.3GB│
-│ You can leave this page — keep the   │
-│ tab open until it reaches 100%.      │  ← true for current XHR upload
-│ [ Pause ]  [ Cancel ]                │
+│ Keep this tab open until the         │
+│ upload reaches 100%.                 │  ← true for current XHR upload
+│ [ Cancel ]                           │
 └──────────────────────────────────────┘
 ```
 
 | State | What the player sees | Why / dependency |
 |---|---|---|
 | Queued/transferring | Real percentage from upload progress; "Uploading" vs "Checking video" (existing labels) | `uploadVideo` |
-| Interrupted | "Connection lost at 48%." **[Resume]** (if resumable) or **[Start again]** with a plain explanation | Resumable upload = **G-ONB-1**; until then the Resume button is absent and copy says "We'll need to start again" |
+| Interrupted | "Connection lost at 48%." **[Resume]** only for a server-confirmed resumable draft; otherwise **[Start again]** with a plain explanation | Resumable upload = **G-ONB-1**; until then the Resume button is absent and copy says "We'll need to start again" |
 | Mobile data | Before starting on a cellular connection: "This is 2.3 GB. Wait for Wi-Fi?" **[Upload now] [Wait for Wi-Fi]** (uses `navigator.connection` where available, else asks once) | Low-bandwidth consideration (§15) |
 | Cancelled | "Cancelled. Nothing was kept." (or what *was* kept, truthfully) | v1 session lifecycle |
 | Duplicate file | "You've already added this video — open it?" (SHA-256 exists in `source.sha256`; the media cache avoids re-encoding) | Prevent duplicates |
 | Server error | Safe message + retry; never stack traces | v1 §6 |
 
-After the transfer, status moves through the engine's states (see §10). The player is taken to **Pick yourself** as soon as the *video is playable* (`ready_to_play`), **not** when analysis ends.
+After the transfer, status moves through the engine's states (see §10). The player is taken to **Pick yourself** when a stable frame and track proposal exist. The current upload endpoint starts analysis immediately; this post-upload choice must not retroactively make earlier results "about you" until the mapping is saved and dependent claims are recomputed (G-01/G-12).
 
 ### 6.4 Telemetry
 `consent_viewed` · `consent_changed {purpose, value}` · `consent_optional_declined {purpose}` · `consent_continue` · `upload_started {size_mb, network_class}` · `upload_interrupted {at_pct}` · `upload_resumed` · `upload_cancelled` · `upload_completed {duration_s}`.
@@ -857,7 +857,7 @@ The engine lets the video **play as soon as the first segment is prepared** whil
 │ Your moments so far                  │
 │ [ 11-shot rally ] [ ░░░ ] [ ░░░ ]    │
 │                                      │
-│ You can leave this page — we'll keep │
+│ Keep this tab open unless we confirm │
 │ going.                               │
 └──────────────────────────────────────┘
 ```

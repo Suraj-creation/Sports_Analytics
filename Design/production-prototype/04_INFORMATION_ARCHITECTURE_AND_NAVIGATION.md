@@ -15,7 +15,7 @@
 5. **The URL is the state.** A player can paste a link to a recap, a filter, or an exact frame (`?f=`), and land in the same place — subject to permission.
 6. **No dead ends.** Every empty, partial, failed or revoked route offers one next step (v1 §6 navigation rules).
 7. **Navigation never creates pressure.** No unread counts, no "streak" badges, no red dots for inactivity. The only indicator is a quiet *ready* dot when an analysis the player started has finished.
-8. **Presets and depth change what is *shown*, never what is *true*** (D2). The same data and the same permissions apply on every layout.
+8. **Presets and depth change what is *shown*, never what is *true*** (D2). Relax, Explore, Improve and Compete are shortcuts over one Recap and one evidence model, not separate products. Switching keeps the current match, scroll context and corrections; it changes ordering and depth only. The same permissions and trust gates apply on every layout.
 
 ---
 
@@ -82,7 +82,7 @@ OPERATOR (not in the player's navigation)
 | `…/deep-dive/story` | Match story | Owner | Matches | `?game=&f=` | Momentum/head-to-head live here (D6) |
 | `…/deep-dive/rallies` | Rally timeline & list | Owner | Matches | `?game=&who=&len=&outcome=&doubtful=1&f=` | |
 | `…/deep-dive/shots` | Shots | Owner | Matches | `?who=&shot=` | Preview |
-| `…/deep-dive/court` | Court maps | Owner | Matches | `?kind=presence\|origin\|landing\|…&who=` | Preview; calibration-gated |
+| `…/deep-dive/court` | Court maps | Owner | Matches | `?kind=presence\|origin\|opponent-met&who=` | Preview; calibration-gated |
 | `…/deep-dive/compare` | Compare matches | Owner | Matches | `?with=<matchId>` | Only comparable pairs offered |
 | `…/deep-dive/ask` | Ask | Owner | Matches | `?q=` | Grounded; citations deep-link `?f=` |
 | `/moments` | All moments | Player | Moments | `?tab=for-you\|favourites\|together&q=&match=` | |
@@ -525,7 +525,7 @@ Success: player can state the comparison and its limit.
 Header preset → **Compete** (1) → `/deep-dive/rallies` (auto) → filter score/shot/player (2–3) → open rally (4) → `RallyDetailPanel` + evidence → `Export` (5).
 
 ### 14.5 Journey E — "Something looks wrong" → **Review & fix**
-Any claim or clip → `Fix this` (1) → `FixSheet`: *wrong rally · wrong player · wrong winner · not a rally* (2) → apply (3) → `ChangeSummaryBanner` shows what changed with Undo. From the Recap's `ReviewBanner`: **Check what we show you** → `/review` queue ordered by what the Recap displays (hero first), max three questions to start.
+Any claim or clip → `Fix this` → `FixSheet` offers only API-backed fixes (winner, official, match start, verify). Unsupported kinds are labelled feedback only after G-32. After persistence, `ChangeSummaryBanner` shows the refetched change; Undo appears only after G-14. G-15 is required for wrong-player/shot/boundary corrections. From the Recap's `ReviewBanner`: **Check what we show you** → `/review` queue ordered by what the Recap displays (hero first), max three questions to start.
 
 ### 14.6 Journey F — "Privacy control"
 Avatar (1) → **Privacy** (2) → `ConsentLedger` → toggle/revoke (3) → effect explained inline → `Export my data` / `Delete` (separate confirm).

@@ -4,7 +4,7 @@
 **Depends on:** `00` (decisions D1–D18, vocabulary, routes, component names) · `01` (behaviour model) · `06` (metric definitions) · `07` (component anatomy) · `09` (copy).
 **Sister files:** `05b` (Deep dive, Review & fix, Place your court) · `05c` (Progress, Social, Settings).
 
-> The core loop is: **Add a match → see what we could follow → watch your best moment → understand one thing (optionally) → save or share what you choose → leave.** Everything on these screens is judged against the question *"Did the player get something they value in under a minute, without being graded?"*
+> The core loop is: **Add a match → see what we could follow → watch an inspectable Moment when one exists → understand one thing (optionally) → keep it privately or share only when approved → leave.** Judge these screens by whether a player can find value without being graded. Time to first value is measured separately from upload and processing time; no sub-minute result is promised.
 
 ---
 
@@ -45,7 +45,7 @@ Depth changes **order, wording and density — never the facts or the evidence s
 
 ### 0.4 `PreviewTag` rules (D10)
 
-A `PreviewTag` is attached to **any surface that depends on a Preview capability** (00 §7): shot types, placement, relative court presence, scoreline *until Checked*, anything calibration-gated. The tag is a word + icon ("Preview ◔"), opens a short explanation ("Works with limits. Here's what to double-check."), and is never colour-only. A surface that depends on a **Not yet** capability is not rendered; a quiet one-line note may say what will appear later.
+A `PreviewTag` is attached to **any displayed surface that depends on a Preview capability** (00 §7): supported shot candidates, placement or relative court presence, provided their claim gates pass. The tag is a word + icon ("Preview ◔"), opens a short explanation, and is never colour-only. A scoreline is **withheld** until its complete dependency set is Checked; Preview does not make an unchecked score safe to display. A surface that depends on a **Not yet** capability is not rendered; a quiet note may say what will appear later.
 
 ### 0.5 Data-source shorthand
 
@@ -100,7 +100,8 @@ Direct URL, `/s/$token` footer ("Make your own"), referral link, sign-out. A sig
 │ [expand]                       │  Preview / Not yet)
 ├────────────────────────────────┤
 │ Private by default             │
-│ Analyse · Keep · Share · Train │  four separate switches shown
+│ Analyse · Keep · History        │  five decisions explained here
+│ Share · Improve models         │  actual choices happen before upload
 ├────────────────────────────────┤
 │ What it costs & needs          │
 │ FAQ · Recording guide · Privacy│
@@ -423,7 +424,7 @@ Grid of 3–4 `MatchCard`s, filters in a left rail or top `FilterBar` with activ
 | Status chip | `Session.status` via `STATUS_LABEL` (rename: *Queued → "Waiting", Preparing video → "Getting your video ready", Ready to play → "Watch now", Analysing → "Reading your match", Analysed → "Ready", Failed → "Needs attention"*) |
 | Progress (processing only) | `analysed_frames / media.n_frames` — shown as a bar only because it is **measured**, never as a time estimate |
 | Rallies, longest | `Analytics.rallies`, `longest_rally_shots` (per-match fetch, cached) |
-| Coverage "Followed 31/36" | derived: analysed rallies / (rallies + unofficial) — new — see G-20 |
+| Coverage "Followed 31/36" | G-20 coverage service with an explicit detected-rally denominator and tracked-duration rule; never derive it by adding unofficial rallies |
 | Opponent / partner name | `Session.players[].name` (+ "me" mapping — new, see G-01) |
 | Match type | new — see G-04 |
 | Saved moments count | new — see G-06 |
@@ -509,10 +510,10 @@ A player right after a game on a phone, or later at a desktop. Fatigue and impat
 │ │ ○ Match   Scored to 21      │ │
 │ │   We'll follow the score.   │ │
 │ ├────────────────────────────┤ │
-│ │ ● Social game  Just rallies │ │
-│ │   No score. Best for fun.   │ │
+│ │ ○ Social game  Not yet     │ │
+│ │   Needs unscored analysis. │ │
 │ ├────────────────────────────┤ │
-│ │ ○ Practice  Drills, feeding │ │
+│ │ ○ Practice  Not yet        │ │
 │ └────────────────────────────┘ │
 │ You can change this later.     │
 │ [ Continue ]        Back       │
@@ -532,7 +533,7 @@ Two columns: left = step content; right = **live preview** (video frame with cou
 | Create session | `POST /api/sessions` (multipart: `file`, `title`, `player1`, `player2`) — existing; type & "me" mapping are **new — see G-04, G-01** |
 | YouTube import | `POST /api/sessions/youtube` (`url`, `player1`, `player2`, `acknowledge_rights`) — existing; enabled by `system.youtube_ingest` |
 | Court proposal | `GET …/calibration/proposal`, `POST …/calibration/auto`, `POST …/calibration` — existing |
-| Test-clip suitability | new — see G-20 (runs auto-calibration + player detection on ~5 s and returns Suitable / Usable with limits / Not supported + reasons) |
+| Test-clip suitability | new — G-ONB-2, after G-05 consent; G-20 supplies coverage definitions, not the probe endpoint. The verdict remains a research estimate until G-11 validates phone footage |
 | Consent | new — see G-05 |
 
 ### Copy
@@ -605,7 +606,7 @@ After upload, Home processing card, Matches card, notification.
 │ ◔ Following rallies   (31 so far)│
 │ ○ Spotting shots (Preview)     │
 │ ○ Picking your moments         │
-│ You can leave — we'll keep going│
+│ Keep this tab open unless confirmed│
 │ [ Notify me when it's ready ]  │
 │ Ready so far: 3 moments ▸      │
 └────────────────────────────────┘
@@ -759,24 +760,24 @@ The sticky video sits left on wide screens; clicking any claim seeks it (existin
 - Everything with a Preview dependency carries `PreviewTag`.
 
 **③ Together**
-- Doubles/pair surfaces are **Not yet** (G-03). Until then this section shows a single quiet card: *"Playing with a friend? Invite them to see this match."* (`InviteLink`, Preview). For Social games it shows the other player's positive moment **only if** that player is a Rally user who consented, or if the match owner chose *Both players* and the other player is anonymous-labelled.
+- Doubles/pair surfaces are **Not yet** (G-03). Until then this section shows a single quiet card: *"Playing with a friend? Invite them to see this match."* (`InviteLink`, Preview). For Social games, another person's attributed Moment appears in a private owner view only when identity and attribution are reliable. Sharing or inviting requires that person's approval; anonymous naming is not consent (G-05).
 
 ### 7.2 Data in
 | UI field | Source |
 |---|---|
 | Title, date, type | `Session.title`, `created_at`, type (new — G-04) |
 | Names, "me" | `Session.players`, mapping (new — G-01) |
-| Scoreline chip | `Analytics.score_timeline[-1].score`, `MatchState.completed_games` via `GET …/state`; shown only for a **Match** type; chip carries Checked/Looks right |
+| Scoreline chip | `Analytics.score_timeline[-1].score`, `MatchState.completed_games` via `GET …/state`; shown only for a scored Match after every contributing winner/official flag and match start is Checked; otherwise withheld |
 | Coverage | derived from `scene` events (`ScenePayload.analysed`), `StatusMsg.degraded`, `Calibration.coverage` / `quality` — plain-language form (G-20) |
 | Hero + strip | `Highlight[]` (existing) re-ranked (G-18); clip file `GET …/exports/clip.mp4?from=&to=` (existing); posters (G-31) |
 | FactTrio values | `Analytics.longest_rally_shots`, `avg_rally_shots`, `rallies`; rallies ≥ 6 shots from `rally_end.payload.n_shots`; shot types spotted from `PlayerStats.strokes` (Preview); `active_play_s` (in API `to_public()`; **add to the TS `Analytics` type**) |
 | CheckChip | `BaiEvent.band`, `status` (D5 mapping) |
 | StoryParagraph / InsightCard | new — see G-29 (claim, claim_type, evidence_refs, metric_definition_id, sample_size, coverage) |
 | Metric definition | new — see G-07 |
-| Feedback | new — see G-30 |
+| Feedback | new — see G-32 (G-30 is preferences/focus) |
 
 ### 7.3 Entry choice (first open)
-A short card above ① on the **first open** of a match whose scoreline is *Checked or Looks right*. It is **identical for every outcome**: no result-dependent copy, no colour, no emoji.
+A short card above ① on the **first open** of a ready match. It does not depend on a scoreline; a checked score requires every contributing winner, official flag and match start to be checked (D5). It is **identical for every outcome**: no result-dependent copy, no colour, no emoji.
 
 > **How would you like to see this?**  
 > ○ **Quick recap** — your moments, in two minutes  
@@ -855,7 +856,7 @@ Special variants:
 `recap_viewed` (depth, preset, coverage), `first_insight_viewed`, `entry_choice_selected`, `coverage_opened`, `finding_opened`, `evidence_clip_opened`, `evidence_played`, `insight_response` (confirm/correct/dismiss/save), `moment_saved`, `share_previewed`, `label_corrected`, `focus_chosen`, `next_step_selected`, `recap_feedback` (useful/not/incorrect), `depth_changed`, `preset_changed`, `report_comprehension` (teach-back when sampled).
 
 ### 7.12 Acceptance criteria
-- **AC-recap-1** The first screen on mobile shows a playable moment above any number.
+- **AC-recap-1** The first screen on mobile shows a playable, evidence-backed Moment above any number when one exists; otherwise it shows a calm why-not state and a player-selected clip path.
 - **AC-recap-2** FactTrio shows ≤ 3 facts; each opens a definition and a clip.
 - **AC-recap-3** Win and loss produce identical layout; no result-dependent colour, icon or animation.
 - **AC-recap-4** The EntryChoice offers the same three options regardless of outcome.
@@ -916,7 +917,7 @@ Desktop: 3–4 column grid; selecting multiple tiles shows a bar *"3 selected �
 - **No scores displayed** on cards (`Highlight.score` is internal ranking, **not shown**; the existing UI shows `h.score.toFixed(1)` — remove for amateurs; keep in Advanced as "Rank score").
 
 ### Interactions
-Tap card → `/moments/$clipId`. Heart toggles favourite. Long-press (mobile) or checkbox (desktop) selects. **Add a moment** → pick a time on the video → creates a manual moment (`Verified: chosen by you`). Lens chips filter. Download via `clip.mp4` (Advanced only; Share dialog covers normal use).
+Tap card → `/moments/$clipId`. Heart toggles favourite. Long-press (mobile) or checkbox (desktop) selects. **Add a moment** → pick a time on the video → creates a manual moment (`Selected by you` — not engine-verified). Lens chips filter. Raw `clip.mp4` download is an operator/technical-demo export until G-05/G-28 add media consent and audio handling. A real player download shows who is visible and what cannot be recalled; it is never a substitute for approval to share.
 
 ### States
 | State | Behaviour |
@@ -945,7 +946,7 @@ Cards are a list of links with titles; selection mode announces counts; each cli
 - **AC-moments-2** No numeric rank score is shown below Advanced.
 - **AC-moments-3** Each moment shows a one-line reason in plain language.
 - **AC-moments-4** Funny/social moments are absent unless the player approved them.
-- **AC-moments-5** A player can add a moment manually when none is verified.
+- **AC-moments-5** In the fixture prototype, a player can select a clip without implying the engine verified it. Real manual saving requires G-06 persistence and a clear player-selected label.
 
 ---
 
@@ -1117,8 +1118,8 @@ Player controls ≥ 44 px, labelled; keyboard operable; transcript-like text des
 ### Acceptance criteria
 - **AC-clip-1** The clip always shows *why it was chosen* in plain language.
 - **AC-clip-2** Overlays are off by default and have a legend.
-- **AC-clip-3** Save is immediate and undoable; share never creates a link without `SharePreviewDialog`.
-- **AC-clip-4** Fix this offers the six categories and shows what changed afterwards.
+- **AC-clip-3** In demo, Save is visibly simulated. On real data it appears only when G-06 persistence works; Share appears only after G-05/G-28 gates and never creates a link without `SharePreviewDialog`.
+- **AC-clip-4** Fix this offers only correction kinds backed by the current API. Unsupported kinds use a clearly labelled feedback path only after G-32; a saved fix shows the persisted change.
 - **AC-clip-5** Arriving from Deep dive shows "Return to analysis" and restores filters and scroll.
 - **AC-clip-6** A revoked shared clip shows a permission state, not an error.
 - **AC-clip-7** Shot labels on the clip carry `PreviewTag` until the classifier is validated.

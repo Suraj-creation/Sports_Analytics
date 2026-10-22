@@ -8,7 +8,7 @@
 
 ## 1. The one-paragraph model
 
-An amateur does not "use a sports analytics platform". They **play badminton with friends or at a club, once to three times a week, in a time-boxed court slot, then go home tired.** Playing is the point. The product is a *guest* in that life: it earns a place only if (a) it asks almost nothing of them on court, (b) it gives them something **delightful and personal within seconds** when they glance at their phone later, (c) it **never makes them feel judged** — by the machine, by friends, or by their own past self — and (d) it quietly offers more depth to the minority who want it. The analytics must be professional-grade *underneath* precisely so that the surface can be **short, kind and trusted**.
+An amateur does not "use a sports analytics platform". They play badminton for varied reasons and may have little time or interest in analysis afterward. Playing is the point. The product earns a place by asking little on court, offering a personal, inspectable Moment when processing and evidence allow, avoiding judgment, and offering depth by choice. Time to a result is a research target, not a promise: current upload and analysis can take much longer than a glance. The analytics must meet a high factual standard so the surface can be short, kind and trusted.
 
 > **Design thesis.** *Sport first, app second. Moment before metric. Mirror, not judge. Depth by invitation.*
 
@@ -38,7 +38,7 @@ People play for different mixes of **enjoyment, social connection, health, maste
 | Need | In badminton terms | The product serves it by | The product harms it by |
 |---|---|---|---|
 | **Autonomy** | "I choose what I look at and whether I look" | Purpose chips, Depth switch, skippable questions, *Just play* mode, per-clip sharing | Forced goals, bundled consent, "you should practise…" |
-| **Competence** | "I can see I did something well / am getting somewhere" | A verified positive moment every match, honest personal bests, attainable *Focus* | Praise without evidence, impossible targets, single-match "improvement" claims |
+| **Competence** | "I can recognise something I did or want to revisit" | An evidence-backed positive moment when one can be found; otherwise an honest coverage explanation, player-selected clip, or quiet recap. Personal bests require comparable history. | Invented praise, impossible targets, single-match "improvement" claims |
 | **Relatedness** | "This is shared with my people, and nobody's embarrassed" | Pair memory, consented sharing, friendly language about partners | Rankings, blame in doubles, exposing a friend's mistake |
 
 Six outcomes the product is *for* (from the amateur brief): **enjoyment · personal progress · social connection · physical activity (qualified) · confidence and comfort · sustainable participation.** Section 8 maps each to surfaces and measures.
@@ -176,7 +176,7 @@ A lost rally after a shot does not show the shot caused the loss. Use *associate
 |---|---|---|
 | A **Moment** that isn't really good | Low | "Why this was picked" + swap; no claim of "best" without a definition |
 | **Which person is you** | **High** | Mandatory *Pick yourself* with visible confirmation; easy re-map |
-| **Rally winner / scoreline** | **High** (arguments start here) | Scoreline shows **Preview** until Checked; Review & fix first; "from the scoreboard" label when OCR-derived |
+| **Rally winner / scoreline** | **High** (arguments start here) | Withhold scoreline until all contributing winners, official flags and match start are Checked; Review & fix first. Label a genuinely OCR-derived observation by its source |
 | **Shot type** | Medium | **Preview**; per-shot *Fix this*; never in a headline |
 | **Distance, speed, calories** | High | **Not yet**; calories/fitness never from video |
 | **A personal best that isn't** | High (public pride) | Needs verified events and a stable definition; delay recognition until Checked |

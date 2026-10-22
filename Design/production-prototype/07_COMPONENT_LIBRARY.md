@@ -182,7 +182,7 @@ Everywhere: EmptyState · LoadingSkeleton · PartialAnalysisNote · FailedState 
 ### 3.1 Core types (new file `apps/web/src/lib/trust.ts`)
 
 ```ts
-import type { Band, EventStatus, PlayerId } from "@/lib/types";
+import type { Band, EventStatus } from "@/lib/types";
 
 export type Depth = "quick" | "guided" | "advanced";
 export type Preset = "relax" | "explore" | "improve" | "compete";
@@ -204,11 +204,15 @@ export interface EvidenceRef {
 export type Absent = { kind: "missing" | "not_measured" | "not_applicable" | "insufficient"; reason: string };
 export type Measured<T> = T | Absent;
 
-/** D5 mapping. retracted events are filtered out upstream. */
-export function checkStateOf(e: { band: Band; status: EventStatus }): CheckState {
+/** D5 mapping for a single event. Aggregates also need every dependency checked. */
+export function checkStateOf(
+  e: { band: Band; status: EventStatus },
+  gate: { claimTypeValidatedOnThisFootage: boolean },
+): CheckState {
+  if (e.status === "retracted" || e.status === "provisional") return "not_enough";
   if (e.status === "human_verified" || e.status === "corrected") return "checked";
-  if (e.band === "confirmed") return "looks_right";
-  if (e.band === "probable") return "worth_a_look";
+  if (e.band === "confirmed" && gate.claimTypeValidatedOnThisFootage) return "looks_right";
+  if (e.band === "confirmed" || e.band === "probable") return "worth_a_look";
   return "not_enough";
 }
 
@@ -300,7 +304,7 @@ interface CheckChipProps {
 | State | Icon | Word | Border | Fill | Tooltip (tap on touch) |
 |---|---|---|---|---|---|
 | `checked` | double tick | Checked | solid | tint of `--strength`? no — **neutral ink tint** (checking is a human act, not "good") | "You or a reviewer confirmed this." |
-| `looks_right` | tick | Looks right | solid | none | "Our analysis is fairly sure. Not checked by a person yet." |
+| `looks_right` | tick | Looks right | solid | none | "This type of finding has been tested on footage like yours, but no person checked this one." Only after G-08/G-11 for that claim type and footage condition. |
 | `worth_a_look` | half dial | Worth a look | dashed | none | "Our analysis isn't sure. Take a quick look." |
 | `not_enough` | question | Not enough to say | dashed + hatch | hatch | "We couldn't tell reliably, so we left it out of your recap." |
 
@@ -707,7 +711,7 @@ interface MomentCardProps {
 │ ▸ Something else is wrong                      │  → wrong person / wrong shot / bad clip / other
 │ ⚠ Changing the winner updates the score from   │
 │   here on.                                     │
-│ [Save fix]  [Looks right already]  [Skip]      │
+│ [Save fix]  [I checked this rally]  [Skip]      │
 └──────────────────────────────────────────────┘
 ```
 
@@ -733,7 +737,7 @@ interface ChangeSummary { affected: { label: string; before: string; after: stri
 
 **Behaviour**
 
-1. "Looks right already" calls `api.verifyEvent` → status `human_verified` → chip `Checked`.
+1. "Looks right already" is offered only after the player watched the evidence and the action identifies the exact event being checked. It calls `api.verifyEvent` and changes only that event to `Checked`; dependent aggregate claims retain their own gate (D5).
 2. Winner change calls `api.correctWinner`; the engine re-folds every later point. The UI waits for the next `analyticsVersion` bump (store counter) then computes the **before/after diff** from the cached analytics (`useAnalytics` previous data via `placeholderData`) → `ChangeSummaryBanner`.
 3. "Not part of the game" → `api.setRallyOfficial(false)`; "Match starts here" → `api.setMatchStart(frame)` — offered only when the rally is the first in the list.
 4. `wrong_player`, `wrong_shot`, `bad_clip`, `other` are **feedback events** until the API supports them (gap G-15 in file 11): the sheet says "Thanks — noted. This won't change your numbers yet." Never promise a fix that the backend cannot make (v1 rule).
@@ -772,7 +776,7 @@ interface ChangeSummary { affected: { label: string; before: string; after: stri
 ```
  ✎ Updated after your fix        Today 18:42
  • Score after rally 14: 11–9  →  10–10      • 2 moments re-checked
- [See what changed ▾]                [Undo]   [✕]
+ [See what changed ▾]                [✕]   (Undo only after G-14)
 ```
 
 **Props.** `summary: ChangeSummary; at: string; onUndo?: () => void; onDismiss(): void`. **Rules:** persists until dismissed or until the next fix; lists affected claims by name (Doc 06 `metric` ids → labels); if the correction removes a Moment/claim, says so ("One moment was removed because it depended on that rally"). **A11y:** `role="status"`; `Undo` is a button with a visible countdown only if time-limited. **Copy:** "Updated after your fix"; "Thanks. Affected findings have updated." **Used by:** Recap, Deep dive, Progress (when a past match changes a trend: "This changes your Week 6 comparison").
@@ -848,13 +852,13 @@ interface PlaceYourCourtProps {
 
 ### 7.3 `ConsentToggle` / `ConsentLedger` / `ConsentCards` (deep)
 
-**Purpose.** Four separate permissions plus training (D15). Never bundled, never pre-ticked beyond what is needed to run the requested analysis.
+**Purpose.** Five distinct purpose decisions: four product permissions plus a separate model-improvement opt-in (D15). Never bundled, never pre-ticked beyond what is needed to run the requested analysis.
 
 | Permission id | Plain label | Default | Why it exists |
 |---|---|---|---|
 | `analyse` | "Analyse this video" | **on at upload** (required to proceed; can decline = cancel) | essential service |
-| `store` | "Keep the video so I can watch it again" | on | playback needs it; off = delete after analysis |
-| `history` | "Add the results to my history" | on | progress/journey |
+| `store` | "Keep the video so I can watch it again" | on | playback needs it; off = delete after analysis only after G-05 implements and verifies media deletion |
+| `history` | "Add the results to my history" | **off** on first use | progress/journey; a prior explicit choice may pre-fill later uploads |
 | `share` | "Let me share chosen moments with people I pick" | **off** | per-clip approval still required |
 | `train` | "Help improve the product with this video" | **off, separate** | never bundled |
 
@@ -900,7 +904,7 @@ Visual: the existing `Toggle` in `VideoStage.tsx` (`role="switch"`, `aria-checke
 **Anatomy**
 
 ```
- Getting your match ready                       You can leave — we'll keep working.
+ Getting your match ready                       Keep this tab open unless the server confirms background processing (G-ONB-9).
  ✓ Video received
  ✓ Video prepared                  (ingesting 100 %)
  ● Following the players and shuttle   61 %  · about 4 min left   (frontier / n_frames; ETA from rate_x only if rate_x is stable)
@@ -1070,12 +1074,12 @@ interface RallyTimelineProps {
 
 - **`ShotMix`** (from `StrokeMix`): per-shot-type bars with counts. Amateur default is **"Shots you played"** (single colour `--you`), not P1/P2 pairs; opponent bars appear in `variant="compare"`. Always **Preview**; includes "Shot names can be wrong — tap a rally to check". Unknown shots are excluded and counted in a footnote ("12 shots we couldn't name"). Table view required.
 - **`ShotRepertoireGrid`:** the 12-stroke ontology as a grid of tiles: *Spotted* (first date + clip) vs *Not spotted yet* (neutral, never "locked"). "Spotted ≠ mastered" line permanently visible. No count-based "completion %". Tiles open `EvidenceChip`. Preview.
-- **`ScoreStory`:** the score timeline as one sentence + a minimal strip ("You led most of game 1; it tightened after 14–14") using `score_timeline`; shown only for Match type and when winners are Checked/Looks right; hidden otherwise (D6, D12).
+- **`ScoreStory`:** the score timeline as one sentence + a minimal strip ("You led most of game 1; it tightened after 14–14") using `score_timeline`; shown only for Match type when the entire score dependency set is Checked; hidden otherwise (D6, D12).
 - **`MomentumChart`** (from `Momentum`): kept as is in Advanced; copy "Rally-by-rally lead". Hover tooltip kept; add text summary; P1/P2 colours allowed (compare). Not shown in Quick/Guided.
 - **`HeadToHead`** (from `H2HRow` table): Advanced only; labelled "Side by side"; win-rate row removed; points/winners/errors rows keep their labels but "Errors (out)" → "Shots that went out", "Errors (net)" → "Shots into the net"; colour pair P1/P2 allowed.
 - **`CompareMatchesPicker`:** pick two *comparable* matches (same type, similar camera); incompatible choices are disabled with the reason ("Different camera angle — court positions aren't comparable"). Props: `matches: MatchSummary[]; value: [id,id]; onChange`. Uses `useComparable`.
 - **`AskPanel`** (from `AskTab`): renamed "Ask about this match". Keeps grounded answers and `EvidenceChip variant="citation"`, `Bold` markup, provider-missing note (reworded: "Written answers need a language model on this server — you'll still get facts from your match."). Suggestions rewritten in file 09 (not "What should P1 change"). Never surfaces `provider`/`model` outside Advanced. Retains `[[ev:…]]`/`[[kb:…]]` parsing.
-- **`ExportList`** (from `ExportTab`): "Take it with you": **Match story (PDF)**, **Rallies (spreadsheet)**, **Clip (video)** are Quick-visible; Event log, Summary JSON, Classic CSV are Advanced. Descriptions in plain words; download via existing `exportUrl`. PDF content spec in Doc 06 §9.
+- **`ExportList`** (from `ExportTab`): "Take it with you": **Match story (PDF)**, **Rallies (spreadsheet)**, **Clip (video)** become Quick-visible only when G-05/G-28 export permissions and media handling are enforced; otherwise a technical-demo export remains in Advanced and is labelled. Event log and Summary JSON stay Advanced. Descriptions explain who appears and what cannot be recalled; downloads use `exportUrl` only after the gate passes. PDF content spec in Doc 06 §9.
 
 ---
 
@@ -1400,10 +1404,10 @@ The screen specs needed 32 components that file 00 §6 did not list. They are ca
 
 | Component | Purpose | Key props | Behaviour and states | A11y / copy | Evolve / new | Used by | Pri |
 |---|---|---|---|---|---|---|---|
-| `EntryChoice` | Gate on opening a recap: **Quick recap · Deep review · Review later** (R5) | `onChoose(choice)`, `remember?: boolean` | Shown once per match, only when the player chose to see it or after a lost scored match; identical wording and layout after a win ("How would you like to look at this?"). *Review later* parks the match on Home with no nag. Never shows the score | Radio-card group, arrow keys; no result-dependent colour or confetti | New | Recap | P1 |
-| `MatchTypePicker` | Choose **Match · Social game · Practice** (D12) | `value`, `onChange`, `disabledTypes[]` | Each card says what you will and will not get ("Social game: rallies and Moments, no score"). Until G-04 ships, Social/Practice hide score surfaces and show a Preview tag | Radio group; descriptions linked by `aria-describedby` | New | New match | P0 |
+| `EntryChoice` | Gate on opening a recap: **Quick recap · Deep review · Review later** (R5) | `onChoose(choice)`, `remember?: boolean` | Shown on first open of a ready match independent of score or outcome; identical wording and layout for every result ("How would you like to look at this?"). *Review later* parks the match on Home with no nag. Never shows the score | Radio-card group, arrow keys; no result-dependent colour or confetti | New | Recap | P1 |
+| `MatchTypePicker` | Choose **Match · Social game · Practice** (D12) | `value`, `onChange`, `disabledTypes[]` | Each card says what you will and will not get ("Social game: rallies and Moments, no score"). Until G-04 ships, Social/Practice are disabled on real uploads and may be explored only with labelled fixtures | Radio group; descriptions linked by `aria-describedby` | New | New match | P0 |
 | `LensChips` | Filter Moments by lens (Longest · Saved it · Net duel · Variety · Close finish · First · Personal best · Fun · Partner) | `lenses`, `active[]`, `counts` | Multi-select; lenses with 0 items are hidden, not greyed; "Partner" absent until doubles (Not yet) | `aria-pressed`; counts in the accessible name | New | Moments, Clip detail | P0 |
-| `ScoreChip` | The scoreline as **context** (D6): small, neutral, never a headline | `games: [number, number][]`, `check: CheckState`, `shown: boolean` | Neutral colours for both sides (no red/green); when `check` is not `checked` it appends a `CheckChip` and a Preview tag; hidden entirely for Social/Practice and when the score is `not_enough_to_say` | Text such as "Game 1: 21–17"; no colour-only encoding | Evolve `ScoreBug` styling (broadcast bug becomes a quiet chip) | Recap header, MatchCard | P0 |
+| `ScoreChip` | The scoreline as **context** (D6): small, neutral, never a headline | `games: [number, number][]`, `check: CheckState`, `shown: boolean` | Neutral colours for both sides (no red/green); shown only for scored Match when the whole score dependency set is `checked`; otherwise show a review prompt without a numeric score. Hidden for Social/Practice | Text such as "Game 1: 21–17"; no colour-only encoding | Evolve `ScoreBug` styling (broadcast bug becomes a quiet chip) | Recap header, MatchCard | P0 |
 | `FilterBar` | Matches / Moments filters (type, date, status, lens, player) | `facets`, `value`, `onChange`, `activeCount` | Desktop inline chips with active count and Clear; syncs with URL query (file 04 §6) | Visible "n filters active" text; Clear is a button | New | Matches, Moments | P0 |
 | `FilterSheet` | Mobile bottom-sheet version of `FilterBar` | same as `FilterBar` | Radix Dialog as bottom sheet; Apply/Reset; focus returns to the trigger | Focus trap; Escape closes | New (Radix `dialog`) | Matches, Moments (mobile) | P0 |
 | `FavouriteButton` | Save a Moment privately | `momentId`, `value`, `onChange` | Optimistic toggle with a 5-second undo toast; **saving never changes visibility** (copy: "Saved to your Moments. Only you can see it.") | `aria-pressed`, label "Save this Moment" | New | MomentCard, Clip detail | P0 |

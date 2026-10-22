@@ -103,7 +103,7 @@ Deep link: `SessionSearch { f?: number }` → `useDeepLink` seeks to a frame. **
 | `Button` (primary/secondary/ghost/danger, sm/md, busy) | `h-8`/`h-10` | **KEEP** | Raise targets to 44 px on touch (file 08) |
 | `IconButton` (label required) | `size-9`, `aria-label` + `title` + `aria-pressed` | **KEEP** | Enforce ≥ 44 px on mobile |
 | `Spinner`, `Meter` (progressbar role) | | **KEEP** | `Meter` must never show a fabricated percentage (see §6 R-12) |
-| `BandChip` | solid = confirmed, outlined + "probable", dashed + "uncertain" | **RESHAPE** → `CheckChip` | Same shape language (non-colour encoding ✓). Words become Checked / Looks right / Worth a look (D5) |
+| `BandChip` | solid = confirmed, outlined + "probable", dashed + "uncertain" | **RESHAPE** → `CheckChip` | Same shape language (non-colour encoding ✓). Words become claim-specific Checked / Looks right / Worth a look; raw winner bands stay Worth a look until validated (D5) |
 | `PlayerDot` | P1 blue / P2 orange | **ADVANCED** | Only in Deep dive compare (D8) |
 | `Empty`, `ErrorNote` | Title+body; red alert box with raw `error.message` | **RESHAPE** | `ErrorNote` echoes `detail` strings from the API ("see the server log") — needs a friendly-error mapper · D18 |
 | `Field`, `inputClass`, `Kbd` | | **KEEP** | |
@@ -322,7 +322,7 @@ Behaviour already right: strict JSON tools, every number must appear in a tool r
 
 | # | A UI element that would imply… | Why the engine cannot back it today | Mitigation (label) |
 |---|---|---|---|
-| R-1 | "You won / lost" as a headline | Rally-winner accuracy 61.5 % (8/13) on the only real-video check, before OCR; amateur video has no scoreboard | Scoreline shown only after **Checked** or labelled Preview (D5, D11) |
+| R-1 | "You won / lost" as a headline | Rally-winner accuracy 61.5 % (8/13) on the only real-video check, before OCR; amateur video has no scoreboard | Withhold score-derived claims until all contributing winners, official flags and match start are checked. Preview alone is insufficient (D5, D11). |
 | R-2 | Shot names ("you hit 11 smashes") | Rule classifier `MAX_CONF 0.7`; learned model is a placeholder | Preview; "spotted"; never counts in headlines |
 | R-3 | "Where your shots land" | `landing_court_xy` is the receiver's feet | Rename or hide until G-10 |
 | R-4 | "You covered 1.2 km" | Ungated, unsmoothed distance | **Not yet** (N) |
@@ -362,7 +362,7 @@ Behaviour already right: strict JSON tools, every number must appear in a tool r
 ## 8. Quick wins available without backend work
 
 1. Rename and re-order surfaces (Matches/Recap/Deep dive) behind a feature flag; keep every existing component.
-2. Replace `BandChip` words with Checked / Looks right / Worth a look and add the Preview tag.
+2. Replace `BandChip` with claim-specific trust states: human-checked event → Checked; unvalidated winner/shot → Worth a look; uncertain → withhold. Add a separate Preview capability tag; do not map a raw `confirmed` band to Looks right.
 3. Default overlay layers and `waitForAnalysis` by Depth.
 4. Hide `distance_m`, `targeting`, numeric highlight score, `legacy.csv`.
 5. Build the **fixture-driven** Home, Progress, Records, My story, Explore, Together screens with `DemoBanner` — they need no engine change and let research start.

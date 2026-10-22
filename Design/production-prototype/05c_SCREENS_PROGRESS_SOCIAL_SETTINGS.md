@@ -18,13 +18,14 @@ Almost everything in this file needs data that **does not exist yet**: a profile
 | Focus + Reflection | **Preview** | G-30 (preferences/focus store), G-29 (insights) |
 | Together (singles friends) | **Not yet** | G-01 profiles, G-05 consent ledger, G-05 share/invite |
 | Together (doubles pair) | **Not yet** | + G-03 doubles |
-| Share dialog / `/s/$token` | **Preview** (save-to-phone works now via `clip.mp4`; links need G-05) | G-05, G-05 |
+| Share dialog / `/s/$token` | **Fixture-only preview**; existing `clip.mp4` is a raw local export, not consented sharing | G-05 participant approval, redaction and server-enforced links; G-28 audio safety |
 | Settings & Privacy Centre | **Preview** (UI + local state) | G-05, G-30, G-05 |
-| Help / Feedback | **Available** | — |
+| Help | **Available** as static content | Metric definitions need G-07 |
+| Feedback | **Not yet** until intake exists; fixture form may demonstrate it | G-32 |
 
-**Rule for Not-yet screens:** the route renders, shows the screen's purpose and a quiet "Coming later" note, and — in the prototype — a fully interactive fixture-driven version behind a `DemoBanner`. No Not-yet screen ever shows real-looking personal data as if it were real.
+**Rule for Not-yet screens:** the route shows its purpose and a quiet "Coming later" note. Interactive fixture journeys live only in an explicitly entered sample/demo area with a persistent `DemoBanner`; a real player route must not quietly switch to fictional personal data. No Not-yet screen ever shows real-looking personal data as if it were real.
 
-Proposed gap IDs used here (authoritative list in `11`; see also 05a §0.5): **G-01** profile · **G-03** doubles · **G-02** cross-match store · **G-05** consent ledger · **G-06** Moment entity · **G-05** share links · **G-01** "me" mapping · **G-07** metric registry · **G-29** insight service · **G-30** preferences/focus/notifications · **G-13** notification delivery · **G-05** data export/deletion jobs · **G-32** feedback intake with reference IDs.
+Canonical gap IDs used here (file 11): **G-01** identity/profile · **G-02** cross-match store · **G-03** doubles · **G-05** consent, sharing and deletion · **G-06** Moment entity · **G-07** metric registry · **G-13** notification delivery · **G-28** export audio safety · **G-29** insight service · **G-30** preferences/focus · **G-32** feedback intake. G-01 also covers the "me" mapping; repeated IDs here refer to the same gap, not new work.
 
 ---
 
@@ -173,7 +174,7 @@ Desktop: card grid with a detail drawer showing definition, source match, replay
 ### Records catalogue (each with an exact definition in 06)
 | Record | Scope | Label |
 |---|---|---|
-| Longest rally in a match | shots, verified rally boundaries | Available once Checked/Looks right |
+| Longest rally in a match | shots, verified rally boundaries | Preview until amateur-footage validation; a personal best additionally needs checked event evidence and comparable history |
 | Rallies of 6+ shots in a match | count | Available |
 | Most shot types spotted in a match | distinct types with ≥ 3 verified examples | Preview |
 | Longest defensive sequence (from the back, kept alive) | shots | Preview |
@@ -574,7 +575,7 @@ All fields are labelled; reflection is a single question with a "Skip" button of
 
 ## 7. Together — `/together`, `/together/$partnerId`  *(Not yet)*
 
-> **Availability: Not yet.** v1 = **friends playing singles** (needs G-01/G-05/G-05); v2 = **doubles pair** (adds G-03). The screen is designed now; the prototype renders it from fixtures.
+> **Availability: Not yet.** v1 = **friends playing singles** (needs G-01/G-05); v2 = **doubles pair** (adds G-03). The screen is designed now; the prototype renders it from fixtures.
 
 ### Purpose
 Celebrate **shared memories** — best rallies together, joint milestones, approved clips — **without blame** and **without exposing anyone's private stats**. "Pair memory" is the shared unit; individual and pair data are always visually and structurally distinct.
@@ -668,7 +669,7 @@ Consent rows are switches with descriptive labels; unlink uses an accessible dia
 - **AC-together-2** A pair moment requires both approvals.
 - **AC-together-3** Unlink states what remains with each person.
 - **AC-together-4** No copy assigns blame to a partner.
-- **AC-together-5** The screen is labelled Not yet until G-01/G-05/G-05 ship.
+- **AC-together-5** The screen is labelled Not yet until G-01/G-05 ship.
 
 ---
 
@@ -707,14 +708,14 @@ Consent rows are switches with descriptive labels; unlink uses an accessible dia
 
 **Components used:** `SharePreviewDialog`, `ShareAudiencePicker`, `ConsentRow`, `ClipPlayer` (preview), `ActiveLinksList` (in Settings), `PreviewTag`.
 
-**Data in:** the `Moment` (G-06); clip file `GET …/exports/clip.mp4?from&to` (existing, for *save to phone*); link creation `POST /api/…/share` — new (G-05: token, audience, expiry, download flag, redactions); participant approvals (G-05).
+**Data in:** the `Moment` (G-06); clip file `GET …/exports/clip.mp4?from&to` (existing raw export; gated for player download by G-05/G-28); link creation `POST /api/…/share` — new (G-05: token, audience, expiry, download flag, redactions); participant approvals (G-05).
 
 **Rules:**
 - **Default audience = Only me.** The dialog never pre-selects a public link.
 - **Show exactly** what is included: footage, whether score/stats/names appear, identifiable people, recipients/access, expiry, download permission, how to revoke and what can't be recalled.
 - **Strip by default:** hidden analytics and the score are **off**; the player opts them in.
 - **Consent gates:** funny/embarrassing moments need **explicit per-clip approval** (a separate tick); an opponent/partner in the clip who hasn't approved → warning and a *"Blur / trim / share only me"* option (blur where feasible); **sharing a clip never changes the analysis or training consent** (copy states this).
-- **Save to phone** (download of `clip.mp4`) is offered as the most private option and works **now**.
+- **Save to phone** is a local-copy choice only after the player sees who appears, hears any audio, and the G-05/G-28 export gate passes. It is never described as permission to forward the file. In fixture demos it is simulated.
 - Link default expiry **7 days**; options 24 h / 7 d / 30 d / never (never requires an extra confirm).
 
 **Copy:**
@@ -807,7 +808,7 @@ AvatarMenu, Recap "Shown because you chose… Change", Share dialog, Help, notif
 Desktop: left list, right panel; each panel ends with a "What changes if I…?" note.
 
 ### 9.1 Profile — `/settings/profile`
-**Fields:** nickname (editable anywhere; used in recaps), optional avatar (only if supported), **play mode** (singles · doubles · both), **self-described level** (new · casual · regular · competitive · coach/other — optional, used for *wording*, never as a rank), **language**. **Not asked:** age, health, dominant hand (only if a validated analysis needs it — none today), gender. **Data:** new (G-01).
+**Fields:** nickname (editable anywhere; used in recaps), optional avatar (only if supported), **preferred play mode** (singles · doubles · both; preference does not imply analysis support), **self-described level** (new · casual · regular · competitive · coach/other — optional, used for *wording*, never as a rank), **language**. **Not asked:** age, health, dominant hand (only if a validated analysis needs it — none today), gender. **Data:** new (G-01).
 
 ### 9.2 Preferences — `/settings/preferences`
 | Control | Options | Effect |
@@ -843,7 +844,7 @@ People
 Retention
  Video kept for: [30 days ▾] · Derived stats: kept until you delete
 ```
-**Rules:** four separate permissions (analyse · keep · share · train) + per-clip share approvals; **model-improvement is off by default and separate**; every switch shows **what changes now** vs **what needs a background job**; revoking *share* blocks future shares immediately and offers to **stop active links**; analysis consent is required for processing (turning it off stops new analyses; existing results stay until deleted).
+**Rules:** five separate decisions (analyse · keep media · save history · share · improve models) + per-clip share approvals; **model-improvement is off by default and separate**; every switch shows **what changes now** vs **what needs a background job**; revoking *share* blocks future shares immediately and offers to **stop active links**; analysis consent is required for processing (turning it off stops new analyses; existing results stay until deleted).
 **Data:** consent ledger (G-05: `purpose`, `status`, `captured_at`, `policy_version`, `revoked_at`); active links (G-05); retention (G-05).
 **Copy:** *"Private by default. Analysing a video doesn't mean sharing it or using it to train anything."*; *"Turning this off stops new matches being analysed. Your past results stay until you delete them."*
 
@@ -899,7 +900,7 @@ Settings are standard forms; each switch has a visible label and description; fo
 - **AC-settings-2** Every permission states what changes immediately and what needs a job.
 - **AC-settings-3** Changing Tone changes wording/order only; evidence and limits are identical.
 - **AC-settings-4** No notification permission is requested without a reason; no inactivity notification exists.
-- **AC-settings-5** Delete explains what is removed and what is not (including media cache).
+- **AC-settings-5** Delete states actual originals, derived media, cache and backup retention; it never says "deleted" while media remains in cache. The control is gated on G-05 server deletion jobs.
 - **AC-settings-6** Demo export/delete says "simulated".
 - **AC-settings-7** "Show all" restores everything personalisation has hidden.
 
@@ -1105,19 +1106,17 @@ Legend: **✓** designed · **–** not applicable · **N** screen is *Not yet* 
 
 | Gap | Used here for |
 |---|---|
-| G-01 | Profile, nickname, partner identity |
+| G-01 | Profile, nickname, "me" mapping and partner identity |
 | G-03 | Doubles (Together v2, Doubles Duo) |
 | G-02 | Cross-match store: Progress, Records, Shot Explorer, My story, Explore |
-| G-05 | Consent ledger: Privacy Centre, Share approvals, Together |
+| G-05 | Consent ledger, participant approvals, share links/invites, data export/deletion jobs and media-cache deletion semantics |
 | G-06 | `Moment` entity (library, favourites, visibility) |
-| G-05 | Share links, invites, `/s/$token` |
-| G-01 | "Me" mapping |
 | G-07 | Metric registry (definitions, versions, n, denominators) |
 | G-29 | Insight service (claims with evidence) for Focus offers |
 | G-30 | Preferences, focus store, notification settings |
 | G-13 | Notification delivery |
-| G-05 | Data export/deletion jobs; media-cache deletion semantics |
 | G-32 | Feedback intake with reference IDs |
+| G-28 | Audio stripping/redaction for exported or shared clips |
 
 ## 15. Components named here that are not in `00 §6`
 
