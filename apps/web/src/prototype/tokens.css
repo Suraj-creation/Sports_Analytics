@@ -1,0 +1,356 @@
+@import "tailwindcss";
+@import "@fontsource-variable/archivo/wdth.css";
+
+/* The prototype lives beside the production app and shares none of its CSS.
+   Token values are taken verbatim from Design/production-prototype/08_VISUAL_DESIGN_SYSTEM.md §3,
+   where every hex was computed for WCAG 2.x contrast and re-checked under Machado-2009
+   colour-vision simulation. Do not adjust a hex by eye — re-run 08 Appendix A. */
+
+@source "../../src/prototype";
+
+/* ───────────────────────── raw theme variables ───────────────────────── */
+
+:root,
+:root[data-theme="light"] {
+  color-scheme: light;
+  --c-canvas: #f6f3ec;
+  --c-well: #0c2620;
+  --c-surface: #ffffff;
+  --c-surface-raised: #ede8dc;
+  --c-edge: #d6cfbf;
+  --c-edge-strong: #7e7869;
+  --c-ink: #14211d;
+  --c-muted: #47544f;
+  --c-faint: #5e6b66;
+  --c-primary: #0b6e6e;
+  --c-primary-hover: #095a5a;
+  --c-on-primary: #ffffff;
+  --c-you: #0b7466;
+  --c-partner: #a415c1;
+  --c-other: #3a3f4a;
+  --c-evidence: #1d4ed8;
+  --c-strength: #166534;
+  --c-opportunity: #9a4a07;
+  --c-uncertain: #475569;
+  --c-corrected: #6d28d9;
+  --c-error: #b91c1c;
+  --c-live: #0b7466;
+  --c-shuttle: #ffffff;
+  --c-court-floor: #e4efe6;
+  --c-court-line: #1f6f5b;
+  --c-p1: #2d7fd3;
+  --c-p2: #c55a12;
+  --shadow-pop: 0 8px 24px rgb(20 33 29 / 0.14), 0 1px 0 rgb(20 33 29 / 0.06);
+}
+
+:root[data-theme="dark"],
+[data-theme="dark"] {
+  color-scheme: dark;
+  --c-canvas: #103129;
+  --c-well: #0c2620;
+  --c-surface: #18221f;
+  --c-surface-raised: #1f2b27;
+  --c-edge: #2a3833;
+  --c-edge-strong: #74877f;
+  --c-ink: #e8efea;
+  --c-muted: #a9bab2;
+  --c-faint: #8da098;
+  --c-primary: #e8efea;
+  --c-primary-hover: #ffffff;
+  --c-on-primary: #0c2620;
+  --c-you: #4fd6c4;
+  --c-partner: #e27bf2;
+  --c-other: #7c8794;
+  --c-evidence: #7da7ff;
+  --c-strength: #5fd38a;
+  --c-opportunity: #f0b454;
+  --c-uncertain: #9fb0c4;
+  --c-corrected: #b79cff;
+  --c-error: #f26b68;
+  --c-live: #3ddc97;
+  --c-shuttle: #ffffff;
+  --c-court-floor: #14382f;
+  --c-court-line: rgb(232 239 234 / 0.55);
+  --c-p1: #4290e0;
+  --c-p2: #e2701f;
+  --shadow-pop: 0 8px 24px rgb(0 0 0 / 0.45);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --c-canvas: #103129;
+    --c-well: #0c2620;
+    --c-surface: #18221f;
+    --c-surface-raised: #1f2b27;
+    --c-edge: #2a3833;
+    --c-edge-strong: #74877f;
+    --c-ink: #e8efea;
+    --c-muted: #a9bab2;
+    --c-faint: #8da098;
+    --c-primary: #e8efea;
+    --c-primary-hover: #ffffff;
+    --c-on-primary: #0c2620;
+    --c-you: #4fd6c4;
+    --c-partner: #e27bf2;
+    --c-other: #7c8794;
+    --c-evidence: #7da7ff;
+    --c-strength: #5fd38a;
+    --c-opportunity: #f0b454;
+    --c-uncertain: #9fb0c4;
+    --c-corrected: #b79cff;
+    --c-error: #f26b68;
+    --c-live: #3ddc97;
+    --c-court-floor: #14382f;
+    --c-court-line: rgb(232 239 234 / 0.55);
+    --c-p1: #4290e0;
+    --c-p2: #e2701f;
+    --shadow-pop: 0 8px 24px rgb(0 0 0 / 0.45);
+  }
+}
+
+/* ───────────────────────── semantic utilities ───────────────────────── */
+
+@theme inline {
+  --color-canvas: var(--c-canvas);
+  --color-well: var(--c-well);
+  --color-surface: var(--c-surface);
+  --color-surface-raised: var(--c-surface-raised);
+  --color-edge: var(--c-edge);
+  --color-edge-strong: var(--c-edge-strong);
+  --color-ink: var(--c-ink);
+  --color-muted: var(--c-muted);
+  --color-faint: var(--c-faint);
+  --color-primary: var(--c-primary);
+  --color-primary-hover: var(--c-primary-hover);
+  --color-on-primary: var(--c-on-primary);
+  --color-you: var(--c-you);
+  --color-partner: var(--c-partner);
+  --color-other: var(--c-other);
+  --color-evidence: var(--c-evidence);
+  --color-strength: var(--c-strength);
+  --color-opportunity: var(--c-opportunity);
+  --color-uncertain: var(--c-uncertain);
+  --color-corrected: var(--c-corrected);
+  --color-error: var(--c-error);
+  --color-live: var(--c-live);
+  --color-shuttle: var(--c-shuttle);
+  --color-court-floor: var(--c-court-floor);
+  --color-court-line: var(--c-court-line);
+  --shadow-pop: var(--shadow-pop);
+}
+
+@theme {
+  --font-sans: "Archivo Variable", "Archivo", ui-sans-serif, system-ui, sans-serif;
+  --text-xs: 0.8125rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: 2.25rem;
+  --text-hero: 3.5rem;
+  --radius-card: 14px;
+  --radius-control: 10px;
+  --radius-sheet: 20px;
+  --radius-chip: 999px;
+  --ease-snap: cubic-bezier(0.2, 0.9, 0.25, 1);
+  --breakpoint-md: 48rem;
+  --breakpoint-lg: 64rem;
+  --breakpoint-xl: 90rem;
+}
+
+:root {
+  --duration-fast: 150ms;
+  --duration-base: 250ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-base: 0ms;
+  }
+}
+
+/* ───────────────────────── density, tied to Depth (08 §8) ───────────────────────── */
+
+:root,
+[data-depth="guided"] {
+  --d-pad: 16px;
+  --d-gap: 16px;
+  --d-row: 44px;
+  --d-body: 1rem;
+}
+[data-depth="quick"] {
+  --d-pad: 24px;
+  --d-gap: 24px;
+  --d-row: 56px;
+  --d-body: 1.125rem;
+}
+[data-depth="advanced"] {
+  --d-pad: 12px;
+  --d-gap: 12px;
+  --d-row: 36px;
+  --d-body: 0.9375rem;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    background: var(--c-canvas);
+    color: var(--c-ink);
+    font-family: var(--font-sans);
+    font-variation-settings: "wdth" 100;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  :focus-visible {
+    outline: 2px solid var(--c-primary);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  [data-theme="dark"] :focus-visible {
+    outline-color: var(--c-ink);
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--c-you) 30%, transparent);
+  }
+  /* The reading measure rule from 08 §7 — 65-75 characters. */
+  .measure {
+    max-width: 68ch;
+  }
+}
+
+@layer components {
+  .numerals {
+    font-variation-settings: "wdth" 62;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+  .condensed {
+    font-variation-settings: "wdth" 80;
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Certainty shapes — never colour alone (08 §3.3). */
+  .check-checked {
+    border: 1.5px solid currentColor;
+    background: color-mix(in oklab, var(--c-ink) 8%, transparent);
+  }
+  .check-looks-right {
+    border: 1.5px solid currentColor;
+  }
+  .check-worth-a-look {
+    border: 1.5px dashed currentColor;
+  }
+  .check-not-enough {
+    border: 1.5px dashed currentColor;
+    background: var(--hatch);
+  }
+}
+
+:root {
+  --hatch: repeating-linear-gradient(
+    45deg,
+    transparent 0 4px,
+    color-mix(in oklab, var(--c-uncertain) 35%, transparent) 4px 5px
+  );
+}
+.hatch {
+  background-image: var(--hatch);
+}
+
+/* The one celebration in the product: a Checked personal best (08 §9.3). */
+@keyframes record-ring {
+  from {
+    stroke-dashoffset: 126;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.record-ring {
+  stroke-dasharray: 126;
+  animation: record-ring 600ms var(--ease-snap) forwards;
+}
+
+/* A correction landing: one brief tint, then rest. */
+@keyframes corrected-tint {
+  0% {
+    background-color: color-mix(in oklab, var(--c-corrected) 18%, transparent);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+.corrected-tint {
+  animation: corrected-tint 1000ms var(--ease-snap) forwards;
+}
+
+/* Status dot: the only looping motion allowed, and only while analysing. */
+@keyframes live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+.live-dot {
+  animation: live-pulse 1.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-dot,
+  .record-ring,
+  .corrected-tint {
+    /* biome-ignore lint/complexity/noImportantStyles: reduced motion must beat every animation */
+    animation: none !important;
+  }
+}
+
+/* Theatre rise (05 §13) — the product's one piece of drama. */
+@keyframes theatre-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.theatre-rise {
+  animation: theatre-rise var(--duration-base) var(--ease-snap);
+}
+
+/* A sheet slides up from the edge it belongs to — but only where it IS an edge sheet.
+   From md it is a centred panel, and a panel that slides in from off-screen reads as
+   a different component (08 §17). */
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+@media (max-width: 47.99rem) {
+  .sheet-up {
+    animation: sheet-up var(--duration-base) var(--ease-snap);
+  }
+}
+
+/* Scrollbars inside dense panels stay quiet. */
+.quiet-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-edge-strong) transparent;
+}
