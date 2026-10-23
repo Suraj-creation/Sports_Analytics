@@ -65,6 +65,21 @@ def test_tracker_needs_positive_evidence_to_start_the_match() -> None:
     assert t.phase is Phase.COMPLETED
 
 
+@pytest.mark.parametrize(
+    "evidence",
+    [
+        RallyEvidence(calibrated=False),
+        RallyEvidence(formation=True, still=None, gap_s=9.0),
+    ],
+)
+def test_missing_phase_evidence_cannot_promote_activity_to_official(evidence: RallyEvidence) -> None:
+    tracker = MatchPhaseTracker()
+    decision = tracker.decide(100, evidence)
+    assert not decision.official
+    assert decision.basis == "insufficient"
+    assert tracker.phase is Phase.UNKNOWN
+
+
 def test_human_marker_and_override_win() -> None:
     t = MatchPhaseTracker(match_start_frame=1000)
     assert not t.decide(10, RallyEvidence(formation=True, scoreboard="changed")).official
@@ -109,6 +124,34 @@ def test_api_rebuild_matches_engine(tmp_path: Path) -> None:
     for k in ("rallies", "unofficial_rallies", "active_play_s"):
         assert rebuilt[k] == live[k]
     assert rebuilt["players"]["P1"]["strokes"] == live["players"]["P1"]["strokes"]
+
+
+def test_corrected_warmup_stroke_remains_excluded_from_live_statistics(tmp_path: Path) -> None:
+    from bai_badminton.analytics.rebuild import build
+
+    eng, store = _run(tmp_path, [_rally("P1", 1, **WARM), _rally("P2", 2, lead_in=180)])
+    warmup = store.query(types=["rally_end"])[0]
+    original = store.get(warmup.payload["shots"][0]["event_id"])
+    assert original is not None
+    eng._emit([original.correct(payload={**original.payload, "stroke": "drive"})])
+    eng._rebuild_analytics()
+    rebuilt = build(store, None, FPS).to_public()
+    live = eng.analytics.to_public()
+    for pid in ("P1", "P2"):
+        assert live["players"][pid]["strokes"] == rebuilt["players"][pid]["strokes"]
+
+
+def test_open_exchange_strokes_wait_for_official_rally_acceptance(tmp_path: Path) -> None:
+    rally = make_rally(n_shots=10, fps=FPS, **WARM)
+    frames = to_frames(rally, 0)[:190]
+    store = EventStore(tmp_path / "open.sqlite", "S1")
+    eng = BadmintonMatchEngine("S1", EngineConfig(fps=FPS, frame_width=1280, frame_height=720), store)
+    eng.set_calibration(0, rally.homography)
+    eng.ingest(ChunkPerception(start=0, end=len(frames) - 1, frames=frames))
+    assert store.query(types=["stroke"])  # physical contact candidates do exist
+    assert store.query(types=["rally_end"]) == []  # phase has not been accepted
+    stats = eng.analytics.to_public()
+    assert sum(sum(p["strokes"].values()) for p in stats["players"].values()) == 0
 
 
 def test_unchanged_scoreboard_rejects_rally_in_play(tmp_path: Path) -> None:

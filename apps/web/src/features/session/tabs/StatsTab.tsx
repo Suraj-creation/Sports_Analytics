@@ -22,7 +22,7 @@ export function useAnalytics(sessionId: string) {
 
 interface Row {
   label: string;
-  get: (s: PlayerStats) => number;
+  get: (s: PlayerStats) => number | null;
   fmt?: (v: number) => string;
 }
 
@@ -102,25 +102,25 @@ export function StatsTab({ session }: { session: Session }) {
 }
 
 function H2HRow({ row, a, b }: { row: Row; a?: PlayerStats; b?: PlayerStats }) {
-  const va = a ? row.get(a) : 0;
-  const vb = b ? row.get(b) : 0;
-  const max = Math.max(va, vb, 1e-9);
+  const va = a ? row.get(a) : null;
+  const vb = b ? row.get(b) : null;
+  const max = Math.max(va ?? 0, vb ?? 0, 1e-9);
   const fmt = row.fmt ?? ((v: number) => String(v));
   return (
     <tr className="border-b border-seam/60 last:border-0">
-      <td className="tabular w-14 py-1.5 pr-2 text-right">{a ? fmt(va) : "—"}</td>
+      <td className="tabular w-14 py-1.5 pr-2 text-right">{va != null ? fmt(va) : "—"}</td>
       <td className="w-[30%] py-1.5">
         <div className="flex justify-end">
-          <div className="h-2 rounded-l-[4px] bg-p1" style={{ width: `${(va / max) * 100}%` }} />
+          <div className="h-2 rounded-l-[4px] bg-p1" style={{ width: `${((va ?? 0) / max) * 100}%` }} />
         </div>
       </td>
       <th scope="row" className="px-3 py-1.5 text-center text-xs font-normal whitespace-nowrap text-line-2">
         {row.label}
       </th>
       <td className="w-[30%] py-1.5">
-        <div className="h-2 rounded-r-[4px] bg-p2" style={{ width: `${(vb / max) * 100}%` }} />
+        <div className="h-2 rounded-r-[4px] bg-p2" style={{ width: `${((vb ?? 0) / max) * 100}%` }} />
       </td>
-      <td className="tabular w-14 py-1.5 pl-2">{b ? fmt(vb) : "—"}</td>
+      <td className="tabular w-14 py-1.5 pl-2">{vb != null ? fmt(vb) : "—"}</td>
     </tr>
   );
 }

@@ -36,12 +36,14 @@ export function ScoreBug({ session }: { session: Session }) {
             serving={known && state.server === pid}
             games={state.games_won[pid] ?? 0}
             points={state.score[pid] ?? 0}
-            pending={!known && status === "analysing"}
+            pending={!known}
           />
         ))}
       </div>
       <div className="mt-1 flex items-center gap-1.5 text-[11px]">
-        <span className="rounded bg-mat-deep/80 px-1.5 py-0.5 text-line-2">Game {state.game_no}</span>
+        <span className="rounded bg-mat-deep/80 px-1.5 py-0.5 text-line-2">
+          {known ? `Game ${state.game_no}` : status === "analysing" ? "Score pending" : "Score unavailable"}
+        </span>
         {flag && <span className="rounded bg-line px-1.5 py-0.5 font-semibold text-mat-deep">{flag}</span>}
         {!known && status === "analysing" && (
           <span className="rounded bg-mat-deep/80 px-1.5 py-0.5 text-line-3">score pending</span>
@@ -72,14 +74,14 @@ function Row(props: {
         aria-hidden
       />
       <span className="sr-only">{props.serving ? "serving" : ""}</span>
-      <span className="numerals w-5 text-center text-line-2">{props.games}</span>
+      <span className="numerals w-5 text-center text-line-2">{props.pending ? "—" : props.games}</span>
       <span
         className={clsx(
           "numerals grid h-7 w-8 place-items-center bg-white/8 text-base",
           props.pending && "text-line-3",
         )}
       >
-        {props.points}
+        {props.pending ? "—" : props.points}
       </span>
     </div>
   );

@@ -10,8 +10,9 @@ import {
 } from "@/features/analytics/evidence";
 import { playEvidence } from "@/features/player/clip";
 import { api } from "@/lib/api";
-import { clock, STROKE_LABEL, shortName } from "@/lib/format";
+import { clock, fps as fpsOf, STROKE_LABEL, shortName } from "@/lib/format";
 import type { PlayerId, Session } from "@/lib/types";
+import { usePlayback } from "@/stores/playback";
 import { useSession } from "@/stores/session";
 
 export function RalliesTab({
@@ -114,6 +115,8 @@ export function RalliesTab({
 }
 
 function RallyRow({ rally: r, session, open }: { rally: EvidenceRally; session: Session; open: boolean }) {
+  const selection = usePlayback((s) => s.selection);
+  const selected = selection && selection.start >= r.start && selection.start <= r.end;
   const qc = useQueryClient();
   const fix = useMutation({
     mutationFn: (
@@ -133,7 +136,7 @@ function RallyRow({ rally: r, session, open }: { rally: EvidenceRally; session: 
     },
   });
   return (
-    <details className="rally-row" open={open || undefined}>
+    <details className="rally-row" open={open || selected || undefined}>
       <summary>
         <span className="font-semibold">Rally {r.no}</span>
         <span className="text-sm text-line-2">
@@ -160,11 +163,15 @@ function RallyRow({ rally: r, session, open }: { rally: EvidenceRally; session: 
             <button
               type="button"
               key={s.event_id}
+              aria-current={
+                selection?.eventId === s.event_id || selection?.start === s.frame_start ? "true" : undefined
+              }
               onClick={() =>
                 playEvidence(
                   s.frame_start,
-                  Math.min(r.end, s.frame_start + 45),
+                  Math.min(r.end, s.frame_start + Math.round(fpsOf(session.media) * 1.5)),
                   STROKE_LABEL[String(s.payload.stroke)] ?? "Shot",
+                  s.event_id,
                 )
               }
             >

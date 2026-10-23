@@ -546,7 +546,6 @@ class BadmintonMatchEngine:
         out = [c.event.retract(prov, note)]
         if c.stroke_event is not None:
             out.append(c.stroke_event.retract(prov, note))
-            self.analytics.on_stroke_retracted(c.stroke_event)
         self._emit(out)
 
     def _on_contact(self, c: ContactCandidate, w: WindowObs) -> None:
@@ -647,7 +646,11 @@ class BadmintonMatchEngine:
         }
         if receiver is not None:
             _, _, rc = self._player_at(receiver.player_id, receiver.frame)
+            payload["receiver_court_xy"] = list(rc) if rc else None
+            # Retain the legacy field for existing clients, but disclose that
+            # these are receiver feet rather than an observed shuttle landing.
             payload["landing_court_xy"] = list(rc) if rc else None
+            payload["landing_source"] = "receiver_position"
         comps: dict[str, float] = {}
         if stroke == "smash" or pred.probs.get("smash", 0.0) > 0.3:
             jf = self._jump_features(cand.player_id, cand.frame)
@@ -689,7 +692,8 @@ class BadmintonMatchEngine:
         )
         c.event = confirmed_contact
         self._emit([ev, confirmed_contact])
-        self.analytics.on_stroke(ev)
+        # Classification confirms a physical event; match statistics require
+        # its containing rally's official-play decision below.
 
     def _jump_features(self, pid: str | None, frame: int) -> dict[str, float] | None:
         if pid is None:
@@ -808,11 +812,11 @@ class BadmintonMatchEngine:
             duration_s=(seg.end - seg.start + 1) / self.cfg.fps,
             official=decision.official,
         )
-        if not decision.official:
-            # practice / replayed hitting stays on the timeline but out of the official statistics
+        if decision.official:
+            # Accept shots only when their rally is accepted as official play.
             for c in p.contacts:
                 if c.stroke_event is not None:
-                    self.analytics.on_stroke_retracted(c.stroke_event)
+                    self.analytics.on_stroke(c.stroke_event)
         point: Event | None = None
         transitions: list[Event] = []
         if winner in ("P1", "P2") and not before.finished:
@@ -820,6 +824,7 @@ class BadmintonMatchEngine:
             point, transitions = self._point_events(res, rally_end, seg, source)
             self.state = res.after
             record.score_after = self._score_after(res)
+            record.score_available = True
             self.store.put_state(
                 StateSnapshot(
                     session_id=self.session_id,
@@ -970,6 +975,12 @@ class BadmintonMatchEngine:
         return dict(res.after.score)
 
     def _outcome(self, seg: RallySegment) -> tuple[str, str, str, float]:
+        # A camera cut or EOF closes our observation interval, not the rally.
+        # Applying landing/extrapolation heuristics to an airborne shuttle
+        # invents a winner. OCR and reviewers can still resolve the outcome.
+        if seg.reason in ("cut", "flush"):
+            return Outcome.UNKNOWN.value, "unknown", "incomplete_rally", 0.2
+
         calib = self._calib(self._shot_at(seg.end))
         if calib is None or self._proc is None:
             return Outcome.UNKNOWN.value, "unknown", "uncalibrated", 0.2
@@ -1160,8 +1171,10 @@ class BadmintonMatchEngine:
                     new_events.extend([r.point, *r.transitions])
                 state = res.after
                 rec.score_after = self._score_after(res)
+                rec.score_available = r.point is not None
             else:
                 rec.score_after = dict(state.score)
+                rec.score_available = False
             if dirty:  # overwrite the snapshot of the previous fold at this frame
                 seq = r.point.seq if r.point else self.store.last_seq()
                 self.store.put_state(
@@ -1295,10 +1308,21 @@ class BadmintonMatchEngine:
         return min(cands, key=lambda e: abs(e.frame_start - frame), default=None)
 
     def _rebuild_analytics(self) -> None:
+        from bai_badminton.analytics.rebuild import rally_records
+
         self.analytics = MatchAnalytics(self.cfg.fps)
-        unofficial = {s.get("event_id") for r in self._rallies if not r.record.official for s in r.record.shots}
+        # Embedded shot ids refer to the original ledger revisions. Resolve
+        # them before replay so corrections/retractions cannot re-admit a
+        # warm-up stroke or retain a superseded player/classification.
+        canonical = {r.rally_id: r for r in rally_records(self.store)}
+        for rally in self._rallies:
+            current = canonical.get(rally.rally_end.event_id)
+            if current is not None:
+                rally.record.shots = current.shots
+                rally.record.score_available = current.score_available
+        official = {s.get("event_id") for r in self._rallies if r.record.official for s in r.record.shots}
         for ev in self.store.query(types=["stroke"]):
-            if ev.event_id not in unofficial:
+            if ev.event_id in official:
                 self.analytics.on_stroke(ev)
         for r in self._rallies:
             if r.record.official:

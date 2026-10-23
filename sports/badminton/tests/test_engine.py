@@ -73,7 +73,10 @@ def test_analytics(run: tuple[BadmintonMatchEngine, EventStore, list[Event]]) ->
     a = eng.analytics.to_public()
     assert a["rallies"] == len(WINNERS)
     assert a["players"]["P1"]["points_won"] == WINNERS.count("P1")
-    assert eng.analytics.heatmaps.to_public("P1", "presence")["total"] > 0
+    # The synthetic stream supplies positions without per-frame camera-quality
+    # or identity-continuity evidence, so physical movement remains unavailable.
+    assert a["players"]["P1"]["distance_m"] is None
+    assert eng.analytics.heatmaps.to_public("P1", "presence")["total"] == 0
     hl = eng.analytics.highlights(k=3)
     assert len(hl) <= 3
 
@@ -102,6 +105,32 @@ def test_uncalibrated_rallies_have_unknown_winner(tmp_path: Path) -> None:
     assert len(rallies) == 2
     assert all(r.payload["winner"] is None and r.payload["rule_check"] == "uncalibrated" for r in rallies)
     assert store.query(types=["point"]) == []
+
+
+@pytest.mark.parametrize("end_reason", ["flush", "cut"])
+def test_recording_ending_mid_rally_does_not_award_a_point(tmp_path: Path, end_reason: str) -> None:
+    from dataclasses import replace
+
+    from bai_badminton.perception_types import ChunkPerception
+    from bai_badminton.testing.synth import make_rally, to_frames
+
+    rally = make_rally(n_shots=10)
+    # The shuttle is still in flight; neither a landing nor a scored outcome is observed.
+    frames = to_frames(rally, 0)[:190]
+    if end_reason == "cut":
+        frames[-1] = replace(frames[-1], replay=True)
+    store = EventStore(tmp_path / "partial.sqlite", "S1")
+    eng = BadmintonMatchEngine("S1", EngineConfig(fps=30, frame_width=1280, frame_height=720), store)
+    eng.set_calibration(0, rally.homography)
+    eng.ingest(ChunkPerception(start=0, end=len(frames) - 1, frames=frames))
+    eng.flush()
+    ends = store.query(types=["rally_end"])
+    assert len(ends) == 1 and ends[0].payload["end_reason"] == end_reason
+    assert ends[0].payload["winner"] is None
+    assert ends[0].payload["outcome"] == "unknown"
+    assert ends[0].payload["rule_check"] == "incomplete_rally"
+    assert store.query(types=["point"]) == []
+    assert eng.public_state()["score"] == {"P1": 0, "P2": 0}
 
 
 def test_cancelled_short_rally_retracts_contacts_and_strokes(tmp_path: Path) -> None:

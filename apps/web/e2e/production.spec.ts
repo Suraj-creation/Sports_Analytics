@@ -114,6 +114,35 @@ test("real upload creates playable media with range delivery and exact frame nav
     .toBe(before + 1);
   await page.getByLabel("Playback speed", { exact: true }).selectOption("0.5");
   await expect.poll(async () => video.evaluate((v: HTMLVideoElement) => v.playbackRate)).toBe(0.5);
+  await page.getByLabel("Playback speed", { exact: true }).selectOption("1");
+  const cue = () =>
+    page.evaluate(() =>
+      window.dispatchEvent(
+        new CustomEvent("bai:play-clip", {
+          detail: { start: 90, end: 105, label: "Canonical test moment" },
+        }),
+      ),
+    );
+  await cue();
+  await expect(page.getByTestId("evidence-details")).toContainText("source frame 90");
+  await expect(page.getByTestId("selected-event-marker")).toBeVisible();
+  await expect.poll(async () => video.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+  await expect.poll(async () => video.evaluate((v: HTMLVideoElement) => Math.floor(v.currentTime * 30))).toBe(105);
+  // Re-selecting the same event is a new playback request, not a no-op from stale query state.
+  await cue();
+  await expect.poll(async () => video.evaluate((v: HTMLVideoElement) => v.paused)).toBe(false);
+  await expect.poll(async () => video.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+  const timeline = page.getByRole("slider", { name: "Match timeline" });
+  await timeline.focus();
+  await page.keyboard.press("Home");
+  await expect(page.getByTestId("selected-event-marker")).toHaveCount(0);
+  await expect(page.getByText("Canonical test moment · bounded clip", { exact: true })).toHaveCount(0);
+  await expect.poll(async () => video.evaluate((v: HTMLVideoElement) => Math.floor(v.currentTime * 30))).toBe(0);
+  await expect(timeline).toHaveAttribute("aria-valuemax", String(session.media.n_frames - 1));
+  const picture = await page.getByTestId("video-stage").boundingBox();
+  expect(picture).not.toBeNull();
+  expect((picture?.width ?? 0) / (picture?.height ?? 1)).toBeCloseTo(16 / 9, 1);
+  await page.screenshot({ path: "/tmp/bai-audit-frontend-desktop.png", fullPage: true });
   await page.getByRole("button", { name: "Overlay layers", exact: true }).click();
   const shuttle = page.getByRole("switch", { name: "Shuttle trail", exact: true });
   await shuttle.click();
@@ -161,6 +190,8 @@ test("real upload creates playable media with range delivery and exact frame nav
   expect((await (await request.get(`/api/sessions/${id}/highlights`)).json()).highlights).toEqual([]);
   await page.setViewportSize({ width: 390, height: 844 });
   await noHorizontalOverflow(page);
+  await expect(page.getByRole("button", { name: "Full screen", exact: true })).toBeVisible();
+  await page.screenshot({ path: "/tmp/bai-audit-frontend-narrow.png", fullPage: true });
   expect(errors).toEqual([]);
 });
 

@@ -14,10 +14,14 @@ const KINDS: { id: string; label: string; hint: string }[] = [
   { id: "origin", label: "Where they hit from", hint: "Position at each shot" },
   {
     id: "landing",
-    label: "Where their shots go",
-    hint: "Where the receiver met the shuttle. Receiver-position proxy, not a measured landing point.",
+    label: "Shuttle landing",
+    hint: "Requires measured shuttle landing evidence. Receiver feet cannot establish a shuttle landing.",
   },
-  { id: "targeting", label: "Targeting", hint: "Areas of the opponent's court this player attacks" },
+  {
+    id: "targeting",
+    label: "Receiver positions",
+    hint: "Opponent foot positions at contact. A receiver-position proxy, not a measured landing point.",
+  },
 ];
 
 export function HeatmapsTab({

@@ -140,7 +140,9 @@ function Overview({
         <AnalysisStat value={stats?.points_won} label={`${shortName(session, player)} · points won`} />
         <AnalysisStat
           value={
-            stats && movement.data && movement.data.total > 0 ? `${Math.round(stats.distance_m)} m` : null
+            stats?.distance_m != null && movement.data && movement.data.total > 0
+              ? `${Math.round(stats.distance_m)} m`
+              : null
           }
           label="Ground covered"
           note="Tracking-based estimate"
@@ -328,20 +330,27 @@ function Movement({
 }) {
   const stats = a.players[player];
   const movement = useMeasuredMovement(session, player);
-  const measured = Boolean(movement.data && movement.data.total > 0);
+  const measured = Boolean(
+    stats?.distance_m != null &&
+      stats.distance_quality?.status !== "unavailable" &&
+      movement.data &&
+      movement.data.total > 0,
+  );
   const active = activeSeconds(rows, fpsOf(session.media));
+  const distance = measured ? stats?.distance_m : null;
+  const observed = stats?.distance_quality?.observed_s;
   return (
     <>
       <div className="analysis-metrics">
         <AnalysisStat
-          value={stats && measured ? `${Math.round(stats.distance_m)} m` : null}
+          value={distance != null ? `${Math.round(distance)} m` : null}
           label="Distance covered"
-          note="Tracking-based estimate"
+          note={stats?.distance_quality?.reason ?? "Tracking-based estimate"}
         />
         <AnalysisStat
-          value={stats && measured ? Math.round(stats.distance_m / 0.78).toLocaleString() : null}
+          value={null}
           label="Estimated steps"
-          note="Distance ÷ 0.78 m assumed stride; not footfalls"
+          note="Video distance does not measure steps; no validated stride is available"
         />
         <AnalysisStat
           value={active === null ? null : `${(active / 60).toFixed(1)} min`}
@@ -350,9 +359,12 @@ function Movement({
         />
         <AnalysisStat
           value={
-            stats && active && measured ? `${(stats.distance_m / (active / 60)).toFixed(0)} m/min` : null
+            distance != null && observed && observed > 0
+              ? `${(distance / (observed / 60)).toFixed(0)} m/min`
+              : null
           }
-          label="Ground covered per active minute"
+          label="Ground covered per tracked minute"
+          note="Uses only accepted tracking intervals; excludes gaps"
         />
       </div>
       <AnalysisPanel

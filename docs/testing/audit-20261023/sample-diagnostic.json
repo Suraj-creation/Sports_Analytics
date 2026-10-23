@@ -1,0 +1,61 @@
+{
+  "evaluator_version": "temporal-intervals-v1",
+  "policy": {
+    "min_iou": 0.2,
+    "boundary_tolerance_s": 1.0,
+    "matching": "chronological_max_cardinality_then_iou",
+    "intervals": "half_open_seconds"
+  },
+  "truth_count": 1,
+  "prediction_count": 1,
+  "matched": 0,
+  "false_positives": 1,
+  "false_negatives": 1,
+  "count_error": 0,
+  "absolute_count_error": 0,
+  "precision": 0.0,
+  "recall": 0.0,
+  "f1": 0.0,
+  "start_mae_s": null,
+  "end_mae_s": null,
+  "boundary_true_positives": 0,
+  "boundary_precision": 0.0,
+  "boundary_recall": 0.0,
+  "winner_correct": 0,
+  "winner_evaluated": 0,
+  "winner_unresolved": 0,
+  "winner_accuracy": null,
+  "winner_resolution_rate": null,
+  "split_candidates": 0,
+  "merge_candidates": 0,
+  "matches": [],
+  "provenance": {
+    "session_id": "01M55MFY9GQF6ZXP2SQPQ8X1KG",
+    "media_sha256": "44ae09ac4369edc971588158a5b4eb2df7586b95c8992770277d4d36f93ea790",
+    "fps_num": 30,
+    "fps_den": 1,
+    "window_s": [
+      0,
+      16
+    ],
+    "population": "all_exchanges",
+    "annotation_sha256": "d23b1a44887444b2f92938b1536901153762fbfc4ef4819f6bec4535f8418368",
+    "annotation_status": "draft",
+    "split": "diagnostic",
+    "review": {
+      "method": "agent visual review of full-video contact sheet sampled every 0.5 seconds",
+      "human_verified": false,
+      "limitations": "Embedded legacy detector overlays are visible; individual contacts, official phase, winner and exact boundaries remain unverified. This is a draft for human review, never held-out accuracy evidence."
+    },
+    "boundary_uncertainty_s": 0.5,
+    "accuracy_claim_eligible": false,
+    "event_log_sha256": "0c393e317c36e4cec944a07844c2a70f5a15b00eb8f8799a208759435f56c4bb",
+    "event_log_last_seq": 31,
+    "prediction_event_ids": [
+      "01M55MGS20RZX8XJYDGQAVDJ5D"
+    ],
+    "git_commit": "d661bc550291218d515b8e3910ceea89c899da00",
+    "git_dirty": true,
+    "timestamp_utc": "2026-10-23T06:39:04.793534+00:00"
+  }
+}

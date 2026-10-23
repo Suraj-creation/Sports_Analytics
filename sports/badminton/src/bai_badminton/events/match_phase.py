@@ -19,9 +19,9 @@ Each finished rally is decided from evidence, in order of authority:
 Once the match is in progress, rallies are official unless there is negative evidence (scoreboard
 unchanged, or a rally that starts right after a camera cut without a serve formation — a replay or
 the tail of a rally already ended by the cut).  Missing evidence never starts the match on its own:
-without player positions the phase stays undecided and those rallies are not scored.  The one
-exception is an uncalibrated session, where no rally gets a winner anyway; those are *assumed*
-official so rally numbering is unchanged.
+without calibrated player positions and stationarity evidence the phase stays undecided and
+those rallies are not scored. Explicit human decisions and stable scoreboard changes can
+establish official play independently of court calibration.
 """
 
 from __future__ import annotations
@@ -122,9 +122,11 @@ class MatchPhaseTracker:
                 return PhaseDecision(False, self.phase, "starts right after a camera cut without a serve", "formation")
             return PhaseDecision(True, self.phase, "match in progress", "phase")
         if not ev.calibrated:
-            return PhaseDecision(True, self.phase, "no court calibration: phase cannot be judged", "assumed")
+            return PhaseDecision(False, self.phase, "no court calibration: phase cannot be judged", "insufficient")
         if ev.formation is None:
             return PhaseDecision(False, self.phase, "players not visible at the serve", "insufficient")
+        if ev.still is None:
+            return PhaseDecision(False, self.phase, "players not observed stationary before the serve", "insufficient")
         failed = []
         if not ev.formation:
             failed.append("players not in diagonal service courts")

@@ -27,6 +27,15 @@ beforeEach(() => {
 });
 
 describe("ScoreBug", () => {
+  it("shows unavailable score instead of a default 0:0 when no point evidence exists", () => {
+    loadEvents([]);
+    useSession.setState({ session: { ...SESSION, status: "analysed" } });
+    render(<ScoreBug session={SESSION} />);
+    const bug = screen.getByTestId("score-bug");
+    expect(bug).toHaveTextContent("Score unavailable");
+    expect(bug.textContent).not.toMatch(/0/);
+    expect(bug.textContent).toContain("—");
+  });
   it("shows the score as of the presented frame, not the latest analysed one", () => {
     const s0 = state(0, 0);
     const s1 = state(1, 0);
@@ -78,11 +87,44 @@ describe("LiveFeed", () => {
     expect(items[1]).toHaveTextContent("Rally 1 · Axelsen wins");
     expect(items[1]).toHaveTextContent("shuttle landed out");
     fireEvent.click(screen.getByText(/Rally 1/));
-    expect(seek).toHaveBeenCalledWith(70, 30); // one second before the rally starts
+    expect(seek).not.toHaveBeenCalled();
+    expect(usePlayback.getState().selection).toMatchObject({ start: 100, end: 300, label: "Rally 1" });
   });
 });
 
 describe("AskTab", () => {
+  it("selects a known cited event at its canonical frame and retains uncertainty", async () => {
+    const seek = vi.fn();
+    usePlayback.setState({ seekFrame: seek, selection: null, clip: null });
+    loadEvents([
+      ev("stroke", 1500, {
+        event_id: "known-shot",
+        payload: { stroke: "smash" },
+        band: "uncertain",
+      }),
+    ]);
+    vi.spyOn(api, "askProvider").mockResolvedValue({ available: true, provider: "test", model: "m" });
+    vi.spyOn(api, "ask").mockResolvedValue({
+      text: "Inspect the shot [[ev:known-shot]].",
+      citations: [{ kind: "ev", ref: "known-shot", frame: 1200, type: "stroke" }],
+      grounded: true,
+      issues: [],
+      provider: "test",
+      model: "m",
+    });
+    render(withQuery(<AskTab session={SESSION} />));
+    fireEvent.change(screen.getByLabelText("Question"), { target: { value: "Show the shot" } });
+    fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+    const chip = await screen.findByRole("button", { name: "1" });
+    expect(chip).toHaveAttribute("title", expect.stringContaining("uncertain evidence"));
+    fireEvent.click(chip);
+    expect(usePlayback.getState().selection).toMatchObject({
+      start: 1500,
+      eventId: "known-shot",
+      label: "Smash",
+    });
+    expect(seek).not.toHaveBeenCalled();
+  });
   it("renders citations as numbered chips that seek the video", async () => {
     const seek = vi.fn();
     usePlayback.setState({ seekFrame: seek });
@@ -105,7 +147,9 @@ describe("AskTab", () => {
     expect(screen.getByText("rally 4").tagName).toBe("STRONG");
     expect(screen.getByLabelText("background source")).toBeInTheDocument();
     fireEvent.click(chip);
-    expect(seek).toHaveBeenCalledWith(1170, 30);
+    expect(seek).toHaveBeenCalledWith(1200, 30);
+    expect(usePlayback.getState().selection).toBeNull();
+    expect(screen.getByText(/full event details are not available here/)).toBeVisible();
     await waitFor(() => expect(api.ask).toHaveBeenCalledWith("s1", "How did rally 4 end?", []));
   });
 });

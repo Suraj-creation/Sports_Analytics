@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { prepareCanvas } from "@/features/court/geometry";
 import { spriteStyle, useSprite } from "@/features/library/Thumb";
+import { playEvidence } from "@/features/player/clip";
 import { isJumpSmash, isSmash, rallies } from "@/features/session/derive";
 import { clock, fps as fpsOf, PLAYER_HEX, shortName, strokeLabel } from "@/lib/format";
 import { frameClock } from "@/lib/frameClock";
@@ -45,6 +46,8 @@ function Overview({ session }: { session: Session }) {
   const status = useSession((s) => s.session?.status ?? session.status);
   const seekFrame = usePlayback((s) => s.seekFrame);
   const uiFrame = usePlayback((s) => s.frame);
+  const selection = usePlayback((s) => s.selection);
+  const clip = usePlayback((s) => s.clip);
   const n = Math.max(1, session.media?.n_frames ?? 1);
   const fps = fpsOf(session.media);
   const x = (f: number) => (f / n) * width;
@@ -128,12 +131,12 @@ function Overview({ session }: { session: Session }) {
   return (
     <div ref={ref} className="relative">
       <div
-        className="cursor-pointer touch-none select-none"
+        className="min-h-11 cursor-pointer touch-none select-none"
         role="slider"
         tabIndex={0}
         aria-label="Match timeline"
         aria-valuemin={0}
-        aria-valuemax={n}
+        aria-valuemax={n - 1}
         aria-valuenow={uiFrame}
         aria-valuetext={clock(uiFrame, session.media)}
         onPointerDown={(e) => {
@@ -149,8 +152,16 @@ function Overview({ session }: { session: Session }) {
         onPointerUp={() => {
           dragging.current = false;
         }}
+        onPointerCancel={() => {
+          dragging.current = false;
+        }}
         onPointerLeave={() => setHover(null)}
         onKeyDown={(e) => {
+          if (e.key === "Home" || e.key === "End") {
+            e.preventDefault();
+            e.stopPropagation();
+            seekFrame(e.key === "Home" ? 0 : n - 1, fps);
+          }
           const d = e.key === "ArrowRight" ? 5 : e.key === "ArrowLeft" ? -5 : 0;
           if (d) {
             e.preventDefault();
@@ -172,6 +183,27 @@ function Overview({ session }: { session: Session }) {
             opacity={0.85}
           />
           {marks}
+          {clip && (
+            <rect
+              x={x(clip.from)}
+              y={8}
+              width={Math.max(2, x(clip.to) - x(clip.from))}
+              height={22}
+              fill="var(--color-signal)"
+              fillOpacity={0.15}
+              stroke="var(--color-signal)"
+            />
+          )}
+          {selection && (
+            <circle
+              data-testid="selected-event-marker"
+              cx={x(selection.start)}
+              cy={5}
+              r={4}
+              fill="var(--color-caution)"
+              stroke="var(--color-mat-deep)"
+            />
+          )}
           <line ref={playhead} x1={0} x2={0} y1={2} y2={34} stroke="var(--color-shuttle)" strokeWidth={2} />
         </svg>
       </div>
@@ -316,7 +348,17 @@ function Detail({ session }: { session: Session }) {
         role="img"
         onClick={(e) => {
           const f = frameAtX(e.clientX, e.currentTarget);
-          if (f != null) seekFrame(Math.min(n - 1, f), fps);
+          if (f != null) {
+            const near = events.window(f - 6, f + 6, ["stroke"])[0];
+            if (near)
+              playEvidence(
+                near.frame_start,
+                Math.min(n - 1, near.frame_start + Math.round(fps * 1.5)),
+                strokeLabel(near.payload),
+                near.event_id,
+              );
+            else seekFrame(Math.min(n - 1, f), fps);
+          }
         }}
         onMouseMove={(e) => {
           const f = frameAtX(e.clientX, e.currentTarget);
@@ -340,7 +382,7 @@ function Detail({ session }: { session: Session }) {
           {tip.text}
         </div>
       )}
-      <div className="mt-1 flex gap-4 pl-[84px] text-[11px] text-line-3">
+      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 pl-[84px] text-[11px] text-line-3">
         <span className="flex items-center gap-1.5">
           <span className="inline-block h-2.5 w-0.5 bg-line-2" aria-hidden /> shot
         </span>

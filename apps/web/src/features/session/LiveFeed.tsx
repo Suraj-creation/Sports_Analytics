@@ -2,6 +2,7 @@ import { clsx } from "clsx";
 import { Flag, Sparkles, Trophy, Zap } from "lucide-react";
 import { useMemo } from "react";
 import { BandChip, Empty, PlayerDot } from "@/components/ui";
+import { playEventEvidence } from "@/features/player/clip";
 import {
   CATEGORY_LABEL,
   clock,
@@ -21,7 +22,7 @@ const LIMIT = 60;
 /** What has happened up to the playhead, newest first. Nothing after the playhead is shown. */
 export function LiveFeed({ session }: { session: Session }) {
   const frame = usePlayback((s) => s.frame);
-  const seekFrame = usePlayback((s) => s.seekFrame);
+  const selection = usePlayback((s) => s.selection);
   const events = useSession((s) => s.events);
   const eventsVersion = useSession((s) => s.eventsVersion);
   const fps = fpsOf(session.media);
@@ -54,7 +55,8 @@ export function LiveFeed({ session }: { session: Session }) {
         <li key={e.event_id}>
           <button
             type="button"
-            onClick={() => seekFrame(Math.max(0, e.frame_start - Math.round(fps)), fps)}
+            onClick={() => playEventEvidence(e, session.media)}
+            aria-current={selection?.eventId === e.event_id ? "true" : undefined}
             className={clsx(
               "flex w-full items-start gap-3 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-stand-raised",
               events.recentlyCorrected.has(e.event_id) && "animate-[corrected_900ms_ease-out]",

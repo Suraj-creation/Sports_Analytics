@@ -1,5 +1,19 @@
 # Reproducibility Guide & Benchmark Execution Instructions
 
+## Current server instructions — 23 October 2026
+
+Use [the current integrity audit](../audit-production-20261023.md) and its linked
+source-bound evaluation/replay commands. Source `../gpu-env.sh`, use the existing
+`.venv`, and start the application with `../start-server.sh` on port 8010.
+Do not synchronize dependencies or replace the configured Pascal CUDA environment.
+
+The material below is historical: another host, older session IDs, test counts
+and port 8000. Its dependency setup and launch commands are superseded. The legacy
+accuracy evaluator has known matching/denominator defects documented in the audit;
+use `research/evaluate_session.py` for new evaluations.
+
+## Historical report
+
 This document provides exact, deterministic commands to reproduce all unit tests, model benchmarks, accuracy evaluations, agent queries, and full pipeline executions.
 
 ---

@@ -2,10 +2,12 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowUp, BookOpen, CircleAlert } from "lucide-react";
 import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
 import { Empty, ErrorNote, Spinner } from "@/components/ui";
+import { playEventEvidence } from "@/features/player/clip";
 import { api } from "@/lib/api";
 import { clock, fps as fpsOf, shortName } from "@/lib/format";
 import type { AskAnswer, Session } from "@/lib/types";
 import { usePlayback } from "@/stores/playback";
+import { useSession } from "@/stores/session";
 
 interface Turn {
   q: string;
@@ -146,6 +148,8 @@ export function AskTab({ session }: { session: Session }) {
 
 function Answer({ a, session }: { a: AskAnswer; session: Session }) {
   const seekFrame = usePlayback((s) => s.seekFrame);
+  const events = useSession((s) => s.events);
+  useSession((s) => s.eventsVersion);
   const fps = fpsOf(session.media);
   const evIndex = new Map<string, number>();
   for (const c of a.citations)
@@ -160,15 +164,29 @@ function Answer({ a, session }: { a: AskAnswer; session: Session }) {
       const [whole, kind, ref] = m as unknown as [string, "ev" | "kb", string];
       out.push(<Bold key={`${key}-t${n}`} text={text.slice(last, m.index)} />);
       const c = byRef.get(ref);
+      const event = kind === "ev" ? events.get(ref) : undefined;
       if (kind === "ev") {
         out.push(
           <button
             key={`${key}-c${n}`}
             type="button"
             className="mx-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-line/12 px-1 align-[1px] text-[11px] font-semibold tabular-nums text-line hover:bg-line hover:text-mat-deep"
-            title={c?.frame != null ? `Watch at ${clock(c.frame, session.media)}` : "Event"}
-            disabled={c?.frame == null}
-            onClick={() => c?.frame != null && seekFrame(Math.max(0, c.frame - Math.round(fps)), fps)}
+            title={
+              event
+                ? `Watch event at ${clock(event.frame_start, session.media)} · ${event.band} evidence`
+                : c?.frame != null
+                  ? `Go to ${clock(c.frame, session.media)} · timestamp only; event details unavailable`
+                  : "Event time unavailable"
+            }
+            disabled={!event && c?.frame == null}
+            onClick={() => {
+              if (event) playEventEvidence(event, session.media);
+              else if (c?.frame != null) {
+                usePlayback.setState({ selection: null, clip: null });
+                seekFrame(Math.max(0, c.frame), fps);
+                document.querySelector("[data-match-player]")?.scrollIntoView({ block: "start" });
+              }
+            }}
           >
             {evIndex.get(ref)}
           </button>,
@@ -224,6 +242,11 @@ function Answer({ a, session }: { a: AskAnswer; session: Session }) {
           : "Some statements couldn't be linked to match data."}
         {a.provider && ` · ${a.provider}${a.model ? ` ${a.model}` : ""}`}
       </p>
+      {a.citations.some((c) => c.kind === "ev" && c.frame != null && !events.get(c.ref)) && (
+        <p className="text-xs text-line-3">
+          Some references have a source timestamp only. Their full event details are not available here.
+        </p>
+      )}
     </div>
   );
 }

@@ -40,6 +40,7 @@ class ToolContext:
     kb_refs: set[str] = field(default_factory=set)
     outputs: list[str] = field(default_factory=list)  # every tool result of the conversation (grounding)
     _analytics: Any = None
+    _analytics_token: tuple[Any, ...] | None = None
 
     @property
     def names(self) -> dict[str, str]:
@@ -58,11 +59,30 @@ class ToolContext:
         return None
 
     def analytics(self) -> Any:
-        if self._analytics is None:
+        stat = self.store.path.stat()
+        track_revision = (
+            tuple(
+                (kind, (self.tracks.root / kind).stat().st_mtime_ns if (self.tracks.root / kind).exists() else None)
+                for kind in ("player", "camera")
+            )
+            if self.tracks is not None
+            else ()
+        )
+        media = self.session.media
+        token = (
+            self.store.last_seq(),
+            stat.st_ino,
+            stat.st_mtime_ns,
+            track_revision,
+            media.fps_num if media else None,
+            media.fps_den if media else None,
+        )
+        if self._analytics is None or token != self._analytics_token:
             from bai_badminton.analytics.rebuild import build
 
             fps = float(self.session.media.fps) if self.session.media else 30.0
             self._analytics = build(self.store, self.tracks, fps)
+            self._analytics_token = token
         return self._analytics
 
     def t(self, frame: int) -> str:
@@ -171,7 +191,8 @@ def list_rallies(
                 "winner": ctx.names.get(r.winner or "", None),
                 "outcome": r.outcome,
                 "shots": r.n_shots,
-                "score_after": r.score_after if r.official else None,
+                "score_after": r.score_after if r.official and r.score_available else None,
+                "score_available": r.official and r.score_available,
                 "duration_s": round(r.duration_s, 1),
             }
         )
@@ -180,9 +201,21 @@ def list_rallies(
 
 
 def get_rally(ctx: ToolContext, rally_event_id: str | None = None, rally_no: int | None = None) -> dict[str, Any]:
-    ev = ctx.store.get(rally_event_id) if rally_event_id else None
-    if ev is None and rally_no is not None:
-        ev = next((e for e in ctx.store.query(types=["rally_end"]) if e.payload.get("rally_no") == rally_no), None)
+    from bai_badminton.analytics.rebuild import lineage_ids, rally_records
+
+    records = {record.rally_id: record for record in rally_records(ctx.store)}
+    ev = None
+    # Use the same append-only rally versions whose shots were resolved above.
+    # A second live-view query can observe a newer correction absent in records.
+    for record in records.values():
+        candidate = ctx.store.get(record.rally_id)
+        if candidate is None:
+            continue
+        if (rally_event_id and rally_event_id in lineage_ids(ctx.store, candidate)) or (
+            not rally_event_id and rally_no is not None and candidate.payload.get("rally_no") == rally_no
+        ):
+            ev = candidate
+            break
     if ev is None or ev.type != "rally_end":
         official, _ = _official(ctx)
         return {
@@ -192,7 +225,7 @@ def get_rally(ctx: ToolContext, rally_event_id: str | None = None, rally_no: int
             "evidence_ids": [],
         }
     shots = []
-    for s in ev.payload.get("shots", []):
+    for s in records[ev.event_id].shots:
         st = ctx.store.get(s["event_id"]) if s.get("event_id") else None
         shots.append(
             {
@@ -205,7 +238,8 @@ def get_rally(ctx: ToolContext, rally_event_id: str | None = None, rally_no: int
                 "band": st.band.value if st else None,
             }
         )
-    points = [p for p in ctx.store.query(types=["point"]) if p.parent_id == ev.event_id]
+    rally_ids = set(lineage_ids(ctx.store, ev))
+    points = [p for p in ctx.store.query(types=["point"]) if p.parent_id in rally_ids]
     pt = points[-1] if points else None
     ids = [ev.event_id] + [s["stroke_event_id"] for s in shots if s["stroke_event_id"]] + ([pt.event_id] if pt else [])
     return {
@@ -247,7 +281,8 @@ def player_stats(ctx: ToolContext, player: str) -> dict[str, Any]:
         "rallies_won": len(won),
         "rally_ids_won": won[:60],
         "smash_event_ids": smashes[:40],
-        "scope": "official rallies observed in this video only (warm-up excluded); distance is in court metres",
+        "scope": "official rallies observed in this video only (warm-up excluded); distance is an estimate in court metres "
+        "only where distance_quality supports it; null means unavailable",
         "evidence_ids": ctx.cite(won[:60] + smashes[:40]),
     }
 
@@ -260,11 +295,11 @@ def find_strokes(
     limit: int | None = None,
 ) -> dict[str, Any]:
     pid = ctx.resolve_player(player)
-    _, unofficial = _official(ctx)
-    skip = {s.get("event_id") for r in unofficial for s in r.shots}
+    official, _ = _official(ctx)
+    owned = {s.get("event_id") for r in official for s in r.shots}
     out = []
     for e in ctx.store.query(types=["stroke"], player_id=pid):
-        if e.event_id in skip:
+        if e.event_id not in owned:
             continue
         p = e.payload
         if stroke and p.get("stroke") != stroke:

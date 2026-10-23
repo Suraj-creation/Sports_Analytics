@@ -111,7 +111,14 @@ export interface PlayerStats {
   smash_points: number;
   serves: number;
   serve_points_won: number;
-  distance_m: number;
+  distance_m: number | null;
+  distance_quality?: {
+    status: "estimate" | "unavailable";
+    method: string;
+    observed_s: number;
+    coverage: number;
+    reason?: string | null;
+  };
   points_won_under_pressure: number;
 }
 

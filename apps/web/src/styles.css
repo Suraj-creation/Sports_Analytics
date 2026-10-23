@@ -157,9 +157,29 @@
   background: #0c2620;
 }
 .match-video-stage {
-  aspect-ratio: 16 / 9;
-  max-height: 56vh;
   width: 100%;
+}
+.video-picture {
+  max-height: 70svh;
+}
+.video-controls button {
+  min-width: 44px;
+  min-height: 44px;
+}
+.video-controls select {
+  min-height: 44px;
+}
+.evidence-details {
+  padding: 20px 24px;
+  border: 1px solid var(--c-edge);
+  border-radius: 0 0 14px 14px;
+  background: var(--c-surface);
+  overflow-wrap: anywhere;
+}
+.rally-shot-list button[aria-current="true"] {
+  outline: 2px solid var(--c-primary);
+  outline-offset: 2px;
+  font-weight: 600;
 }
 .match-video[data-theme="dark"] {
   --color-line: #e8efea;
@@ -485,8 +505,14 @@
     margin-inline: -16px;
     border-radius: 0;
   }
-  .match-video-stage {
+  .video-picture {
     max-height: none;
+  }
+  .evidence-details {
+    padding: 16px;
+  }
+  .video-controls {
+    gap: 0;
   }
   .match-tabs {
     margin-inline: -16px;

@@ -50,11 +50,16 @@ def build_report(path: Path, session: Any, analytics: Any, rallies: list[dict[st
         ("smash_points", "Points from smashes"),
         ("serve_points_won", "Points won on serve"),
         ("points_won_under_pressure", "Points won under pressure"),
-        ("distance_m", "Distance covered (m)"),
+        ("distance_m", "Estimated distance (m)"),
     ]
     pl = pub["players"]
     data = [["", names["P1"], names["P2"]]] + [
-        [label, str(pl.get("P1", {}).get(k, "–")), str(pl.get("P2", {}).get(k, "–"))] for k, label in keys
+        [
+            label,
+            str(pl.get("P1", {}).get(k)) if pl.get("P1", {}).get(k) is not None else "Unavailable",
+            str(pl.get("P2", {}).get(k)) if pl.get("P2", {}).get(k) is not None else "Unavailable",
+        ]
+        for k, label in keys
     ]
     t = Table(data, colWidths=[70 * mm, 45 * mm, 45 * mm])
     t.setStyle(
@@ -102,7 +107,7 @@ def build_report(path: Path, session: Any, analytics: Any, rallies: list[dict[st
                 str(r["winner"] or "–"),
                 r["outcome"],
                 str(r["n_shots"]),
-                f"{r['score_P1']}–{r['score_P2']}",
+                f"{r['score_P1']}–{r['score_P2']}" if r.get("score_available", True) else "Unavailable",
             ]
         )
     rt = Table(rrows, repeatRows=1, colWidths=[14 * mm, 14 * mm, 24 * mm, 40 * mm, 22 * mm, 16 * mm, 20 * mm])

@@ -1,0 +1,144 @@
+{
+  "schema_version": 1,
+  "timestamp_utc": "2026-10-23T06:45:07.599419+00:00",
+  "gpu": "NVIDIA GeForce GTX 1080 Ti",
+  "torch": "2.14.1+cu126",
+  "cuda": "12.6",
+  "session_id": "01M5EXGZNEVGYAJ3AR6CJS5ZG9",
+  "media_sha256": "90d1f399c05312ede173de2f2c8cd2fee09f1d201df46b476119660a00039ff0",
+  "frame_indices": [
+    0,
+    900,
+    3600,
+    7200,
+    12000,
+    18000,
+    22000
+  ],
+  "repeats": 2,
+  "warmup_calls": 3,
+  "accuracy_measured": false,
+  "limitations": "Full-frame detections before court admission. No player labels. Process VRAM snapshots include retained allocations, not per-model peak memory. CUDA provider listing permits CPU fallback; use ORT profiling for node placement.",
+  "models": [
+    {
+      "model": "rfdetr_nano",
+      "status": "measured",
+      "weight_sha256": "aceebff282d046fae831217136c4c0ce91fb28a6b834dfd48f3a3f46fddc1d9e",
+      "providers": [
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "score_threshold": 0.35,
+      "p50_ms": 14.980635605752468,
+      "p95_ms": 15.182851767167449,
+      "all_latency_ms": [
+        14.708496164530516,
+        14.958115993067622,
+        14.878239016979933,
+        14.958321116864681,
+        15.019658021628857,
+        15.065196203067899,
+        15.002950094640255,
+        15.343249076977372,
+        14.796348987147212,
+        15.096483984962106,
+        15.088079031556845,
+        15.009277034550905,
+        14.835273148491979,
+        14.774121111258864
+      ],
+      "person_counts_first_pass": [
+        13,
+        15,
+        15,
+        13,
+        18,
+        9,
+        15
+      ],
+      "process_vram_snapshot": [
+        "757096, 416 MiB"
+      ]
+    },
+    {
+      "model": "rfdetr_small",
+      "status": "measured",
+      "weight_sha256": "fcd3c3c4e0d3d5533ee9c3a174deb7f02dfe4b042b6fdd3d29040f3c6da7845e",
+      "providers": [
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "score_threshold": 0.35,
+      "p50_ms": 24.975403561256826,
+      "p95_ms": 25.4874981706962,
+      "all_latency_ms": [
+        24.63360410183668,
+        24.768459843471646,
+        24.867698783054948,
+        25.426435051485896,
+        25.600901106372476,
+        24.908722145482898,
+        25.300313951447606,
+        25.09347815066576,
+        24.985733907669783,
+        24.8976091388613,
+        24.95482680387795,
+        25.299113942310214,
+        24.969590129330754,
+        24.981216993182898
+      ],
+      "person_counts_first_pass": [
+        15,
+        15,
+        14,
+        14,
+        18,
+        12,
+        12
+      ],
+      "process_vram_snapshot": [
+        "757096, 416 MiB"
+      ]
+    },
+    {
+      "model": "rfdetr_medium",
+      "status": "measured",
+      "weight_sha256": "7fc5834e2fc7205e399a77d29dd0e89b694b075eeb496d5c8464d25137cad788",
+      "providers": [
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "score_threshold": 0.35,
+      "p50_ms": 32.275765435770154,
+      "p95_ms": 33.07092209579423,
+      "all_latency_ms": [
+        31.98766801506281,
+        32.12205902673304,
+        32.83265605568886,
+        32.02199493534863,
+        32.09179802797735,
+        32.32315508648753,
+        33.15147594548762,
+        32.47218392789364,
+        32.03360619954765,
+        32.00824488885701,
+        32.228375785052776,
+        33.02754694595933,
+        33.010418992489576,
+        32.348789973184466
+      ],
+      "person_counts_first_pass": [
+        16,
+        14,
+        15,
+        14,
+        15,
+        15,
+        16
+      ],
+      "process_vram_snapshot": [
+        "757096, 674 MiB"
+      ]
+    }
+  ]
+}

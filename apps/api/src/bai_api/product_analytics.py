@@ -30,7 +30,7 @@ class Availability(BaseModel):
 class Lineage(BaseModel):
     event_seq: int
     source: Literal["canonical_events_and_tracks"] = "canonical_events_and_tracks"
-    metric_version: int = 1
+    metric_version: int = 2
 
 
 class Capabilities(BaseModel):
@@ -336,6 +336,7 @@ def insights(repo: SessionRepository, cache: AnalyticsCache, session: Session) -
                 "official": rally.official,
                 "game_no": rally.game_no,
                 "score_after": rally.score_after,
+                "score_available": rally.score_available,
                 "shots": rally.shots,
                 "confidence": event.confidence,
                 "band": event.band.value,
@@ -357,8 +358,11 @@ def insights(repo: SessionRepository, cache: AnalyticsCache, session: Session) -
             ),
             "rally_length": "Official rallies with a known winner, grouped by the number of observed shots.",
             "distance_m": (
-                "Sum of accepted court-coordinate displacements during official rallies; "
-                "displacements over 1.5 m between adjacent observed positions are rejected."
+                "Estimated court-plane path during official rallies with validated main-camera geometry. "
+                "Median-smoothed at 5 Hz; gaps over 0.25 s, identity changes, rejected observations and "
+                "implausible speeds break paths. Movement below 0.05 m per step is suppressed. "
+                "Coverage and observed seconds describe support; missing evidence yields null. "
+                "Policy thresholds are not an accuracy validation or physiological measurement."
             ),
         },
     }

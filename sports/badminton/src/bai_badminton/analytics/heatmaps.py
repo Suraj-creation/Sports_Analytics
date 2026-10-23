@@ -1,9 +1,9 @@
 """Court-coordinate heatmaps, updated incrementally from the canonical stream.
 
 Kinds (per player):
-* ``presence``  — where the player spends time (feet positions while in play),
+* ``presence``  — accepted sampled feet positions (sample count, not dwell time),
 * ``origin``    — where the player hits from (feet at their contacts),
-* ``landing``   — where the player's shots land (next contact point / rally-end landing),
+* ``landing``   — explicitly supported trajectory/human shuttle landings,
 * ``movement``  — path segments between contacts (distance-weighted presence),
 * ``targeting`` — where the *opponent* is made to play from (receiver position after a shot).
 
@@ -31,8 +31,8 @@ KINDS = ("presence", "origin", "landing", "movement", "targeting")
 def _cell(x: float, y: float) -> tuple[int, int] | None:
     if not (np.isfinite(x) and np.isfinite(y)):
         return None
-    i = int((x - X0) / CELL)
-    j = int((y - Y0) / CELL)
+    i = int(np.floor((x - X0) / CELL))
+    j = int(np.floor((y - Y0) / CELL))
     if 0 <= i < NX and 0 <= j < NY:
         return i, j
     return None
@@ -65,11 +65,11 @@ class HeatmapSet:
     def add_path(self, player: str, xy: NDArray[np.floating]) -> float:
         """Add a movement path; returns its length in metres (NaN points skipped)."""
         pts = np.asarray(xy, dtype=np.float64).reshape(-1, 2)
-        pts = pts[np.isfinite(pts).all(axis=1)]
+        # Preserve NaNs as breaks; removing them invents motion across missing evidence.
         if len(pts) < 2:
             return 0.0
         seg = np.hypot(*np.diff(pts, axis=0).T)
-        seg[seg > 1.5] = 0.0  # identity glitches / teleports are not movement
+        seg[(~np.isfinite(seg)) | (seg > 1.5)] = 0.0
         for (x, y), d in zip(pts[1:], seg, strict=True):
             if d > 0:
                 self.add(player, "movement", float(x), float(y), float(d))

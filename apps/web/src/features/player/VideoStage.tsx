@@ -15,7 +15,7 @@ import { IconButton, Spinner } from "@/components/ui";
 import { clock, fps as fpsOf, PLAYER_HEX, shortName } from "@/lib/format";
 import { frameClock, timeToFrame } from "@/lib/frameClock";
 import type { Session } from "@/lib/types";
-import { type Layers, usePlayback } from "@/stores/playback";
+import { type EvidenceSelection, type Layers, usePlayback } from "@/stores/playback";
 import { useSession } from "@/stores/session";
 import { normalizeClip } from "./clip";
 import { drawOverlay, type OverlayCtx } from "./overlay";
@@ -62,36 +62,60 @@ export function VideoStage({ session }: { session: Session }) {
   const [gated, setGated] = useState(false);
   const [muted, setMuted] = useState(true);
   const [rate, setRate] = useState(1);
-  const [clip, setClip] = useState<{ from: number; to: number; label: string } | null>(null);
+  const clip = usePlayback((s) => s.clip);
+  const clearClip = usePlayback((s) => s.clearClip);
   const [clipLoop, setClipLoop] = useState(false);
 
   useEffect(() => {
-    const onClip = (event: Event) => {
-      const { start, end, label } = (event as CustomEvent<{ start: number; end: number; label: string }>)
-        .detail;
+    const cue = (selection: EvidenceSelection) => {
+      const { start, end } = selection;
       const range = normalizeClip(start, end, fps, nFrames);
-      if (!range || !video) return;
-      setClip({ ...range, label });
+      if (!range || !video || video.readyState < 1) return;
+      usePlayback.getState().selectEvidence(selection, range);
+      setClipLoop(false);
       setGated(false);
-      video.currentTime = (range.from + 0.5) / fps;
-      useSession.getState().socket?.seek(range.from);
+      // MediaInfo describes the canonical CFR proxy. Cue the actual event, not the lead-in.
+      video.currentTime = (Math.min(nFrames - 1, Math.floor(start)) + 0.5) / fps;
+      usePlayback.getState().setFrame(Math.floor(start));
+      useSession.getState().socket?.seek(Math.floor(start));
       void video.play().catch(() => {});
     };
+    const onClip = (event: Event) => {
+      const selection = (event as CustomEvent<EvidenceSelection>).detail;
+      usePlayback.setState({ selection, clip: null });
+      cue(selection);
+    };
+    const pending = () => {
+      const selection = usePlayback.getState().selection;
+      if (selection) cue(selection);
+    };
+    if (video?.readyState && usePlayback.getState().selection && !usePlayback.getState().clip) pending();
+    video?.addEventListener("loadedmetadata", pending);
     window.addEventListener("bai:play-clip", onClip);
-    return () => window.removeEventListener("bai:play-clip", onClip);
+    return () => {
+      video?.removeEventListener("loadedmetadata", pending);
+      window.removeEventListener("bai:play-clip", onClip);
+    };
   }, [fps, nFrames, video]);
 
   useEffect(() => {
     if (!video || !clip) return;
-    return frameClock.subscribe((frame) => {
-      if (frame < clip.to || video.paused) return;
+    const stopAtBoundary = () => {
+      if (timeToFrame(video.currentTime, fps) < clip.to || video.paused) return;
       if (clipLoop) video.currentTime = (clip.from + 0.5) / fps;
       else {
         video.pause();
         video.currentTime = (clip.to + 0.5) / fps;
+        setFrame(clip.to);
       }
-    });
-  }, [video, clip, clipLoop, fps]);
+    };
+    const unsubscribe = frameClock.subscribe(stopAtBoundary);
+    video.addEventListener("timeupdate", stopAtBoundary);
+    return () => {
+      unsubscribe();
+      video.removeEventListener("timeupdate", stopAtBoundary);
+    };
+  }, [video, clip, clipLoop, fps, setFrame]);
 
   useEffect(() => {
     bindVideo(video);
@@ -260,8 +284,13 @@ export function VideoStage({ session }: { session: Session }) {
   const noTracksYet = status === "analysing" && frontier < 1;
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[var(--radius-card)] border border-seam bg-mat-deep">
-      <div ref={stageRef} className="relative min-h-0 flex-1 bg-black" data-testid="video-stage">
+    <div className="flex min-w-0 flex-col overflow-hidden rounded-[var(--radius-card)] border border-seam bg-mat-deep">
+      <div
+        ref={stageRef}
+        className="video-picture relative w-full bg-black"
+        style={{ aspectRatio: `${session.media?.width || 16} / ${session.media?.height || 9}` }}
+        data-testid="video-stage"
+      >
         <video
           ref={setVideo}
           className="absolute inset-0 size-full object-contain"
@@ -299,7 +328,7 @@ export function VideoStage({ session }: { session: Session }) {
               type="button"
               className="min-h-9 px-2"
               onClick={() => {
-                setClip(null);
+                clearClip();
                 if (video) void video.play().catch(() => {});
               }}
             >
@@ -386,7 +415,7 @@ function Controls(props: {
   };
 
   return (
-    <div className="flex h-12 shrink-0 items-center gap-1 border-t border-seam px-2">
+    <div className="video-controls flex min-h-12 shrink-0 flex-wrap items-center gap-1 border-t border-seam px-2 py-1">
       <IconButton label={props.playing ? "Pause (Space)" : "Play (Space)"} onClick={props.onToggle}>
         {props.playing ? <Pause className="size-5" /> : <Play className="size-5" />}
       </IconButton>

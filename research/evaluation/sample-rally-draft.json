@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "media_sha256": "44ae09ac4369edc971588158a5b4eb2df7586b95c8992770277d4d36f93ea790",
+  "timebase": "canonical_media_seconds",
+  "status": "draft",
+  "split": "diagnostic",
+  "population": "all_exchanges",
+  "exhaustive": true,
+  "window_s": [0, 16],
+  "boundary_uncertainty_s": 0.5,
+  "review": {
+    "method": "agent visual review of full-video contact sheet sampled every 0.5 seconds",
+    "human_verified": false,
+    "limitations": "Embedded legacy detector overlays are visible; individual contacts, official phase, winner and exact boundaries remain unverified. This is a draft for human review, never held-out accuracy evidence."
+  },
+  "rallies": [
+    {
+      "start_s": 0.5,
+      "end_s": 14.5,
+      "winner": null
+    }
+  ]
+}

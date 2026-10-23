@@ -158,3 +158,92 @@ def test_unrepairable_answer_is_marked_ungrounded(ctx: ToolContext) -> None:
 def test_text_tool_call_parser_handles_noise() -> None:
     calls = text_tool_calls('x {"name": "nope"} {"name": "momentum", "arguments": "{}"} {bad json')
     assert [(c.name, c.arguments) for c in calls] == [("momentum", {})]
+
+
+def test_rally_tool_resolves_corrected_stroke_and_retraction(ctx: ToolContext) -> None:
+    from bai_engine.schema import EventStatus, Provenance
+
+    rally = next(r for r in ctx.store.query(types=["rally_end"]) if r.payload.get("official"))
+    original = ctx.store.get(rally.payload["shots"][0]["event_id"])
+    corrected = ctx.store.append(
+        original.correct(
+            payload={**original.payload, "stroke": "drop"},
+            status=EventStatus.HUMAN_VERIFIED,
+            provenance=Provenance(model="human"),
+        )
+    )
+    result = json.loads(run_tool(ctx, "get_rally", {"rally_event_id": rally.event_id}))
+    shot = next(s for s in result["shots"] if s["stroke_event_id"] == corrected.event_id)
+    assert shot["stroke"] == "drop"
+    ctx.store.append(corrected.correct(status=EventStatus.RETRACTED, provenance=Provenance(model="human")))
+    result = json.loads(run_tool(ctx, "get_rally", {"rally_event_id": rally.event_id}))
+    assert corrected.event_id not in {s["stroke_event_id"] for s in result["shots"]}
+    assert original.event_id not in result["evidence_ids"]
+
+
+def test_analyst_never_counts_unowned_candidate_stroke(ctx: ToolContext) -> None:
+    from bai_engine.schema import Event, Provenance
+
+    candidate = ctx.store.append(
+        Event(
+            session_id="S1",
+            type="stroke",
+            frame_start=99999,
+            frame_end=99999,
+            pts_us=3333300000,
+            payload={"stroke": "smash"},
+            provenance=Provenance(model="candidate"),
+        )
+    )
+    result = json.loads(run_tool(ctx, "find_strokes", {}))
+    assert candidate.event_id not in result["evidence_ids"]
+
+
+def test_analyst_refreshes_cached_analytics_after_correction(ctx: ToolContext) -> None:
+    from bai_engine.schema import EventStatus, Provenance
+
+    ctx.analytics()
+    rally = next(r for r in ctx.store.query(types=["rally_end"]) if r.payload.get("official"))
+    stroke = ctx.store.get(rally.payload["shots"][0]["event_id"])
+    ctx.store.append(
+        stroke.correct(
+            payload={**stroke.payload, "stroke": "audit_label"},
+            status=EventStatus.HUMAN_VERIFIED,
+            provenance=Provenance(model="human"),
+        )
+    )
+    stats = json.loads(run_tool(ctx, "player_stats", {"player": stroke.actors.player_id}))
+    assert stats["stats"]["strokes"].get("audit_label") == 1
+
+
+def test_get_rally_keeps_one_revision_when_correction_arrives_during_read(
+    ctx: ToolContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An intervening append must not join newer rally IDs with older shot records."""
+    rally = next(r for r in ctx.store.query(types=["rally_end"]) if r.payload.get("official"))
+    original_query = EventStore.query
+    replacement_ids: list[str] = []
+
+    def query_with_intervening_correction(store: EventStore, *args: Any, **kwargs: Any) -> Any:
+        result = original_query(store, *args, **kwargs)
+        # rally_records has captured its rally versions before resolving strokes.
+        # Append a real revision here; no threads or timing assumptions are needed.
+        if store is ctx.store and kwargs.get("types") == ["stroke"] and not replacement_ids:
+            replacement = store.append(
+                rally.correct(payload={**rally.payload, "phase_reason": "concurrent reviewer revision"})
+            )
+            replacement_ids.append(replacement.event_id)
+        return result
+
+    monkeypatch.setattr(EventStore, "query", query_with_intervening_correction)
+    result = json.loads(run_tool(ctx, "get_rally", {"rally_event_id": rally.event_id}))
+    assert replacement_ids  # the correction actually happened inside this read
+    assert result["rally_event_id"] == rally.event_id
+    assert result["phase_reason"] == rally.payload["phase_reason"]
+    assert result["shots"]
+    assert rally.event_id in result["evidence_ids"]
+    assert replacement_ids[0] not in result["evidence_ids"]
+    # The next request observes the new complete revision, rather than staying stale.
+    refreshed = json.loads(run_tool(ctx, "get_rally", {"rally_event_id": rally.event_id}))
+    assert refreshed["rally_event_id"] == replacement_ids[0]
+    assert refreshed["phase_reason"] == "concurrent reviewer revision"

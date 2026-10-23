@@ -24,8 +24,11 @@ class AnalyticsCache:
         # Sequence numbers restart when reanalysis replaces the database. Tracks
         # can also advance without a new rally/event. Both invalidate the fold.
         stat = store.path.stat()
-        player_dir = self.repo.paths(session_id).tracks / "player"
-        track_revision = player_dir.stat().st_mtime_ns if player_dir.exists() else None
+        tracks_dir = self.repo.paths(session_id).tracks
+        track_revision = tuple(
+            (kind, (tracks_dir / kind).stat().st_mtime_ns if (tracks_dir / kind).exists() else None)
+            for kind in ("player", "camera")
+        )
         token = (
             store.last_seq(),
             stat.st_ino,

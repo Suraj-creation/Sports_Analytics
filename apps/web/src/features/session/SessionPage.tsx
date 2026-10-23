@@ -6,10 +6,12 @@ import { useEffect, useRef, useState } from "react";
 import { ErrorNote, Spinner } from "@/components/ui";
 import { type AnalysisSearch, SessionAnalytics } from "@/features/analytics/SessionAnalytics";
 import { playEvidence } from "@/features/player/clip";
+import { EvidenceDetails } from "@/features/player/EvidenceDetails";
 import { VideoStage } from "@/features/player/VideoStage";
 import { Timeline } from "@/features/timeline/Timeline";
 import { api } from "@/lib/api";
 import { fps as fpsOf, STATUS_LABEL, shortName } from "@/lib/format";
+import { frameClock } from "@/lib/frameClock";
 import type { PlayerId, Session } from "@/lib/types";
 import { usePlayback } from "@/stores/playback";
 import { useSession } from "@/stores/session";
@@ -94,10 +96,18 @@ function SessionWorkspace({ session, search }: { session: Session; search: Analy
     });
 
   useEffect(() => {
+    usePlayback.getState().resetMedia();
+    frameClock.publish(0);
+    return () => usePlayback.getState().resetMedia();
+  }, []);
+
+  useEffect(() => {
+    if (search.f == null) return;
     const requested = Math.max(0, Math.min(nFrames - 1, search.f ?? 0));
     if (!video || !session.media || applied.current === requested) return;
     const cue = () => {
-      usePlayback.getState().seekFrame(requested, fps);
+      // A more recent evidence click while media loaded takes precedence over the arrival URL.
+      if (!usePlayback.getState().selection) usePlayback.getState().seekFrame(requested, fps);
       applied.current = requested;
     };
     if (video.readyState >= 1) cue();
@@ -123,6 +133,7 @@ function SessionWorkspace({ session, search }: { session: Session; search: Analy
       }
       if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
         event.preventDefault();
+        player.video.pause();
         const next =
           player.frame + (event.key === "ArrowLeft" ? -1 : 1) * (event.shiftKey ? Math.round(fps) : 1);
         player.seekFrame(Math.min(nFrames - 1, Math.max(0, next)), fps);
@@ -269,6 +280,7 @@ function SessionWorkspace({ session, search }: { session: Session; search: Analy
           </p>
         </div>
       </div>
+      <EvidenceDetails session={session} />
       <details className="analysis-panel mt-5">
         <summary className="cursor-pointer text-sm font-medium">Live event feed</summary>
         <div className="mt-4 max-h-64 overflow-y-auto">

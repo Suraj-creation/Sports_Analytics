@@ -154,7 +154,10 @@ def test_analytics_exports_and_corrections(settings: Settings) -> None:
         a = client.get(f"/api/sessions/{sid}/analytics").json()
         assert a["rallies"] == 8 and a["players"]["P1"]["points_won"] == 5
         hm = client.get(f"/api/sessions/{sid}/heatmap", params={"player": "P1", "kind": "presence"}).json()
-        assert hm["shape"] and hm["total"] > 0
+        # This legacy synthetic stream has coordinates but no camera-quality evidence.
+        assert hm["shape"] and hm["total"] == 0
+        assert a["players"]["P1"]["distance_m"] is None
+        assert a["players"]["P1"]["distance_quality"]["status"] == "unavailable"
         assert client.get(f"/api/sessions/{sid}/heatmap", params={"player": "P9"}).status_code == 422
         hl = client.get(f"/api/sessions/{sid}/highlights", params={"player": "P2"}).json()["highlights"]
         assert all(h["player"] == "P2" for h in hl)

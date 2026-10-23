@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from bai_badminton.analytics.heatmaps import HeatmapSet
+from bai_badminton.analytics.spatial import METHOD, court_point_valid, movement
 from bai_badminton.ontology import get_ontology
 from bai_engine.schema import Event
 
@@ -33,6 +34,7 @@ class RallyRecord:
     flags_before: dict[str, Any]
     duration_s: float
     official: bool = True  # False: warm-up / practice / replayed hitting (see events.match_phase)
+    score_available: bool = False  # True only when a canonical point supports score_after
 
     @property
     def n_shots(self) -> int:
@@ -53,7 +55,27 @@ class PlayerStats:
     serves: int = 0
     serve_points_won: int = 0
     distance_m: float = 0.0
+    distance_samples: int = 0
+    distance_expected: int = 0
+    distance_observed_s: float = 0.0
+    distance_segments: int = 0
     points_won_under_pressure: int = 0  # at game point (either side) or deuce
+
+    def distance_quality(self) -> dict[str, Any]:
+        return {
+            "status": "estimate" if self.distance_segments else "unavailable",
+            "method": METHOD,
+            "coverage": round(min(1.0, self.distance_samples / self.distance_expected), 3)
+            if self.distance_expected
+            else 0.0,
+            "accepted_samples": self.distance_samples,
+            "total_samples": self.distance_expected,
+            "observed_s": round(self.distance_observed_s, 3),
+            "segments": self.distance_segments,
+            "reason": None
+            if self.distance_segments
+            else "No continuous player observations with validated main-camera calibration.",
+        }
 
     def to_public(self) -> dict[str, Any]:
         played = self.points_won + self.points_lost
@@ -70,7 +92,8 @@ class PlayerStats:
             "smash_points": self.smash_points,
             "serves": self.serves,
             "serve_points_won": self.serve_points_won,
-            "distance_m": round(self.distance_m, 1),
+            "distance_m": round(self.distance_m, 1) if self.distance_segments else None,
+            "distance_quality": self.distance_quality(),
             "points_won_under_pressure": self.points_won_under_pressure,
         }
 
@@ -113,7 +136,7 @@ class MatchAnalytics:
         self.score_timeline: list[dict[str, Any]] = []
 
     # ------------------------------------------------------------------ ingestion
-    def on_stroke(self, ev: Event) -> None:
+    def on_stroke(self, ev: Event, *, spatial_valid: bool = False) -> None:
         pid = ev.actors.player_id
         if pid is None:
             return
@@ -125,15 +148,20 @@ class MatchAnalytics:
                 self.players[pid].jump_smashes += 1
         if ev.payload.get("is_serve"):
             self.players[pid].serves += 1
-        origin = ev.payload.get("hitter_court_xy")
-        if origin:
-            self.heatmaps.add(pid, "origin", *origin)
-        landing = ev.payload.get("landing_court_xy")
-        if landing:
-            self.heatmaps.add(pid, "landing", *landing)
-            opp = ev.payload.get("receiver_id")
-            if opp:
-                self.heatmaps.add(pid, "targeting", *landing)
+        if spatial_valid:
+            origin = ev.payload.get("hitter_court_xy")
+            if origin and court_point_valid(*origin):
+                self.heatmaps.add(pid, "origin", *origin)
+            landing = ev.payload.get("landing_court_xy")
+            source = ev.payload.get("landing_source")
+            if landing and source in ("trajectory", "human") and court_point_valid(*landing):
+                self.heatmaps.add(pid, "landing", *landing)
+            # Legacy engine versions labelled the receiver's feet as a landing.
+            receiver = ev.payload.get("receiver_court_xy")
+            if receiver is None and source in (None, "receiver_position"):
+                receiver = landing
+            if receiver and ev.payload.get("receiver_id") and court_point_valid(*receiver):
+                self.heatmaps.add(pid, "targeting", *receiver)
 
     def on_stroke_retracted(self, ev: Event) -> None:
         pid = ev.actors.player_id
@@ -150,12 +178,33 @@ class MatchAnalytics:
         if ev.payload.get("is_serve") and ps.serves > 0:
             ps.serves -= 1
 
-    def on_presence(self, player: str, court_xy: list[tuple[float, float]]) -> None:
+    def on_presence(
+        self,
+        player: str,
+        court_xy: list[tuple[float, float]],
+        *,
+        frames: list[int] | None = None,
+        track_ids: list[int] | None = None,
+        valid: list[bool] | None = None,
+        expected_frames: int | None = None,
+    ) -> None:
         import numpy as np
 
+        stats = self.players[player]
+        stats.distance_expected += expected_frames if expected_frames is not None else len(court_xy)
+        # Coordinate-only legacy buffers lack timestamp, identity and calibration evidence.
+        if frames is None or track_ids is None or valid is None:
+            return
         arr = np.asarray(court_xy, dtype=float).reshape(-1, 2)
-        self.heatmaps.add_many(player, "presence", arr[:: max(1, int(self.fps // 5))])
-        self.players[player].distance_m += self.heatmaps.add_path(player, arr)
+        measured = movement(arr, frames, track_ids, valid, self.fps)
+        stats.distance_samples += measured.accepted_samples
+        stats.distance_m += measured.distance_m
+        stats.distance_observed_s += measured.observed_s
+        stats.distance_segments += measured.segments
+        for (x, y), distance in zip(measured.xy, measured.weights, strict=True):
+            self.heatmaps.add(player, "presence", float(x), float(y))
+            if distance:
+                self.heatmaps.add(player, "movement", float(x), float(y), distance)
 
     def on_rally(self, rally: RallyRecord) -> None:
         if not rally.official:
@@ -181,16 +230,17 @@ class MatchAnalytics:
         if rally.flags_before.get("game_point") or rally.flags_before.get("deuce"):
             w.points_won_under_pressure += 1
         self._update_momentum(rally)
-        self.score_timeline.append(
-            {
-                "rally_no": rally.rally_no,
-                "game_no": rally.game_no,
-                "score": dict(rally.score_after),
-                "winner": rally.winner,
-                "frame": rally.end,
-                "rally_id": rally.rally_id,
-            }
-        )
+        if rally.score_available:
+            self.score_timeline.append(
+                {
+                    "rally_no": rally.rally_no,
+                    "game_no": rally.game_no,
+                    "score": dict(rally.score_after),
+                    "winner": rally.winner,
+                    "frame": rally.end,
+                    "rally_id": rally.rally_id,
+                }
+            )
 
     def _update_momentum(self, rally: RallyRecord) -> None:
         sign = 1.0 if rally.winner == "P1" else -1.0
@@ -271,7 +321,7 @@ class MatchAnalytics:
 
     def _is_comeback_point(self, r: RallyRecord) -> bool:
         """The winner levels or takes the lead in a game after trailing by ≥ 5."""
-        if r.winner is None:
+        if r.winner is None or not r.score_available:
             return False
         game = [x for x in self.score_timeline if x["game_no"] == r.game_no and x["rally_no"] <= r.rally_no]
         if not game:
@@ -302,6 +352,7 @@ class MatchAnalytics:
     # ------------------------------------------------------------------ public
     def to_public(self) -> dict[str, Any]:
         return {
+            "metric_version": 2,
             "rallies": len(self.rallies),
             "unofficial_rallies": len(self.unofficial),
             # operational definitions: sums of segmented rally durations (shuttle in play), not
