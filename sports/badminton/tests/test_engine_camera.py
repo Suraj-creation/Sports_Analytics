@@ -11,6 +11,7 @@ import numpy as np
 import pytest
 
 from bai_badminton.engine import BadmintonMatchEngine, EngineConfig
+from bai_badminton.events.match_phase import PhaseParams
 from bai_badminton.perception.camera import project
 from bai_badminton.perception_types import ChunkPerception, PersonObs
 from bai_badminton.testing.synth import SynthMatch, make_match
@@ -61,7 +62,10 @@ def move(m: SynthMatch, roll: float = 0.0) -> list[ChunkPerception]:
 
 def run(tmp_path: Path, name: str, chunks: list[ChunkPerception], m: SynthMatch, *, tracked: bool):
     store = EventStore(tmp_path / f"{name}.sqlite", "S1")
-    eng = BadmintonMatchEngine("S1", EngineConfig(fps=m.fps, frame_width=1280, frame_height=720), store)
+    cfg = EngineConfig(
+        fps=m.fps, frame_width=1280, frame_height=720, phase=PhaseParams(allow_heuristic_official=True)
+    )
+    eng = BadmintonMatchEngine("S1", cfg, store)
     eng.set_calibration(0, m.homography, cam_ref=CAM_REF if tracked else None)
     tracks = []
     for ch in chunks:

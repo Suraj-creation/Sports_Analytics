@@ -29,6 +29,7 @@ from typing import Any
 import numpy as np
 
 from bai_badminton.court import REFERENCE_POINTS, WIDTH_DOUBLES, Homography
+from bai_badminton.perception.calibration_state import CalibrationLifecycle
 from bai_badminton.perception.camera import CameraTracker, project
 from bai_badminton.perception.court_lines import CameraRig, CourtTracker, camera_pose
 from bai_badminton.perception.isolation import flight_mask
@@ -58,6 +59,7 @@ class _Scene:
     quality: list[float | None]
     poses: list[np.ndarray | None] | None  # None: the camera is not tracked
     polys: list[np.ndarray | None]
+    held: list[bool] = field(default_factory=list)
 
 
 @dataclass
@@ -94,6 +96,8 @@ class BadmintonPerception:
         self.cuts = CutDetector()
         self.presence: CourtPresence | None = None
         self.camera = CameraTracker()  # legacy: keeps a calibration on a panning camera by its background
+        self.calibration_lifecycle = CalibrationLifecycle()
+        self._calibration_last_frame: int | None = None
         self.court = CourtTracker()  # measures the court in every frame from its painted lines
         self.rig: CameraRig | None = None  # the production's cameras (head 0 = the calibration's)
         self.mode = "static"
@@ -208,6 +212,8 @@ class BadmintonPerception:
         self._learn_court_colour()
         self.camera.clear()
         self.court.reset()
+        self.calibration_lifecycle = CalibrationLifecycle()
+        self._calibration_last_frame = None
         self.rig, self._lines_id, self.mode = None, None, "static"
         size = self.frame_size or (None if reference is None else (reference.shape[1], reference.shape[0]))
         if mode == "lines" and size is not None:
@@ -262,6 +268,25 @@ class BadmintonPerception:
         # Where the camera is: the pose of every frame relative to the calibration's reference view.  A frame
         # that is not analysed (no court in view, another camera) is treated like a replay.
         scene = self._scene(chunk, cut_flags)
+        if self._calibration_last_frame is None or self._calibration_last_frame != chunk.start - 1:
+            self.calibration_lifecycle = CalibrationLifecycle()
+        states = []
+        for i, view in enumerate(scene.views):
+            held = scene.held[i] if scene.held else False
+            main_geometry = view == "main" and scene.polys[i] is not None
+            # Background tracking without an installed floor mask cannot verify the court plane.
+            camera_floor = self.camera._st is not None and self.camera._st.floor is not None
+            can_verify = self.mode == "lines" or (self.mode == "camera" and camera_floor)
+            verified = (
+                main_geometry and can_verify and not held and scene.poses is not None and scene.poses[i] is not None
+            )
+            states.append(
+                self.calibration_lifecycle.update(
+                    verified=verified, held=main_geometry and (held or not can_verify), cut=cut_flags[i]
+                )
+            )
+        if n:
+            self._calibration_last_frame = chunk.start + n - 1
         replay = [v != "main" for v in scene.views]
         poses, polys = scene.poses, scene.polys
 
@@ -318,6 +343,10 @@ class BadmintonPerception:
                         view=scene.views[i],
                         head=scene.heads[i],
                         court_q=scene.quality[i],
+                        calibration_state=states[i],
+                        detector_observed=bool(
+                            not replay[i] and getattr(self.players, "last_detector_observed", False)
+                        ),
                     )
                 )
         self._rate("players", n, t0)
@@ -336,7 +365,7 @@ class BadmintonPerception:
     def _scene(self, chunk: DecodedChunk, cut_flags: list[bool]) -> _Scene:
         """Per-frame view, camera head, pose (reference px → frame px) and court polygon of a chunk."""
         n = len(chunk.frames)
-        sc = _Scene(["main"] * n, [None] * n, [None] * n, None, [None] * n)
+        sc = _Scene(["main"] * n, [None] * n, [None] * n, None, [None] * n, [False] * n)
         if self.presence is None:  # court ownership is unknown: require calibration
             sc.views = ["none"] * n
             return sc
@@ -350,6 +379,7 @@ class BadmintonPerception:
                 if fit is None:
                     sc.views[i] = "none"
                     continue
+                sc.held[i] = fit.method == "hold"
                 head = self.rig.classify(fit)
                 G = fit.H @ H_inv
                 G = G / G[2, 2]
@@ -360,6 +390,8 @@ class BadmintonPerception:
             return sc
         poses = self.camera.track(chunk.frames, cut_flags, chunk.start) if self.mode == "camera" else None
         sc.poses = poses
+        if poses is not None:
+            sc.held = list(self.camera.last_held)
         for i, f in enumerate(chunk.frames):
             if poses is None:
                 sc.polys[i] = self._ref_poly

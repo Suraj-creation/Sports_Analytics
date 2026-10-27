@@ -16,12 +16,15 @@ Each finished rally is decided from evidence, in order of authority:
 4. **tempo** — before the match, warm-up exchanges restart within seconds; the first official serve
    follows a pause.
 
-Once the match is in progress, rallies are official unless there is negative evidence (scoreboard
-unchanged, or a rally that starts right after a camera cut without a serve formation — a replay or
-the tail of a rally already ended by the cut).  Missing evidence never starts the match on its own:
+Legacy heuristic policy: once the match is in progress, rallies are official unless there is
+negative evidence (scoreboard unchanged, or a rally that starts right after a camera cut without
+a serve formation — a replay or the tail of a rally already ended by the cut).
+Missing evidence never starts the match on its own:
 without calibrated player positions and stationarity evidence the phase stays undecided and
 those rallies are not scored. Explicit human decisions and stable scoreboard changes can
-establish official play independently of court calibration.
+establish official play independently of court calibration. By default, formation and tempo
+alone cannot confirm match play; unconfirmed exchanges stay excluded and available for review.
+The legacy heuristic can be enabled explicitly for backwards-compatible analysis.
 """
 
 from __future__ import annotations
@@ -47,6 +50,7 @@ class PhaseParams:
     still_max_m: float = 0.75  # ... moving less than this over the window
     min_entry_gap_s: float = 4.0  # the first official serve follows at least this pause
     post_cut_s: float = 3.0  # "right after a camera cut / replay"
+    allow_heuristic_official: bool = False  # legacy formation classification; not reliable match evidence
 
 
 @dataclass(frozen=True)
@@ -117,6 +121,10 @@ class MatchPhaseTracker:
             return PhaseDecision(False, self.phase, "the scoreboard did not change", "scoreboard")
         if ev.scoreboard == "changed":
             return self._to(True, "the scoreboard changed", "scoreboard")
+        if not self.params.allow_heuristic_official:
+            return PhaseDecision(
+                False, self.phase, "match activity requires human or scoreboard confirmation", "insufficient"
+            )
         if self.phase is Phase.MATCH_PLAY:
             if ev.after_cut and ev.formation is False:
                 return PhaseDecision(False, self.phase, "starts right after a camera cut without a serve", "formation")

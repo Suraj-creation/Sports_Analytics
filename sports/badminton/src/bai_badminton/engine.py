@@ -19,14 +19,17 @@ Event flow::
 
 from __future__ import annotations
 
+from collections import deque
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field, replace
+from hashlib import sha256
 from typing import Any
 
 import numpy as np
 
 from bai_badminton.analytics.match import MatchAnalytics, RallyRecord
 from bai_badminton.court import Homography
+from bai_badminton.events.activity import ActivityInterval, ActivityObservation, ActivityTracker
 from bai_badminton.events.contact import CONTACT_MODEL, ContactCandidate, detect_contacts
 from bai_badminton.events.match_phase import (
     MatchPhaseTracker,
@@ -49,6 +52,8 @@ from bai_badminton.events.stroke import (
 from bai_badminton.identity import IdentityResolver
 from bai_badminton.observations import PlayerSeries, WindowObs
 from bai_badminton.ontology import get_ontology
+from bai_badminton.participation import ParticipantTracker
+from bai_badminton.perception.calibration_state import CalibrationState
 from bai_badminton.perception.camera import project
 from bai_badminton.perception.keypoints import KP
 from bai_badminton.perception.shuttle_post import Track, process
@@ -110,16 +115,40 @@ def keypoint_rows(k: Any) -> tuple[tuple[float, float, float], ...] | None:
     return None if k is None else tuple((float(r[0]), float(r[1]), float(r[2])) for r in k)
 
 
+def _usable_camera_pose(fp: FramePerception, *, allow_alternate: bool = False) -> Any:
+    """Reject missing, stale, non-finite or singular camera transforms."""
+    if fp.cam_lost or fp.cam is None or fp.scene == "none":
+        return None
+    if fp.calibration_state not in (None, CalibrationState.VALID) and not (allow_alternate and fp.scene == "alt"):
+        return None
+    try:
+        cam = np.asarray(fp.cam, dtype=np.float64)
+        if cam.shape != (3, 3) or not np.isfinite(cam).all() or np.linalg.cond(cam) >= 1e12:
+            return None
+    except (TypeError, ValueError, np.linalg.LinAlgError):
+        return None
+    return cam
+
+
 def camera_sample(fp: FramePerception) -> TrackSample:
     """The per-frame CAMERA track row: pose (reference px → frame px; ``None``: no court in view), the physical
     camera that shot the frame (``track_id``: 0 = the main camera, -1 = none) and the court-line fit's
     precision (``conf``)."""
+    cam = _usable_camera_pose(fp, allow_alternate=True)
     return TrackSample(
         frame_idx=fp.frame_idx,
         obj=TrackObject.CAMERA,
-        visible=fp.cam is not None,
-        cam=tuple(float(v) for v in fp.cam.ravel()) if fp.cam is not None else None,
-        track_id=fp.head if fp.head is not None else (0 if fp.cam is not None else -1),
+        visible=cam is not None,
+        cam=tuple(float(v) for v in cam.ravel()) if cam is not None else None,
+        track_id=(
+            fp.head
+            if fp.scene == "main" and fp.head is not None
+            else (
+                0
+                if fp.scene == "main" and cam is not None
+                else (fp.head if fp.scene == "alt" and fp.head not in (None, 0) else -1)
+            )
+        ),
         conf=float(fp.court_q) if fp.court_q is not None else 0.0,
     )
 
@@ -195,6 +224,12 @@ class BadmintonMatchEngine:
         self.ont = get_ontology()
         self.stroke_clf: StrokeClassifier = stroke_classifier or RuleStrokeClassifier()
         self.identity = IdentityResolver(frame_height=float(cfg.frame_height))
+        self.participants: ParticipantTracker | None = None
+        self._multi_person_identity_ambiguous = False
+        self.activity = ActivityTracker(cfg.fps)
+        self._activity_positions: deque[tuple[int, dict[int, tuple[float, float]]]] = deque(
+            maxlen=max(3, round(cfg.fps * 0.5))
+        )
         self.fsm = RallyFSM(RallyParams(fps=cfg.fps))
         self.analytics = MatchAnalytics(cfg.fps)
         self.ocr = ScoreReconciler(player_names=player_names or {})
@@ -224,6 +259,7 @@ class BadmintonMatchEngine:
         self._sconf: list[float] = []
         self._replay: list[bool] = []
         self._shot: list[int] = []
+        self._geometry_valid: list[bool] = []
         self._players: dict[str, dict[str, list[Any]]] = {
             pid: {"bbox": [], "kps": [], "court": []} for pid in ("P1", "P2")
         }
@@ -330,6 +366,7 @@ class BadmintonMatchEngine:
         if self._last_frame < 0:
             return
         self._emit_scenes(self.scenes.flush())
+        self._emit_activity(self.activity.flush())
         self._advance(self._last_frame)
         upd = self.fsm.flush(self._last_frame)
         self._handle_fsm(upd, self._last_frame)
@@ -360,9 +397,30 @@ class BadmintonMatchEngine:
             ]
         )
 
+    def _emit_activity(self, interval: ActivityInterval | None) -> None:
+        if interval is None:
+            return
+        self._emit(
+            [
+                self._event(
+                    "activity_interval",
+                    interval.start_frame,
+                    interval.end_frame,
+                    payload={
+                        "state": interval.state.value,
+                        "basis": interval.basis,
+                        "evidence_coverage": interval.evidence_coverage,
+                        "match_intent": interval.match_intent,
+                    },
+                    model=interval.version,
+                    status=EventStatus.CONFIRMED,
+                )
+            ]
+        )
+
     # ================================================================== buffering
     def _append(self, fp: FramePerception, tracked: bool = False) -> None:
-        G = fp.cam if tracked else None
+        G = _usable_camera_pose(fp) if tracked else None
         self._cam.append(G)
         Ginv = np.linalg.inv(G) if G is not None else None
         sxy = fp.shuttle_xy
@@ -383,13 +441,105 @@ class BadmintonMatchEngine:
         # a tracked camera has one calibration (in the reference view) wherever the court is in view
         calib = (self._main_calib if G is not None else None) if tracked else self._calib(fp.shot_id)
         persons = [_stabilise(p, Ginv) for p in fp.persons] if Ginv is not None else fp.persons
+        # A lost or non-main view cannot support authoritative court coordinates,
+        # even if an upstream observation carries a stale position.
+        geometry_unavailable = (
+            fp.cam_lost
+            or fp.scene != "main"
+            or (tracked and G is None)
+            or fp.calibration_state not in (None, CalibrationState.VALID)
+        )
+        if geometry_unavailable:
+            calib = None
+            persons = [replace(p, court_xy=None) for p in persons]
         for p in persons:
             if p.court_xy is None and calib is not None:
                 feet = np.array([[(p.bbox[0] + p.bbox[2]) / 2, p.bbox[3]]])
                 cx, cy = calib.homography.image_to_court(feet)[0]
                 p.court_xy = (float(cx), float(cy))
+        # Participant hypotheses are separate from P1/P2 scoring identities.
+        # A restart begins a distinct deterministic epoch; old tracks are not silently joined.
+        if self.participants is None:
+            epoch = sha256(f"{self.session_id}:{fp.frame_idx}".encode()).hexdigest()[:16]
+            self.participants = ParticipantTracker(float(self.cfg.frame_height), fps=self.cfg.fps, instance_id=epoch)
+        geometry_valid = not geometry_unavailable and calib is not None
+        self._geometry_valid.append(geometry_valid)
+        coverage_valid = geometry_valid and bool(self._provenance.get("player_detector")) and not fp.replay
+        participant_frame = self.participants.update(
+            fp.frame_idx,
+            persons,
+            coverage_valid=coverage_valid,
+            absence_valid=coverage_valid and fp.detector_observed is True,
+        )
+        participant_events = [
+            self._event(
+                "participant_observation",
+                event.frame_idx,
+                event.frame_idx,
+                payload=asdict(event),
+                model="participant_tracker_v1",
+                status=EventStatus.PROVISIONAL,
+            )
+            for event in participant_frame.events
+        ]
+        self._emit(participant_events)
+        # Movement is a supporting visual cue, not evidence of match intent.
+        positions = {
+            p.track_id: (float((p.bbox[0] + p.bbox[2]) / 2), float(p.bbox[3]))
+            for p in persons
+            if np.isfinite(p.conf) and p.conf >= 0.5 and np.isfinite(p.bbox).all()
+        }
+        movement = None
+        if coverage_valid:
+            if self._activity_positions and self._activity_positions[-1][0] != fp.frame_idx - 1:
+                self._activity_positions.clear()
+            if len(self._activity_positions) >= 2:
+                previous = self._activity_positions[0][1]
+                common = positions.keys() & previous.keys()
+                if len(common) >= 2:
+                    movement = any(
+                        np.hypot(positions[k][0] - previous[k][0], positions[k][1] - previous[k][1])
+                        >= max(2.0, self.cfg.frame_height * 0.005)
+                        for k in common
+                    )
+            self._activity_positions.append((fp.frame_idx, positions))
+        else:
+            self._activity_positions.clear()
+        _, activity_interval = self.activity.update(
+            ActivityObservation(
+                frame_idx=fp.frame_idx,
+                view_valid=geometry_valid and not fp.replay,
+                person_count=len(participant_frame.participants) if coverage_valid else None,
+                moving=movement,
+                shuttle_visible=True if fp.shuttle_xy is not None and fp.shuttle_conf >= 0.5 else None,
+            )
+        )
+        self._emit_activity(activity_interval)
+        # The legacy P1/P2 resolver models two individuals. Three or more
+        # visible court tracks cannot safely be forced into those slots.
+        visible_ids = {p.track_id for p in persons if p.track_id >= 0 and np.isfinite(p.conf) and p.conf >= 0.5}
+        if coverage_valid and len(visible_ids) >= 3 and not self._multi_person_identity_ambiguous:
+            self._multi_person_identity_ambiguous = True
+            self._emit(
+                [
+                    self._event(
+                        "identity_ambiguity",
+                        fp.frame_idx,
+                        fp.frame_idx,
+                        payload={
+                            "reason": "multiple_court_tracks",
+                            "certainty": "hypothesis",
+                            "track_count": len(visible_ids),
+                        },
+                        model="participant_tracker_v1",
+                        status=EventStatus.PROVISIONAL,
+                    )
+                ]
+            )
         assigned = (
-            self.identity.assign(persons, {k: v.value for k, v in self.state.ends.items()}) if not fp.replay else {}
+            self.identity.assign(persons, {k: v.value for k, v in self.state.ends.items()})
+            if geometry_valid and not fp.replay and not self._multi_person_identity_ambiguous
+            else {}
         )
         for pid, buf in self._players.items():
             a = assigned.get(pid)
@@ -409,6 +559,26 @@ class BadmintonMatchEngine:
             )
         )
         raw = {q.track_id: q for q in fp.persons}
+        if self._multi_person_identity_ambiguous and geometry_valid:
+            # Keep visual trajectories usable for overlays without assigning a
+            # singles player or allowing them into player-specific statistics.
+            for p in fp.persons:
+                if p.track_id < 0 or not np.isfinite(p.conf) or not 0 <= p.conf <= 1 or not np.isfinite(p.bbox).all():
+                    continue
+                self._track_out.append(
+                    TrackSample(
+                        frame_idx=fp.frame_idx,
+                        obj=TrackObject.PLAYER,
+                        track_id=p.track_id,
+                        player_id=None,
+                        x=float((p.bbox[0] + p.bbox[2]) / 2),
+                        y=float(p.bbox[3]),
+                        bbox=box_tuple(p.bbox),
+                        keypoints=keypoint_rows(p.kps),
+                        conf=float(p.conf),
+                        model=self._provenance.get("pose", self._provenance.get("player_detector", "")),
+                    )
+                )
         for pid, p in assigned.items():
             r = raw.get(p.track_id, p)
             self._track_out.append(
@@ -460,7 +630,16 @@ class BadmintonMatchEngine:
         drop = keep_from - self._buf0
         if drop <= 0:
             return
-        for lst in (self._sx, self._sy, self._svis, self._sconf, self._replay, self._shot, self._cam):
+        for lst in (
+            self._sx,
+            self._sy,
+            self._svis,
+            self._sconf,
+            self._replay,
+            self._shot,
+            self._cam,
+            self._geometry_valid,
+        ):
             del lst[:drop]
         for buf in self._players.values():
             for lst in buf.values():
@@ -736,7 +915,7 @@ class BadmintonMatchEngine:
         outcome, fault, check, conf_s = self._outcome(seg)
         before = self.state
         geometry_winner: str | None = None
-        if fault in ("near", "far"):
+        if fault in ("near", "far") and not self._multi_person_identity_ambiguous:
             loser = next(pid for pid, e in before.ends.items() if e.value == fault)
             geometry_winner = other(loser)  # type: ignore[arg-type]
         evidence = self._phase_evidence(seg, until)
@@ -884,7 +1063,9 @@ class BadmintonMatchEngine:
         cut_lo = max(self._buf0, seg.start - int(ph.post_cut_s * fps)) - self._buf0
         recent_shots = {*self._shot[cut_lo : b - 1], self._shot_at(seg.start)}
         return RallyEvidence(
-            calibrated=self._calib(self._shot_at(seg.start)) is not None,
+            calibrated=(
+                0 <= seg.start - self._buf0 < len(self._geometry_valid) and self._geometry_valid[seg.start - self._buf0]
+            ),
             formation=serve_formation(pos.get("P1"), pos.get("P2"), ph.court_tol_m) if both else None,
             still=all(x <= ph.still_max_m for x in spread) if both else None,
             gap_s=(seg.start - self._last_rally_end) / fps if self._last_rally_end is not None else None,
@@ -892,9 +1073,13 @@ class BadmintonMatchEngine:
             scoreboard=self.ocr.board_change(seg.start, seg.end, until, lookback=int(30 * fps)),
         )
 
-    @staticmethod
-    def _phase_payload(d: PhaseDecision, ev: RallyEvidence, override: bool | None) -> dict[str, Any]:
+    def _phase_payload(
+        self, d: PhaseDecision, ev: RallyEvidence, override: bool | None, *, policy: str | None = None
+    ) -> dict[str, Any]:
+        if policy is None:
+            policy = "legacy_heuristic_v1" if self.cfg.phase.allow_heuristic_official else "evidence_required_v1"
         return {
+            "phase_policy": policy,
             "official": d.official,
             "phase": d.phase.value,
             "phase_reason": d.reason,
@@ -990,6 +1175,9 @@ class BadmintonMatchEngine:
         settle = self.fsm.params.stationary_window if seg.reason == "stationary" else 3
         end = min(self._last_frame, seg.end + settle)
         lo = max(self._buf0, end - int(3.5 * self.cfg.fps))
+        a, b = lo - self._buf0, end - self._buf0 + 1
+        if a < 0 or b > len(self._geometry_valid) or not all(self._geometry_valid[a:b]):
+            return Outcome.UNKNOWN.value, "unknown", "invalid_court_geometry", 0.2
         w = self._window(lo, end)
         res = analyze_rally_end(w.frames, w.shuttle.x, w.shuttle.y, w.shuttle.vis, end, calib.geometry, self.cfg.fps)
         return res.outcome.value, res.fault, res.check, outcome_confidence(res)
@@ -1124,6 +1312,10 @@ class BadmintonMatchEngine:
         dirty = force  # e.g. a new base score: every point changes
         for i, r in enumerate(self._rallies):
             phase_before = tracker.phase
+            # Historical events without a policy were generated by the legacy formation heuristic.
+            # Preserve that policy during refolds so a correction cannot silently reclassify them.
+            policy = r.rally_end.payload.get("phase_policy", "legacy_heuristic_v1")
+            tracker.params = replace(self.cfg.phase, allow_heuristic_official=policy == "legacy_heuristic_v1")
             d = tracker.decide(r.record.start, r.evidence, match_finished=state.finished, override=r.override)
             winner = r.observed_winner if d.official else None
             loser = other(winner) if winner in PLAYERS else None
@@ -1139,7 +1331,7 @@ class BadmintonMatchEngine:
                 dirty = True
                 payload = {
                     **pay,
-                    **self._phase_payload(d, r.evidence, r.override),
+                    **self._phase_payload(d, r.evidence, r.override, policy=policy),
                     **human.get(i, {}),
                     "winner": winner,
                     "loser": loser,
@@ -1203,6 +1395,7 @@ class BadmintonMatchEngine:
         re-running (and re-emitting) the analysis. Returns the number of rallies restored."""
         from bai_badminton.analytics.rebuild import lineage_ids, rally_records
 
+        self._multi_person_identity_ambiguous = bool(self.store.query(types=["identity_ambiguity"]))
         rallies = self.store.query(types=["rally_end"])
         records = rally_records(self.store)
         point_by_parent = {p.parent_id: p for p in self.store.query(types=["point"])}
@@ -1236,6 +1429,9 @@ class BadmintonMatchEngine:
         self.state = state
         self._rebuild_analytics()
         self._last_frame = self._final = last_frame
+        if not self._sx:
+            # Restored engines have no pre-restart observation buffer.
+            self._buf0 = last_frame + 1
         return len(self._rallies)
 
     def carry_over(self, events: list[Event], provenance: Provenance) -> int:

@@ -1,18 +1,16 @@
-"""Persistent player identity for singles.
+"""Conservative provisional identity assignment for singles.
 
-Identity is *who*, side is *where*.  The tracker gives short-lived ``track_id`` s; this module maps
-them to stable match identities ``P1``/``P2`` using three cues, in order of authority:
-
-1. **Court side + match state** — in singles the players never share a half; the BWF state
-   machine knows which end each player occupies (it flips ends after games and at 11 in the
-   decider), so the person in the near half *is* whoever the state says is near.
-2. **Track continuity** — a track keeps its identity while it lives.
-3. **Appearance** — an HSV shirt signature (EMA) re-links identities after camera cuts and
-   breaks, and disambiguates the end change between games (players walk across the net).
+Initial associations use court side and are hypotheses, not verified identities.
+A known visual track retains its participant across side changes and temporary
+occlusion. A new track cannot inherit an already-bound participant by side or
+shirt colour alone. Track fragmentation therefore remains unresolved; tracker
+ID reuse can still produce an incorrect association and requires tracker-level
+lifetime evidence before it can be ruled out.
 """
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -27,6 +25,8 @@ class IdentityResolver:
     net_image_y: float | None = None  # fallback side divider (image y of the net's floor line)
     _sig: dict[str, NDArray[np.float32]] = field(default_factory=dict)
     _track_to_player: dict[int, str] = field(default_factory=dict)
+    # Current-frame visual tracks not associated with a participant, keyed by track ID.
+    unresolved_tracks: dict[int, str] = field(default_factory=dict, init=False)
 
     def side_of(self, p: PersonObs) -> str:
         if p.court_xy is not None and np.isfinite(p.court_xy[1]):
@@ -50,16 +50,38 @@ class IdentityResolver:
         return best
 
     def assign(self, persons: list[PersonObs], ends: dict[str, str]) -> dict[str, PersonObs]:
-        """Return ``{player_id: person}`` for this frame given the match state's ``ends``."""
-        by_side = self.select_players(persons)
+        """Return provisional participant associations, withholding unknown replacement tracks.
+
+        ``unresolved_tracks`` describes only the current frame, and is cleared on
+        every call. Known tracks take precedence over side and detection confidence.
+        """
         side_to_player = {v: k for k, v in ends.items()}
         out: dict[str, PersonObs] = {}
-        for side, p in by_side.items():
+        counts = Counter(p.track_id for p in persons)
+        self.unresolved_tracks = {track_id: "ambiguous" for track_id, n in counts.items() if n > 1}
+        persons = [p for p in persons if counts[p.track_id] == 1]
+        # Preserve continuity even if the player crosses the net or changes ends.
+        for p in persons:
+            pid = self._track_to_player.get(p.track_id)
+            if pid is not None and (pid not in out or p.conf > out[pid].conf):
+                out[pid] = p
+
+        # Bind each participant at most once. Initial side-based assignment is
+        # only a provisional hypothesis, never a user-confirmed identity.
+        unbound = [p for p in persons if p.track_id not in self._track_to_player]
+        bound_pids = set(self._track_to_player.values())
+        side_counts = Counter(self.side_of(p) for p in persons)
+        for side, p in self.select_players(unbound).items():
             pid = side_to_player.get(side)
-            if pid is None:
-                continue
-            out[pid] = p
-            self._track_to_player[p.track_id] = pid
+            if pid is not None and pid not in bound_pids and side_counts[side] == 1:
+                self._track_to_player[p.track_id] = pid
+                bound_pids.add(pid)
+                out[pid] = p
+
+        for p in unbound:
+            if p.track_id not in self._track_to_player:
+                self.unresolved_tracks[p.track_id] = self.side_of(p)
+        for pid, p in out.items():
             if p.appearance is not None:
                 prev = self._sig.get(pid)
                 self._sig[pid] = p.appearance if prev is None else (0.9 * prev + 0.1 * p.appearance).astype(np.float32)

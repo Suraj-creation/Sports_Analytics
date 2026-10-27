@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 import numpy as np
 from numpy.typing import NDArray
 
+from bai_badminton.perception.calibration_state import CalibrationState
+
 
 @dataclass
 class PersonObs:
@@ -39,6 +41,10 @@ class FramePerception:
     view: str | None = None
     head: int | None = None
     court_q: float | None = None
+    # None is reserved for pre-v7/synthetic observations, not current perception.
+    calibration_state: CalibrationState | None = None
+    # True only for a frame where the person detector actually ran.
+    detector_observed: bool | None = None
 
     @property
     def scene(self) -> str:

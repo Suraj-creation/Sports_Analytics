@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from bai_badminton.engine import BadmintonMatchEngine, EngineConfig
+from bai_badminton.events.match_phase import PhaseParams
 from bai_badminton.testing.synth import make_match
 from bai_engine.schema import Event, EventStatus, Provenance
 from bai_engine.store import EventStore
@@ -16,7 +17,8 @@ def run(tmp_path: Path) -> tuple[BadmintonMatchEngine, EventStore, list[Event]]:
     store = EventStore(tmp_path / "e.sqlite", "S1")
     seen: list[Event] = []
     eng = BadmintonMatchEngine(
-        "S1", EngineConfig(fps=m.fps, frame_width=1280, frame_height=720), store, emit=seen.extend
+        "S1", EngineConfig(fps=m.fps, frame_width=1280, frame_height=720,
+                           phase=PhaseParams(allow_heuristic_official=True)), store, emit=seen.extend
     )
     eng.set_calibration(0, m.homography)
     for ch in m.chunks:

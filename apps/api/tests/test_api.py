@@ -102,6 +102,7 @@ def test_upload_to_playback_end_to_end(client: TestClient, tmp_path: Path) -> No
 def _seed_match(settings: Settings) -> str:
     """A synthetic analysed match written straight into the store (no video needed)."""
     from bai_badminton.engine import BadmintonMatchEngine, EngineConfig
+    from bai_badminton.events.match_phase import PhaseParams
     from bai_badminton.testing.synth import make_match
     from bai_engine.schema import MediaInfo
     from bai_engine.store import SessionRepository
@@ -124,7 +125,9 @@ def _seed_match(settings: Settings) -> str:
         )
     )
     eng = BadmintonMatchEngine(
-        s.session_id, EngineConfig(fps=30, frame_width=1280, frame_height=720), repo.events(s.session_id)
+        s.session_id,
+        EngineConfig(fps=30, frame_width=1280, frame_height=720, phase=PhaseParams(allow_heuristic_official=True)),
+        repo.events(s.session_id),
     )
     eng.set_calibration(0, m.homography)
     from bai_engine.schema import PlayerInfo, TrackObject, samples_to_table

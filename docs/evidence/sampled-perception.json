@@ -1,0 +1,62 @@
+{
+  "windows": [
+    {
+      "start": 0,
+      "frames": 60,
+      "main": 60,
+      "players": 216,
+      "shuttle": 39,
+      "seconds": 3.77
+    },
+    {
+      "start": 900,
+      "frames": 60,
+      "main": 60,
+      "players": 222,
+      "shuttle": 29,
+      "seconds": 2.83
+    },
+    {
+      "start": 3600,
+      "frames": 60,
+      "main": 60,
+      "players": 228,
+      "shuttle": 15,
+      "seconds": 2.63
+    },
+    {
+      "start": 7200,
+      "frames": 60,
+      "main": 56,
+      "players": 200,
+      "shuttle": 11,
+      "seconds": 2.74
+    },
+    {
+      "start": 12000,
+      "frames": 60,
+      "main": 60,
+      "players": 234,
+      "shuttle": 57,
+      "seconds": 3.16
+    },
+    {
+      "start": 18000,
+      "frames": 60,
+      "main": 60,
+      "players": 234,
+      "shuttle": 38,
+      "seconds": 2.72
+    },
+    {
+      "start": 22000,
+      "frames": 60,
+      "main": 60,
+      "players": 234,
+      "shuttle": 8,
+      "seconds": 2.57
+    }
+  ],
+  "degraded": [],
+  "note": "Sampled perception only. Event accuracy requires continuous full-video analysis."
+}

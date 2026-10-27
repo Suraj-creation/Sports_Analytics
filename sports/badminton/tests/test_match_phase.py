@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from bai_badminton.engine import BadmintonMatchEngine, EngineConfig
-from bai_badminton.events.match_phase import MatchPhaseTracker, Phase, RallyEvidence, serve_formation
+from bai_badminton.events.match_phase import MatchPhaseTracker, Phase, PhaseParams, RallyEvidence, serve_formation
 from bai_badminton.perception_types import ChunkPerception, FramePerception, ScoreReading
 from bai_badminton.testing.synth import broadcast_homography, make_rally, to_frames
 from bai_engine.schema import EventStatus, Provenance
@@ -22,12 +22,15 @@ def _rally(winner: str, seed: int, lead_in: int = 30, **kw: object):  # type: ig
     return make_rally(n_shots=n, fps=FPS, lead_in=lead_in, land_court=land, seed=seed, **kw)  # type: ignore[arg-type]
 
 
-def _run(tmp_path: Path, rallies: list, ocr: list[ScoreReading] | None = None, names: dict | None = None):  # type: ignore[no-untyped-def,type-arg]
+def _run(  # type: ignore[no-untyped-def,type-arg]
+    tmp_path: Path, rallies: list, ocr: list[ScoreReading] | None = None, names: dict | None = None,
+    *, legacy: bool = True,
+):
     frames: list[FramePerception] = []
     for r in rallies:
         frames.extend(to_frames(r, len(frames)))
     store = EventStore(tmp_path / "e.sqlite", "S1")
-    cfg = EngineConfig(fps=FPS, frame_width=1280, frame_height=720)
+    cfg = EngineConfig(fps=FPS, frame_width=1280, frame_height=720, phase=PhaseParams(allow_heuristic_official=legacy))
     eng = BadmintonMatchEngine("S1", cfg, store, player_names=names)
     eng.set_calibration(0, broadcast_homography())
     pending = sorted(ocr or [], key=lambda r: r.frame_idx)
@@ -51,7 +54,7 @@ def test_serve_formation_is_diagonal() -> None:
 
 
 def test_tracker_needs_positive_evidence_to_start_the_match() -> None:
-    t = MatchPhaseTracker()
+    t = MatchPhaseTracker(PhaseParams(allow_heuristic_official=True))
     assert not t.decide(0, RallyEvidence(formation=None)).official  # unseen players never start it
     d = t.decide(100, RallyEvidence(formation=False, still=False, gap_s=2.0))
     assert not d.official and t.phase is Phase.WARMUP and "diagonal" in d.reason
@@ -244,3 +247,57 @@ def test_video_starting_mid_game_takes_the_score_from_the_board(tmp_path: Path) 
     eng2 = BadmintonMatchEngine("S1", EngineConfig(fps=FPS, frame_width=1280, frame_height=720), store)
     eng2.restore_from_log(10**6)
     assert eng2.public_state()["score"] == {"P1": 12, "P2": 10}
+
+
+def test_unconfirmed_formation_does_not_establish_official_match() -> None:
+    tracker = MatchPhaseTracker()
+    decision = tracker.decide(0, RallyEvidence(formation=True, still=True, gap_s=9.0))
+    assert not decision.official
+    assert decision.phase is Phase.UNKNOWN
+    assert decision.basis == "insufficient"
+
+
+def test_wrong_side_serve_after_cut_stays_unresolved_without_score_evidence() -> None:
+    tracker = MatchPhaseTracker()
+    assert tracker.decide(0, RallyEvidence(scoreboard="changed")).official
+    decision = tracker.decide(100, RallyEvidence(formation=False, after_cut=True))
+    assert not decision.official
+    assert decision.phase is Phase.MATCH_PLAY
+    assert decision.basis == "insufficient"
+
+
+def test_human_match_marker_authorizes_wrong_side_serve() -> None:
+    tracker = MatchPhaseTracker(match_start_frame=0)
+    decision = tracker.decide(100, RallyEvidence(formation=False, after_cut=True))
+    assert decision.official
+    assert decision.basis == "human"
+
+
+def test_heuristic_match_scoring_requires_explicit_legacy_policy() -> None:
+    tracker = MatchPhaseTracker(PhaseParams(allow_heuristic_official=True))
+    assert tracker.decide(0, RallyEvidence(formation=True, still=True, gap_s=9.0)).official
+
+
+def test_unconfirmed_rallies_are_excluded_until_review(tmp_path: Path) -> None:
+    eng, store = _run(tmp_path, [_rally("P1", 1), _rally("P2", 2, lead_in=180)], legacy=False)
+    ends = store.query(types=["rally_end"])
+    assert len(ends) == 2
+    assert all(not event.payload["official"] for event in ends)
+    assert eng.analytics.to_public()["rallies"] == 0
+    assert store.query(types=["point"]) == []
+    eng.set_match_start(ends[0].frame_start, Provenance(model="human"))
+    assert eng.analytics.to_public()["rallies"] == 2
+
+
+def test_strict_rallies_remain_unconfirmed_when_restored_with_legacy_policy(tmp_path: Path) -> None:
+    eng, store = _run(tmp_path, [_rally("P1", 1), _rally("P2", 2, lead_in=180)], legacy=False)
+    ends = store.query(types=["rally_end"])
+    assert all(e.payload["phase_policy"] == "evidence_required_v1" for e in ends)
+    legacy = EngineConfig(fps=FPS, frame_width=1280, frame_height=720,
+                          phase=PhaseParams(allow_heuristic_official=True))
+    restored = BadmintonMatchEngine("S1", legacy, store)
+    restored.restore_from_log(eng._last_frame)
+    restored.set_rally_official(ends[0].event_id, True, Provenance(model="human"))
+    after = store.query(types=["rally_end"])
+    assert [e.payload["official"] for e in after] == [True, False]
+    assert after[1].payload["phase_policy"] == "evidence_required_v1"

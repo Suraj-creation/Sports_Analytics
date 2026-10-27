@@ -4,6 +4,7 @@ from pathlib import Path
 
 from bai_badminton.analytics.rebuild import rally_records
 from bai_badminton.engine import BadmintonMatchEngine, EngineConfig
+from bai_badminton.events.match_phase import PhaseParams
 from bai_badminton.testing.synth import make_match
 from bai_engine.schema import Event, EventStatus, Provenance
 from bai_engine.store import EventStore
@@ -14,7 +15,10 @@ HUMAN = Provenance(model="human", worker="test")
 
 def _analyse(store: EventStore) -> BadmintonMatchEngine:
     m = make_match(WINNERS)
-    eng = BadmintonMatchEngine("S1", EngineConfig(fps=m.fps, frame_width=1280, frame_height=720), store)
+    cfg = EngineConfig(
+        fps=m.fps, frame_width=1280, frame_height=720, phase=PhaseParams(allow_heuristic_official=True)
+    )
+    eng = BadmintonMatchEngine("S1", cfg, store)
     eng.set_calibration(0, m.homography)
     for ch in m.chunks:
         eng.ingest(ch)
@@ -79,3 +83,31 @@ def test_carry_over_reapplies_human_corrections_after_reanalysis(tmp_path: Path)
     assert s0.payload["stroke"] == "drop" and s0.status is EventStatus.HUMAN_VERIFIED
     # nothing to carry twice: re-applying is idempotent
     assert eng2.carry_over(human, HUMAN) == 0
+
+
+def test_restored_legacy_decisions_survive_correction_under_strict_default(tmp_path: Path) -> None:
+    store = EventStore(tmp_path / "legacy.sqlite", "S1")
+    original = _analyse(store)
+    old = store.query(types=["rally_end"])
+    eng = BadmintonMatchEngine("S1", EngineConfig(fps=original.cfg.fps, frame_width=1280, frame_height=720), store)
+    eng.restore_from_log(original._last_frame)
+    eng.correct_rally_winner(old[2].event_id, "P1", HUMAN)
+    after = store.query(types=["rally_end"])
+    assert [r.payload["official"] for r in after] == [True] * len(WINNERS)
+    assert [r.payload["winner"] for r in after] == [*WINNERS[:2], "P1", *WINNERS[3:]]
+    assert len(store.query(types=["point"])) == len(WINNERS)
+
+
+def test_unversioned_legacy_rallies_keep_original_scoring_on_refold(tmp_path: Path) -> None:
+    store = EventStore(tmp_path / "old.sqlite", "S1")
+    original = _analyse(store)
+    for event in store.query(types=["rally_end"]):
+        payload = {key: value for key, value in event.payload.items() if key != "phase_policy"}
+        store.append(event.correct(payload=payload))
+    eng = BadmintonMatchEngine("S1", EngineConfig(fps=original.cfg.fps, frame_width=1280, frame_height=720), store)
+    eng.restore_from_log(original._last_frame)
+    old = store.query(types=["rally_end"])
+    eng.correct_rally_winner(old[2].event_id, "P1", HUMAN)
+    after = store.query(types=["rally_end"])
+    assert all(r.payload["official"] for r in after)
+    assert len(store.query(types=["point"])) == len(WINNERS)

@@ -99,6 +99,7 @@ class _Last:
     since: int  # frames since the pose was last confirmed against an image
     check: int  # frames since the last SIFT check against the original reference
     state: str  # verdict of the last frame ("ok" / "blind")
+    hold: int = 0  # consecutive held frames, including across chunk boundaries
 
 
 @dataclass
@@ -135,6 +136,7 @@ class CameraTracker:
         self._st: _State | None = None
         self._last: _Last | None = None
         self._rejected = False  # the current frame had a candidate pose that failed court verification
+        self.last_held: list[bool] = []  # current chunk; held poses are not fresh geometric evidence
         self._sift = cv2.SIFT_create(nfeatures=1500)  # type: ignore[attr-defined]  # cv2 stubs
         self._bf = cv2.BFMatcher(cv2.NORM_L2)
 
@@ -187,6 +189,7 @@ class CameraTracker:
         returns, but reported as no court) or ``bad`` (the floor is visible and does *not* line up: a
         different camera — the chain is dropped)."""
         n = len(frames)
+        self.last_held = [False] * n
         out: list[Mat | None] = [None] * n
         st = self._st
         if st is None or n == 0:
@@ -201,7 +204,7 @@ class CameraTracker:
         G_prev: Mat | None = last.G if last else None
         state_prev = last.state if last else "bad"
         since, check = (last.since, last.check) if last else (_INF, 0)
-        hold, lost_for, since_key = 0, 0, _INF
+        hold, lost_for, since_key = (last.hold if last else 0), 0, _INF
         verify_age, still_age = _INF, _INF  # frames since the floor check / since the last alignment
         for i, gray in enumerate(grays):
             f = start + i
@@ -238,6 +241,7 @@ class CameraTracker:
                 G_prev is not None
                 and prev_g is not None
                 and state_prev == "ok"
+                and hold == 0  # a held frame cannot validate itself by appearing unchanged
                 and still_age < self.realign_every
                 and not cuts[i]
                 and self._unchanged(prev_g, gray)
@@ -280,6 +284,7 @@ class CameraTracker:
                         self._add_key(gray, G, f)
                         since_key = 0
             held = G is None and G_prev is not None and hold < self.max_hold and not cuts[i] and not self._rejected
+            self.last_held[i] = held
             if held:  # a blurred frame (tracking failed, nothing contradicts the pose): hold it briefly
                 G, state, hold = G_prev, state_prev, hold + 1
             elif G is not None:
@@ -308,7 +313,9 @@ class CameraTracker:
         for i, p in enumerate(poses):
             out[i] = _norm(Sinv @ p @ S) if p is not None and verdicts[i] == "ok" else None
         tail = poses[-1]
-        self._last = _Last(start + n - 1, grays[-1], tail, since, check, verdicts[-1]) if tail is not None else None
+        self._last = (
+            _Last(start + n - 1, grays[-1], tail, since, check, verdicts[-1], hold) if tail is not None else None
+        )
         return out
 
     # ------------------------------------------------------------------ keyframes

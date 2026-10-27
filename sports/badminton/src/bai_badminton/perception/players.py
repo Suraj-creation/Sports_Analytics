@@ -202,6 +202,7 @@ class PlayerPerception:
         max_players: int = 2,
     ) -> None:
         self.detector, self.pose = detector, pose
+        self.last_detector_observed = False
         self.tracker = PlayerTracker(fps)
         self.det_stride, self.pose_stride = max(1, det_stride), max(1, pose_stride)
         self.max_players = max_players
@@ -221,6 +222,7 @@ class PlayerPerception:
     def process(
         self, frame_idx: int, img: NDArray[np.uint8], strides: tuple[int, int] | None = None
     ) -> list[PersonObs]:
+        self.last_detector_observed = False
         det_stride, pose_stride = strides or (self.det_stride, self.pose_stride)
         if self.detector is None or det_stride == 0:
             return []
@@ -233,6 +235,7 @@ class PlayerPerception:
             x0, y0, x1, y1 = self.roi.crop_box(w, h)
             view = img[y0:y1, x0:x1]
         boxes, scores = self.detector(view)
+        self.last_detector_observed = True
         if len(boxes):
             boxes = boxes + np.array([x0, y0, x0, y0], dtype=np.float64)
         if self.roi is not None and len(boxes):

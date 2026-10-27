@@ -13,6 +13,7 @@ import numpy as np
 from bai_badminton.court import REFERENCE_POINTS, WIDTH_DOUBLES, Homography, fit_homography
 from bai_badminton.engine import BadmintonMatchEngine, EngineConfig, box_tuple, camera_sample, keypoint_rows
 from bai_badminton.events.rally_fsm import RallyState
+from bai_badminton.perception.calibration_state import CalibrationState
 from bai_badminton.perception.court_lines import METHOD as LINES_METHOD
 from bai_badminton.perception.court_lines import CourtFit, camera_pose, choose_main, detect_court, refine_court
 from bai_badminton.perception.isolation import is_fixed_camera
@@ -29,7 +30,7 @@ from bai_engine.store import EventStore
 log = get_logger(__name__)
 AUTO_CALIBRATION_MIN_SCORE = 0.6
 REF_FILE = "camera_ref.png"  # the frame the calibration was made on (lossless: its id is a content hash)
-CODEC_VERSION = 6  # isolation geometry and camera policy are part of every cache identity
+CODEC_VERSION = 7  # v7 persists per-frame calibration validity and recovery state
 MAX_ADJUST = 0.03  # a human calibration the court lines move by more than this (× frame width) is kept as is
 
 
@@ -333,14 +334,15 @@ class BadmintonSession:
             )
             if p.cam_ref is not None and p.cam_ref == self.perception.ref_id:
                 out.append(camera_sample(fp))
-            for side, person in self.engine.identity.select_players(fp.persons).items():
-                pid = next((k for k, v in self.engine.state.ends.items() if v.value == side), None)
+            # A seek preview is out of chronological order; preserve visual
+            # observations without claiming a match participant association.
+            for person in fp.persons:
                 out.append(
                     TrackSample(
                         frame_idx=fp.frame_idx,
                         obj=TrackObject.PLAYER,
                         track_id=person.track_id,
-                        player_id=pid,
+                        player_id=None,
                         x=float((person.bbox[0] + person.bbox[2]) / 2),
                         y=float(person.bbox[3]),
                         bbox=box_tuple(person.bbox),
@@ -474,6 +476,8 @@ class BadmintonSession:
                     "v": fp.view,
                     "h": fp.head,
                     "q": fp.court_q,
+                    "cs": fp.calibration_state.value if fp.calibration_state is not None else None,
+                    "do": fp.detector_observed,
                     "p": [
                         {
                             "t": q.track_id,
@@ -512,6 +516,13 @@ class BadmintonSession:
                 f"perception segment {d['start']} has stale codec/calibration policy "
                 f"(version {d.get('v', 1)} vs {CODEC_VERSION}; reference {d.get('cr')} vs {ref_id})"
             )
+        # A v7 cache without explicit validity is incomplete, even if its version
+        # and geometry fingerprint otherwise match. Never trust it as legacy.
+        valid_states = {state.value for state in CalibrationState}
+        if any(frame.get("cs") not in valid_states for frame in d["frames"]):
+            raise StaleCacheError("perception segment lacks valid calibration state")
+        if any(not isinstance(frame.get("do"), bool) for frame in d["frames"]):
+            raise StaleCacheError("perception segment lacks detector observation metadata")
         frames = [
             FramePerception(
                 frame_idx=f["f"],
@@ -524,6 +535,8 @@ class BadmintonSession:
                 view=f.get("v"),
                 head=f.get("h"),
                 court_q=f.get("q"),
+                calibration_state=CalibrationState(f["cs"]) if f.get("cs") is not None else None,
+                detector_observed=f["do"],
                 persons=[
                     PersonObs(
                         track_id=q["t"],

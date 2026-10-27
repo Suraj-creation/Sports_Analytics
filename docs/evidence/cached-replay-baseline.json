@@ -1,0 +1,173 @@
+{
+  "provenance": {
+    "kind": "cached_perception_semantic_replay",
+    "implementation_label": "d932684",
+    "status": "complete",
+    "accuracy_claim": false,
+    "gpu_inference": false,
+    "source_data_dir": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/data",
+    "started_at_utc": "2026-10-27T18:52:22.740981+00:00",
+    "implementation_file": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/sports/badminton/src/bai_badminton/engine.py",
+    "implementation_sha256": "29e098bcfedd2a9c161cd67ed3f69aac98fde904bc488477a0170422b344bdf1",
+    "python": "3.12.12 (main, Jan 14 2026, 19:35:58) [Clang 21.1.4 ]",
+    "initial_calibration_only": true,
+    "human_corrections_applied": false,
+    "finished_at_utc": "2026-10-27T18:52:49.521867+00:00"
+  },
+  "sessions": [
+    {
+      "session_id": "01M55MFY9GQF6ZXP2SQPQ8X1KG",
+      "title": "SampleRally",
+      "cached_codec_versions": [
+        1
+      ],
+      "media_sha256": "44ae09ac4369edc971588158a5b4eb2df7586b95c8992770277d4d36f93ea790",
+      "cached_observations_sha256": "cf43ce403bdaee00dd83c9d03f3068c45370c63981aa7963320b1abb1285b8da",
+      "frames": 480,
+      "expected_frames": 480,
+      "coverage_complete": true,
+      "fps": 30.0,
+      "seconds": 0.149,
+      "rallies": 1,
+      "official": 0,
+      "unresolved": 1,
+      "points": 0,
+      "strokes": 2,
+      "score": {
+        "P1": 0,
+        "P2": 0
+      },
+      "end_reasons": {
+        "gap": 1
+      },
+      "phase_basis": {
+        "formation": 1
+      }
+    },
+    {
+      "session_id": "01M55NQMRAS0ATB73XE3XA6S74",
+      "title": "Anders Antonsen vs Alwi Farhan | Intense play with swift court coverage",
+      "cached_codec_versions": [
+        3
+      ],
+      "media_sha256": "314b4997fde9670c17cde76a256ff64c9a5f565317078f1d9826f5ffee8602c0",
+      "cached_observations_sha256": "0d2b03c92fe708697451c62fcf102587c7beca7e8024a5561056b8a7f5d86c80",
+      "frames": 12075,
+      "expected_frames": 12075,
+      "coverage_complete": true,
+      "fps": 25.0,
+      "seconds": 4.893,
+      "rallies": 25,
+      "official": 24,
+      "unresolved": 2,
+      "points": 23,
+      "strokes": 268,
+      "score": {
+        "P1": 10,
+        "P2": 13
+      },
+      "end_reasons": {
+        "gap": 4,
+        "stationary": 20,
+        "cut": 1
+      },
+      "phase_basis": {
+        "insufficient": 1,
+        "formation": 1,
+        "phase": 22,
+        "scoreboard": 1
+      }
+    },
+    {
+      "session_id": "01M56T2EED5Z7W9VTGG19FHNTF",
+      "title": "He/Ren vs Rankireddy/Shetty | Fast and furious men's doubles action",
+      "cached_codec_versions": [
+        3
+      ],
+      "media_sha256": "f9a419327a85b4e17d524d2fae24245ae9fc862b06a05c8fc11ed457eb487cba",
+      "cached_observations_sha256": "fd0018a896e66fcb6d3c505cbb0eb7d497956a258045b24c0d449c6102a0c8f0",
+      "frames": 12148,
+      "expected_frames": 12148,
+      "coverage_complete": true,
+      "fps": 25.0,
+      "seconds": 5.226,
+      "rallies": 28,
+      "official": 24,
+      "unresolved": 7,
+      "points": 21,
+      "strokes": 235,
+      "score": {
+        "P1": 7,
+        "P2": 14
+      },
+      "end_reasons": {
+        "gap": 11,
+        "stationary": 14,
+        "cut": 3
+      },
+      "phase_basis": {
+        "formation": 3,
+        "insufficient": 2,
+        "phase": 22,
+        "scoreboard": 1
+      }
+    },
+    {
+      "session_id": "01M5EXGZNEVGYAJ3AR6CJS5ZG9",
+      "title": "A02 20261010205221",
+      "cached_codec_versions": [
+        5
+      ],
+      "media_sha256": "90d1f399c05312ede173de2f2c8cd2fee09f1d201df46b476119660a00039ff0",
+      "cached_observations_sha256": "8b72389039fb73807a5798d38acff68517e5351dda76620d9633b16066101e4e",
+      "frames": 22802,
+      "expected_frames": 22802,
+      "coverage_complete": true,
+      "fps": 30.0,
+      "seconds": 14.633,
+      "rallies": 64,
+      "official": 50,
+      "unresolved": 15,
+      "points": 49,
+      "strokes": 261,
+      "score": {
+        "P1": 17,
+        "P2": 5
+      },
+      "end_reasons": {
+        "stationary": 36,
+        "gap": 27,
+        "cut": 1
+      },
+      "phase_basis": {
+        "formation": 15,
+        "phase": 49
+      }
+    },
+    {
+      "session_id": "01M5MBR3087FH07N5B1XR5VGHW",
+      "title": "Real  Video",
+      "cached_codec_versions": [
+        6
+      ],
+      "media_sha256": "06a5cb888e58c64421114fecc582f60b85466900efec6db0bbf99420f4f6c010",
+      "cached_observations_sha256": "a5d528d2343a183e3ba89255ffe0351107f4e0736d0dec1f7192b9cbb2b9e08e",
+      "frames": 4462,
+      "expected_frames": 4462,
+      "coverage_complete": true,
+      "fps": 30.0,
+      "seconds": 1.631,
+      "rallies": 0,
+      "official": 0,
+      "unresolved": 0,
+      "points": 0,
+      "strokes": 0,
+      "score": {
+        "P1": 0,
+        "P2": 0
+      },
+      "end_reasons": {},
+      "phase_basis": {}
+    }
+  ]
+}

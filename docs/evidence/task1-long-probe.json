@@ -1,0 +1,1357 @@
+{
+  "kind": "unlabelled_video_probe",
+  "accuracy_measured": false,
+  "windows": [
+    {
+      "start": 0,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 58,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 2
+      },
+      "players": 216,
+      "shuttle": 12,
+      "seconds": 3.38,
+      "rss_bytes": 1976602624,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 60,
+      "frames": 60,
+      "main": 59,
+      "states": {
+        "VALID": 57,
+        "DEGRADED": 0,
+        "LOST": 1,
+        "REACQUIRING": 2
+      },
+      "players": 236,
+      "shuttle": 20,
+      "seconds": 3.32,
+      "rss_bytes": 2021429248,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 120,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 20,
+      "seconds": 2.44,
+      "rss_bytes": 2021470208,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 180,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 12,
+      "seconds": 3.18,
+      "rss_bytes": 2027032576,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 240,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 31,
+      "seconds": 3.64,
+      "rss_bytes": 2077847552,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 300,
+      "frames": 60,
+      "main": 59,
+      "states": {
+        "VALID": 57,
+        "DEGRADED": 0,
+        "LOST": 1,
+        "REACQUIRING": 2
+      },
+      "players": 236,
+      "shuttle": 9,
+      "seconds": 2.98,
+      "rss_bytes": 2014326784,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 360,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 10,
+      "seconds": 3.53,
+      "rss_bytes": 2047959040,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 420,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 232,
+      "shuttle": 22,
+      "seconds": 3.38,
+      "rss_bytes": 2081898496,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 480,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 232,
+      "shuttle": 60,
+      "seconds": 3.64,
+      "rss_bytes": 2082721792,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 540,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 2,
+      "seconds": 3.85,
+      "rss_bytes": 2051477504,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 600,
+      "frames": 60,
+      "main": 59,
+      "states": {
+        "VALID": 57,
+        "DEGRADED": 0,
+        "LOST": 1,
+        "REACQUIRING": 2
+      },
+      "players": 236,
+      "shuttle": 1,
+      "seconds": 3.52,
+      "rss_bytes": 2019790848,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 660,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 7,
+      "seconds": 2.69,
+      "rss_bytes": 2070474752,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 720,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 25,
+      "seconds": 2.45,
+      "rss_bytes": 2038788096,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 780,
+      "frames": 60,
+      "main": 58,
+      "states": {
+        "VALID": 56,
+        "DEGRADED": 0,
+        "LOST": 2,
+        "REACQUIRING": 2
+      },
+      "players": 232,
+      "shuttle": 32,
+      "seconds": 2.55,
+      "rss_bytes": 2070515712,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 840,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 22,
+      "seconds": 2.89,
+      "rss_bytes": 2070568960,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 900,
+      "frames": 60,
+      "main": 59,
+      "states": {
+        "VALID": 57,
+        "DEGRADED": 0,
+        "LOST": 1,
+        "REACQUIRING": 2
+      },
+      "players": 236,
+      "shuttle": 16,
+      "seconds": 2.7,
+      "rss_bytes": 2070724608,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 960,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 210,
+      "shuttle": 5,
+      "seconds": 2.65,
+      "rss_bytes": 2090127360,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 1020,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 28,
+      "seconds": 2.64,
+      "rss_bytes": 2045435904,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 1080,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 238,
+      "shuttle": 24,
+      "seconds": 3.39,
+      "rss_bytes": 2071379968,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 1140,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 24,
+      "seconds": 4.29,
+      "rss_bytes": 2090360832,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 1200,
+      "frames": 60,
+      "main": 59,
+      "states": {
+        "VALID": 57,
+        "DEGRADED": 0,
+        "LOST": 1,
+        "REACQUIRING": 2
+      },
+      "players": 236,
+      "shuttle": 6,
+      "seconds": 3.45,
+      "rss_bytes": 2020921344,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 1260,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 11,
+      "seconds": 2.73,
+      "rss_bytes": 2092572672,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 1320,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 30,
+      "seconds": 2.6,
+      "rss_bytes": 2156273664,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 1380,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 52,
+      "seconds": 3.55,
+      "rss_bytes": 2156322816,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 1440,
+      "frames": 60,
+      "main": 58,
+      "states": {
+        "VALID": 56,
+        "DEGRADED": 0,
+        "LOST": 2,
+        "REACQUIRING": 2
+      },
+      "players": 232,
+      "shuttle": 8,
+      "seconds": 4.19,
+      "rss_bytes": 2156998656,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 1500,
+      "frames": 60,
+      "main": 59,
+      "states": {
+        "VALID": 57,
+        "DEGRADED": 0,
+        "LOST": 1,
+        "REACQUIRING": 2
+      },
+      "players": 236,
+      "shuttle": 16,
+      "seconds": 2.94,
+      "rss_bytes": 2093428736,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 1560,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 48,
+      "seconds": 3.4,
+      "rss_bytes": 2125148160,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 1620,
+      "frames": 60,
+      "main": 58,
+      "states": {
+        "VALID": 56,
+        "DEGRADED": 0,
+        "LOST": 2,
+        "REACQUIRING": 2
+      },
+      "players": 232,
+      "shuttle": 1,
+      "seconds": 3.71,
+      "rss_bytes": 2125148160,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 1680,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 11,
+      "seconds": 3.02,
+      "rss_bytes": 2152894464,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 1740,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 234,
+      "shuttle": 37,
+      "seconds": 3.83,
+      "rss_bytes": 2022207488,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 1800,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 15,
+      "seconds": 3.55,
+      "rss_bytes": 2080780288,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 1860,
+      "frames": 60,
+      "main": 52,
+      "states": {
+        "VALID": 46,
+        "DEGRADED": 0,
+        "LOST": 8,
+        "REACQUIRING": 6
+      },
+      "players": 208,
+      "shuttle": 28,
+      "seconds": 3.66,
+      "rss_bytes": 2080792576,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 1920,
+      "frames": 60,
+      "main": 57,
+      "states": {
+        "VALID": 53,
+        "DEGRADED": 0,
+        "LOST": 3,
+        "REACQUIRING": 4
+      },
+      "players": 228,
+      "shuttle": 12,
+      "seconds": 3.62,
+      "rss_bytes": 2099666944,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 1980,
+      "frames": 60,
+      "main": 59,
+      "states": {
+        "VALID": 57,
+        "DEGRADED": 0,
+        "LOST": 1,
+        "REACQUIRING": 2
+      },
+      "players": 236,
+      "shuttle": 22,
+      "seconds": 2.99,
+      "rss_bytes": 2099671040,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 2040,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 8,
+      "seconds": 3.16,
+      "rss_bytes": 2099671040,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 2100,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 8,
+      "seconds": 2.58,
+      "rss_bytes": 2046980096,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 2160,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 18,
+      "seconds": 2.71,
+      "rss_bytes": 2093772800,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 2220,
+      "frames": 60,
+      "main": 57,
+      "states": {
+        "VALID": 53,
+        "DEGRADED": 0,
+        "LOST": 3,
+        "REACQUIRING": 4
+      },
+      "players": 228,
+      "shuttle": 32,
+      "seconds": 2.72,
+      "rss_bytes": 2125651968,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 2280,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 5,
+      "seconds": 2.63,
+      "rss_bytes": 2157510656,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 2340,
+      "frames": 60,
+      "main": 50,
+      "states": {
+        "VALID": 48,
+        "DEGRADED": 0,
+        "LOST": 10,
+        "REACQUIRING": 2
+      },
+      "players": 200,
+      "shuttle": 6,
+      "seconds": 3.65,
+      "rss_bytes": 2157522944,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 2400,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 15,
+      "seconds": 2.64,
+      "rss_bytes": 2157522944,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 2460,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 36,
+      "seconds": 2.95,
+      "rss_bytes": 2157531136,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 2520,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 10,
+      "seconds": 3.37,
+      "rss_bytes": 2157621248,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 2580,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 6,
+      "seconds": 3.64,
+      "rss_bytes": 2157699072,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 2640,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 16,
+      "seconds": 3.43,
+      "rss_bytes": 2157711360,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 2700,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 4,
+      "seconds": 3.4,
+      "rss_bytes": 2157711360,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 2760,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 7,
+      "seconds": 2.36,
+      "rss_bytes": 2043203584,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 2820,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 9,
+      "seconds": 2.22,
+      "rss_bytes": 2107269120,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 2880,
+      "frames": 60,
+      "main": 52,
+      "states": {
+        "VALID": 50,
+        "DEGRADED": 0,
+        "LOST": 8,
+        "REACQUIRING": 2
+      },
+      "players": 208,
+      "shuttle": 15,
+      "seconds": 2.43,
+      "rss_bytes": 2126143488,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 2940,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 31,
+      "seconds": 3.13,
+      "rss_bytes": 2126405632,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 3000,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 28,
+      "seconds": 3.22,
+      "rss_bytes": 2126438400,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 3060,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 24,
+      "seconds": 3.3,
+      "rss_bytes": 2126467072,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 3120,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 234,
+      "shuttle": 34,
+      "seconds": 2.45,
+      "rss_bytes": 2126479360,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 3180,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 204,
+      "shuttle": 15,
+      "seconds": 2.53,
+      "rss_bytes": 2128736256,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 3240,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 234,
+      "shuttle": 23,
+      "seconds": 3.16,
+      "rss_bytes": 2062802944,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 3300,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 200,
+      "shuttle": 20,
+      "seconds": 3.27,
+      "rss_bytes": 2094551040,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 3360,
+      "frames": 60,
+      "main": 59,
+      "states": {
+        "VALID": 57,
+        "DEGRADED": 0,
+        "LOST": 1,
+        "REACQUIRING": 2
+      },
+      "players": 220,
+      "shuttle": 19,
+      "seconds": 3.09,
+      "rss_bytes": 2094559232,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 3420,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 234,
+      "shuttle": 20,
+      "seconds": 2.1,
+      "rss_bytes": 2094608384,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 3480,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 228,
+      "shuttle": 32,
+      "seconds": 3.35,
+      "rss_bytes": 2094608384,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 3540,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 0,
+      "seconds": 3.93,
+      "rss_bytes": 2094776320,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 3600,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 9,
+      "seconds": 2.52,
+      "rss_bytes": 2094776320,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 3660,
+      "frames": 60,
+      "main": 53,
+      "states": {
+        "VALID": 49,
+        "DEGRADED": 0,
+        "LOST": 7,
+        "REACQUIRING": 4
+      },
+      "players": 212,
+      "shuttle": 6,
+      "seconds": 2.36,
+      "rss_bytes": 2094776320,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 3720,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 10,
+      "seconds": 2.6,
+      "rss_bytes": 2060353536,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 3780,
+      "frames": 60,
+      "main": 57,
+      "states": {
+        "VALID": 55,
+        "DEGRADED": 0,
+        "LOST": 3,
+        "REACQUIRING": 2
+      },
+      "players": 228,
+      "shuttle": 1,
+      "seconds": 3.35,
+      "rss_bytes": 2067333120,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 3840,
+      "frames": 60,
+      "main": 58,
+      "states": {
+        "VALID": 56,
+        "DEGRADED": 0,
+        "LOST": 2,
+        "REACQUIRING": 2
+      },
+      "players": 232,
+      "shuttle": 27,
+      "seconds": 3.21,
+      "rss_bytes": 2067337216,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 3900,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 17,
+      "seconds": 2.32,
+      "rss_bytes": 2067337216,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 3960,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 11,
+      "seconds": 2.25,
+      "rss_bytes": 2067337216,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 4020,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 21,
+      "seconds": 2.17,
+      "rss_bytes": 2067337216,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 4080,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 204,
+      "shuttle": 11,
+      "seconds": 2.33,
+      "rss_bytes": 2067337216,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 4140,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 13,
+      "seconds": 3.24,
+      "rss_bytes": 2067337216,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 4200,
+      "frames": 60,
+      "main": 59,
+      "states": {
+        "VALID": 57,
+        "DEGRADED": 0,
+        "LOST": 1,
+        "REACQUIRING": 2
+      },
+      "players": 236,
+      "shuttle": 28,
+      "seconds": 2.57,
+      "rss_bytes": 2085228544,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 4260,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 210,
+      "shuttle": 23,
+      "seconds": 2.47,
+      "rss_bytes": 2072793088,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 4320,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 236,
+      "shuttle": 13,
+      "seconds": 3.37,
+      "rss_bytes": 2035617792,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    },
+    {
+      "start": 4380,
+      "frames": 60,
+      "main": 38,
+      "states": {
+        "VALID": 38,
+        "DEGRADED": 0,
+        "LOST": 22,
+        "REACQUIRING": 0
+      },
+      "players": 152,
+      "shuttle": 0,
+      "seconds": 3.06,
+      "rss_bytes": 2067337216,
+      "gpu_process_memory": [
+        "2124 MiB"
+      ]
+    }
+  ],
+  "events": {
+    "rally_start": 5,
+    "rally_end": 5,
+    "point": 0,
+    "stroke": 11,
+    "scene": 2
+  },
+  "official_rallies": 0,
+  "participation_event_counts": {
+    "PLAYER_ENTERED": 12,
+    "PLAYER_EXITED": 8,
+    "PLAYER_SUBSTITUTION_OR_IDENTITY_UNCERTAIN": 8
+  },
+  "activity_frame_counts": {
+    "reacquiring": 133,
+    "unknown": 4259,
+    "active_play": 48
+  },
+  "note": "4440 continuous canonical frames through perception and match engine; not labelled accuracy. Sampled memory is not a guaranteed peak."
+}

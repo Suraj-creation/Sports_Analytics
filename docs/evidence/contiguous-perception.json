@@ -1,0 +1,54 @@
+{
+  "windows": [
+    {
+      "start": 0,
+      "frames": 60,
+      "main": 60,
+      "players": 216,
+      "shuttle": 39,
+      "seconds": 3.83
+    },
+    {
+      "start": 60,
+      "frames": 60,
+      "main": 57,
+      "players": 228,
+      "shuttle": 23,
+      "seconds": 3.57
+    },
+    {
+      "start": 120,
+      "frames": 60,
+      "main": 60,
+      "players": 240,
+      "shuttle": 10,
+      "seconds": 2.6
+    },
+    {
+      "start": 180,
+      "frames": 60,
+      "main": 60,
+      "players": 216,
+      "shuttle": 25,
+      "seconds": 3.17
+    },
+    {
+      "start": 240,
+      "frames": 60,
+      "main": 60,
+      "players": 230,
+      "shuttle": 52,
+      "seconds": 3.79
+    }
+  ],
+  "degraded": [],
+  "events": {
+    "rally_start": 1,
+    "rally_end": 1,
+    "point": 0,
+    "stroke": 4,
+    "scene": 1
+  },
+  "official_rallies": 0,
+  "note": "300 contiguous normalized frames through perception and match engine, unlabelled; excludes model loading and calibration."
+}
