@@ -1,0 +1,42 @@
+
+> @bai/web@0.1.0 test /home/administrator/Desktop/sport-analytics/task2-local-dev-20261028/code/apps/web
+> vitest run
+
+
+ RUN  v3.2.7 /home/administrator/Desktop/sport-analytics/task2-local-dev-20261028/code/apps/web
+
+ ✓ src/lib/api.test.ts (2 tests) 16ms
+ ✓ src/features/product/model.test.ts (2 tests) 7ms
+ ✓ src/stores/playback.test.ts (3 tests) 9ms
+ ✓ src/features/session/derive.test.ts (6 tests) 8ms
+ ✓ src/features/analytics/evidence.test.ts (2 tests) 8ms
+ ✓ src/lib/homography.test.ts (4 tests) 9ms
+ ✓ src/features/product/api.test.ts (3 tests) 15ms
+ ✓ src/features/player/clip.test.ts (2 tests) 6ms
+ ✓ src/lib/buffers.test.ts (13 tests) 14ms
+ ✓ src/stores/session.test.ts (2 tests) 61ms
+ ✓ src/features/session/IndividualAnalytics.test.tsx (1 test) 96ms
+ ✓ src/features/session/ReanalysisFeedback.test.tsx (3 tests) 262ms
+ ✓ src/features/session/PlayerSelector.test.tsx (1 test) 287ms
+ ✓ src/features/session/EstimatedIndividualAnalytics.test.tsx (2 tests) 96ms
+ ✓ src/features/player/EvidenceDetails.test.tsx (2 tests) 351ms
+ ✓ src/features/session/EpisodeMovement.test.tsx (1 test) 278ms
+ ✓ src/features/session/ParticipantRoster.test.tsx (1 test) 338ms
+   ✓ creates four distinct participants only after an explicit doubles choice  336ms
+ ✓ src/features/analytics/movement.test.tsx (3 tests) 320ms
+ ✓ src/features/library/LibraryPage.test.tsx (2 tests) 485ms
+   ✓ sends the selected doubles format when uploading  372ms
+ ✓ src/features/session/components.test.tsx (6 tests) 537ms
+ ✓ src/features/session/SessionPage.test.tsx (1 test) 548ms
+   ✓ retains exactly one roster and one review panel across playback and session updates  546ms
+ ✓ src/features/session/ParticipantReview.test.tsx (2 tests) 870ms
+   ✓ requires an explicit person and frame interval before saving a track review  575ms
+ ✓ src/features/session/VisualObservations.test.tsx (4 tests) 892ms
+   ✓ shows unlinked track hypotheses and resets, and opens the actual event clip  347ms
+   ✓ discloses when the visible list is truncated and reveals more on request  506ms
+
+ Test Files  23 passed (23)
+      Tests  68 passed (68)
+   Start at  22:50:45
+   Duration  2.91s (transform 2.42s, setup 6.20s, collect 7.77s, tests 5.51s, environment 17.79s, prepare 3.44s)
+
