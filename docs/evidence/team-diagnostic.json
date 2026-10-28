@@ -1,0 +1,52 @@
+{
+  "source_cache_sha256": "8b72389039fb73807a5798d38acff68517e5351dda76620d9633b16066101e4e",
+  "cached_codec_versions": [
+    5
+  ],
+  "source_sha256": {
+    "engine": "965d8075c384b58687da38374d124fa03479e22c9205b33f7d8c1c6a7c4b765d",
+    "activity": "7d58b324d293376013d94c27757ad1af21c4eabd4934791dcfdc914a1742d013",
+    "teams": "90e3c7a7dd496d57ce77bf132019172f642f578cf5101a9959cc6a02b3a5cfa2",
+    "participation": "f986ac14fab9631986906f460e53b77b6695f8512abb4b9820093c44fe3c1645"
+  },
+  "fps": 30.0,
+  "simulation_window_frames": 150,
+  "simulation_support_threshold_frames": 60,
+  "frames": 600,
+  "counts": {
+    "frames": 600,
+    "participants_0": 9,
+    "status_unknown": 569,
+    "participants_4": 541,
+    "court_valid": 527,
+    "participants_3": 50,
+    "active_play": 114,
+    "court_and_activity": 102,
+    "side_split_1_3": 71,
+    "side_split_2_2": 31,
+    "status_candidate": 31
+  },
+  "gap_simulations": {
+    "15": {
+      "max_support": 31,
+      "would_emit_frames": 0
+    },
+    "30": {
+      "max_support": 31,
+      "would_emit_frames": 0
+    },
+    "60": {
+      "max_support": 31,
+      "would_emit_frames": 0
+    }
+  },
+  "max_stable_candidate": 31,
+  "max_four_and_active_streak": 67,
+  "replay_events": {
+    "rallies": 0,
+    "official": 0,
+    "points": 0
+  },
+  "accuracy_measured": false,
+  "limitations": "Cached perception replay; candidate simulations are hypothetical, not actual output or ground truth."
+}

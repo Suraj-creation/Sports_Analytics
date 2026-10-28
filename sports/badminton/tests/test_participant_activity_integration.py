@@ -61,7 +61,7 @@ def test_activity_integration_handles_sustained_motion_then_view_loss(tmp_path: 
         frames.append(
             FramePerception(
                 frame_idx=i,
-                shuttle_xy=(500.0, 300.0),
+                shuttle_xy=(500.0 + 4 * i, 300.0),
                 shuttle_conf=0.9,
                 persons=people,
                 view="none" if i >= 45 else "main",
@@ -160,7 +160,7 @@ def test_strided_detections_still_capture_sustained_motion(tmp_path: Path):
             PersonObs(track_id=n, bbox=np.array([100.0 * n + offset, y - 80, 100.0 * n + offset + 30, y]), conf=0.9)
             for n, y in [(1, 250.0), (2, 550.0)]
         ]
-        frames.append(FramePerception(frame_idx=i, shuttle_xy=(500.0, 300.0), shuttle_conf=0.9, persons=people))
+        frames.append(FramePerception(frame_idx=i, shuttle_xy=(500.0 + 4 * i, 300.0), shuttle_conf=0.9, persons=people))
     engine.ingest(ChunkPerception(start=0, end=49, frames=frames, models={"player_detector": "test"}))
     engine.flush()
     assert any(e.payload["state"] == "active_play" for e in store.query(types=["activity_interval"]))

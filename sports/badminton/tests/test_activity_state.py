@@ -6,7 +6,14 @@ from bai_badminton.events.activity import ActivityObservation, ActivityState, Ac
 
 
 def frame(i, **changes):
-    kw = dict(frame_idx=i, view_valid=True, person_count=2, moving=True, shuttle_visible=True)
+    kw = dict(
+        frame_idx=i,
+        view_valid=True,
+        person_count=2,
+        moving=True,
+        shuttle_visible=True,
+        shuttle_position=(0.2 + (i % 10) * 0.02, 0.4),
+    )
     kw.update(changes)
     return ActivityObservation(**kw)
 
