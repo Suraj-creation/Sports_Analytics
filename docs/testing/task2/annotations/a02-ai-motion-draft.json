@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "session_id": "01M5EXGZNEVGYAJ3AR6CJS5ZG9",
+  "source_sha256": "90d1f399c05312ede173de2f2c8cd2fee09f1d201df46b476119660a00039ff0",
+  "proxy_sha256": "a4eaaf0551bec33ecf3b8ffbe9b002c8bad9dcdbc1be894e39356c60bb7436aee",
+  "timebase": "proxy_seconds",
+  "fps": 30,
+  "window_s": [30.0, 32.0],
+  "status": "draft",
+  "split": "diagnostic",
+  "exhaustive": false,
+  "review": {
+    "method": "AI visual inspection of a right-court crop sampled at 8 fps, before examining model events for this window",
+    "human_verified": false,
+    "contact_is_not_visibly_confirmed": true,
+    "independent_ground_truth": false
+  },
+  "persons": [
+    {"alias": "near_back_dark_red_shoes", "actual_name": null, "continuity": "local visual description only; not match-wide identity"},
+    {"alias": "near_front_dark", "actual_name": null, "continuity": "local visual description only; not match-wide identity"},
+    {"alias": "far_left_partial", "actual_name": null, "continuity": "partially cropped; identity uncertain"},
+    {"alias": "far_right", "actual_name": null, "continuity": "distant; identity uncertain"}
+  ],
+  "shots": [
+    {
+      "time_s": 31.8,
+      "time_window_s": [31.5, 32.0],
+      "family": "unknown",
+      "player_id": null,
+      "visual_swing_person": "near_back_dark_red_shoes",
+      "contact_status": "possible_not_confirmed",
+      "confidence": "low",
+      "notes": "The near-side back player raises the racket for an overhead action in the last frames. Shuttle contact, actual hitter, and shot family are not established. The crop ends before the action is complete."
+    }
+  ],
+  "limitations": [
+    "Only two seconds were sampled at 8 fps; other hits may be missing and timing is approximate.",
+    "The target-court crop partly cuts off the far-left person and cannot establish four stable identities.",
+    "A visible racket motion is not a verified shuttle contact. Do not use this draft as precision, recall, or classification accuracy ground truth."
+  ],
+  "evidence": [{"path": "/home/administrator/Desktop/sport-analytics/evaluation-task3-20261028/a02-30-32-sheet.jpg", "sha256": "76b2b905e4a25348479df4c394b782bf254f50314ce17f67714f77df02bacb54"}],
+  "reproduction": "ffmpeg -ss 30 -i proxy.mp4 -t 2 -vf fps=8,crop=635:720:635:0,scale=300:340,tile=4x4 -frames:v 1 -q:v 5 a02-30-32-sheet.jpg"
+}
