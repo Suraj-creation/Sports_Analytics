@@ -13,7 +13,7 @@ from bai_agents.tools import ToolContext, run_tool
 from bai_badminton.engine import BadmintonMatchEngine, EngineConfig
 from bai_badminton.perception_types import ChunkPerception
 from bai_badminton.testing.synth import broadcast_homography, make_rally, to_frames
-from bai_engine.schema import MediaInfo, PlayerInfo, Session, SessionStatus, Source, SourceKind
+from bai_engine.schema import MediaInfo, PlayerInfo, Provenance, Session, SessionStatus, Source, SourceKind
 from bai_engine.store import EventStore
 
 WARM = {"near_xy": (-1.5, -5.6), "far_xy": (-1.5, 5.6)}
@@ -35,6 +35,10 @@ def ctx(tmp_path: Path) -> ToolContext:
         part = frames[s : s + 64]
         eng.ingest(ChunkPerception(start=part[0].frame_idx, end=part[-1].frame_idx, frames=part))
     eng.flush()
+    # The synthetic fixture explicitly labels the first rally as warm-up and
+    # the remaining rallies as match play; do not infer match intent from motion.
+    match_start = len(to_frames(rallies[0], 0))
+    eng.set_reviewed_match_intervals([(match_start, len(frames) - 1)], Provenance(model="human"))
     session = Session(
         title="t",
         source=Source(kind=SourceKind.UPLOAD, uri="none"),
