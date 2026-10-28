@@ -38,8 +38,11 @@ def setup_box(client):
     return repo, session, store, obs, url
 
 
-def sample(frame=20, track=7, bbox=(100.0, 200.0, 300.0, 500.0), visible=True):
-    return TrackSample(frame_idx=frame, obj=TrackObject.PLAYER, track_id=track, bbox=bbox, visible=visible, conf=0.9)
+def sample(frame=20, track=7, bbox=(100.0, 200.0, 300.0, 500.0), visible=True, detector_observed=True):
+    return TrackSample(
+        frame_idx=frame, obj=TrackObject.PLAYER, track_id=track, bbox=bbox,
+        visible=visible, conf=0.9, detector_observed=detector_observed,
+    )
 
 
 def write(repo, session, rows, *, mark=True):
@@ -170,4 +173,27 @@ def test_reset_or_exit_after_birth_at_same_frame_prevents_box(client: TestClient
             provenance=Provenance(model="participant_tracker_v1"),
         )
     )
+    assert client.get(url, params={"frame": 20}).json()["available"] is False
+
+
+@pytest.mark.parametrize("flag,available", [(True, True), (False, False), (None, False)])
+def test_review_seed_requires_explicit_detector_run(client: TestClient, flag, available):
+    repo, session, _, _, url = setup_box(client)
+    write(repo, session, [sample(detector_observed=flag)])
+    response = client.get(url, params={"frame": 20})
+    assert response.status_code == 200
+    assert response.json()["available"] is available
+    if not available:
+        assert response.json()["bbox"] is None
+
+
+def test_legacy_parquet_without_detector_source_fails_closed(client: TestClient):
+    import pyarrow.parquet as pq
+
+    repo, session, _, obs, url = setup_box(client)
+    row = sample().model_copy(update={"participant_observation_id": obs.event_id})
+    track_dir = repo.tracks(session.session_id).root / "player"
+    track_dir.mkdir(parents=True, exist_ok=True)
+    legacy = samples_to_table([row]).drop(["detector_observed"])
+    pq.write_table(legacy, track_dir / "f000000000-000000099.v1.parquet")
     assert client.get(url, params={"frame": 20}).json()["available"] is False

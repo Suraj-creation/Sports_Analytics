@@ -72,7 +72,12 @@ def participant_box(session: SessionDep, observation_id: str, r: Repo, frame: in
         for row in r.tracks(session.session_id).read([TrackObject.PLAYER], frame, frame).to_pylist()
         if row["track_id"] == track
     ]
-    if len(rows) != 1 or rows[0]["visible"] is not True or rows[0]["participant_observation_id"] != obs.event_id:
+    if (
+        len(rows) != 1
+        or rows[0]["visible"] is not True
+        or rows[0].get("detector_observed") is not True
+        or rows[0]["participant_observation_id"] != obs.event_id
+    ):
         return result
     box = rows[0]["bbox"]
     if not (

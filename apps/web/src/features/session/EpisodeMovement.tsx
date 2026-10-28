@@ -20,7 +20,7 @@ export function EpisodeMovement({ session }: {session: Session}) {
   return <details className="analysis-panel mt-5">
     <summary className="cursor-pointer text-sm font-medium">Court movement by track</summary>
     <div className="mt-4 space-y-3">
-      <p className="analysis-panel-hint">Estimated movement uses only supported, calibrated track segments. It is not a full-match distance or a confirmed person; tracking gaps and jitter can affect it.</p>
+      <p className="analysis-panel-hint">Estimated movement uses only supported, calibrated track segments. It is not a full-match distance or a confirmed person; tracking gaps and jitter can affect it. A detector-run frame does not prove that a specific player was detected.</p>
       <button className="rally-action" type="button" onClick={inspect} disabled={result.isFetching}>Inspect movement near this frame</button>
       {result.isFetching && <p className="text-sm text-line-2">Checking track coverage…</p>}
       {result.error && <ErrorNote error={result.error} />}
@@ -28,7 +28,7 @@ export function EpisodeMovement({ session }: {session: Session}) {
       {result.data?.available && <div>
         <p className="text-xs text-line-2">Frames {result.data.window.from}–{result.data.window.to}. {result.data.warning}</p>
         <ul className="mt-3 space-y-2 text-sm">{result.data.episodes.map((episode) => <li key={`${episode.observation_id}:${episode.track_id}`}>
-          Track {episode.track_id} · episode {episode.observation_id.slice(-6)} · {episode.distance_m === null ? "distance unavailable" : `${episode.distance_m.toFixed(1)} m estimated`} · {Math.round(episode.coverage_fraction * 100)}% frame coverage
+          Track {episode.track_id} · episode {episode.observation_id.slice(-6)} · {episode.distance_m === null ? "distance unavailable" : `${episode.distance_m.toFixed(1)} m estimated`} · {Math.round(episode.coverage_fraction * 100)}% track-frame coverage · {episode.detector_observed_frames} detector-run, {episode.carried_frames} carried, {episode.unknown_source_frames} source unknown
         </li>)}</ul>
       </div>}
     </div>

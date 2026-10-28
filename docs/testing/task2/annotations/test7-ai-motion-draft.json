@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "session_id": null,
+  "media_sha256": "1ad1eac44150a0a23e2bad1f3d4204bd41f2d257ff6b35156234d38cfa2b9d9c",
+  "timebase": "source_video_seconds",
+  "fps": 30,
+  "window_s": [
+    55.0,
+    57.55
+  ],
+  "status": "draft",
+  "split": "diagnostic",
+  "exhaustive": false,
+  "review": {
+    "method": "AI visual inspection of 10 fps overview and cropped 30 fps frames; model outputs not consulted for this review",
+    "human_verified": false,
+    "contact_is_not_visibly_confirmed": true,
+    "independent_ground_truth": false
+  },
+  "persons": [
+    {
+      "alias": "near_white",
+      "description": "White outfit; on near half during this short window",
+      "actual_name": null,
+      "continuity": "visual alias only, not a match-wide identity"
+    },
+    {
+      "alias": "far_teal",
+      "description": "Teal/dark outfit; on far half during this short window",
+      "actual_name": null,
+      "continuity": "visual alias only, not a match-wide identity"
+    }
+  ],
+  "shots": [
+    {
+      "time_s": 56.3,
+      "time_window_s": [
+        56.2,
+        56.4
+      ],
+      "family": "unknown",
+      "player_id": null,
+      "visual_swing_person": "far_teal",
+      "contact_status": "possible_not_confirmed",
+      "confidence": "low",
+      "notes": "Far teal player raises and swings racket; shuttle contact and flight family cannot be established in these frames."
+    },
+    {
+      "time_s": 57.1,
+      "time_window_s": [
+        57.02,
+        57.18
+      ],
+      "family": "unknown",
+      "player_id": null,
+      "visual_swing_person": "near_white",
+      "contact_status": "possible_not_confirmed",
+      "confidence": "low",
+      "notes": "Near white player swings overhead while a small white object is visible; the contact itself and family are unclear."
+    }
+  ],
+  "limitations": [
+    "Only sampled windows were inspected; other physical hits may be missing.",
+    "Nominal ffmpeg seek, FPS filter and sampled visual timing may shift actual source frame.",
+    "Possible motions are not verified contacts; do not use for precision/recall or classification accuracy."
+  ],
+  "evidence": [
+    {
+      "path": "/home/administrator/Desktop/sport-analytics/evaluation-task2.sVX43G/review-evidence-20261028/task2-test7-55-57-review.jpg",
+      "sha256": "582ac59380a7954926b4056cdf266f4017bc5086943e487f5c572b7f5d2dd415"
+    },
+    {
+      "path": "/home/administrator/Desktop/sport-analytics/evaluation-task2.sVX43G/review-evidence-20261028/task2-test7-detail.jpg",
+      "sha256": "bc2c9c780c46705dc4cba7bc002395fc07f49779298107406b683b4d626224fe"
+    },
+    {
+      "path": "/home/administrator/Desktop/sport-analytics/evaluation-task2.sVX43G/review-evidence-20261028/task2-test7-detail2.jpg",
+      "sha256": "06f8fa8529d18f37c261c763445f7a10d30e7418144b8c82d86fd90839b19007"
+    }
+  ],
+  "reproduction": {
+    "overview": "ffmpeg -ss 55 -i Test7_Full.mp4 -t 2 -vf fps=10,scale=640:-1,tile=4x5 -frames:v 1 test7-overview.jpg",
+    "detail": "Seek to 56.1 and 56.75 s separately; use fps=30,crop=1200:900:360:100,scale=480:360, frame labels, tile=4x6 for 0.8 s."
+  }
+}

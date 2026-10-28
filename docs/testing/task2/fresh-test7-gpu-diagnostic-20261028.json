@@ -1,0 +1,41 @@
+{
+  "kind": "isolated_real_video_end_to_end",
+  "status": "analysed",
+  "status_detail": "Analysis complete",
+  "session_id": "01M60N2GDF2ERH9EEQY0YEBAHZ",
+  "video_sha256": "441c4da7dd5c1bf96a99f03aa226b70b6f47bf0fefcbd234bddb5dfc1e62befe",
+  "duration_s": 22.02,
+  "sampled_peak_gpu_mib": 2122,
+  "gpu_index": 1,
+  "frame_count": 120,
+  "media_frames": 77,
+  "event_counts": {
+    "participant_observation": 2,
+    "rally_end": 1,
+    "stroke": 2,
+    "contact": 2
+  },
+  "stroke_families": {
+    "long_serve": 1,
+    "unknown": 1
+  },
+  "episode_counts": {
+    "total_linked_shots": 2,
+    "episode_candidate_shots": 0,
+    "unresolved_shots": 2
+  },
+  "movement_available": true,
+  "accuracy_claim": false,
+  "limitations": "2.55-second Test7 clip, no independently reviewed contact, shot or player labels. Isolated session, not the user live database.",
+  "source_sha256": "1ad1eac44150a0a23e2bad1f3d4204bd41f2d257ff6b35156234d38cfa2b9d9c",
+  "source_window_seconds": [
+    55,
+    57.55
+  ],
+  "fps": 30,
+  "stroke_candidate_frames": [
+    33,
+    64
+  ],
+  "note": "The first run reported 120 analysed frames for 77 media frames due to the partial-segment progress bug; this counter is not a measure of decoded frames. Corrected by a follow-up reanalysis."
+}

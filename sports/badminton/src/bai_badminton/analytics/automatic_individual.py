@@ -39,8 +39,10 @@ def _continuous(
     end: int,
     frame_width: int,
     frame_height: int,
+    *,
+    require_detector_runs: bool = True,
 ) -> bool:
-    """Require bounded, plausible motion and a unique matching sample at both ends."""
+    """Require bounded track continuity; detector runs are frame-level, not person matches."""
     rows = [row for row in rows if row["track_id"] == track_id and start <= row["frame_idx"] <= end]
     counts = Counter(row["frame_idx"] for row in rows)
     if not rows or any(count != 1 for count in counts.values()):
@@ -63,6 +65,16 @@ def _continuous(
             and 0 <= box[0] < box[2] <= frame_width
             and 0 <= box[1] < box[3] <= frame_height
         ):
+            return False
+    if require_detector_runs:
+        # None is legacy/unknown provenance; False means the detector explicitly did not run.
+        flags = [row.get("detector_observed") for row in rows]
+        if any(flag is not True and flag is not False for flag in flags):
+            return False
+        if flags[0] is not True or flags[-1] is not True:
+            return False
+        detector_frames = [row["frame_idx"] for row in rows if row["detector_observed"] is True]
+        if any(b - a > MAX_TRACK_SAMPLE_GAP_FRAMES for a, b in pairwise(detector_frames)):
             return False
     for before, after in pairwise(rows):
         a, b = before["bbox"], after["bbox"]
@@ -166,7 +178,7 @@ def build_estimated_individual_analytics(
                 official.setdefault(event_id, rally.rally_id)
 
     @lru_cache(maxsize=4096)
-    def candidate(event_id: str) -> tuple[tuple[Any, dict[str, Any], Any] | None, str | None]:
+    def candidate(event_id: str) -> tuple[tuple[Any, dict[str, Any], Any, bool | None] | None, str | None]:
         event = strokes.get(event_id)
         h = event.payload.get("participant_hypothesis") if event else None
         if not event or not isinstance(h, dict) or h.get("status") != "provisional":
@@ -204,15 +216,22 @@ def build_estimated_individual_analytics(
             return None, "missing_matching_observation_provenance"
         if episode_error(obs.event_id, frame) is not None:
             return None, "episode_boundary"
-        if not _continuous(track_interval(frame, frame), obs.event_id, track, frame, frame, frame_width, frame_height):
+        shot_rows = track_interval(frame, frame)
+        if not _continuous(
+            shot_rows, obs.event_id, track, frame, frame, frame_width, frame_height,
+            require_detector_runs=False,
+        ):
             return None, "shot_frame_track_unavailable"
-        return (event, h, obs), None
+        sample = next(row for row in shot_rows if row["track_id"] == track and row["frame_idx"] == frame)
+        detector_run = sample.get("detector_observed")
+        detector_run = detector_run if detector_run is True or detector_run is False else None
+        return (event, h, obs, detector_run), None
 
     def estimate(event_id: str, rally_id: str) -> tuple[str | None, dict[str, Any] | str]:
         selected, reason = candidate(event_id)
         if selected is None:
             return None, str(reason)
-        event, h, obs_for_shot = selected
+        event, h, obs_for_shot, _detector_run = selected
         episode, track, frame = h["participant_id"], h["track_id"], event.frame_start
         observation_id = obs_for_shot.event_id
         relevant = [
@@ -282,6 +301,8 @@ def build_estimated_individual_analytics(
             "seed_review_id": seed.event_id,
             "observation_id": obs.event_id,
             "status": "estimated",
+            "detector_observed": True,
+            "detector_observation_scope": "frame_only_not_person_match",
             "hypothesis_reason": h.get("reason"),
             "hypothesis_policy": h.get("policy"),
         }
@@ -332,7 +353,7 @@ def build_estimated_individual_analytics(
             if selected is None:
                 unresolved[event_id] = str(reason)
                 continue
-            event, h, obs = selected
+            event, h, obs, detector_run = selected
             key = (obs.event_id, h["participant_id"], h["track_id"])
             episode = episodes.setdefault(
                 key,
@@ -341,12 +362,15 @@ def build_estimated_individual_analytics(
                     "participant_id": h["participant_id"],
                     "track_id": h["track_id"],
                     "candidate_shots": 0,
+                    "detector_run_counts": {"ran": 0, "not_run": 0, "unknown": 0},
                     "shot_distribution": {},
                     "events": [],
                     "status": "anonymous_track_episode",
                 },
             )
             episode["candidate_shots"] += 1
+            detector_status = "ran" if detector_run is True else "not_run" if detector_run is False else "unknown"
+            episode["detector_run_counts"][detector_status] += 1
             shot = str(event.payload.get("stroke") or "unknown")
             episode["shot_distribution"][shot] = episode["shot_distribution"].get(shot, 0) + 1
             if include_events:
@@ -357,10 +381,16 @@ def build_estimated_individual_analytics(
                         "stroke": shot,
                         "rally_id": rally_id,
                         "status": "anonymous_track_candidate",
+                        "detector_observed": detector_run,
+                        "detector_observation_scope": "frame_only_not_person_match",
                     }
                 )
         return {
             "episodes": list(episodes.values()),
+            "detector_run_counts": {
+                key: sum(ep["detector_run_counts"][key] for ep in episodes.values())
+                for key in ("ran", "not_run", "unknown")
+            },
             "accounting": {
                 "total_linked_shots": len(refs),
                 "episode_candidate_shots": len(refs) - len(unresolved),
@@ -387,11 +417,15 @@ def build_estimated_individual_analytics(
             "kind": "uncalibrated_episode_estimate",
             "seed_max_seconds": MAX_SEED_AGE_SECONDS,
             "max_track_sample_gap_frames": MAX_TRACK_SAMPLE_GAP_FRAMES,
+            "named_requires_detector_run_at_seed_and_shot": True,
+            "max_detector_run_gap_frames": MAX_TRACK_SAMPLE_GAP_FRAMES,
+            "detector_run_scope": "frame_only_not_person_match",
             "min_track_confidence": MIN_TRACK_CONFIDENCE,
             "max_box_height_ratio": MAX_HEIGHT_RATIO,
             "min_footpoint_jump_limit_body_heights": MIN_DISPLACEMENT_LIMIT,
             "max_footpoint_jump_per_frame_body_heights": MAX_DISPLACEMENT_PER_GAP_FRAME,
-            "warning": "Estimates may be wrong if a tracker switches people without recording an ambiguity. "
+            "warning": "A detector run is frame-level evidence, not proof that it matched this person. "
+            "Estimates may be wrong if a tracker switches people without recording an ambiguity. "
             "All-linked counts include non-official rallies and are not match scores.",
         },
     }

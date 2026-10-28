@@ -10,7 +10,10 @@ from bai_engine.schema.tracks import samples_to_table
 from bai_engine.store import EventStore, TrackStore
 
 
-def setup(tmp_path: Path, *, missing_camera=(), missing_xy=(), duplicate=(), jump=(), invalid_bbox=(), reverse=False):
+def setup(
+    tmp_path: Path, *, missing_camera=(), missing_xy=(), duplicate=(), jump=(), invalid_bbox=(),
+    reverse=False, source_flags=None,
+):
     store = EventStore(tmp_path / "events.sqlite", "S1")
     tracks = TrackStore(tmp_path / "tracks")
     obs = store.append(
@@ -41,6 +44,7 @@ def setup(tmp_path: Path, *, missing_camera=(), missing_xy=(), duplicate=(), jum
             court_y=None if frame in missing_xy else 0.5,
             visible=True,
             conf=0.9,
+            detector_observed=(source_flags or {}).get(frame),
         )
         players.append(TrackSample(**fields))
         if frame in duplicate:
@@ -200,3 +204,24 @@ def test_position_samples_cannot_be_mistaken_for_a_continuous_polyline_across_a_
     assert episode["segments"] >= 2
     assert episode["positions_semantics"] == "unordered_samples_do_not_connect"
     assert episode["positions_m"] == sorted(episode["positions_m"])
+
+
+def test_movement_counts_source_flags_only_for_valid_frames(tmp_path):
+    store, tracks, _ = setup(tmp_path, missing_camera={3}, invalid_bbox={4},
+        source_flags={0: True, 1: False, 3: True, 4: False, 5: True, 6: False})
+    episode = fold(store, tracks)["episodes"][0]
+    assert episode["valid_frames"] == 28
+    assert episode["detector_observed_frames"] == 2
+    assert episode["carried_frames"] == 2
+    assert episode["unknown_source_frames"] == 24
+    source_total = sum(episode[k] for k in ("detector_observed_frames", "carried_frames", "unknown_source_frames"))
+    assert source_total == episode["valid_frames"]
+
+
+def test_legacy_movement_marks_all_accepted_sources_unknown(tmp_path):
+    store, tracks, _ = setup(tmp_path)
+    episode = fold(store, tracks)["episodes"][0]
+    assert episode["valid_frames"] == 30
+    assert episode["detector_observed_frames"] == 0
+    assert episode["carried_frames"] == 0
+    assert episode["unknown_source_frames"] == 30

@@ -1,7 +1,9 @@
 """Doubles contact inference must use all visible episodes without naming players."""
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from bai_badminton.engine import BadmintonMatchEngine, EngineConfig
 from bai_badminton.events.contact import ContactCandidate, detect_contacts
@@ -27,7 +29,7 @@ def frames(*, tie=False):
         offset = 0 if i == 1 or (tie and i == 2) else i * 100
         rows[f"participant-epoch-{i:06d}"] = ParticipantSnapshot(
             track_id=i, bbox=np.array([90 + offset, 85, 110 + offset, 185], float),
-            kps=None, court_xy=(0.5, -3.0), observation_id=f"birth-{i}",
+            kps=None, court_xy=(0.5, -3.0), observation_id=f"birth-{i}", detector_observed=True,
         )
     return [dict(rows) for _ in range(7)]
 
@@ -63,7 +65,7 @@ def test_classification_uses_unique_episode_context_without_naming_hitter(tmp_pa
     engine = BadmintonMatchEngine("S1", EngineConfig(fps=30, frame_width=1280, frame_height=720,
                                                  match=MatchConfig(discipline="doubles")), store)
     engine._participant_frames = frames()
-    engine._post_contact_kinematics = lambda _: (800.0, -30.0)
+    engine._post_contact_kinematics = lambda _, next_frame=None: (800.0, -30.0)
     engine._on_contact(ContactCandidate(frame=3, player_id=None, p=0.9, shuttle_xy=(100., 100.)), window())
     engine._classify(engine._open_contacts[-1], next_frame=35, is_serve=False, receiver=None)
     stroke = store.query(types=["stroke"])[0]
@@ -71,15 +73,38 @@ def test_classification_uses_unique_episode_context_without_naming_hitter(tmp_pa
     assert stroke.payload["participant_hypothesis"]["participant_id"] == "participant-epoch-000001"
     assert stroke.payload["hitter_court_xy"] == [0.5, -3.0]
     assert stroke.payload["classification_context_source"] == "provisional_track_episode"
+    assert stroke.payload["classification_context_detector_scope"] == "frame_only_not_person_match"
     assert stroke.payload["stroke"] != "unknown"
 
+
+
+@pytest.mark.parametrize("detector_observed", [False, None])
+def test_classifier_abstains_when_episode_box_has_no_detector_run(tmp_path: Path, detector_observed):
+    store = EventStore(tmp_path / "source.sqlite", "S1")
+    engine = BadmintonMatchEngine(
+        "S1", EngineConfig(fps=30, frame_width=1280, frame_height=720,
+                           match=MatchConfig(discipline="doubles")), store,
+    )
+    engine._participant_frames = frames()
+    key = "participant-epoch-000001"
+    engine._participant_frames[3][key] = replace(
+        engine._participant_frames[3][key], detector_observed=detector_observed,
+    )
+    engine._post_contact_kinematics = lambda _, next_frame=None: (800.0, -30.0)
+    engine._on_contact(ContactCandidate(frame=3, player_id=None, p=0.9, shuttle_xy=(100., 100.)), window())
+    engine._classify(engine._open_contacts[-1], next_frame=35, is_serve=False, receiver=None)
+    stroke = store.query(types=["stroke"])[0]
+    assert stroke.payload["participant_hypothesis"]["participant_id"] == key
+    assert stroke.payload["hitter_court_xy"] is None
+    assert "classification_context_source" not in stroke.payload
+    assert stroke.payload["stroke"] == "unknown"
 
 def test_ambiguous_episode_never_supplies_classifier_context(tmp_path: Path):
     store = EventStore(tmp_path / "ambiguous.sqlite", "S1")
     engine = BadmintonMatchEngine("S1", EngineConfig(fps=30, frame_width=1280, frame_height=720,
                                                  match=MatchConfig(discipline="doubles")), store)
     engine._participant_frames = frames(tie=True)
-    engine._post_contact_kinematics = lambda _: (800.0, -30.0)
+    engine._post_contact_kinematics = lambda _, next_frame=None: (800.0, -30.0)
     engine._on_contact(ContactCandidate(frame=3, player_id=None, p=0.9, shuttle_xy=(100., 100.)), window())
     engine._classify(engine._open_contacts[-1], next_frame=35, is_serve=False, receiver=None)
     stroke = store.query(types=["stroke"])[0]
@@ -121,7 +146,7 @@ def test_ambiguous_singles_does_not_enable_doubles_classification_context(tmp_pa
     store = EventStore(tmp_path / "single-context.sqlite", "S1")
     engine = BadmintonMatchEngine("S1", EngineConfig(fps=30, frame_width=1280, frame_height=720), store)
     engine._participant_frames = frames()
-    engine._post_contact_kinematics = lambda _: (800.0, -30.0)
+    engine._post_contact_kinematics = lambda _, next_frame=None: (800.0, -30.0)
     engine._on_contact(ContactCandidate(frame=3, player_id=None, p=0.9, shuttle_xy=(100., 100.)), window())
     engine._classify(engine._open_contacts[-1], next_frame=35, is_serve=False, receiver=None)
     stroke = store.query(types=["stroke"])[0]
@@ -142,12 +167,15 @@ def test_declared_doubles_never_bind_two_visible_tracks_to_individual_score_slot
     )
     engine.set_calibration(0, broadcast_homography())
     engine._provenance["player_detector"] = "synthetic"
-    for frame in range(4):
+    for frame, detector_observed in enumerate((True,) * 12 + (False, None, True)):
         people = [
             PersonObs(track_id=1, bbox=np.array([100, 300, 140, 500], float), conf=0.9, court_xy=(0.5, -2)),
             PersonObs(track_id=2, bbox=np.array([800, 100, 840, 300], float), conf=0.9, court_xy=(0.5, 2)),
         ]
-        engine._append(FramePerception(frame_idx=frame, shuttle_xy=None, shuttle_conf=0.0, persons=people))
+        engine._append(FramePerception(frame_idx=frame, shuttle_xy=None, shuttle_conf=0.0, persons=people,
+                                       detector_observed=detector_observed))
+    flags = [next(iter(frame.values())).detector_observed for frame in engine._participant_frames[-3:]]
+    assert flags == [False, None, True]
     assert all(value is None for value in engine._players["P1"]["track_id"])
     assert all(value is None for value in engine._players["P2"]["track_id"])
 
@@ -265,3 +293,22 @@ def test_ambiguous_duplicate_track_never_supplies_court_coordinates(tmp_path: Pa
     engine._append(FramePerception(frame_idx=3, shuttle_xy=None, shuttle_conf=0.0, persons=[person, person]))
     rows = [s for s in engine.drain_tracks() if s.obj.value == "player" and s.frame_idx == 3]
     assert rows and all(item.court_x is None and item.court_y is None for item in rows)
+
+
+def test_anonymous_track_samples_preserve_detector_frame_status(tmp_path: Path):
+    from bai_badminton.perception_types import FramePerception, PersonObs
+    from bai_badminton.testing.synth import broadcast_homography
+
+    engine = BadmintonMatchEngine(
+        "S1", EngineConfig(fps=30, frame_width=1280, frame_height=720, match=MatchConfig(discipline="doubles")),
+        EventStore(tmp_path / "detector-frame.sqlite", "S1"),
+    )
+    engine.set_calibration(0, broadcast_homography())
+    engine._provenance["player_detector"] = "synthetic"
+    person = PersonObs(track_id=1, bbox=np.array([100, 300, 140, 500], float), conf=0.9, court_xy=(0.5, -2))
+    for frame, ran in enumerate((True, False, None)):
+        engine._append(
+            FramePerception(frame_idx=frame, shuttle_xy=None, shuttle_conf=0.0, persons=[person], detector_observed=ran)
+        )
+    rows = [item for item in engine.drain_tracks() if item.obj.value == "player"]
+    assert [(item.frame_idx, item.detector_observed) for item in rows] == [(0, True), (1, False), (2, None)]

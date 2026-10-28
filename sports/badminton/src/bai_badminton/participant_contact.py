@@ -24,6 +24,8 @@ class ParticipantSnapshot:
     kps: NDArray[np.float64] | None
     court_xy: tuple[float, float] | None
     observation_id: str | None = None
+    # Frame-level detector execution, not evidence that this person was matched.
+    detector_observed: bool | None = None
 
 
 

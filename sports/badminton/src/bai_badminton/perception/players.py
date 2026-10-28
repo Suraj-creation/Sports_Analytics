@@ -4,7 +4,7 @@
   a court region of interest; person class only; boxes whose feet fall outside the (padded)
   court polygon are discarded (umpires, line judges, coaches, crowd).
 * **Tracking** — ByteTrack (Roboflow ``trackers``, Apache-2.0).  The detector runs every
-  ``stride`` frames; in between, the tracker's Kalman prediction carries the boxes.
+  ``stride`` frames; in between, the last observed boxes are carried forward without a new detection.
 * **Pose** — RTMPose (Apache-2.0) top-down on full-resolution crops of the (at most two) players.
 * **Appearance** — an HSV torso signature per box for identity re-linking after cuts.
 
@@ -203,6 +203,7 @@ class PlayerPerception:
     ) -> None:
         self.detector, self.pose = detector, pose
         self.last_detector_observed = False
+        self.last_capacity_limited = False
         self.tracker = PlayerTracker(fps)
         self.det_stride, self.pose_stride = max(1, det_stride), max(1, pose_stride)
         self.max_players = max_players
@@ -223,6 +224,7 @@ class PlayerPerception:
         self, frame_idx: int, img: NDArray[np.uint8], strides: tuple[int, int] | None = None
     ) -> list[PersonObs]:
         self.last_detector_observed = False
+        self.last_capacity_limited = False
         det_stride, pose_stride = strides or (self.det_stride, self.pose_stride)
         if self.detector is None or det_stride == 0:
             return []
@@ -245,6 +247,14 @@ class PlayerPerception:
         self._admitted = {tid: last for tid, last in self._admitted.items() if frame_idx - last <= 2 * self.fps}
         if self.roi is not None:
             tracks = [t for t in tracks if self.roi.contains_feet(t[1], allow_runoff=t[0] in self._admitted)]
+        # A doubles overflow is ambiguous: dropping a lower-ranked track could
+        # discard a player. Withhold all participant evidence for this frame
+        # and its carried frames rather than treating the survivors as certain.
+        if self.max_players >= 4 and len(tracks) > self.max_players + 2:
+            self.last_capacity_limited = True
+            self.last_detector_observed = False
+            self._last = []
+            return []
         self._admitted.update({t[0]: frame_idx for t in tracks})
         tracks.sort(key=lambda t: -t[2] * (t[1][3] - t[1][1]))
         persons = [PersonObs(track_id=tid, bbox=b, conf=c) for tid, b, c in tracks[: self.max_players + 2]]

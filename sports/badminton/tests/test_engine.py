@@ -184,7 +184,7 @@ def test_missing_shuttle_kinematics_are_persisted_as_unknown(tmp_path: Path) -> 
     store = EventStore(tmp_path / "missing-kinematics.sqlite", "S1")
     eng = BadmintonMatchEngine("S1", EngineConfig(fps=m.fps, frame_width=1280, frame_height=720), store)
     eng.set_calibration(0, m.homography)
-    eng._post_contact_kinematics = lambda frame: (None, None)
+    eng._post_contact_kinematics = lambda frame, next_frame=None: (None, None)
     for chunk in m.chunks:
         eng.ingest(chunk)
     eng.flush()

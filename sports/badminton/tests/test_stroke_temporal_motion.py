@@ -104,3 +104,54 @@ def test_serve_with_missing_post_contact_evidence_is_unknown():
     )
     assert prediction.top[0] == "unknown"
     assert prediction.abstention_reason == "missing_required_evidence"
+
+
+def test_next_contact_excludes_opponent_motion_and_abstains_when_too_few_samples():
+    x = np.array([0, 10, 20, 30, 40, 50], dtype=float)
+    y = np.zeros(6, dtype=float)
+    speed, vy = post_contact_motion(x, y, np.ones(6, dtype=bool), np.zeros(6, dtype=bool),
+                                    0, 30.0, 1080.0, next_contact_idx=3)
+    assert speed is None and vy is None
+
+
+def test_next_contact_excludes_later_return_from_velocity_estimate():
+    x = np.array([0, 10, 20, 30, -300, -600], dtype=float)
+    y = np.zeros(6, dtype=float)
+    speed, vy = post_contact_motion(x, y, np.ones(6, dtype=bool), np.zeros(6, dtype=bool),
+                                    0, 30.0, 1080.0, next_contact_idx=4)
+    assert speed == pytest.approx(300.0)
+    assert vy == pytest.approx(0.0)
+
+
+def test_engine_excludes_next_contact_when_building_shot_speed(tmp_path):
+    from bai_badminton.engine import BadmintonMatchEngine, EngineConfig
+    from bai_badminton.events.contact import ContactCandidate
+    from bai_badminton.perception.shuttle_post import Track
+    from bai_badminton.testing.synth import make_rally
+    from bai_engine.store import EventStore
+
+    store = EventStore(tmp_path / "events.sqlite", "S1")
+    engine = BadmintonMatchEngine("S1", EngineConfig(fps=30, frame_width=1280, frame_height=720), store)
+    track = Track.from_arrays(np.arange(6, dtype=float) * 10, np.zeros(6), np.ones(6, dtype=bool))
+    engine._shuttle_around = lambda _frame: (track, 0)
+    engine._on_contact(ContactCandidate(frame=10, player_id=None, p=0.8), make_rally(n_shots=3).obs)
+    engine._classify(engine._open_contacts[-1], next_frame=13, is_serve=False, receiver=None)
+    stroke = store.query(types=["stroke"])[0]
+    assert stroke.payload["speed_px_s"] is None
+    assert stroke.payload["stroke"] == "unknown"
+    store.close()
+
+
+@pytest.mark.parametrize("is_serve", [True, False])
+def test_stationary_shuttle_observations_do_not_imply_a_shot_family(is_serve):
+    from bai_badminton.events.stroke import RuleStrokeClassifier, StrokeContext
+
+    speed, vy = motion([10, 10, 10, 10, 10, 10], [20, 20, 20, 20, 20, 20])
+    assert speed == 0.0 and vy == 0.0
+    prediction = RuleStrokeClassifier().predict(StrokeContext(
+        frame=0, player_id="A", is_serve=is_serve, hitter_court_xy=(0, 3),
+        speed_after_px_s=speed, frame_height_px=1080, flight_time_s=1.1,
+        vy_after_px_s=vy, hitter_side="near", contact_above_head=None,
+    ))
+    assert prediction.top[0] == "unknown"
+    assert prediction.abstention_reason == "missing_required_evidence"

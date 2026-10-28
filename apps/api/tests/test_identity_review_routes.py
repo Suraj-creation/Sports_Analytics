@@ -1,7 +1,9 @@
+import pytest
 from fastapi.testclient import TestClient
 
-from bai_engine.schema import Event, EventStatus, Provenance, Session, Source, SourceKind
+from bai_engine.schema import Event, EventStatus, Provenance, Session, Source, SourceKind, TrackObject, TrackSample
 from bai_engine.schema.session import MediaInfo
+from bai_engine.schema.tracks import samples_to_table
 
 
 def setup_review(client):
@@ -38,6 +40,11 @@ def setup_review(client):
             provenance=Provenance(model="participant_tracker_v1"),
         )
     )
+    rows = [TrackSample(frame_idx=frame, obj=TrackObject.PLAYER, track_id=7,
+                        participant_observation_id=obs.event_id, detector_observed=True,
+                        bbox=(100.0, 200.0, 300.0, 500.0), visible=True, conf=0.9)
+            for frame in (10, 20, 25, 30)]
+    client.app.state.repo.tracks(session.session_id).write_chunk(TrackObject.PLAYER, 0, 99, samples_to_table(rows))
     stroke = store.append(
         Event(
             session_id=session.session_id,
@@ -259,4 +266,71 @@ def test_review_rejects_preexisting_human_rewrite_of_machine_hypothesis(client: 
             "participant_id": "participant-abc123-000001", "track_id": 7}
     result = client.post(root + f"/strokes/{forged.event_id}/participant-review", json=body)
     assert result.status_code == 422
+    assert not store.query(types=["stroke_participant_review"])
+
+
+@pytest.mark.parametrize("start_flag,end_flag", [(False, True), (None, True), (True, False), (True, None)])
+def test_identity_review_requires_detector_observed_boxes_at_both_endpoints(client: TestClient, start_flag, end_flag):
+    root, store, obs, _ = setup_review(client)
+    rows = [TrackSample(frame_idx=frame, obj=TrackObject.PLAYER, track_id=7,
+                        participant_observation_id=obs.event_id, detector_observed=flag,
+                        bbox=(100.0, 200.0, 300.0, 500.0), conf=0.9)
+            for frame, flag in ((10, start_flag), (30, end_flag))]
+    client.app.state.repo.tracks(store.session_id).write_chunk(TrackObject.PLAYER, 0, 99, samples_to_table(rows))
+    response = client.post(root + "/identity-reviews", json={
+        "observation_id": obs.event_id, "player_id": "U1", "frame_start": 10, "frame_end": 30,
+    })
+    assert response.status_code == 422
+    assert not store.query(types=["identity_review"])
+
+
+def test_historical_review_stays_readable_and_revocable_without_source_flag(client: TestClient):
+    from bai_badminton.identity_review import IdentityReviewLedger
+    root, store, obs, _ = setup_review(client)
+    review = IdentityReviewLedger(store, {"U1"}, max_frame=299, fps=30).confirm(obs.event_id, "U1", 10, 30)
+    rows = [TrackSample(frame_idx=f, obj=TrackObject.PLAYER, track_id=7,
+                        participant_observation_id=obs.event_id, detector_observed=None,
+                        bbox=(100.0, 200.0, 300.0, 500.0), conf=0.9) for f in (10, 30)]
+    client.app.state.repo.tracks(store.session_id).write_chunk(TrackObject.PLAYER, 0, 99, samples_to_table(rows))
+    current = client.get(root + "/identity-reviews")
+    assert current.status_code == 200 and [e["event_id"] for e in current.json()] == [review.event_id]
+    assert client.delete(root + "/identity-reviews/" + review.event_id).status_code == 200
+
+
+@pytest.mark.parametrize("bad_end", ["missing", "duplicate", "wrong_birth", "invalid_box"])
+def test_identity_review_rejects_ambiguous_endpoint_evidence(client: TestClient, bad_end):
+    root, store, obs, _ = setup_review(client)
+    start = TrackSample(frame_idx=10, obj=TrackObject.PLAYER, track_id=7,
+                        participant_observation_id=obs.event_id, detector_observed=True,
+                        bbox=(100.0, 200.0, 300.0, 500.0), conf=0.9)
+    end = TrackSample(frame_idx=30, obj=TrackObject.PLAYER, track_id=7,
+                      participant_observation_id=obs.event_id if bad_end != "wrong_birth" else "different",
+                      detector_observed=True,
+                      bbox=(100.0, 200.0, 300.0, 500.0) if bad_end != "invalid_box" else (-1.0, 0.0, 5.0, 10.0),
+                      conf=0.9)
+    rows = [start] if bad_end == "missing" else [start, end, end] if bad_end == "duplicate" else [start, end]
+    client.app.state.repo.tracks(store.session_id).write_chunk(TrackObject.PLAYER, 0, 99, samples_to_table(rows))
+    response = client.post(root + "/identity-reviews", json={
+        "observation_id": obs.event_id, "player_id": "U1", "frame_start": 10, "frame_end": 30,
+    })
+    assert response.status_code == 422
+    assert not store.query(types=["identity_review"])
+
+
+@pytest.mark.parametrize("shot_flag", [False, None])
+def test_scoped_review_rejects_unobserved_shot_frame(client: TestClient, shot_flag):
+    root, store, obs, stroke = setup_review(client)
+    identity = client.post(root + "/identity-reviews", json={
+        "observation_id": obs.event_id, "player_id": "U1", "frame_start": 10, "frame_end": 30,
+    })
+    assert identity.status_code == 201
+    rows = [TrackSample(frame_idx=frame, obj=TrackObject.PLAYER, track_id=7,
+                        participant_observation_id=obs.event_id, detector_observed=flag,
+                        bbox=(100.0, 200.0, 300.0, 500.0), conf=0.9)
+            for frame, flag in ((10, True), (25, shot_flag), (30, True))]
+    client.app.state.repo.tracks(store.session_id).write_chunk(TrackObject.PLAYER, 0, 99, samples_to_table(rows))
+    body = {"identity_review_id": identity.json()["event_id"], "player_id": "U1",
+            "participant_id": "participant-abc123-000001", "track_id": 7}
+    response = client.post(root + f"/strokes/{stroke.event_id}/participant-review", json=body)
+    assert response.status_code == 422
     assert not store.query(types=["stroke_participant_review"])

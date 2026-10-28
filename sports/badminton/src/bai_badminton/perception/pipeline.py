@@ -87,7 +87,12 @@ class BadmintonPerception:
         fps: float,
         models_dir: Path,
         frame_size: tuple[int, int] | None = None,
+        *,
+        match_format: str = "singles",
     ) -> None:
+        if match_format not in ("singles", "doubles"):
+            raise ValueError("unknown match format")
+        self.match_format = match_format
         self.profile = profile
         self.fps = fps
         self.frame_size = frame_size
@@ -112,7 +117,8 @@ class BadmintonPerception:
         pose = self._load_pose(profile.pose, registry, cache)
         self.scoreboard = self._load_ocr(profile.ocr, registry, fps)
         self.players = PlayerPerception(
-            det, pose, fps, det_stride=profile.detector_rates.in_play, pose_stride=profile.pose_rates.in_play
+            det, pose, fps, det_stride=profile.detector_rates.in_play, pose_stride=profile.pose_rates.in_play,
+            max_players=4 if match_format == "doubles" else 2,
         )
 
     # ------------------------------------------------------------------ loading
@@ -326,6 +332,10 @@ class BadmintonPerception:
                     h_now = Homography(H_now, 0.0, 4) if H_now is not None else None
                     self.players.set_roi(CourtROI(poly.astype(np.float32), homography=h_now))
                 persons = [] if replay[i] else self.players.process(fidx, img, (rates_det, rates_pose))
+                reason = "Too many court tracks in some frames; player evidence was withheld."
+                if (not replay[i] and getattr(self.players, "last_capacity_limited", False)
+                    and not any(d.stage == "player_tracking" and d.reason == reason for d in self.degraded)):
+                    self._degrade("player_tracking", reason)
                 s = shuttle[i] if not replay[i] else None
                 # lines mode: every calibrated frame carries its pose (other cameras too: the court is drawn
                 # there); camera mode: only analysed frames (another camera's pose is not measured)

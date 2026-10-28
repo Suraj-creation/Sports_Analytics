@@ -379,7 +379,12 @@ class SessionRunner(threading.Thread):
                         break
             p = self._perceive(dec, k)
             self.sport.ingest(p)
-            start, end = k * F, k * F + F - 1
+            start, planned_end = k * F, k * F + F - 1
+            # The final decoded segment can be shorter than the segment plan.
+            # Sport plugins with explicit chunk bounds report the actual end.
+            end = getattr(p, "end", planned_end)
+            if not isinstance(end, int) or not start <= end <= planned_end:
+                raise ValueError("Perception chunk has invalid frame bounds")
             self._publish_tracks(self.sport.drain_tracks(), start, end)
             k += 1
             self.main_k = k

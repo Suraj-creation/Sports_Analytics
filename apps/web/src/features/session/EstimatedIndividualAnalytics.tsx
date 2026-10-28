@@ -33,10 +33,10 @@ export function EstimatedIndividualAnalytics({ session }: {session: Session}) {
     </p>
     <div className="mt-5 border-t border-seam pt-4">
       <h3 className="font-medium">Anonymous track episodes</h3>
-      <p className="analysis-panel-hint mt-2">Candidate shots are grouped automatically by a temporary visual track. A track can switch people or restart; these are not durable player identities and cannot be added to named totals.</p>
+      <p className="analysis-panel-hint mt-2">Candidate shots are grouped automatically by a temporary visual track. A track can switch people or restart; these are not durable player identities and cannot be added to named totals. Detector-run counts indicate the detector ran on the frame, not that it matched a particular person.</p>
       {episodes.episodes.length === 0 ? <p className="mt-2 text-sm text-line-2">No supported track candidates are available yet.</p> : <ul className="mt-3 space-y-2 text-sm">
         {episodes.episodes.slice(0, limit).map((episode) => <li key={`${episode.observation_id}:${episode.track_id}`}>
-          Track {episode.track_id} · episode {episode.observation_id.slice(-6)} · {episode.candidate_shots} candidate {episode.candidate_shots === 1 ? "shot" : "shots"}
+          Track {episode.track_id} · episode {episode.observation_id.slice(-6)} · {episode.candidate_shots} candidate {episode.candidate_shots === 1 ? "shot" : "shots"} · {episode.detector_run_counts.ran} detector-run, {episode.detector_run_counts.not_run} carried, {episode.detector_run_counts.unknown} source unknown
         </li>)}
       </ul>}
       {episodes.episodes.length > limit && <button className="rally-action mt-3" type="button" onClick={() => setLimit((n) => n + 8)}>Show more tracks</button>}

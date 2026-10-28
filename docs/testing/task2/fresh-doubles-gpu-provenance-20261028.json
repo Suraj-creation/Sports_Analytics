@@ -1,0 +1,33 @@
+{
+  "kind": "isolated_real_video_end_to_end",
+  "status": "analysed",
+  "status_detail": "Analysis complete",
+  "session_id": "01M60MY5G7X4DTSJ58M7BBTP7S",
+  "video_sha256": "e50e00223bf41468ac4c913ff5a7647d909563326d256be8037fe79fedace640",
+  "duration_s": 31.35,
+  "sampled_peak_gpu_mib": 2128,
+  "gpu_index": 1,
+  "frame_count": 250,
+  "media_frames": 250,
+  "event_counts": {
+    "rally_end": 1,
+    "participant_observation": 6,
+    "stroke": 16,
+    "contact": 17
+  },
+  "stroke_families": {
+    "short_serve": 1,
+    "unknown": 6,
+    "push": 4,
+    "clear": 1,
+    "drop": 4
+  },
+  "episode_counts": {
+    "total_linked_shots": 16,
+    "episode_candidate_shots": 16,
+    "unresolved_shots": 0
+  },
+  "movement_available": true,
+  "accuracy_claim": false,
+  "limitations": "Ten-second clip, no independently reviewed contact, shot or player labels. Isolated session, not the user live database."
+}

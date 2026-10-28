@@ -92,7 +92,8 @@ class BadmintonSession:
             player_names=names,
         )
         self.perception = BadmintonPerception(
-            profile, registry, fps, get_settings().models_dir, frame_size=(m.width, m.height)
+            profile, registry, fps, get_settings().models_dir, frame_size=(m.width, m.height),
+            match_format=discipline,
         )
         self.calibration: Homography | None = None
         self._fixed_camera: bool | None = None  # None: legacy or not yet sampled
@@ -480,11 +481,16 @@ class BadmintonSession:
 
     # ------------------------------------------------------------------ cache codec
     def _isolation_id(self) -> dict[str, Any]:
-        return {
+        policy = {
             "court": lines_ref_id(self.calibration.H) if self.calibration is not None else None,
             "mode": self.perception.mode,
             "fixed_camera": self._fixed_camera,
         }
+        # Older doubles caches silently capped candidate tracks at four; do not
+        # reuse them with the expanded policy. Existing singles caches remain valid.
+        if getattr(self.perception, "match_format", "singles") == "doubles":
+            policy["player_candidate_limit"] = 6
+        return policy
 
     def encode_perception(self, p: ChunkPerception) -> bytes:
         frames = []

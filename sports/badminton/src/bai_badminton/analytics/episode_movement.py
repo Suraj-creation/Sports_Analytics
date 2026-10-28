@@ -169,6 +169,14 @@ def build_episode_movement(
             ids.append(track)
             valid.append(ok)
         m = movement(np.asarray(xs), frames, ids, valid, float(fps))
+        # The flag means the detector ran on that frame; it does not establish
+        # that this particular track was matched to a fresh detection.
+        source_counts = Counter(
+            "detector" if row.get("detector_observed") is True
+            else "carried" if row.get("detector_observed") is False
+            else "unknown"
+            for row, accepted in zip(group, valid, strict=True) if accepted
+        )
         episodes.append(
             {
                 "observation_id": obs_id,
@@ -177,6 +185,9 @@ def build_episode_movement(
                 "status": "anonymous_track_episode",
                 "distance_m": round(m.distance_m, 3) if m.segments else None,
                 "valid_frames": m.accepted_samples,
+                "detector_observed_frames": source_counts["detector"],
+                "carried_frames": source_counts["carried"],
+                "unknown_source_frames": source_counts["unknown"],
                 "coverage_fraction": m.accepted_samples / (end_frame - start_frame + 1),
                 "observed_seconds": round(m.observed_s, 3),
                 "segments": m.segments,

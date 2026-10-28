@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
 from bai_api.deps import Repo, SessionDep
+from bai_api.routes.participant_observations import participant_box
 from bai_badminton.analytics.individual import machine_hypothesis_unchanged
 from bai_badminton.analytics.rebuild import lineage_ids
 from bai_badminton.identity_review import IdentityReviewLedger
@@ -55,9 +56,15 @@ def create_identity_review(session: SessionDep, body: IdentityReviewInput, r: Re
     store = r.events(session.session_id)
     with store._lock:
         try:
-            return _ledger(session, store).confirm(
-                body.observation_id, body.player_id, body.frame_start, body.frame_end
-            )
+            ledger = _ledger(session, store)
+            for frame in {body.frame_start, body.frame_end}:
+                evidence = participant_box(session, body.observation_id, r, frame=frame)
+                if not evidence["available"]:
+                    raise HTTPException(
+                        status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        "A unique, detector-run track box is required at each review interval endpoint",
+                    )
+            return ledger.confirm(body.observation_id, body.player_id, body.frame_start, body.frame_end)
         except ValueError as exc:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
 
@@ -120,6 +127,11 @@ def review_stroke_participant(
             raise HTTPException(
                 status.HTTP_422_UNPROCESSABLE_ENTITY,
                 "Review, observation, interval and explicit participant must match the stroke hypothesis",
+            )
+        if not participant_box(session, observation.event_id, r, frame=stroke.frame_start)["available"]:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                "A unique, detector-run track box is required at the stroke frame",
             )
         if any(e.payload.get("stroke_event_id") in lineage_ids(store, stroke) for e in _scoped_reviews(store)):
             raise HTTPException(

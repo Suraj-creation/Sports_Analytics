@@ -537,6 +537,7 @@ class BadmintonMatchEngine:
                     bbox=person.bbox.copy(),
                     kps=person.kps.copy() if person.kps is not None else None,
                     court_xy=person.court_xy,
+                    detector_observed=fp.detector_observed,
                 )
         participant_events = [
             self._event(
@@ -709,6 +710,7 @@ class BadmintonMatchEngine:
                         track_id=p.track_id,
                         player_id=None,
                         participant_observation_id=observation_by_track.get(p.track_id),
+                        detector_observed=fp.detector_observed,
                         x=float((p.bbox[0] + p.bbox[2]) / 2),
                         y=float(p.bbox[3]),
                         court_x=court_xy[0] if court_xy else None,
@@ -728,6 +730,7 @@ class BadmintonMatchEngine:
                     track_id=p.track_id,
                     player_id=pid,
                     participant_observation_id=observation_by_track.get(p.track_id),
+                    detector_observed=fp.detector_observed,
                     x=float((r.bbox[0] + r.bbox[2]) / 2),
                     y=float(r.bbox[3]),
                     court_x=p.court_xy[0] if p.court_xy else None,
@@ -936,13 +939,17 @@ class BadmintonMatchEngine:
         w = self._window(lo, min(self._last_frame, frame + self.cfg.lookahead))
         return w.shuttle, frame - lo
 
-    def _post_contact_kinematics(self, frame: int) -> tuple[float | None, float | None]:
+    def _post_contact_kinematics(self, frame: int, next_frame: int | None = None) -> tuple[float | None, float | None]:
         """Estimate shuttle velocity from consistent observed positions after contact."""
         located = self._shuttle_around(frame)
         if located is None:
             return None, None
         t, i = located
-        return post_contact_motion(t.x, t.y, t.vis, t.interp, i, self.cfg.fps, float(self.cfg.frame_height))
+        next_idx = i + next_frame - frame if next_frame is not None else None
+        return post_contact_motion(
+            t.x, t.y, t.vis, t.interp, i, self.cfg.fps, float(self.cfg.frame_height),
+            next_contact_idx=next_idx,
+        )
 
     def _player_at(
         self, pid: str | None, frame: int
@@ -970,6 +977,7 @@ class BadmintonMatchEngine:
                 snapshot = self._participant_frames[index].get(hypothesis.get("participant_id"))
                 if (
                     snapshot is not None
+                    and snapshot.detector_observed is True
                     and snapshot.track_id == hypothesis.get("track_id")
                     and snapshot.observation_id is not None
                     and snapshot.observation_id == hypothesis.get("observation_id")
@@ -980,7 +988,7 @@ class BadmintonMatchEngine:
                         court_xy = snapshot.court_xy
                     if bbox is not None or court_xy is not None:
                         context_source = "provisional_track_episode"
-        speed, vy = self._post_contact_kinematics(cand.frame)
+        speed, vy = self._post_contact_kinematics(cand.frame, next_frame)
         above_head: bool | None = None
         if bbox is not None and cand.shuttle_xy is not None:
             above_head = bool(cand.shuttle_xy[1] < bbox[1] + 0.12 * (bbox[3] - bbox[1]))
@@ -1015,6 +1023,8 @@ class BadmintonMatchEngine:
         }
         if context_source is not None:
             payload["classification_context_source"] = context_source
+            if context_source == "provisional_track_episode":
+                payload["classification_context_detector_scope"] = "frame_only_not_person_match"
         if "participant_hypothesis" in c.event.payload:
             payload["participant_hypothesis"] = c.event.payload["participant_hypothesis"]
         if cand.attribution_reason is not None:

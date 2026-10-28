@@ -38,7 +38,7 @@ def _event(kind, frame, *, payload, model="test", status=EventStatus.CONFIRMED, 
     )
 
 
-def _setup(tmp_path: Path, *, frames=(1, 5, 10)):
+def _setup(tmp_path: Path, *, frames=(1, 5, 10), detector_observed=True):
     store = EventStore(tmp_path / "events.sqlite", "S1")
     tracks = TrackStore(tmp_path / "tracks")
     observations = []
@@ -61,6 +61,7 @@ def _setup(tmp_path: Path, *, frames=(1, 5, 10)):
         seeds.append(ledger.confirm(obs.event_id, f"U{i}", 1, 1))
         rows.extend(
             TrackSample(
+                detector_observed=detector_observed,
                 frame_idx=f,
                 obj=TrackObject.PLAYER,
                 track_id=i,
@@ -119,6 +120,8 @@ def test_four_participants_are_separate_estimates_and_not_verified(tmp_path):
         assert ev["seed_review_id"] == seeds[i - 1].event_id
         assert ev["observation_id"] == observations[i - 1].event_id
         assert ev["event_id"] == shots[i - 1].event_id and ev["status"] == "estimated"
+        assert ev["detector_observed"] is True
+        assert ev["detector_observation_scope"] == "frame_only_not_person_match"
     assert result["all_linked"]["accounting"]["estimated_shots"] == 4
 
 
@@ -130,6 +133,7 @@ def test_missing_track_sample_gap_and_reset_abstain(tmp_path):
     # A gap no longer than six frames is permitted, but a reset still invalidates propagation.
     rows = [
         TrackSample(
+            detector_observed=True,
             frame_idx=f,
             obj=TrackObject.PLAYER,
             track_id=i,
@@ -222,6 +226,7 @@ def test_invalid_sample_never_infers_an_identity(tmp_path, problem):
         for f in (1, 5, 10):
             fields = {
                 "frame_idx": f,
+                "detector_observed": True,
                 "obj": TrackObject.PLAYER,
                 "track_id": i,
                 "bbox": (1, 1, 20, 30),
@@ -380,6 +385,7 @@ def test_seed_expires_after_bounded_duration(tmp_path):
         samples_to_table(
             [
                 TrackSample(
+                    detector_observed=True,
                     frame_idx=250,
                     obj=TrackObject.PLAYER,
                     track_id=1,
@@ -451,6 +457,7 @@ def test_anonymous_episode_does_not_count_stale_or_invalid_shot_frame_box(tmp_pa
     store, tracks, observations, seeds, shots = _setup(tmp_path)
     rows = [
         TrackSample(
+            detector_observed=True,
             frame_idx=10,
             obj=TrackObject.PLAYER,
             track_id=i,
@@ -524,6 +531,7 @@ def test_offscreen_shot_box_does_not_support_an_episode(tmp_path):
     store, tracks, observations, seeds, shots = _setup(tmp_path)
     rows = [
         TrackSample(
+            detector_observed=True,
             frame_idx=10,
             obj=TrackObject.PLAYER,
             track_id=i,
@@ -581,3 +589,64 @@ def test_identity_boundaries_are_loaded_once_per_fold(tmp_path, monkeypatch):
     result = _fold(store, tracks)
     assert result["official"]["accounting"]["estimated_shots"] == 4
     assert len(queries) == 1
+
+
+def test_carried_boxes_without_detector_evidence_do_not_propagate_identity():
+    from bai_badminton.analytics.automatic_individual import _continuous
+
+    rows = [
+        {"frame_idx": frame, "track_id": 4, "visible": True, "participant_observation_id": "obs",
+         "conf": 0.9, "bbox": [10, 10, 30, 50], "detector_observed": False}
+        for frame in range(7)
+    ]
+    rows[0]["detector_observed"] = True
+    assert not _continuous(rows, "obs", 4, 0, 6, 1280, 720)
+    rows[-1]["detector_observed"] = True
+    assert _continuous(rows, "obs", 4, 0, 6, 1280, 720)
+    rows[0]["detector_observed"] = None
+    assert not _continuous(rows, "obs", 4, 0, 6, 1280, 720)
+
+
+def test_detector_run_gap_and_unknown_intermediate_provenance_abstain():
+    from bai_badminton.analytics.automatic_individual import _continuous
+
+    rows = [
+        {"frame_idx": frame, "track_id": 4, "visible": True, "participant_observation_id": "obs",
+         "conf": 0.9, "bbox": [10, 10, 30, 50], "detector_observed": False}
+        for frame in range(14)
+    ]
+    rows[0]["detector_observed"] = rows[-1]["detector_observed"] = True
+    assert not _continuous(rows, "obs", 4, 0, 13, 1280, 720)
+    rows[6]["detector_observed"] = rows[12]["detector_observed"] = True
+    assert _continuous(rows, "obs", 4, 0, 13, 1280, 720)
+    rows[7]["detector_observed"] = None
+    assert not _continuous(rows, "obs", 4, 0, 13, 1280, 720)
+
+
+def test_legacy_unknown_detector_provenance_never_becomes_named_but_anonymous_remains(tmp_path):
+    store, tracks, observations, seeds, shots = _setup(tmp_path, detector_observed=None)
+    result = _fold(store, tracks)
+    assert result["all_linked"]["accounting"]["estimated_shots"] == 0
+    scope = result["episode_profiles"]["all_linked"]
+    assert scope["accounting"]["episode_candidate_shots"] == 4
+    assert scope["detector_run_counts"] == {"ran": 0, "not_run": 0, "unknown": 4}
+    assert all(ep["events"][0]["detector_observed"] is None for ep in scope["episodes"])
+    assert all(ep["events"][0]["detector_observation_scope"] == "frame_only_not_person_match"
+               for ep in scope["episodes"])
+
+
+def test_carried_shot_sample_abstains_named_but_discloses_anonymous_status(tmp_path):
+    store, tracks, observations, seeds, shots = _setup(tmp_path)
+    rows = [
+        TrackSample(frame_idx=frame, obj=TrackObject.PLAYER, track_id=i, bbox=(1, 1, 20, 30),
+                    conf=0.9, participant_observation_id=observations[i - 1].event_id,
+                    detector_observed=(frame != 10))
+        for i in range(1, 5) for frame in (1, 5, 10)
+    ]
+    tracks.write_chunk(TrackObject.PLAYER, 1, 10, samples_to_table(rows))
+    result = _fold(store, tracks)
+    assert result["official"]["accounting"]["estimated_shots"] == 0
+    scope = result["episode_profiles"]["official"]
+    assert scope["accounting"]["episode_candidate_shots"] == 4
+    assert scope["detector_run_counts"] == {"ran": 0, "not_run": 4, "unknown": 0}
+    assert all(ep["events"][0]["detector_observed"] is False for ep in scope["episodes"])

@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "session_id": "01M60K38M17QTHTE7QFC1RDG0N",
+  "media_sha256": "e50e00223bf41468ac4c913ff5a7647d909563326d256be8037fe79fedace640",
+  "source_proxy_sha256": "205132cc64f0d269ca67bd0eea1dfc9e08352f68202cdb8754a19a58217d958f",
+  "clip_source_window_s": [
+    60,
+    70
+  ],
+  "timebase": "clip_relative_seconds",
+  "fps": 25,
+  "window_s": [
+    0.8,
+    1.6
+  ],
+  "status": "draft",
+  "split": "diagnostic",
+  "exhaustive": false,
+  "review": {
+    "method": "AI visual inspection of 10 fps overview and cropped 25 fps frames; model outputs not consulted for this review",
+    "human_verified": false,
+    "contact_is_not_visibly_confirmed": true,
+    "independent_ground_truth": false
+  },
+  "persons": [
+    {
+      "alias": "near_red_forward_at_start",
+      "actual_name": null,
+      "continuity": "unknown through overlap; starting location is a temporary descriptor only"
+    },
+    {
+      "alias": "near_red_rear_at_start",
+      "actual_name": null,
+      "continuity": "unknown through overlap; starting location is a temporary descriptor only"
+    },
+    {
+      "alias": "far_dark_left_at_start",
+      "actual_name": null,
+      "continuity": "unknown through overlap; starting location is a temporary descriptor only"
+    },
+    {
+      "alias": "far_dark_right_at_start",
+      "actual_name": null,
+      "continuity": "unknown through overlap; starting location is a temporary descriptor only"
+    }
+  ],
+  "shots": [
+    {
+      "time_s": 0.96,
+      "time_window_s": [
+        0.8,
+        1.12
+      ],
+      "family": "unknown",
+      "player_id": null,
+      "visual_swing_person": "near_red_forward_at_start",
+      "contact_status": "possible_not_confirmed",
+      "confidence": "low",
+      "notes": "Near-side red forward player extends racket while teammates are close; shuttle contact and durable identity are not established."
+    },
+    {
+      "time_s": 1.44,
+      "time_window_s": [
+        1.28,
+        1.6
+      ],
+      "family": "unknown",
+      "player_id": null,
+      "visual_swing_person": null,
+      "contact_status": "possible_not_confirmed",
+      "confidence": "low",
+      "notes": "A far-side dark-clad player moves right and extends racket; partner overlap prevents reliable identity and contact determination."
+    }
+  ],
+  "limitations": [
+    "Non-exhaustive subset of clip; visible action does not prove physical hit.",
+    "Matching outfits and crossing/occlusion prevent durable individual identity.",
+    "Use neither these records nor their times as accuracy ground truth."
+  ],
+  "evidence": [
+    {
+      "path": "/home/administrator/Desktop/sport-analytics/evaluation-task2.sVX43G/review-evidence-20261028/task2-doubles-0-2-review.jpg",
+      "sha256": "1c64d1cd44e9860c8ea4536475d7d747121e7cf0fd90313b8a78d21781469cb5"
+    },
+    {
+      "path": "/home/administrator/Desktop/sport-analytics/evaluation-task2.sVX43G/review-evidence-20261028/task2-doubles-detail.jpg",
+      "sha256": "b0c14c1cde75efc84545ea302e8335ae9269453b292bc3cb8c9997b1940f3cb5"
+    }
+  ],
+  "reproduction": {
+    "overview": "ffmpeg -ss 0 -i doubles-probe.mp4 -t 2 -vf fps=10,scale=640:-1,tile=4x5 -frames:v 1 doubles-overview.jpg",
+    "detail": "Seek 0.8 s; use fps=25,crop=700:640:280:80,scale=500:458, frame labels and tile=4x5 for 0.8 s."
+  }
+}

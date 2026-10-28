@@ -74,6 +74,8 @@ def post_contact_motion(
     contact_idx: int,
     fps: float,
     frame_height_px: float,
+    *,
+    next_contact_idx: int | None = None,
 ) -> tuple[float | None, float | None]:
     """Estimate image-space speed from observed shuttle positions after a hit.
 
@@ -83,6 +85,8 @@ def post_contact_motion(
     residual means that the positions may include a false detection, so the
     estimate is withheld. The residual tolerance is a conservative heuristic,
     not a calibrated prediction confidence or a guarantee of correct tracking.
+    When the next contact is known, only observations strictly before it are used;
+    the next hit can change shuttle velocity and cannot describe this flight.
     """
     if not (math.isfinite(fps) and fps > 0 and math.isfinite(frame_height_px)
             and frame_height_px > 0):
@@ -90,7 +94,10 @@ def post_contact_motion(
     n = min(len(x), len(y), len(visible), len(interpolated))
     if contact_idx < 0 or contact_idx >= n:
         return None, None
-    indices = [j for j in range(contact_idx + 1, min(n, contact_idx + 6))
+    if next_contact_idx is not None and next_contact_idx <= contact_idx:
+        return None, None
+    end = min(n, contact_idx + 6, next_contact_idx if next_contact_idx is not None else n)
+    indices = [j for j in range(contact_idx + 1, end)
                if visible[j] and not interpolated[j]
                and math.isfinite(x[j]) and math.isfinite(y[j])]
     if len(indices) < 3:
@@ -119,7 +126,7 @@ class RuleStrokeClassifier:
         flight_valid = ctx.flight_time_s is not None and math.isfinite(ctx.flight_time_s) and ctx.flight_time_s > 0
         court_valid = ctx.hitter_court_xy is not None and all(math.isfinite(v) for v in ctx.hitter_court_xy)
         speed_valid = (ctx.speed_after_px_s is not None and math.isfinite(ctx.speed_after_px_s)
-                       and ctx.speed_after_px_s >= 0 and math.isfinite(ctx.frame_height_px)
+                       and ctx.speed_after_px_s > 0 and math.isfinite(ctx.frame_height_px)
                        and ctx.frame_height_px > 0)
         if not flight_valid or not speed_valid or (not ctx.is_serve and not court_valid):
             return StrokePrediction({"unknown": 0.0}, self.name, "missing_required_evidence")

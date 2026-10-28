@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "status": "draft",
+  "human_verified": false,
+  "limitations": "Single-frame visual spot-checks; format/target may change across the recording.",
+  "sessions": [
+    {
+      "session_id": "01M5EXGZNEVGYAJ3AR6CJS5ZG9",
+      "title": "A02",
+      "original_source_sha256": "90d1f399c05312ede173de2f2c8cd2fee09f1d201df46b476119660a00039ff0",
+      "proxy_sha256": "a4eaaf0551bec33ecf3b8ffbe9b002c8bad9dcdbc1be894e39356c60b7436aee",
+      "proxy_time_s": 30,
+      "fps_num": 30,
+      "fps_den": 1,
+      "source_frame_approx": 900,
+      "observed_format": "doubles",
+      "certainty": "AI spot-check only; not independently human verified",
+      "notes": "At 30 s, four likely active people appear on the right-hand calibrated court, with people on the neighboring left court; continuity and match phase are not established.",
+      "evidence": {
+        "path": "/home/administrator/Desktop/sport-analytics/evaluation-task2.sVX43G/review-evidence-20261028/task2-a02-frame.jpg",
+        "sha256": "1500764bc5ca6fe4c9e8ee521de834b41a3845a6cdd39c3a95a7214367e96119"
+      }
+    },
+    {
+      "session_id": "01M5MBR3087FH07N5B1XR5VGHW",
+      "title": "Real Video",
+      "original_source_sha256": "06a5cb888e58c64421114fecc582f60b85466900efec6db0bbf99420f4f6c010",
+      "proxy_sha256": "ca1fb9357fbc54cbe82aebc9c429d813671bd63b2e5984bd0b810d8c83ea0bc3",
+      "proxy_time_s": 30,
+      "fps_num": 30,
+      "fps_den": 1,
+      "source_frame_approx": 900,
+      "observed_format": "doubles",
+      "certainty": "AI spot-check only; not independently human verified",
+      "notes": "At 30 s, two near and two far people appear on the cropped calibrated court; continuity and match phase are not established.",
+      "evidence": {
+        "path": "/home/administrator/Desktop/sport-analytics/evaluation-task2.sVX43G/review-evidence-20261028/task2-real-frame.jpg",
+        "sha256": "8813710f837b1817bba05f0a246b83cf53556b2a8ee36f1f1315870a97bda578"
+      }
+    },
+    {
+      "session_id": "01M55MFY9GQF6ZXP2SQPQ8X1KG",
+      "title": "SampleRally",
+      "original_source_sha256": "44ae09ac4369edc971588158a5b4eb2df7586b95c8992770277d4d36f93ea790",
+      "proxy_sha256": "16b2dec0ab40d49668d670bb6ff52663fceb3769c29f5af98083902bbf66f420",
+      "proxy_time_s": 5,
+      "fps_num": 30,
+      "fps_den": 1,
+      "source_frame_approx": 150,
+      "observed_format": "singles",
+      "certainty": "AI spot-check only; not independently human verified",
+      "notes": "At 5 s one player is visible on each side; the source contains burned-in tracking boxes, labels and court graphics, so it is not a clean unbiased tracking benchmark.",
+      "evidence": {
+        "path": "/home/administrator/Desktop/sport-analytics/evaluation-task2.sVX43G/review-evidence-20261028/task2-sample-frame.jpg",
+        "sha256": "7166984666321126587a92af0e73d89e039631b6376b7a3a80b50b7d1872367c"
+      }
+    }
+  ]
+}
