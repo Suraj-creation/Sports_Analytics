@@ -1,4 +1,4 @@
-# Opt-in Task 2 candidate. Existing GPU defaults remain unchanged until real-video evaluation.
+# Opt-in experiment: sampled AI-draft identity agreement regressed; GPU defaults remain unchanged.
 description: Doubles identity experiment — existing detector/pose and pinned OSNet FP32
 device: cuda
 analysis_height: 720

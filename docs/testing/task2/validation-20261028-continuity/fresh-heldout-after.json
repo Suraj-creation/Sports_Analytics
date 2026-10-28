@@ -1,0 +1,58 @@
+{
+  "label": "3a17473",
+  "profile": "gpu-rtx4000",
+  "status": "analysed",
+  "source_session": "Fine0046",
+  "source_sha256": "263c7456643f96f37ad5ccc7d04c01c08d201209d49f141997405325709d0a2d",
+  "proxy_sha256": "b7c83ab716f4ca959395de826c8f5d226870a43bc780a2728e17bfbb55140a3b",
+  "calibration_sha256": "8b83f3bd24e053ff83d9cf717a3dacd10cb102f83611c6c0b4deb99792a94dab",
+  "media_frames": 7616,
+  "analysed_frames": 7616,
+  "analysis_wall_s": 307.26,
+  "sampled_peak_gpu_mib": 2124,
+  "event_counts": {
+    "calibration": 1,
+    "scene": 60,
+    "activity_interval": 79,
+    "identity_ambiguity": 38,
+    "rally_start": 23,
+    "rally_end": 23,
+    "participant_observation": 81,
+    "stroke": 135,
+    "contact": 135
+  },
+  "stroke_families": {
+    "short_serve": 7,
+    "push": 12,
+    "unknown": 93,
+    "drop": 1,
+    "lift": 10,
+    "clear": 3,
+    "drive": 1,
+    "long_serve": 5,
+    "net_shot": 3
+  },
+  "calibration_state_frames": {
+    "VALID": 4573,
+    "LOST": 2972,
+    "REACQUIRING": 49,
+    "DEGRADED": 22
+  },
+  "pose_stride_frames": {
+    "1": 3085,
+    "0": 2972,
+    "6": 1559
+  },
+  "detector_run_frames": {
+    "True": 1807,
+    "False": 5809
+  },
+  "visible_shuttle_frames": 3367,
+  "activity_state_frames": {
+    "reacquiring": 3043,
+    "unknown": 2588,
+    "active_play": 1985
+  },
+  "accuracy_claim": false,
+  "measurement_note": "Fresh perception and semantic analysis, including model loading and seeding; copied source media/calibration. Timing is one run, not a controlled performance study. No labelled contact, family or identity accuracy."
+}

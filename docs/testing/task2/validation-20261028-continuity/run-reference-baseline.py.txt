@@ -1,0 +1,56 @@
+from pathlib import Path
+import argparse
+import collections
+import hashlib
+import json
+import shutil
+import time
+
+from bai_engine.bus import LocalBus
+from bai_engine.config import Settings
+from bai_engine.runtime.registry import ModelRegistry
+from bai_engine.runtime.runner import SessionRunner
+from bai_engine.schema.session import Session, Source, SourceKind, SessionStatus
+from bai_engine.store import SessionRepository
+
+root = Path('/home/administrator/Desktop/sport-analytics/task2-local-dev-20261028')
+parser = argparse.ArgumentParser()
+parser.add_argument('--recording-id', default='0044')
+parser.add_argument('--media-sha256', default='1ac5999828f4d789e246d3cfce2ef0fbd7b647cd4e40326a6629157b368899e7')
+parser.add_argument('--output-name', default='public-baseline')
+args = parser.parse_args()
+assert args.recording_id.isdigit() and args.output_name in ('public-baseline','heldout-baseline')
+output = root/args.output_name
+output.mkdir(exist_ok=False)
+data = output/'data'
+digest = args.media_sha256
+media = data/'media'/digest
+media.mkdir(parents=True)
+shutil.copy2(root/f'reference/{args.recording_id}.mp4', media/'source.mp4')
+assert hashlib.sha256((media/'source.mp4').read_bytes()).hexdigest() == digest
+repo = SessionRepository(data)
+session = Session(session_id='Fine'+args.recording_id, title=f'Published reference {args.recording_id} — singles',
+                  source=Source(kind=SourceKind.UPLOAD,uri=str(media/'source.mp4'),
+                                original_name=args.recording_id+'.mp4',sha256=digest),profile='gpu-rtx4000')
+repo.save(session)
+settings = Settings(_env_file=None, data_dir=data, models_dir=root/'runtime/models',
+                    profiles_dir=root/'runtime/config/profiles',profile=session.profile,
+                    proxy_height=720)
+runner = SessionRunner(session.session_id, repo, LocalBus(), settings, ModelRegistry(settings.models_dir))
+start = time.monotonic()
+runner._ensure_media()
+runner._analyse()
+if runner._transcode_thread is not None:
+    runner._transcode_thread.join(timeout=60)
+state = repo.get(session.session_id)
+events = repo.events(session.session_id).query()
+result={'implementation':'b97c069','status':state.status.value,'elapsed_s':time.monotonic()-start,
+        'media':state.media.model_dump(),'frontier':state.frontier_frame,
+        'event_counts':dict(collections.Counter(e.type for e in events)),
+        'degraded':runner.sport.degraded(),
+        'source_sha256':digest,
+        'proxy_sha256':hashlib.sha256((media/'proxy.mp4').read_bytes()).hexdigest()}
+(output/'report.json').write_text(json.dumps(result,indent=2)+'\n')
+print(json.dumps(result,indent=2))
+repo.close()
+assert state.status is SessionStatus.ANALYSED

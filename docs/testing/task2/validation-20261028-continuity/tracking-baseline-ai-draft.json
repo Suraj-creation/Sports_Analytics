@@ -1,0 +1,113 @@
+{
+  "evaluator_version": "sampled-tracking-v1",
+  "accuracy_claim_eligible": false,
+  "metric_eligibility": {
+    "localization": false,
+    "identity": false
+  },
+  "scope": "sampled_tracking_box_agreement_not_person_detector_accuracy",
+  "session_id": "01M60K38M17QTHTE7QFC1RDG0N",
+  "media_sha256": "e50e00223bf41468ac4c913ff5a7647d909563326d256be8037fe79fedace640",
+  "proxy_sha256": "316120c31b96e17aeebc4d8b3977affbdbb46c00637069cd4147b51d928d6b4c",
+  "window_frames": [
+    0,
+    250
+  ],
+  "sampled_frames": [
+    0,
+    15,
+    30,
+    45,
+    60,
+    75,
+    90,
+    105,
+    120,
+    135,
+    150,
+    165,
+    180,
+    195,
+    210,
+    225
+  ],
+  "status": "draft",
+  "split": "diagnostic",
+  "iou_threshold": 0.5,
+  "missing_prediction_frames": 0,
+  "localization": {
+    "truth_count": 64,
+    "prediction_count": 60,
+    "true_positives": 59,
+    "false_positives": 1,
+    "false_negatives": 5,
+    "precision": 0.9833333333333333,
+    "recall": 0.921875
+  },
+  "identity": {
+    "labelled_truth": 64,
+    "ambiguous_truth_boxes": 0,
+    "prediction_support": 60,
+    "idtp": 57,
+    "idfp": 3,
+    "idfn": 7,
+    "idf1": 0.9193548387096774,
+    "sampled_switches": 0,
+    "sampled_fragments": 0,
+    "ambiguous_assignment_truth_boxes": 2,
+    "switch_scope": "uniquely_localizable_sample_pairs_only",
+    "global_mapping": {
+      "far-initial-left": "f0c08fbe1e90da75941460b86e46b5ed350c127278391fe9558ec851e0988037:01M61RNK6S0F9Q8956TMYBAC1D",
+      "far-initial-right": "f0c08fbe1e90da75941460b86e46b5ed350c127278391fe9558ec851e0988037:01M61RNK6S0F9Q8956TMYBAC1C",
+      "near-initial-front": "f0c08fbe1e90da75941460b86e46b5ed350c127278391fe9558ec851e0988037:01M61RNPAEMWW7G3AX18YJR4PR",
+      "near-initial-rear": "f0c08fbe1e90da75941460b86e46b5ed350c127278391fe9558ec851e0988037:01M61RNK6S0F9Q8956TMYBAC1B"
+    },
+    "distinct_compatible_keys_per_person": {
+      "near-initial-front": 3,
+      "near-initial-rear": 1,
+      "far-initial-left": 1,
+      "far-initial-right": 1
+    }
+  },
+  "four_player": {
+    "four_visible_frames": 16,
+    "all_localized_frames": 14,
+    "four_distinct_identity_frames": 14,
+    "distinct_matched_fraction": 0.875
+  },
+  "limitations": [
+    "Sparse sampled frames cannot validate continuity between samples.",
+    "AI draft agreement does not establish human-reviewed accuracy.",
+    "Detector provenance is frame-level and does not prove an individual person was detected."
+  ],
+  "provenance": {
+    "annotations_sha256": "1756e91e0ba61c30c07d362971711e34b0c11d3621bae03c84267abb8d0816aa",
+    "predictions_sha256": "d9104c4c2fa87b55fcdfd54b5d63d16472bd9fb4cfb389750127c4a12e869713"
+  },
+  "input_manifest": {
+    "analysis_generation": "f0c08fbe1e90da75941460b86e46b5ed350c127278391fe9558ec851e0988037",
+    "event_log_sha256": "989c7a9be4708f9a9f457ca55849331cdd1ab4e985d09b9ce284beb0aae288a7",
+    "track_chunks": [
+      {
+        "path": "tracks/player/f000000000-000000049.v1.parquet",
+        "sha256": "88753249ff72afccf406b2c67a2f9759bc37a4078113bc0cec92d991a72a5ddf"
+      },
+      {
+        "path": "tracks/player/f000000050-000000099.v1.parquet",
+        "sha256": "c352709799b7a1d8ddd87475dabf3631d2cdb88382f74268edb3c98a1820430d"
+      },
+      {
+        "path": "tracks/player/f000000100-000000149.v1.parquet",
+        "sha256": "6cbb73afe2a67f401f667802262c18dc2f4bcea0841ef85692e1590bc904afdc"
+      },
+      {
+        "path": "tracks/player/f000000150-000000199.v1.parquet",
+        "sha256": "1b9ce66dd373c8386062e5c33b16fab9b784e2cc0358662ba29df7da1e50f39e"
+      },
+      {
+        "path": "tracks/player/f000000200-000000249.v1.parquet",
+        "sha256": "b5b01ae2749d5acabba9391d00c67c7a47bdca785b000994a75ed3654ec6f441"
+      }
+    ]
+  }
+}

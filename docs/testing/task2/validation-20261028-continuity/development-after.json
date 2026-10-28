@@ -1,0 +1,3367 @@
+{
+  "evaluator_version": "published-reference-session-v1",
+  "scope": "published_singles_rally_windows_with_court_side_only",
+  "session_id": "Fine0044",
+  "media_sha256": "1ac5999828f4d789e246d3cfce2ef0fbd7b647cd4e40326a6629157b368899e7",
+  "tolerance_s": 0.2,
+  "durable_person_accuracy_evaluated": false,
+  "physical_contact_accuracy_claim_eligible": false,
+  "metric_semantics": {
+    "comparison_kind": "published_hit_anchor_agreement",
+    "metric_label": "agreement with published hit anchors at \u00b10.2 s",
+    "reference_timestamp_field": "hitting.start_frame",
+    "reference_time_conversion": "source frame / canonical media fps, without retiming",
+    "matching_tolerance_s": 0.2,
+    "matching_tolerance_frames": 5.0,
+    "physical_contact_frames_independently_verified": false,
+    "event_population": "current_nonprovisional_machine_stroke_candidates",
+    "timestamp_mae_s": "timestamp error relative to published hit anchors, not verified physical contacts",
+    "court_side": "top/bottom agreement for anchor-matched events; not durable person accuracy"
+  },
+  "pretrained_training_overlap": "unknown",
+  "published_reference_review_accepted": true,
+  "held_out_for_this_project": false,
+  "general_accuracy_claim_eligible": false,
+  "family_normalization": "cross_net_to_net_shot_with_cross_court_placement_v1",
+  "aggregate": {
+    "contact_detection": {
+      "truth_count": 41,
+      "prediction_count": 29,
+      "matched": 9,
+      "false_positives": 20,
+      "false_negatives": 32,
+      "precision": 0.3103448275862069,
+      "recall": 0.21951219512195122,
+      "f1": 0.2571428571428571,
+      "metric_label": "agreement with published hit anchors at \u00b10.2 s"
+    },
+    "shot_family": {
+      "per_class": {
+        "block": {
+          "support": 6,
+          "predicted": 0,
+          "true_positive": 0,
+          "precision": null,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "clear": {
+          "support": 1,
+          "predicted": 2,
+          "true_positive": 0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "drive": {
+          "support": 1,
+          "predicted": 0,
+          "true_positive": 0,
+          "precision": null,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "drop": {
+          "support": 1,
+          "predicted": 0,
+          "true_positive": 0,
+          "precision": null,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "lift": {
+          "support": 2,
+          "predicted": 2,
+          "true_positive": 0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "long_serve": {
+          "support": 2,
+          "predicted": 1,
+          "true_positive": 0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "net_shot": {
+          "support": 5,
+          "predicted": 2,
+          "true_positive": 1,
+          "precision": 0.5,
+          "recall": 0.2,
+          "f1": 0.2857142857142857
+        },
+        "push": {
+          "support": 10,
+          "predicted": 3,
+          "true_positive": 2,
+          "precision": 0.6666666666666666,
+          "recall": 0.2,
+          "f1": 0.3076923076923077
+        },
+        "short_serve": {
+          "support": 2,
+          "predicted": 1,
+          "true_positive": 0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "smash": {
+          "support": 11,
+          "predicted": 0,
+          "true_positive": 0,
+          "precision": null,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "unknown": {
+          "support": 0,
+          "predicted": 18,
+          "true_positive": 0,
+          "precision": 0.0,
+          "recall": null,
+          "f1": 0.0
+        }
+      },
+      "macro_f1_including_unknown": 0.053946053946053944,
+      "known_family": {
+        "truth_support": 41,
+        "per_class": {
+          "block": {
+            "support": 6,
+            "predicted": 0,
+            "true_positive": 0,
+            "precision": null,
+            "recall": 0.0,
+            "f1": 0.0
+          },
+          "clear": {
+            "support": 1,
+            "predicted": 2,
+            "true_positive": 0,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0
+          },
+          "drive": {
+            "support": 1,
+            "predicted": 0,
+            "true_positive": 0,
+            "precision": null,
+            "recall": 0.0,
+            "f1": 0.0
+          },
+          "drop": {
+            "support": 1,
+            "predicted": 0,
+            "true_positive": 0,
+            "precision": null,
+            "recall": 0.0,
+            "f1": 0.0
+          },
+          "lift": {
+            "support": 2,
+            "predicted": 2,
+            "true_positive": 0,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0
+          },
+          "long_serve": {
+            "support": 2,
+            "predicted": 1,
+            "true_positive": 0,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0
+          },
+          "net_shot": {
+            "support": 5,
+            "predicted": 2,
+            "true_positive": 1,
+            "precision": 0.5,
+            "recall": 0.2,
+            "f1": 0.2857142857142857
+          },
+          "push": {
+            "support": 10,
+            "predicted": 3,
+            "true_positive": 2,
+            "precision": 0.6666666666666666,
+            "recall": 0.2,
+            "f1": 0.3076923076923077
+          },
+          "short_serve": {
+            "support": 2,
+            "predicted": 1,
+            "true_positive": 0,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0
+          },
+          "smash": {
+            "support": 11,
+            "predicted": 0,
+            "true_positive": 0,
+            "precision": null,
+            "recall": 0.0,
+            "f1": 0.0
+          }
+        },
+        "macro_f1": 0.05934065934065934,
+        "excluded_unknown_truth": 0,
+        "excluded_predictions_on_unknown_truth": 0
+      },
+      "confusion": {
+        "block": {
+          "unknown": 2,
+          "__missed__": 3,
+          "long_serve": 1
+        },
+        "push": {
+          "push": 2,
+          "__missed__": 6,
+          "unknown": 2
+        },
+        "long_serve": {
+          "__missed__": 2
+        },
+        "smash": {
+          "__missed__": 10,
+          "unknown": 1
+        },
+        "drop": {
+          "__missed__": 1
+        },
+        "drive": {
+          "__missed__": 1
+        },
+        "__spurious__": {
+          "lift": 2,
+          "unknown": 13,
+          "clear": 2,
+          "push": 1,
+          "net_shot": 1,
+          "short_serve": 1
+        },
+        "clear": {
+          "__missed__": 1
+        },
+        "lift": {
+          "__missed__": 2
+        },
+        "unknown": {},
+        "net_shot": {
+          "net_shot": 1,
+          "__missed__": 4
+        },
+        "short_serve": {
+          "__missed__": 2
+        }
+      },
+      "unknown_prediction_fraction": 0.6206896551724138
+    },
+    "court_side": {
+      "labelled_truth": 41,
+      "matched_labelled_truth": 9,
+      "unmatched_labelled_truth": 32,
+      "correct": 1,
+      "wrong": 2,
+      "unresolved_matched": 6,
+      "resolved_matched": 3,
+      "spurious_assigned_predictions": 9,
+      "per_side": {
+        "top": {
+          "truth_count": 20,
+          "prediction_count": 5,
+          "true_positives": 1,
+          "false_positives": 4,
+          "false_negatives": 19,
+          "precision": 0.2,
+          "recall": 0.05,
+          "f1": 0.08
+        },
+        "bottom": {
+          "truth_count": 21,
+          "prediction_count": 7,
+          "true_positives": 0,
+          "false_positives": 7,
+          "false_negatives": 21,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0
+        }
+      },
+      "accuracy_all_labelled_truth": 0.024390243902439025,
+      "accuracy_resolved_matched": 0.3333333333333333,
+      "resolved_fraction_matched": 0.3333333333333333
+    },
+    "joint_contact_family_court_side": {
+      "truth_count": 41,
+      "prediction_count": 29,
+      "true_positives": 1,
+      "false_positives": 28,
+      "false_negatives": 40,
+      "precision": 0.034482758620689655,
+      "recall": 0.024390243902439025,
+      "f1": 0.02857142857142857,
+      "excluded_ambiguous_truth": 0,
+      "excluded_predictions_on_ambiguous_truth": 0
+    },
+    "timestamp_mae_s": 0.13777777777777722
+  },
+  "rallies": [
+    {
+      "annotation_file": "/home/administrator/Desktop/sport-analytics/task2-local-dev-20261028/reference/normalized-0044-development/0044-rally-0000.json",
+      "annotation_sha256": "03593da9299a0504cdabf5aaf07f410d2f0dd158de7a3ca9f48b0c06f5159234",
+      "window_frames": [
+        2197,
+        2530
+      ],
+      "window_s": [
+        87.88,
+        101.2
+      ],
+      "source_reference": {
+        "schema_version": 1,
+        "session_id": "Fine0044",
+        "media_sha256": "1ac5999828f4d789e246d3cfce2ef0fbd7b647cd4e40326a6629157b368899e7",
+        "timebase": "canonical_media_seconds",
+        "window_s": [
+          87.88,
+          101.2
+        ],
+        "window_frames": [
+          2197,
+          2530
+        ],
+        "fps_num": 25,
+        "fps_den": 1,
+        "media_n_frames": 7577,
+        "width": 1280,
+        "height": 720,
+        "status": "reviewed",
+        "split": "development",
+        "exhaustive": true,
+        "review": {
+          "human_verified": true,
+          "provider_human_verified": true,
+          "our_human_reviewed": false,
+          "accepted_published_review": true,
+          "origin": "published_human_refined_reference",
+          "publication": "https://arxiv.org/html/2508.07554v1",
+          "method": "Deterministic import of provider labels; no new human review or AI relabelling.",
+          "held_out_reserved_before_tuning": false
+        },
+        "rally_index": 0,
+        "source_player_list": [
+          {
+            "name": "Lakshya Sen",
+            "role": "server"
+          },
+          {
+            "name": "Jia Heng Jason Teh",
+            "role": "receiver"
+          }
+        ],
+        "shots": [
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-0:hit-0",
+            "time_s": 87.88,
+            "family": "long_serve",
+            "player_id": "Lakshya Sen",
+            "frame_idx": 2197,
+            "source_start_frame": 2197,
+            "source_end_frame": 2227,
+            "source_player": "Lakshya Sen",
+            "source_hitter": "bottom",
+            "raw_family": "serve",
+            "raw_subtypes": [
+              "high serve",
+              "flick serve"
+            ],
+            "source_ball_area": "mid front court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source serve subtype"
+          },
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-0:hit-1",
+            "time_s": 89.08,
+            "family": "smash",
+            "player_id": "Jia Heng Jason Teh",
+            "frame_idx": 2227,
+            "source_start_frame": 2227,
+            "source_end_frame": 2250,
+            "source_player": "Jia Heng Jason Teh",
+            "source_hitter": "top",
+            "raw_family": "kill",
+            "raw_subtypes": [
+              "common smash"
+            ],
+            "source_ball_area": "left back court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source smash or net-kill subtype"
+          },
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-0:hit-2",
+            "time_s": 90.0,
+            "family": "push",
+            "player_id": "Lakshya Sen",
+            "frame_idx": 2250,
+            "source_start_frame": 2250,
+            "source_end_frame": 2274,
+            "source_player": "Lakshya Sen",
+            "source_hitter": "bottom",
+            "raw_family": "push shot",
+            "raw_subtypes": [
+              "flat lift"
+            ],
+            "source_ball_area": "mid court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source primary-type mapping; source subtypes retained"
+          },
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-0:hit-3",
+            "time_s": 90.96,
+            "family": "smash",
+            "player_id": "Jia Heng Jason Teh",
+            "frame_idx": 2274,
+            "source_start_frame": 2274,
+            "source_end_frame": 2291,
+            "source_player": "Jia Heng Jason Teh",
+            "source_hitter": "top",
+            "raw_family": "kill",
+            "raw_subtypes": [
+              "full smash",
+              "jump smash"
+            ],
+            "source_ball_area": "mid back court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source smash or net-kill subtype"
+          },
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-0:hit-4",
+            "time_s": 91.64,
+            "family": "block",
+            "player_id": "Lakshya Sen",
+            "frame_idx": 2291,
+            "source_start_frame": 2291,
+            "source_end_frame": 2312,
+            "source_player": "Lakshya Sen",
+            "source_hitter": "bottom",
+            "raw_family": "block",
+            "raw_subtypes": [],
+            "source_ball_area": "mid court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source primary-type mapping; source subtypes retained"
+          },
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-0:hit-5",
+            "time_s": 92.48,
+            "family": "push",
+            "player_id": "Jia Heng Jason Teh",
+            "frame_idx": 2312,
+            "source_start_frame": 2312,
+            "source_end_frame": 2345,
+            "source_player": "Jia Heng Jason Teh",
+            "source_hitter": "top",
+            "raw_family": "push shot",
+            "raw_subtypes": [
+              "flat lift"
+            ],
+            "source_ball_area": "right front court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source primary-type mapping; source subtypes retained"
+          },
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-0:hit-6",
+            "time_s": 93.8,
+            "family": "drop",
+            "player_id": "Lakshya Sen",
+            "frame_idx": 2345,
+            "source_start_frame": 2345,
+            "source_end_frame": 2369,
+            "source_player": "Lakshya Sen",
+            "source_hitter": "bottom",
+            "raw_family": "drop shot",
+            "raw_subtypes": [
+              "reverse slice drop shot"
+            ],
+            "source_ball_area": "left back court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source primary-type mapping; source subtypes retained"
+          },
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-0:hit-7",
+            "time_s": 94.76,
+            "family": "push",
+            "player_id": "Jia Heng Jason Teh",
+            "frame_idx": 2369,
+            "source_start_frame": 2369,
+            "source_end_frame": 2396,
+            "source_player": "Jia Heng Jason Teh",
+            "source_hitter": "top",
+            "raw_family": "push shot",
+            "raw_subtypes": [
+              "flat lift"
+            ],
+            "source_ball_area": "left mid court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source primary-type mapping; source subtypes retained"
+          },
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-0:hit-8",
+            "time_s": 95.84,
+            "family": "drive",
+            "player_id": "Lakshya Sen",
+            "frame_idx": 2396,
+            "source_start_frame": 2396,
+            "source_end_frame": 2426,
+            "source_player": "Lakshya Sen",
+            "source_hitter": "bottom",
+            "raw_family": "drive",
+            "raw_subtypes": [
+              "high drive"
+            ],
+            "source_ball_area": "right back court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source primary-type mapping; source subtypes retained"
+          },
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-0:hit-9",
+            "time_s": 97.04,
+            "family": "smash",
+            "player_id": "Jia Heng Jason Teh",
+            "frame_idx": 2426,
+            "source_start_frame": 2426,
+            "source_end_frame": 2443,
+            "source_player": "Jia Heng Jason Teh",
+            "source_hitter": "top",
+            "raw_family": "kill",
+            "raw_subtypes": [
+              "full smash",
+              "jump smash"
+            ],
+            "source_ball_area": "left back court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source smash or net-kill subtype"
+          },
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-0:hit-10",
+            "time_s": 97.72,
+            "family": "block",
+            "player_id": "Lakshya Sen",
+            "frame_idx": 2443,
+            "source_start_frame": 2443,
+            "source_end_frame": 2463,
+            "source_player": "Lakshya Sen",
+            "source_hitter": "bottom",
+            "raw_family": "block",
+            "raw_subtypes": [],
+            "source_ball_area": "mid court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source primary-type mapping; source subtypes retained"
+          },
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-0:hit-11",
+            "time_s": 98.52,
+            "family": "push",
+            "player_id": "Jia Heng Jason Teh",
+            "frame_idx": 2463,
+            "source_start_frame": 2463,
+            "source_end_frame": 2484,
+            "source_player": "Jia Heng Jason Teh",
+            "source_hitter": "top",
+            "raw_family": "push shot",
+            "raw_subtypes": [
+              "flat lift"
+            ],
+            "source_ball_area": "mid court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source primary-type mapping; source subtypes retained"
+          },
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-0:hit-12",
+            "time_s": 99.36,
+            "family": "smash",
+            "player_id": "Lakshya Sen",
+            "frame_idx": 2484,
+            "source_start_frame": 2484,
+            "source_end_frame": 2530,
+            "source_player": "Lakshya Sen",
+            "source_hitter": "bottom",
+            "raw_family": "kill",
+            "raw_subtypes": [
+              "jump smash"
+            ],
+            "source_ball_area": "right mid court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source smash or net-kill subtype"
+          }
+        ],
+        "reference_provenance": {
+          "converter_version": "finebadminton-reference-v1",
+          "mapping_version": "finebadminton-reference-map-v1",
+          "dataset": "iLearn-Lab/Finebadminton-20K",
+          "dataset_revision": "72cae601e08c83ee8ec7e19f8fd7850e9158af7d",
+          "annotations_sha256": "51d940300a7386253f3af63d8b2f15ecc13b48be02b5c4144bc48f7bc74785b1",
+          "annotations_url": "https://huggingface.co/datasets/iLearn-Lab/Finebadminton-20K/resolve/72cae601e08c83ee8ec7e19f8fd7850e9158af7d/finebadminton-20K/0044_updated.json",
+          "media_url": "https://huggingface.co/datasets/iLearn-Lab/Finebadminton-20K/resolve/72cae601e08c83ee8ec7e19f8fd7850e9158af7d/videos/0044.mp4",
+          "source_media_sha256": "1ac5999828f4d789e246d3cfce2ef0fbd7b647cd4e40326a6629157b368899e7",
+          "publication": "https://arxiv.org/html/2508.07554v1",
+          "publication_sections": [
+            "3.1",
+            "3.2"
+          ],
+          "license": "Apache-2.0",
+          "annotation_process": "Provider: manual annotation or machine proposals refined and verified by human annotators.",
+          "coverage": "published annotated rally windows only",
+          "anchor_semantics": "published hitting.start_frame, without retiming or deriving contacts from model predictions"
+        },
+        "limitations": [
+          "Provider labels include machine assistance followed by reported human refinement.",
+          "Import does not independently verify annotation correctness or pixel/frame correspondence.",
+          "Only published rally windows are covered; other video spans are unlabelled.",
+          "Cross-court net predictions require the same family/placement normalization before comparison."
+        ]
+      },
+      "predictions": [
+        {
+          "time_s": 90.24,
+          "family": "lift",
+          "event_id": "01M61RZPKRTHY51QJRPJEXXGEZ",
+          "confidence": 0.4630934287780659,
+          "participant_hypothesis": {
+            "status": "provisional",
+            "participant_id": "participant-8fb168e5c483481f-000001",
+            "track_id": 0,
+            "observation_id": "01M61RZPESAX5T8Z9ZKN96PP6N",
+            "reason": "nearest_proximity",
+            "policy": "relative_proximity_gap_v1",
+            "components": {
+              "redirect": 1.0,
+              "impulse": 1.0,
+              "proximity": 0.8329,
+              "proximity_runner_up": 0.0213,
+              "proximity_gap": 0.8117,
+              "proximity_relative_gap": 0.9745,
+              "proximity_relative_gap_threshold": 0.05,
+              "proximity_minimum_threshold": 0.05,
+              "proximity_candidates": 2.0,
+              "swing": 0.0,
+              "angle_deg": 173.1095,
+              "speed_before": 21.537,
+              "speed_after": 62.3503,
+              "body_h": 180.0532
+            }
+          },
+          "original_family": "lift",
+          "placement": null,
+          "court_side": "bottom",
+          "court_side_reason": "supported_event_context_and_finite_court_position",
+          "hitter_court_xy": [
+            -0.4436795262253674,
+            -4.089497875615637
+          ],
+          "classification_context_source": "provisional_track_episode"
+        },
+        {
+          "time_s": 91.84,
+          "family": "unknown",
+          "event_id": "01M61RZPNWHSPEJW6Y5XHQZT2S",
+          "confidence": null,
+          "participant_hypothesis": {
+            "status": "unresolved",
+            "participant_id": null,
+            "track_id": null,
+            "observation_id": null,
+            "reason": "player_not_detector_matched",
+            "policy": "relative_proximity_gap_v1",
+            "components": {
+              "redirect": 1.0,
+              "impulse": 1.0,
+              "proximity": 0.0675,
+              "proximity_runner_up": 0.0,
+              "proximity_gap": 0.0675,
+              "proximity_relative_gap": 1.0,
+              "proximity_relative_gap_threshold": 0.05,
+              "proximity_minimum_threshold": 0.05,
+              "proximity_candidates": 1.0,
+              "swing": 0.2482,
+              "angle_deg": 102.0472,
+              "speed_before": 8.5453,
+              "speed_after": 32.2401,
+              "body_h": 161.4999
+            }
+          },
+          "original_family": "unknown",
+          "placement": null,
+          "court_side": null,
+          "court_side_reason": "unsupported_or_missing_classification_context",
+          "hitter_court_xy": null,
+          "classification_context_source": null
+        },
+        {
+          "time_s": 92.84,
+          "family": "unknown",
+          "event_id": "01M61RZPNZ4HCQH0CSZBWC6QRV",
+          "confidence": null,
+          "participant_hypothesis": {
+            "status": "unresolved",
+            "participant_id": null,
+            "track_id": null,
+            "observation_id": null,
+            "reason": "player_not_detector_matched",
+            "policy": "relative_proximity_gap_v1",
+            "components": {
+              "redirect": 1.0,
+              "impulse": 1.0,
+              "proximity": 0.429,
+              "proximity_runner_up": 0.2588,
+              "proximity_gap": 0.1702,
+              "proximity_relative_gap": 0.3968,
+              "proximity_relative_gap_threshold": 0.05,
+              "proximity_minimum_threshold": 0.05,
+              "proximity_candidates": 2.0,
+              "swing": 0.151,
+              "angle_deg": 177.3087,
+              "speed_before": 10.2402,
+              "speed_after": 34.4552,
+              "body_h": 120.036
+            }
+          },
+          "original_family": "unknown",
+          "placement": null,
+          "court_side": null,
+          "court_side_reason": "unsupported_or_missing_classification_context",
+          "hitter_court_xy": null,
+          "classification_context_source": null
+        },
+        {
+          "time_s": 94.28,
+          "family": "unknown",
+          "event_id": "01M61RZPS1K04CCPV21FXKFJQ9",
+          "confidence": null,
+          "participant_hypothesis": {
+            "status": "unresolved",
+            "participant_id": null,
+            "track_id": null,
+            "observation_id": null,
+            "reason": "player_not_detector_matched",
+            "policy": "relative_proximity_gap_v1",
+            "components": {
+              "redirect": 1.0,
+              "impulse": 0.7767,
+              "proximity": 0.5174,
+              "proximity_runner_up": 0.0198,
+              "proximity_gap": 0.4976,
+              "proximity_relative_gap": 0.9617,
+              "proximity_relative_gap_threshold": 0.05,
+              "proximity_minimum_threshold": 0.05,
+              "proximity_candidates": 2.0,
+              "swing": 0.3902,
+              "angle_deg": 106.6557,
+              "speed_before": 25.0302,
+              "speed_after": 61.1417,
+              "body_h": 283.4759
+            }
+          },
+          "original_family": "unknown",
+          "placement": null,
+          "court_side": null,
+          "court_side_reason": "unsupported_or_missing_classification_context",
+          "hitter_court_xy": null,
+          "classification_context_source": null
+        },
+        {
+          "time_s": 95.04,
+          "family": "lift",
+          "event_id": "01M61RZPS3THE38DM74DGMC0E2",
+          "confidence": 0.674169603622104,
+          "participant_hypothesis": {
+            "status": "provisional",
+            "participant_id": "participant-8fb168e5c483481f-000003",
+            "track_id": 2,
+            "observation_id": "01M61RZPJ4H9JR78MYW716CJ0D",
+            "reason": "nearest_proximity",
+            "policy": "relative_proximity_gap_v1",
+            "components": {
+              "redirect": 1.0,
+              "impulse": 0.8333,
+              "proximity": 0.4451,
+              "proximity_runner_up": 0.0473,
+              "proximity_gap": 0.3978,
+              "proximity_relative_gap": 0.8938,
+              "proximity_relative_gap_threshold": 0.05,
+              "proximity_minimum_threshold": 0.05,
+              "proximity_candidates": 2.0,
+              "swing": 0.9698,
+              "angle_deg": 121.935,
+              "speed_before": 9.55,
+              "speed_after": 24.1932,
+              "body_h": 103.8818
+            }
+          },
+          "original_family": "lift",
+          "placement": null,
+          "court_side": "top",
+          "court_side_reason": "supported_event_context_and_finite_court_position",
+          "hitter_court_xy": [
+            0.8615838615114982,
+            2.5821085259987555
+          ],
+          "classification_context_source": "provisional_track_episode"
+        },
+        {
+          "time_s": 96.24,
+          "family": "clear",
+          "event_id": "01M61RZPXC3BXFWV3KDVMJ9F7D",
+          "confidence": 0.674169603622104,
+          "participant_hypothesis": {
+            "status": "provisional",
+            "participant_id": "participant-8fb168e5c483481f-000001",
+            "track_id": 0,
+            "observation_id": "01M61RZPESAX5T8Z9ZKN96PP6N",
+            "reason": "nearest_proximity",
+            "policy": "relative_proximity_gap_v1",
+            "components": {
+              "redirect": 1.0,
+              "impulse": 1.0,
+              "proximity": 0.3158,
+              "proximity_runner_up": 0.0071,
+              "proximity_gap": 0.3087,
+              "proximity_relative_gap": 0.9775,
+              "proximity_relative_gap_threshold": 0.05,
+              "proximity_minimum_threshold": 0.05,
+              "proximity_candidates": 2.0,
+              "swing": 0.5698,
+              "angle_deg": 165.6702,
+              "speed_before": 26.8859,
+              "speed_after": 90.5869,
+              "body_h": 199.0094
+            }
+          },
+          "original_family": "clear",
+          "placement": null,
+          "court_side": "bottom",
+          "court_side_reason": "supported_event_context_and_finite_court_position",
+          "hitter_court_xy": [
+            1.0919782133423752,
+            -6.0192356543547705
+          ],
+          "classification_context_source": "provisional_track_episode"
+        },
+        {
+          "time_s": 98.48,
+          "family": "push",
+          "event_id": "01M61RZPXFFXQMMMA1TZWN3CSN",
+          "confidence": 0.33785113592349153,
+          "participant_hypothesis": {
+            "status": "provisional",
+            "participant_id": "participant-8fb168e5c483481f-000001",
+            "track_id": 0,
+            "observation_id": "01M61RZPESAX5T8Z9ZKN96PP6N",
+            "reason": "nearest_proximity",
+            "policy": "relative_proximity_gap_v1",
+            "components": {
+              "redirect": 1.0,
+              "impulse": 1.0,
+              "proximity": 0.0849,
+              "proximity_runner_up": 0.0569,
+              "proximity_gap": 0.028,
+              "proximity_relative_gap": 0.3296,
+              "proximity_relative_gap_threshold": 0.05,
+              "proximity_minimum_threshold": 0.05,
+              "proximity_candidates": 2.0,
+              "swing": 0.3787,
+              "angle_deg": 104.386,
+              "speed_before": 0.4753,
+              "speed_after": 3.0412,
+              "body_h": 201.0762
+            }
+          },
+          "original_family": "push",
+          "placement": null,
+          "court_side": "bottom",
+          "court_side_reason": "supported_event_context_and_finite_court_position",
+          "hitter_court_xy": [
+            -0.49465706994521214,
+            -4.347828922310433
+          ],
+          "classification_context_source": "provisional_track_episode"
+        },
+        {
+          "time_s": 98.88,
+          "family": "push",
+          "event_id": "01M61RZPXHPFTG3DAK409E4SAS",
+          "confidence": 0.33785113592349153,
+          "participant_hypothesis": {
+            "status": "provisional",
+            "participant_id": "participant-8fb168e5c483481f-000003",
+            "track_id": 2,
+            "observation_id": "01M61RZPJ4H9JR78MYW716CJ0D",
+            "reason": "nearest_proximity",
+            "policy": "relative_proximity_gap_v1",
+            "components": {
+              "redirect": 1.0,
+              "impulse": 0.9872,
+              "proximity": 0.3776,
+              "proximity_runner_up": 0.1801,
+              "proximity_gap": 0.1975,
+              "proximity_relative_gap": 0.523,
+              "proximity_relative_gap_threshold": 0.05,
+              "proximity_minimum_threshold": 0.05,
+              "proximity_candidates": 2.0,
+              "swing": 0.2835,
+              "angle_deg": 108.8867,
+              "speed_before": 9.5804,
+              "speed_after": 26.6294,
+              "body_h": 98.0782
+            }
+          },
+          "original_family": "push",
+          "placement": null,
+          "court_side": "top",
+          "court_side_reason": "supported_event_context_and_finite_court_position",
+          "hitter_court_xy": [
+            -0.533479503292288,
+            2.99295617954023
+          ],
+          "classification_context_source": "provisional_track_episode"
+        },
+        {
+          "time_s": 99.6,
+          "family": "unknown",
+          "event_id": "01M61RZPY9SH9W4D81Z266VFNR",
+          "confidence": null,
+          "participant_hypothesis": {
+            "status": "provisional",
+            "participant_id": "participant-8fb168e5c483481f-000001",
+            "track_id": 0,
+            "observation_id": "01M61RZPESAX5T8Z9ZKN96PP6N",
+            "reason": "nearest_proximity",
+            "policy": "relative_proximity_gap_v1",
+            "components": {
+              "redirect": 1.0,
+              "impulse": 1.0,
+              "proximity": 0.3794,
+              "proximity_runner_up": 0.0633,
+              "proximity_gap": 0.3161,
+              "proximity_relative_gap": 0.8332,
+              "proximity_relative_gap_threshold": 0.05,
+              "proximity_minimum_threshold": 0.05,
+              "proximity_candidates": 2.0,
+              "swing": 0.6123,
+              "angle_deg": 153.801,
+              "speed_before": 16.1844,
+              "speed_after": 52.6374,
+              "body_h": 220.1257
+            }
+          },
+          "original_family": "unknown",
+          "placement": null,
+          "court_side": "bottom",
+          "court_side_reason": "supported_event_context_and_finite_court_position",
+          "hitter_court_xy": [
+            0.5423900869014564,
+            -4.32697869518753
+          ],
+          "classification_context_source": "provisional_track_episode"
+        }
+      ],
+      "contact_detection": {
+        "truth_count": 13,
+        "prediction_count": 9,
+        "matched": 2,
+        "false_positives": 7,
+        "false_negatives": 11,
+        "metric_label": "agreement with published hit anchors at \u00b10.2 s"
+      },
+      "shot_family": {
+        "per_class": {
+          "block": {
+            "support": 2,
+            "predicted": 0,
+            "true_positive": 0,
+            "precision": null,
+            "recall": 0.0,
+            "f1": 0.0
+          },
+          "clear": {
+            "support": 0,
+            "predicted": 1,
+            "true_positive": 0,
+            "precision": 0.0,
+            "recall": null,
+            "f1": 0.0
+          },
+          "drive": {
+            "support": 1,
+            "predicted": 0,
+            "true_positive": 0,
+            "precision": null,
+            "recall": 0.0,
+            "f1": 0.0
+          },
+          "drop": {
+            "support": 1,
+            "predicted": 0,
+            "true_positive": 0,
+            "precision": null,
+            "recall": 0.0,
+            "f1": 0.0
+          },
+          "lift": {
+            "support": 0,
+            "predicted": 2,
+            "true_positive": 0,
+            "precision": 0.0,
+            "recall": null,
+            "f1": 0.0
+          },
+          "long_serve": {
+            "support": 1,
+            "predicted": 0,
+            "true_positive": 0,
+            "precision": null,
+            "recall": 0.0,
+            "f1": 0.0
+          },
+          "push": {
+            "support": 4,
+            "predicted": 2,
+            "true_positive": 1,
+            "precision": 0.5,
+            "recall": 0.25,
+            "f1": 0.3333333333333333
+          },
+          "smash": {
+            "support": 4,
+            "predicted": 0,
+            "true_positive": 0,
+            "precision": null,
+            "recall": 0.0,
+            "f1": 0.0
+          },
+          "unknown": {
+            "support": 0,
+            "predicted": 4,
+            "true_positive": 0,
+            "precision": 0.0,
+            "recall": null,
+            "f1": 0.0
+          }
+        },
+        "known_family": {
+          "truth_support": 13,
+          "excluded_unknown_truth": 0,
+          "excluded_predictions_on_unknown_truth": 0,
+          "per_class": {
+            "block": {
+              "support": 2,
+              "predicted": 0,
+              "true_positive": 0,
+              "precision": null,
+              "recall": 0.0,
+              "f1": 0.0
+            },
+            "clear": {
+              "support": 0,
+              "predicted": 1,
+              "true_positive": 0,
+              "precision": 0.0,
+              "recall": null,
+              "f1": 0.0
+            },
+            "drive": {
+              "support": 1,
+              "predicted": 0,
+              "true_positive": 0,
+              "precision": null,
+              "recall": 0.0,
+              "f1": 0.0
+            },
+            "drop": {
+              "support": 1,
+              "predicted": 0,
+              "true_positive": 0,
+              "precision": null,
+              "recall": 0.0,
+              "f1": 0.0
+            },
+            "lift": {
+              "support": 0,
+              "predicted": 2,
+              "true_positive": 0,
+              "precision": 0.0,
+              "recall": null,
+              "f1": 0.0
+            },
+            "long_serve": {
+              "support": 1,
+              "predicted": 0,
+              "true_positive": 0,
+              "precision": null,
+              "recall": 0.0,
+              "f1": 0.0
+            },
+            "push": {
+              "support": 4,
+              "predicted": 2,
+              "true_positive": 1,
+              "precision": 0.5,
+              "recall": 0.25,
+              "f1": 0.3333333333333333
+            },
+            "smash": {
+              "support": 4,
+              "predicted": 0,
+              "true_positive": 0,
+              "precision": null,
+              "recall": 0.0,
+              "f1": 0.0
+            }
+          },
+          "macro_f1": 0.041666666666666664
+        },
+        "confusion": {
+          "block": {
+            "unknown": 1,
+            "__missed__": 1
+          },
+          "push": {
+            "push": 1,
+            "__missed__": 3
+          },
+          "long_serve": {
+            "__missed__": 1
+          },
+          "smash": {
+            "__missed__": 4
+          },
+          "drop": {
+            "__missed__": 1
+          },
+          "drive": {
+            "__missed__": 1
+          },
+          "__spurious__": {
+            "lift": 2,
+            "unknown": 3,
+            "clear": 1,
+            "push": 1
+          },
+          "clear": {},
+          "lift": {},
+          "unknown": {}
+        },
+        "unknown_predictions": 4
+      },
+      "court_side": {
+        "labelled_truth": 13,
+        "matched_labelled_truth": 2,
+        "unmatched_labelled_truth": 11,
+        "correct": 0,
+        "wrong": 1,
+        "unresolved_matched": 1,
+        "resolved_matched": 1,
+        "spurious_assigned_predictions": 5,
+        "per_side": {
+          "bottom": {
+            "truth_count": 7,
+            "prediction_count": 4,
+            "true_positives": 0,
+            "false_positives": 4,
+            "false_negatives": 7,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0
+          },
+          "top": {
+            "truth_count": 6,
+            "prediction_count": 2,
+            "true_positives": 0,
+            "false_positives": 2,
+            "false_negatives": 6,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0
+          }
+        }
+      },
+      "joint_contact_family_court_side": {
+        "truth_count": 13,
+        "prediction_count": 9,
+        "true_positives": 0,
+        "false_positives": 9,
+        "false_negatives": 13,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "excluded_ambiguous_truth": 0,
+        "excluded_predictions_on_ambiguous_truth": 0
+      },
+      "timestamp_mae_s": 0.11999999999999744
+    },
+    {
+      "annotation_file": "/home/administrator/Desktop/sport-analytics/task2-local-dev-20261028/reference/normalized-0044-development/0044-rally-0001.json",
+      "annotation_sha256": "4d9b5e20e51d29b5a7d16f3088f32185491532ed46f17fa56c5ae82ec62ef5c2",
+      "window_frames": [
+        3921,
+        4120
+      ],
+      "window_s": [
+        156.84,
+        164.8
+      ],
+      "source_reference": {
+        "schema_version": 1,
+        "session_id": "Fine0044",
+        "media_sha256": "1ac5999828f4d789e246d3cfce2ef0fbd7b647cd4e40326a6629157b368899e7",
+        "timebase": "canonical_media_seconds",
+        "window_s": [
+          156.84,
+          164.8
+        ],
+        "window_frames": [
+          3921,
+          4120
+        ],
+        "fps_num": 25,
+        "fps_den": 1,
+        "media_n_frames": 7577,
+        "width": 1280,
+        "height": 720,
+        "status": "reviewed",
+        "split": "development",
+        "exhaustive": true,
+        "review": {
+          "human_verified": true,
+          "provider_human_verified": true,
+          "our_human_reviewed": false,
+          "accepted_published_review": true,
+          "origin": "published_human_refined_reference",
+          "publication": "https://arxiv.org/html/2508.07554v1",
+          "method": "Deterministic import of provider labels; no new human review or AI relabelling.",
+          "held_out_reserved_before_tuning": false
+        },
+        "rally_index": 1,
+        "source_player_list": [
+          {
+            "name": "Lakshya Sen",
+            "role": "server"
+          },
+          {
+            "name": "Jia Heng Jason Teh",
+            "role": "receiver"
+          }
+        ],
+        "shots": [
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-1:hit-0",
+            "time_s": 156.84,
+            "family": "long_serve",
+            "player_id": "Lakshya Sen",
+            "frame_idx": 3921,
+            "source_start_frame": 3921,
+            "source_end_frame": 3949,
+            "source_player": "Lakshya Sen",
+            "source_hitter": "top",
+            "raw_family": "serve",
+            "raw_subtypes": [
+              "high serve",
+              "flick serve"
+            ],
+            "source_ball_area": "mid court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source serve subtype"
+          },
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-1:hit-1",
+            "time_s": 157.96,
+            "family": "clear",
+            "player_id": "Jia Heng Jason Teh",
+            "frame_idx": 3949,
+            "source_start_frame": 3949,
+            "source_end_frame": 3977,
+            "source_player": "Jia Heng Jason Teh",
+            "source_hitter": "bottom",
+            "raw_family": "clear",
+            "raw_subtypes": [
+              "attacking clear"
+            ],
+            "source_ball_area": "left back court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source primary-type mapping; source subtypes retained"
+          },
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-1:hit-2",
+            "time_s": 159.08,
+            "family": "smash",
+            "player_id": "Lakshya Sen",
+            "frame_idx": 3977,
+            "source_start_frame": 3977,
+            "source_end_frame": 3994,
+            "source_player": "Lakshya Sen",
+            "source_hitter": "top",
+            "raw_family": "kill",
+            "raw_subtypes": [
+              "stick smash",
+              "jump smash"
+            ],
+            "source_ball_area": "right back court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source smash or net-kill subtype"
+          },
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-1:hit-3",
+            "time_s": 159.76,
+            "family": "push",
+            "player_id": "Jia Heng Jason Teh",
+            "frame_idx": 3994,
+            "source_start_frame": 3994,
+            "source_end_frame": 4016,
+            "source_player": "Jia Heng Jason Teh",
+            "source_hitter": "bottom",
+            "raw_family": "push shot",
+            "raw_subtypes": [],
+            "source_ball_area": "left mid court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source primary-type mapping; source subtypes retained"
+          },
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-1:hit-4",
+            "time_s": 160.64,
+            "family": "net_shot",
+            "player_id": "Lakshya Sen",
+            "frame_idx": 4016,
+            "source_start_frame": 4016,
+            "source_end_frame": 4040,
+            "source_player": "Lakshya Sen",
+            "source_hitter": "top",
+            "raw_family": "net shot",
+            "raw_subtypes": [
+              "spinning net"
+            ],
+            "source_ball_area": "left front court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source primary-type mapping; source subtypes retained"
+          },
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-1:hit-5",
+            "time_s": 161.6,
+            "family": "net_shot",
+            "player_id": "Jia Heng Jason Teh",
+            "frame_idx": 4040,
+            "source_start_frame": 4040,
+            "source_end_frame": 4061,
+            "source_player": "Jia Heng Jason Teh",
+            "source_hitter": "bottom",
+            "raw_family": "cross-court net shot",
+            "raw_subtypes": [],
+            "source_ball_area": "right front court",
+            "placement": "cross_court",
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "source cross-court placement separated from net-shot family"
+          },
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-1:hit-6",
+            "time_s": 162.44,
+            "family": "push",
+            "player_id": "Lakshya Sen",
+            "frame_idx": 4061,
+            "source_start_frame": 4061,
+            "source_end_frame": 4088,
+            "source_player": "Lakshya Sen",
+            "source_hitter": "top",
+            "raw_family": "push shot",
+            "raw_subtypes": [
+              "flat lift"
+            ],
+            "source_ball_area": "right front court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source primary-type mapping; source subtypes retained"
+          },
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-1:hit-7",
+            "time_s": 163.52,
+            "family": "smash",
+            "player_id": "Jia Heng Jason Teh",
+            "frame_idx": 4088,
+            "source_start_frame": 4088,
+            "source_end_frame": 4120,
+            "source_player": "Jia Heng Jason Teh",
+            "source_hitter": "bottom",
+            "raw_family": "kill",
+            "raw_subtypes": [
+              "full smash",
+              "jump smash"
+            ],
+            "source_ball_area": "mid back court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source smash or net-kill subtype"
+          }
+        ],
+        "reference_provenance": {
+          "converter_version": "finebadminton-reference-v1",
+          "mapping_version": "finebadminton-reference-map-v1",
+          "dataset": "iLearn-Lab/Finebadminton-20K",
+          "dataset_revision": "72cae601e08c83ee8ec7e19f8fd7850e9158af7d",
+          "annotations_sha256": "51d940300a7386253f3af63d8b2f15ecc13b48be02b5c4144bc48f7bc74785b1",
+          "annotations_url": "https://huggingface.co/datasets/iLearn-Lab/Finebadminton-20K/resolve/72cae601e08c83ee8ec7e19f8fd7850e9158af7d/finebadminton-20K/0044_updated.json",
+          "media_url": "https://huggingface.co/datasets/iLearn-Lab/Finebadminton-20K/resolve/72cae601e08c83ee8ec7e19f8fd7850e9158af7d/videos/0044.mp4",
+          "source_media_sha256": "1ac5999828f4d789e246d3cfce2ef0fbd7b647cd4e40326a6629157b368899e7",
+          "publication": "https://arxiv.org/html/2508.07554v1",
+          "publication_sections": [
+            "3.1",
+            "3.2"
+          ],
+          "license": "Apache-2.0",
+          "annotation_process": "Provider: manual annotation or machine proposals refined and verified by human annotators.",
+          "coverage": "published annotated rally windows only",
+          "anchor_semantics": "published hitting.start_frame, without retiming or deriving contacts from model predictions"
+        },
+        "limitations": [
+          "Provider labels include machine assistance followed by reported human refinement.",
+          "Import does not independently verify annotation correctness or pixel/frame correspondence.",
+          "Only published rally windows are covered; other video spans are unlabelled.",
+          "Cross-court net predictions require the same family/placement normalization before comparison."
+        ]
+      },
+      "predictions": [
+        {
+          "time_s": 158.36,
+          "family": "unknown",
+          "event_id": "01M61RZQQNKPDHCT3RKPACN3R4",
+          "confidence": null,
+          "participant_hypothesis": {
+            "status": "unresolved",
+            "participant_id": null,
+            "track_id": null,
+            "observation_id": null,
+            "reason": "player_not_detector_matched",
+            "policy": "relative_proximity_gap_v1",
+            "components": {
+              "redirect": 1.0,
+              "impulse": 0.5621,
+              "proximity": 0.1467,
+              "proximity_runner_up": 0.0058,
+              "proximity_gap": 0.1409,
+              "proximity_relative_gap": 0.9608,
+              "proximity_relative_gap_threshold": 0.05,
+              "proximity_minimum_threshold": 0.05,
+              "proximity_candidates": 2.0,
+              "swing": 0.0,
+              "angle_deg": 173.7198,
+              "speed_before": 25.2257,
+              "speed_after": 52.9596,
+              "body_h": 219.779
+            }
+          },
+          "original_family": "unknown",
+          "placement": null,
+          "court_side": null,
+          "court_side_reason": "unsupported_or_missing_classification_context",
+          "hitter_court_xy": null,
+          "classification_context_source": null
+        },
+        {
+          "time_s": 158.4,
+          "family": "clear",
+          "event_id": "01M61RZQQQPP71WEZTCK13VA6W",
+          "confidence": 0.674169603622104,
+          "participant_hypothesis": {
+            "status": "provisional",
+            "participant_id": "participant-6a38775933592747-000001",
+            "track_id": 3,
+            "observation_id": "01M61RZQM2AVVTPNKDPABYST4C",
+            "reason": "nearest_proximity",
+            "policy": "relative_proximity_gap_v1",
+            "components": {
+              "redirect": 1.0,
+              "impulse": 0.921,
+              "proximity": 0.5309,
+              "proximity_runner_up": 0.0095,
+              "proximity_gap": 0.5214,
+              "proximity_relative_gap": 0.9821,
+              "proximity_relative_gap_threshold": 0.05,
+              "proximity_minimum_threshold": 0.05,
+              "proximity_candidates": 2.0,
+              "swing": 0.0,
+              "angle_deg": 173.185,
+              "speed_before": 24.5671,
+              "speed_after": 65.6835,
+              "body_h": 276.7936
+            }
+          },
+          "original_family": "clear",
+          "placement": null,
+          "court_side": "bottom",
+          "court_side_reason": "supported_event_context_and_finite_court_position",
+          "hitter_court_xy": [
+            -1.7271199813987024,
+            -5.488562266250944
+          ],
+          "classification_context_source": "provisional_track_episode"
+        },
+        {
+          "time_s": 159.92,
+          "family": "unknown",
+          "event_id": "01M61RZQSCTWABXVF0CYVA2RMA",
+          "confidence": null,
+          "participant_hypothesis": {
+            "status": "unresolved",
+            "participant_id": null,
+            "track_id": null,
+            "observation_id": null,
+            "reason": "player_not_detector_matched",
+            "policy": "relative_proximity_gap_v1",
+            "components": {
+              "redirect": 1.0,
+              "impulse": 1.0,
+              "proximity": 0.2167,
+              "proximity_runner_up": 0.0033,
+              "proximity_gap": 0.2134,
+              "proximity_relative_gap": 0.9847,
+              "proximity_relative_gap_threshold": 0.05,
+              "proximity_minimum_threshold": 0.05,
+              "proximity_candidates": 2.0,
+              "swing": 0.0,
+              "angle_deg": 133.9301,
+              "speed_before": 15.3537,
+              "speed_after": 50.3349,
+              "body_h": 161.4873
+            }
+          },
+          "original_family": "unknown",
+          "placement": null,
+          "court_side": null,
+          "court_side_reason": "unsupported_or_missing_classification_context",
+          "hitter_court_xy": null,
+          "classification_context_source": null
+        },
+        {
+          "time_s": 161.44,
+          "family": "net_shot",
+          "event_id": "01M61RZQSE2N4Y1K6CJX9Z3NMR",
+          "confidence": 0.5306560032659717,
+          "participant_hypothesis": {
+            "status": "provisional",
+            "participant_id": "participant-6a38775933592747-000002",
+            "track_id": 4,
+            "observation_id": "01M61RZQM2AVVTPNKDPABYST4D",
+            "reason": "nearest_proximity",
+            "policy": "relative_proximity_gap_v1",
+            "components": {
+              "redirect": 1.0,
+              "impulse": 1.0,
+              "proximity": 0.1836,
+              "proximity_runner_up": 0.1109,
+              "proximity_gap": 0.0727,
+              "proximity_relative_gap": 0.3958,
+              "proximity_relative_gap_threshold": 0.05,
+              "proximity_minimum_threshold": 0.05,
+              "proximity_candidates": 2.0,
+              "swing": 0.2092,
+              "angle_deg": 145.7641,
+              "speed_before": 0.8085,
+              "speed_after": 3.8451,
+              "body_h": 118.1301
+            }
+          },
+          "original_family": "net_shot",
+          "placement": null,
+          "court_side": "top",
+          "court_side_reason": "supported_event_context_and_finite_court_position",
+          "hitter_court_xy": [
+            1.320724490407338,
+            1.656977487967601
+          ],
+          "classification_context_source": "provisional_track_episode"
+        },
+        {
+          "time_s": 161.88,
+          "family": "unknown",
+          "event_id": "01M61RZQV3FW7G66EADRWZDF2Y",
+          "confidence": null,
+          "participant_hypothesis": {
+            "status": "unresolved",
+            "participant_id": null,
+            "track_id": null,
+            "observation_id": null,
+            "reason": "player_not_detector_matched",
+            "policy": "relative_proximity_gap_v1",
+            "components": {
+              "redirect": 1.0,
+              "impulse": 0.974,
+              "proximity": 0.503,
+              "proximity_runner_up": 0.1007,
+              "proximity_gap": 0.4023,
+              "proximity_relative_gap": 0.7998,
+              "proximity_relative_gap_threshold": 0.05,
+              "proximity_minimum_threshold": 0.05,
+              "proximity_candidates": 2.0,
+              "swing": 0.1412,
+              "angle_deg": 112.0845,
+              "speed_before": 11.2625,
+              "speed_after": 31.067,
+              "body_h": 168.4617
+            }
+          },
+          "original_family": "unknown",
+          "placement": null,
+          "court_side": null,
+          "court_side_reason": "unsupported_or_missing_classification_context",
+          "hitter_court_xy": null,
+          "classification_context_source": null
+        },
+        {
+          "time_s": 162.72,
+          "family": "net_shot",
+          "event_id": "01M61RZQV5M079B2P2XV51K9P9",
+          "confidence": 0.5306560032659717,
+          "participant_hypothesis": {
+            "status": "provisional",
+            "participant_id": "participant-6a38775933592747-000002",
+            "track_id": 4,
+            "observation_id": "01M61RZQM2AVVTPNKDPABYST4D",
+            "reason": "nearest_proximity",
+            "policy": "relative_proximity_gap_v1",
+            "components": {
+              "redirect": 1.0,
+              "impulse": 0.9401,
+              "proximity": 0.3814,
+              "proximity_runner_up": 0.1027,
+              "proximity_gap": 0.2786,
+              "proximity_relative_gap": 0.7306,
+              "proximity_relative_gap_threshold": 0.05,
+              "proximity_minimum_threshold": 0.05,
+              "proximity_candidates": 2.0,
+              "swing": 0.6453,
+              "angle_deg": 135.6781,
+              "speed_before": 12.7731,
+              "speed_after": 34.5413,
+              "body_h": 115.3275
+            }
+          },
+          "original_family": "net_shot",
+          "placement": null,
+          "court_side": "top",
+          "court_side_reason": "supported_event_context_and_finite_court_position",
+          "hitter_court_xy": [
+            -0.4948174807671303,
+            1.168321711082675
+          ],
+          "classification_context_source": "provisional_track_episode"
+        },
+        {
+          "time_s": 163.4,
+          "family": "unknown",
+          "event_id": "01M61RZQWCD11KEZQ1G1ES7BDY",
+          "confidence": null,
+          "participant_hypothesis": {
+            "status": "unresolved",
+            "participant_id": null,
+            "track_id": null,
+            "observation_id": null,
+            "reason": "insufficient_proximity",
+            "policy": "relative_proximity_gap_v1",
+            "components": {
+              "redirect": 1.0,
+              "impulse": 1.0,
+              "proximity": 0.0244,
+              "proximity_runner_up": 0.012,
+              "proximity_gap": 0.0124,
+              "proximity_relative_gap": 0.5094,
+              "proximity_relative_gap_threshold": 0.05,
+              "proximity_minimum_threshold": 0.05,
+              "proximity_candidates": 2.0,
+              "swing": 0.0,
+              "angle_deg": 126.9277,
+              "speed_before": 0.8869,
+              "speed_after": 5.3396,
+              "body_h": 137.5326
+            }
+          },
+          "original_family": "unknown",
+          "placement": null,
+          "court_side": null,
+          "court_side_reason": "unsupported_or_missing_classification_context",
+          "hitter_court_xy": null,
+          "classification_context_source": null
+        },
+        {
+          "time_s": 164.52,
+          "family": "unknown",
+          "event_id": "01M61RZQWYD496SZ66WZ56D6ZW",
+          "confidence": null,
+          "participant_hypothesis": {
+            "status": "unresolved",
+            "participant_id": null,
+            "track_id": null,
+            "observation_id": null,
+            "reason": "ambiguous_proximity",
+            "policy": "relative_proximity_gap_v1",
+            "components": {
+              "redirect": 1.0,
+              "impulse": 1.0,
+              "proximity": 0.0734,
+              "proximity_runner_up": 0.0718,
+              "proximity_gap": 0.0016,
+              "proximity_relative_gap": 0.0219,
+              "proximity_relative_gap_threshold": 0.05,
+              "proximity_minimum_threshold": 0.05,
+              "proximity_candidates": 2.0,
+              "swing": 0.1888,
+              "angle_deg": 127.9466,
+              "speed_before": 3.9931,
+              "speed_after": 83.1198,
+              "body_h": 217.4274
+            }
+          },
+          "original_family": "unknown",
+          "placement": null,
+          "court_side": null,
+          "court_side_reason": "unsupported_or_missing_classification_context",
+          "hitter_court_xy": null,
+          "classification_context_source": null
+        }
+      ],
+      "contact_detection": {
+        "truth_count": 8,
+        "prediction_count": 8,
+        "matched": 3,
+        "false_positives": 5,
+        "false_negatives": 5,
+        "metric_label": "agreement with published hit anchors at \u00b10.2 s"
+      },
+      "shot_family": {
+        "per_class": {
+          "clear": {
+            "support": 1,
+            "predicted": 1,
+            "true_positive": 0,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0
+          },
+          "long_serve": {
+            "support": 1,
+            "predicted": 0,
+            "true_positive": 0,
+            "precision": null,
+            "recall": 0.0,
+            "f1": 0.0
+          },
+          "net_shot": {
+            "support": 2,
+            "predicted": 2,
+            "true_positive": 1,
+            "precision": 0.5,
+            "recall": 0.5,
+            "f1": 0.5
+          },
+          "push": {
+            "support": 2,
+            "predicted": 0,
+            "true_positive": 0,
+            "precision": null,
+            "recall": 0.0,
+            "f1": 0.0
+          },
+          "smash": {
+            "support": 2,
+            "predicted": 0,
+            "true_positive": 0,
+            "precision": null,
+            "recall": 0.0,
+            "f1": 0.0
+          },
+          "unknown": {
+            "support": 0,
+            "predicted": 5,
+            "true_positive": 0,
+            "precision": 0.0,
+            "recall": null,
+            "f1": 0.0
+          }
+        },
+        "known_family": {
+          "truth_support": 8,
+          "excluded_unknown_truth": 0,
+          "excluded_predictions_on_unknown_truth": 0,
+          "per_class": {
+            "clear": {
+              "support": 1,
+              "predicted": 1,
+              "true_positive": 0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1": 0.0
+            },
+            "long_serve": {
+              "support": 1,
+              "predicted": 0,
+              "true_positive": 0,
+              "precision": null,
+              "recall": 0.0,
+              "f1": 0.0
+            },
+            "net_shot": {
+              "support": 2,
+              "predicted": 2,
+              "true_positive": 1,
+              "precision": 0.5,
+              "recall": 0.5,
+              "f1": 0.5
+            },
+            "push": {
+              "support": 2,
+              "predicted": 0,
+              "true_positive": 0,
+              "precision": null,
+              "recall": 0.0,
+              "f1": 0.0
+            },
+            "smash": {
+              "support": 2,
+              "predicted": 0,
+              "true_positive": 0,
+              "precision": null,
+              "recall": 0.0,
+              "f1": 0.0
+            }
+          },
+          "macro_f1": 0.1
+        },
+        "confusion": {
+          "push": {
+            "unknown": 1,
+            "__missed__": 1
+          },
+          "net_shot": {
+            "net_shot": 1,
+            "__missed__": 1
+          },
+          "smash": {
+            "unknown": 1,
+            "__missed__": 1
+          },
+          "long_serve": {
+            "__missed__": 1
+          },
+          "clear": {
+            "__missed__": 1
+          },
+          "__spurious__": {
+            "unknown": 3,
+            "clear": 1,
+            "net_shot": 1
+          },
+          "unknown": {}
+        },
+        "unknown_predictions": 5
+      },
+      "court_side": {
+        "labelled_truth": 8,
+        "matched_labelled_truth": 3,
+        "unmatched_labelled_truth": 5,
+        "correct": 0,
+        "wrong": 1,
+        "unresolved_matched": 2,
+        "resolved_matched": 1,
+        "spurious_assigned_predictions": 2,
+        "per_side": {
+          "bottom": {
+            "truth_count": 4,
+            "prediction_count": 1,
+            "true_positives": 0,
+            "false_positives": 1,
+            "false_negatives": 4,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0
+          },
+          "top": {
+            "truth_count": 4,
+            "prediction_count": 2,
+            "true_positives": 0,
+            "false_positives": 2,
+            "false_negatives": 4,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0
+          }
+        }
+      },
+      "joint_contact_family_court_side": {
+        "truth_count": 8,
+        "prediction_count": 8,
+        "true_positives": 0,
+        "false_positives": 8,
+        "false_negatives": 8,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "excluded_ambiguous_truth": 0,
+        "excluded_predictions_on_ambiguous_truth": 0
+      },
+      "timestamp_mae_s": 0.14666666666666592
+    },
+    {
+      "annotation_file": "/home/administrator/Desktop/sport-analytics/task2-local-dev-20261028/reference/normalized-0044-development/0044-rally-0002.json",
+      "annotation_sha256": "aa39e7b939b926432447fe3b31160f59c1b4334ff7eb63024836e11ab4f53c3c",
+      "window_frames": [
+        4342,
+        4527
+      ],
+      "window_s": [
+        173.68,
+        181.08
+      ],
+      "source_reference": {
+        "schema_version": 1,
+        "session_id": "Fine0044",
+        "media_sha256": "1ac5999828f4d789e246d3cfce2ef0fbd7b647cd4e40326a6629157b368899e7",
+        "timebase": "canonical_media_seconds",
+        "window_s": [
+          173.68,
+          181.08
+        ],
+        "window_frames": [
+          4342,
+          4527
+        ],
+        "fps_num": 25,
+        "fps_den": 1,
+        "media_n_frames": 7577,
+        "width": 1280,
+        "height": 720,
+        "status": "reviewed",
+        "split": "development",
+        "exhaustive": true,
+        "review": {
+          "human_verified": true,
+          "provider_human_verified": true,
+          "our_human_reviewed": false,
+          "accepted_published_review": true,
+          "origin": "published_human_refined_reference",
+          "publication": "https://arxiv.org/html/2508.07554v1",
+          "method": "Deterministic import of provider labels; no new human review or AI relabelling.",
+          "held_out_reserved_before_tuning": false
+        },
+        "rally_index": 2,
+        "source_player_list": [
+          {
+            "name": "Lakshya Sen",
+            "role": "server"
+          },
+          {
+            "name": "Jia Heng Jason Teh",
+            "role": "receiver"
+          }
+        ],
+        "shots": [
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-2:hit-0",
+            "time_s": 173.68,
+            "family": "short_serve",
+            "player_id": "Lakshya Sen",
+            "frame_idx": 4342,
+            "source_start_frame": 4342,
+            "source_end_frame": 4365,
+            "source_player": "Lakshya Sen",
+            "source_hitter": "top",
+            "raw_family": "serve",
+            "raw_subtypes": [
+              "short serve"
+            ],
+            "source_ball_area": "mid front court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source serve subtype"
+          },
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-2:hit-1",
+            "time_s": 174.6,
+            "family": "block",
+            "player_id": "Jia Heng Jason Teh",
+            "frame_idx": 4365,
+            "source_start_frame": 4365,
+            "source_end_frame": 4386,
+            "source_player": "Jia Heng Jason Teh",
+            "source_hitter": "bottom",
+            "raw_family": "block",
+            "raw_subtypes": [],
+            "source_ball_area": "right front court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source primary-type mapping; source subtypes retained"
+          },
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-2:hit-2",
+            "time_s": 175.44,
+            "family": "lift",
+            "player_id": "Lakshya Sen",
+            "frame_idx": 4386,
+            "source_start_frame": 4386,
+            "source_end_frame": 4417,
+            "source_player": "Lakshya Sen",
+            "source_hitter": "top",
+            "raw_family": "net lift",
+            "raw_subtypes": [
+              "high lift"
+            ],
+            "source_ball_area": "left back court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source primary-type mapping; source subtypes retained"
+          },
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-2:hit-3",
+            "time_s": 176.68,
+            "family": "smash",
+            "player_id": "Jia Heng Jason Teh",
+            "frame_idx": 4417,
+            "source_start_frame": 4417,
+            "source_end_frame": 4440,
+            "source_player": "Jia Heng Jason Teh",
+            "source_hitter": "bottom",
+            "raw_family": "kill",
+            "raw_subtypes": [
+              "common smash"
+            ],
+            "source_ball_area": "left back court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source smash or net-kill subtype"
+          },
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-2:hit-4",
+            "time_s": 177.6,
+            "family": "push",
+            "player_id": "Lakshya Sen",
+            "frame_idx": 4440,
+            "source_start_frame": 4440,
+            "source_end_frame": 4460,
+            "source_player": "Lakshya Sen",
+            "source_hitter": "top",
+            "raw_family": "push shot",
+            "raw_subtypes": [],
+            "source_ball_area": "right mid court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source primary-type mapping; source subtypes retained"
+          },
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-2:hit-5",
+            "time_s": 178.4,
+            "family": "push",
+            "player_id": "Jia Heng Jason Teh",
+            "frame_idx": 4460,
+            "source_start_frame": 4460,
+            "source_end_frame": 4487,
+            "source_player": "Jia Heng Jason Teh",
+            "source_hitter": "bottom",
+            "raw_family": "push shot",
+            "raw_subtypes": [
+              "flat lift"
+            ],
+            "source_ball_area": "right front court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source primary-type mapping; source subtypes retained"
+          },
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-2:hit-6",
+            "time_s": 179.48,
+            "family": "smash",
+            "player_id": "Lakshya Sen",
+            "frame_idx": 4487,
+            "source_start_frame": 4487,
+            "source_end_frame": 4527,
+            "source_player": "Lakshya Sen",
+            "source_hitter": "top",
+            "raw_family": "kill",
+            "raw_subtypes": [
+              "full smash",
+              "jump smash"
+            ],
+            "source_ball_area": "left back court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source smash or net-kill subtype"
+          }
+        ],
+        "reference_provenance": {
+          "converter_version": "finebadminton-reference-v1",
+          "mapping_version": "finebadminton-reference-map-v1",
+          "dataset": "iLearn-Lab/Finebadminton-20K",
+          "dataset_revision": "72cae601e08c83ee8ec7e19f8fd7850e9158af7d",
+          "annotations_sha256": "51d940300a7386253f3af63d8b2f15ecc13b48be02b5c4144bc48f7bc74785b1",
+          "annotations_url": "https://huggingface.co/datasets/iLearn-Lab/Finebadminton-20K/resolve/72cae601e08c83ee8ec7e19f8fd7850e9158af7d/finebadminton-20K/0044_updated.json",
+          "media_url": "https://huggingface.co/datasets/iLearn-Lab/Finebadminton-20K/resolve/72cae601e08c83ee8ec7e19f8fd7850e9158af7d/videos/0044.mp4",
+          "source_media_sha256": "1ac5999828f4d789e246d3cfce2ef0fbd7b647cd4e40326a6629157b368899e7",
+          "publication": "https://arxiv.org/html/2508.07554v1",
+          "publication_sections": [
+            "3.1",
+            "3.2"
+          ],
+          "license": "Apache-2.0",
+          "annotation_process": "Provider: manual annotation or machine proposals refined and verified by human annotators.",
+          "coverage": "published annotated rally windows only",
+          "anchor_semantics": "published hitting.start_frame, without retiming or deriving contacts from model predictions"
+        },
+        "limitations": [
+          "Provider labels include machine assistance followed by reported human refinement.",
+          "Import does not independently verify annotation correctness or pixel/frame correspondence.",
+          "Only published rally windows are covered; other video spans are unlabelled.",
+          "Cross-court net predictions require the same family/placement normalization before comparison."
+        ]
+      },
+      "predictions": [
+        {
+          "time_s": 174.28,
+          "family": "short_serve",
+          "event_id": "01M61RZR0C1RRQ8P6DFFW0NVAQ",
+          "confidence": 0.7,
+          "participant_hypothesis": {
+            "status": "unresolved",
+            "participant_id": null,
+            "track_id": null,
+            "observation_id": null,
+            "reason": "no_player_observation",
+            "policy": "relative_proximity_gap_v1",
+            "components": {
+              "redirect": 0.8244,
+              "impulse": 1.0,
+              "proximity": 0.0,
+              "proximity_runner_up": 0.0,
+              "proximity_gap": 0.0,
+              "proximity_relative_gap": 0.0,
+              "proximity_relative_gap_threshold": 0.05,
+              "proximity_minimum_threshold": 0.05,
+              "proximity_candidates": 0.0,
+              "swing": 0.0,
+              "angle_deg": 82.707,
+              "speed_before": 0.239,
+              "speed_after": 51.1027,
+              "body_h": 0.0
+            }
+          },
+          "original_family": "short_serve",
+          "placement": null,
+          "court_side": null,
+          "court_side_reason": "unsupported_or_missing_classification_context",
+          "hitter_court_xy": null,
+          "classification_context_source": null
+        },
+        {
+          "time_s": 174.92,
+          "family": "unknown",
+          "event_id": "01M61RZR21BFP29FFFX2HWJVGA",
+          "confidence": null,
+          "participant_hypothesis": {
+            "status": "unresolved",
+            "participant_id": null,
+            "track_id": null,
+            "observation_id": null,
+            "reason": "player_not_detector_matched",
+            "policy": "relative_proximity_gap_v1",
+            "components": {
+              "redirect": 1.0,
+              "impulse": 0.3885,
+              "proximity": 0.3434,
+              "proximity_runner_up": 0.0258,
+              "proximity_gap": 0.3175,
+              "proximity_relative_gap": 0.9247,
+              "proximity_relative_gap_threshold": 0.05,
+              "proximity_minimum_threshold": 0.05,
+              "proximity_candidates": 2.0,
+              "swing": 0.0,
+              "angle_deg": 160.0631,
+              "speed_before": 9.8333,
+              "speed_after": 17.9116,
+              "body_h": 195.6682
+            }
+          },
+          "original_family": "unknown",
+          "placement": null,
+          "court_side": null,
+          "court_side_reason": "unsupported_or_missing_classification_context",
+          "hitter_court_xy": null,
+          "classification_context_source": null
+        },
+        {
+          "time_s": 177.76,
+          "family": "push",
+          "event_id": "01M61RZR3KZHXTN2V6VAKFKDAV",
+          "confidence": 0.33785113592349153,
+          "participant_hypothesis": {
+            "status": "provisional",
+            "participant_id": "participant-5b4c9ecac8ad6384-000002",
+            "track_id": 1,
+            "observation_id": "01M61RZQY1A4TNBQ1ZK02J2WH2",
+            "reason": "nearest_proximity",
+            "policy": "relative_proximity_gap_v1",
+            "components": {
+              "redirect": 0.8229,
+              "impulse": 1.0,
+              "proximity": 0.3933,
+              "proximity_runner_up": 0.1174,
+              "proximity_gap": 0.2759,
+              "proximity_relative_gap": 0.7015,
+              "proximity_relative_gap_threshold": 0.05,
+              "proximity_minimum_threshold": 0.05,
+              "proximity_candidates": 2.0,
+              "swing": 0.1431,
+              "angle_deg": 82.6055,
+              "speed_before": 4.931,
+              "speed_after": 17.9092,
+              "body_h": 105.1926
+            }
+          },
+          "original_family": "push",
+          "placement": null,
+          "court_side": "top",
+          "court_side_reason": "supported_event_context_and_finite_court_position",
+          "hitter_court_xy": [
+            -0.43837817230464476,
+            3.942504164337259
+          ],
+          "classification_context_source": "provisional_track_episode"
+        },
+        {
+          "time_s": 178.72,
+          "family": "unknown",
+          "event_id": "01M61RZR51WA4ZSEFNK66VQVM2",
+          "confidence": null,
+          "participant_hypothesis": {
+            "status": "provisional",
+            "participant_id": "participant-5b4c9ecac8ad6384-000001",
+            "track_id": 0,
+            "observation_id": "01M61RZQY1A4TNBQ1ZK02J2WH1",
+            "reason": "nearest_proximity",
+            "policy": "relative_proximity_gap_v1",
+            "components": {
+              "redirect": 1.0,
+              "impulse": 1.0,
+              "proximity": 0.4846,
+              "proximity_runner_up": 0.0279,
+              "proximity_gap": 0.4567,
+              "proximity_relative_gap": 0.9425,
+              "proximity_relative_gap_threshold": 0.05,
+              "proximity_minimum_threshold": 0.05,
+              "proximity_candidates": 2.0,
+              "swing": 0.1919,
+              "angle_deg": 164.6687,
+              "speed_before": 19.3675,
+              "speed_after": 61.0364,
+              "body_h": 176.5381
+            }
+          },
+          "original_family": "unknown",
+          "placement": null,
+          "court_side": "bottom",
+          "court_side_reason": "supported_event_context_and_finite_court_position",
+          "hitter_court_xy": [
+            0.46178236008722484,
+            -3.856679341267772
+          ],
+          "classification_context_source": "provisional_track_episode"
+        }
+      ],
+      "contact_detection": {
+        "truth_count": 7,
+        "prediction_count": 4,
+        "matched": 1,
+        "false_positives": 3,
+        "false_negatives": 6,
+        "metric_label": "agreement with published hit anchors at \u00b10.2 s"
+      },
+      "shot_family": {
+        "per_class": {
+          "block": {
+            "support": 1,
+            "predicted": 0,
+            "true_positive": 0,
+            "precision": null,
+            "recall": 0.0,
+            "f1": 0.0
+          },
+          "lift": {
+            "support": 1,
+            "predicted": 0,
+            "true_positive": 0,
+            "precision": null,
+            "recall": 0.0,
+            "f1": 0.0
+          },
+          "push": {
+            "support": 2,
+            "predicted": 1,
+            "true_positive": 1,
+            "precision": 1.0,
+            "recall": 0.5,
+            "f1": 0.6666666666666666
+          },
+          "short_serve": {
+            "support": 1,
+            "predicted": 1,
+            "true_positive": 0,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0
+          },
+          "smash": {
+            "support": 2,
+            "predicted": 0,
+            "true_positive": 0,
+            "precision": null,
+            "recall": 0.0,
+            "f1": 0.0
+          },
+          "unknown": {
+            "support": 0,
+            "predicted": 2,
+            "true_positive": 0,
+            "precision": 0.0,
+            "recall": null,
+            "f1": 0.0
+          }
+        },
+        "known_family": {
+          "truth_support": 7,
+          "excluded_unknown_truth": 0,
+          "excluded_predictions_on_unknown_truth": 0,
+          "per_class": {
+            "block": {
+              "support": 1,
+              "predicted": 0,
+              "true_positive": 0,
+              "precision": null,
+              "recall": 0.0,
+              "f1": 0.0
+            },
+            "lift": {
+              "support": 1,
+              "predicted": 0,
+              "true_positive": 0,
+              "precision": null,
+              "recall": 0.0,
+              "f1": 0.0
+            },
+            "push": {
+              "support": 2,
+              "predicted": 1,
+              "true_positive": 1,
+              "precision": 1.0,
+              "recall": 0.5,
+              "f1": 0.6666666666666666
+            },
+            "short_serve": {
+              "support": 1,
+              "predicted": 1,
+              "true_positive": 0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1": 0.0
+            },
+            "smash": {
+              "support": 2,
+              "predicted": 0,
+              "true_positive": 0,
+              "precision": null,
+              "recall": 0.0,
+              "f1": 0.0
+            }
+          },
+          "macro_f1": 0.13333333333333333
+        },
+        "confusion": {
+          "push": {
+            "push": 1,
+            "__missed__": 1
+          },
+          "short_serve": {
+            "__missed__": 1
+          },
+          "block": {
+            "__missed__": 1
+          },
+          "lift": {
+            "__missed__": 1
+          },
+          "smash": {
+            "__missed__": 2
+          },
+          "__spurious__": {
+            "short_serve": 1,
+            "unknown": 2
+          },
+          "unknown": {}
+        },
+        "unknown_predictions": 2
+      },
+      "court_side": {
+        "labelled_truth": 7,
+        "matched_labelled_truth": 1,
+        "unmatched_labelled_truth": 6,
+        "correct": 1,
+        "wrong": 0,
+        "unresolved_matched": 0,
+        "resolved_matched": 1,
+        "spurious_assigned_predictions": 1,
+        "per_side": {
+          "bottom": {
+            "truth_count": 3,
+            "prediction_count": 1,
+            "true_positives": 0,
+            "false_positives": 1,
+            "false_negatives": 3,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0
+          },
+          "top": {
+            "truth_count": 4,
+            "prediction_count": 1,
+            "true_positives": 1,
+            "false_positives": 0,
+            "false_negatives": 3,
+            "precision": 1.0,
+            "recall": 0.25,
+            "f1": 0.4
+          }
+        }
+      },
+      "joint_contact_family_court_side": {
+        "truth_count": 7,
+        "prediction_count": 4,
+        "true_positives": 1,
+        "false_positives": 3,
+        "false_negatives": 6,
+        "precision": 0.25,
+        "recall": 0.14285714285714285,
+        "f1": 0.18181818181818182,
+        "excluded_ambiguous_truth": 0,
+        "excluded_predictions_on_ambiguous_truth": 0
+      },
+      "timestamp_mae_s": 0.1599999999999966
+    },
+    {
+      "annotation_file": "/home/administrator/Desktop/sport-analytics/task2-local-dev-20261028/reference/normalized-0044-development/0044-rally-0003.json",
+      "annotation_sha256": "4f11338377a9c22ab55eeb3fd2bbf9719d68cdf30b6ee1db70d2150ba30acce2",
+      "window_frames": [
+        4841,
+        5150
+      ],
+      "window_s": [
+        193.64,
+        206.0
+      ],
+      "source_reference": {
+        "schema_version": 1,
+        "session_id": "Fine0044",
+        "media_sha256": "1ac5999828f4d789e246d3cfce2ef0fbd7b647cd4e40326a6629157b368899e7",
+        "timebase": "canonical_media_seconds",
+        "window_s": [
+          193.64,
+          206.0
+        ],
+        "window_frames": [
+          4841,
+          5150
+        ],
+        "fps_num": 25,
+        "fps_den": 1,
+        "media_n_frames": 7577,
+        "width": 1280,
+        "height": 720,
+        "status": "reviewed",
+        "split": "development",
+        "exhaustive": true,
+        "review": {
+          "human_verified": true,
+          "provider_human_verified": true,
+          "our_human_reviewed": false,
+          "accepted_published_review": true,
+          "origin": "published_human_refined_reference",
+          "publication": "https://arxiv.org/html/2508.07554v1",
+          "method": "Deterministic import of provider labels; no new human review or AI relabelling.",
+          "held_out_reserved_before_tuning": false
+        },
+        "rally_index": 3,
+        "source_player_list": [
+          {
+            "name": "Lakshya Sen",
+            "role": "receiver"
+          },
+          {
+            "name": "Jia Heng Jason Teh",
+            "role": "server"
+          }
+        ],
+        "shots": [
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-3:hit-0",
+            "time_s": 193.64,
+            "family": "short_serve",
+            "player_id": "Jia Heng Jason Teh",
+            "frame_idx": 4841,
+            "source_start_frame": 4841,
+            "source_end_frame": 4860,
+            "source_player": "Jia Heng Jason Teh",
+            "source_hitter": "bottom",
+            "raw_family": "serve",
+            "raw_subtypes": [
+              "short serve"
+            ],
+            "source_ball_area": "mid court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source serve subtype"
+          },
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-3:hit-1",
+            "time_s": 194.4,
+            "family": "net_shot",
+            "player_id": "Lakshya Sen",
+            "frame_idx": 4860,
+            "source_start_frame": 4860,
+            "source_end_frame": 4880,
+            "source_player": "Lakshya Sen",
+            "source_hitter": "top",
+            "raw_family": "net shot",
+            "raw_subtypes": [
+              "spinning net"
+            ],
+            "source_ball_area": "mid front court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source primary-type mapping; source subtypes retained"
+          },
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-3:hit-2",
+            "time_s": 195.2,
+            "family": "lift",
+            "player_id": "Jia Heng Jason Teh",
+            "frame_idx": 4880,
+            "source_start_frame": 4880,
+            "source_end_frame": 4916,
+            "source_player": "Jia Heng Jason Teh",
+            "source_hitter": "bottom",
+            "raw_family": "net lift",
+            "raw_subtypes": [
+              "high lift"
+            ],
+            "source_ball_area": "mid front court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source primary-type mapping; source subtypes retained"
+          },
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-3:hit-3",
+            "time_s": 196.64,
+            "family": "smash",
+            "player_id": "Lakshya Sen",
+            "frame_idx": 4916,
+            "source_start_frame": 4916,
+            "source_end_frame": 4938,
+            "source_player": "Lakshya Sen",
+            "source_hitter": "top",
+            "raw_family": "kill",
+            "raw_subtypes": [
+              "full smash",
+              "jump smash"
+            ],
+            "source_ball_area": "mid back court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source smash or net-kill subtype"
+          },
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-3:hit-4",
+            "time_s": 197.52,
+            "family": "block",
+            "player_id": "Jia Heng Jason Teh",
+            "frame_idx": 4938,
+            "source_start_frame": 4938,
+            "source_end_frame": 4958,
+            "source_player": "Jia Heng Jason Teh",
+            "source_hitter": "bottom",
+            "raw_family": "block",
+            "raw_subtypes": [],
+            "source_ball_area": "left mid court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source primary-type mapping; source subtypes retained"
+          },
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-3:hit-5",
+            "time_s": 198.32,
+            "family": "net_shot",
+            "player_id": "Lakshya Sen",
+            "frame_idx": 4958,
+            "source_start_frame": 4958,
+            "source_end_frame": 4980,
+            "source_player": "Lakshya Sen",
+            "source_hitter": "top",
+            "raw_family": "net shot",
+            "raw_subtypes": [
+              "spinning net"
+            ],
+            "source_ball_area": "right front court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source primary-type mapping; source subtypes retained"
+          },
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-3:hit-6",
+            "time_s": 199.2,
+            "family": "push",
+            "player_id": "Jia Heng Jason Teh",
+            "frame_idx": 4980,
+            "source_start_frame": 4980,
+            "source_end_frame": 5008,
+            "source_player": "Jia Heng Jason Teh",
+            "source_hitter": "bottom",
+            "raw_family": "push shot",
+            "raw_subtypes": [
+              "flat lift"
+            ],
+            "source_ball_area": "left front court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source primary-type mapping; source subtypes retained"
+          },
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-3:hit-7",
+            "time_s": 200.32,
+            "family": "smash",
+            "player_id": "Lakshya Sen",
+            "frame_idx": 5008,
+            "source_start_frame": 5008,
+            "source_end_frame": 5025,
+            "source_player": "Lakshya Sen",
+            "source_hitter": "top",
+            "raw_family": "kill",
+            "raw_subtypes": [
+              "jump smash",
+              "common smash"
+            ],
+            "source_ball_area": "right back court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source smash or net-kill subtype"
+          },
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-3:hit-8",
+            "time_s": 201.0,
+            "family": "block",
+            "player_id": "Jia Heng Jason Teh",
+            "frame_idx": 5025,
+            "source_start_frame": 5025,
+            "source_end_frame": 5045,
+            "source_player": "Jia Heng Jason Teh",
+            "source_hitter": "bottom",
+            "raw_family": "block",
+            "raw_subtypes": [],
+            "source_ball_area": "left mid court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source primary-type mapping; source subtypes retained"
+          },
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-3:hit-9",
+            "time_s": 201.8,
+            "family": "net_shot",
+            "player_id": "Lakshya Sen",
+            "frame_idx": 5045,
+            "source_start_frame": 5045,
+            "source_end_frame": 5066,
+            "source_player": "Lakshya Sen",
+            "source_hitter": "top",
+            "raw_family": "net shot",
+            "raw_subtypes": [
+              "spinning net"
+            ],
+            "source_ball_area": "right front court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source primary-type mapping; source subtypes retained"
+          },
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-3:hit-10",
+            "time_s": 202.64,
+            "family": "block",
+            "player_id": "Jia Heng Jason Teh",
+            "frame_idx": 5066,
+            "source_start_frame": 5066,
+            "source_end_frame": 5084,
+            "source_player": "Jia Heng Jason Teh",
+            "source_hitter": "bottom",
+            "raw_family": "block",
+            "raw_subtypes": [],
+            "source_ball_area": "mid front court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source primary-type mapping; source subtypes retained"
+          },
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-3:hit-11",
+            "time_s": 203.36,
+            "family": "push",
+            "player_id": "Lakshya Sen",
+            "frame_idx": 5084,
+            "source_start_frame": 5084,
+            "source_end_frame": 5107,
+            "source_player": "Lakshya Sen",
+            "source_hitter": "top",
+            "raw_family": "push shot",
+            "raw_subtypes": [
+              "flat lift"
+            ],
+            "source_ball_area": "mid front court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source primary-type mapping; source subtypes retained"
+          },
+          {
+            "annotation_id": "finebadminton:72cae601e08c83ee8ec7e19f8fd7850e9158af7d:0044.mp4:rally-3:hit-12",
+            "time_s": 204.28,
+            "family": "smash",
+            "player_id": "Jia Heng Jason Teh",
+            "frame_idx": 5107,
+            "source_start_frame": 5107,
+            "source_end_frame": 5150,
+            "source_player": "Jia Heng Jason Teh",
+            "source_hitter": "bottom",
+            "raw_family": "kill",
+            "raw_subtypes": [
+              "full smash",
+              "jump smash"
+            ],
+            "source_ball_area": "right mid court",
+            "placement": null,
+            "mapping_version": "finebadminton-reference-map-v1",
+            "mapping_reason": "explicit source smash or net-kill subtype"
+          }
+        ],
+        "reference_provenance": {
+          "converter_version": "finebadminton-reference-v1",
+          "mapping_version": "finebadminton-reference-map-v1",
+          "dataset": "iLearn-Lab/Finebadminton-20K",
+          "dataset_revision": "72cae601e08c83ee8ec7e19f8fd7850e9158af7d",
+          "annotations_sha256": "51d940300a7386253f3af63d8b2f15ecc13b48be02b5c4144bc48f7bc74785b1",
+          "annotations_url": "https://huggingface.co/datasets/iLearn-Lab/Finebadminton-20K/resolve/72cae601e08c83ee8ec7e19f8fd7850e9158af7d/finebadminton-20K/0044_updated.json",
+          "media_url": "https://huggingface.co/datasets/iLearn-Lab/Finebadminton-20K/resolve/72cae601e08c83ee8ec7e19f8fd7850e9158af7d/videos/0044.mp4",
+          "source_media_sha256": "1ac5999828f4d789e246d3cfce2ef0fbd7b647cd4e40326a6629157b368899e7",
+          "publication": "https://arxiv.org/html/2508.07554v1",
+          "publication_sections": [
+            "3.1",
+            "3.2"
+          ],
+          "license": "Apache-2.0",
+          "annotation_process": "Provider: manual annotation or machine proposals refined and verified by human annotators.",
+          "coverage": "published annotated rally windows only",
+          "anchor_semantics": "published hitting.start_frame, without retiming or deriving contacts from model predictions"
+        },
+        "limitations": [
+          "Provider labels include machine assistance followed by reported human refinement.",
+          "Import does not independently verify annotation correctness or pixel/frame correspondence.",
+          "Only published rally windows are covered; other video spans are unlabelled.",
+          "Cross-court net predictions require the same family/placement normalization before comparison."
+        ]
+      },
+      "predictions": [
+        {
+          "time_s": 197.72,
+          "family": "long_serve",
+          "event_id": "01M61RZRCJTC5QD6CWFHFJFZQ5",
+          "confidence": 0.7,
+          "participant_hypothesis": {
+            "status": "unresolved",
+            "participant_id": null,
+            "track_id": null,
+            "observation_id": null,
+            "reason": "player_not_detector_matched",
+            "policy": "relative_proximity_gap_v1",
+            "components": {
+              "redirect": 1.0,
+              "impulse": 1.0,
+              "proximity": 0.3162,
+              "proximity_runner_up": 0.0004,
+              "proximity_gap": 0.3158,
+              "proximity_relative_gap": 0.9988,
+              "proximity_relative_gap_threshold": 0.05,
+              "proximity_minimum_threshold": 0.05,
+              "proximity_candidates": 2.0,
+              "swing": 0.6672,
+              "angle_deg": 156.2267,
+              "speed_before": 14.4833,
+              "speed_after": 44.3523,
+              "body_h": 130.1981
+            }
+          },
+          "original_family": "long_serve",
+          "placement": null,
+          "court_side": null,
+          "court_side_reason": "unsupported_or_missing_classification_context",
+          "hitter_court_xy": null,
+          "classification_context_source": null
+        },
+        {
+          "time_s": 199.48,
+          "family": "unknown",
+          "event_id": "01M61RZRCMX268RBFRWHV5M1TZ",
+          "confidence": null,
+          "participant_hypothesis": {
+            "status": "unresolved",
+            "participant_id": null,
+            "track_id": null,
+            "observation_id": null,
+            "reason": "player_not_detector_matched",
+            "policy": "relative_proximity_gap_v1",
+            "components": {
+              "redirect": 1.0,
+              "impulse": 0.7433,
+              "proximity": 0.5799,
+              "proximity_runner_up": 0.2169,
+              "proximity_gap": 0.363,
+              "proximity_relative_gap": 0.626,
+              "proximity_relative_gap_threshold": 0.05,
+              "proximity_minimum_threshold": 0.05,
+              "proximity_candidates": 2.0,
+              "swing": 0.7205,
+              "angle_deg": 175.977,
+              "speed_before": 14.8713,
+              "speed_after": 35.5318,
+              "body_h": 179.629
+            }
+          },
+          "original_family": "unknown",
+          "placement": null,
+          "court_side": null,
+          "court_side_reason": "unsupported_or_missing_classification_context",
+          "hitter_court_xy": null,
+          "classification_context_source": null
+        },
+        {
+          "time_s": 199.84,
+          "family": "unknown",
+          "event_id": "01M61RZREB8DC756BGW5W576H1",
+          "confidence": null,
+          "participant_hypothesis": {
+            "status": "unresolved",
+            "participant_id": null,
+            "track_id": null,
+            "observation_id": null,
+            "reason": "insufficient_proximity",
+            "policy": "relative_proximity_gap_v1",
+            "components": {
+              "redirect": 1.0,
+              "impulse": 1.0,
+              "proximity": 0.0163,
+              "proximity_runner_up": 0.016,
+              "proximity_gap": 0.0002,
+              "proximity_relative_gap": 0.014,
+              "proximity_relative_gap_threshold": 0.05,
+              "proximity_minimum_threshold": 0.05,
+              "proximity_candidates": 2.0,
+              "swing": 0.0,
+              "angle_deg": 149.9687,
+              "speed_before": 19.5825,
+              "speed_after": 55.9431,
+              "body_h": 112.7783
+            }
+          },
+          "original_family": "unknown",
+          "placement": null,
+          "court_side": null,
+          "court_side_reason": "unsupported_or_missing_classification_context",
+          "hitter_court_xy": null,
+          "classification_context_source": null
+        },
+        {
+          "time_s": 201.16,
+          "family": "unknown",
+          "event_id": "01M61RZRG3T9Y2G0BZGB6PT3GW",
+          "confidence": null,
+          "participant_hypothesis": {
+            "status": "unresolved",
+            "participant_id": null,
+            "track_id": null,
+            "observation_id": null,
+            "reason": "player_not_detector_matched",
+            "policy": "relative_proximity_gap_v1",
+            "components": {
+              "redirect": 1.0,
+              "impulse": 0.3023,
+              "proximity": 0.4337,
+              "proximity_runner_up": 0.0057,
+              "proximity_gap": 0.428,
+              "proximity_relative_gap": 0.9868,
+              "proximity_relative_gap_threshold": 0.05,
+              "proximity_minimum_threshold": 0.05,
+              "proximity_candidates": 2.0,
+              "swing": 0.6035,
+              "angle_deg": 178.6234,
+              "speed_before": 24.6019,
+              "speed_after": 41.4223,
+              "body_h": 182.7422
+            }
+          },
+          "original_family": "unknown",
+          "placement": null,
+          "court_side": null,
+          "court_side_reason": "unsupported_or_missing_classification_context",
+          "hitter_court_xy": null,
+          "classification_context_source": null
+        },
+        {
+          "time_s": 202.92,
+          "family": "unknown",
+          "event_id": "01M61RZRG5KYVSPXCK90W8DJ9R",
+          "confidence": null,
+          "participant_hypothesis": {
+            "status": "unresolved",
+            "participant_id": null,
+            "track_id": null,
+            "observation_id": null,
+            "reason": "player_not_detector_matched",
+            "policy": "relative_proximity_gap_v1",
+            "components": {
+              "redirect": 1.0,
+              "impulse": 1.0,
+              "proximity": 0.7563,
+              "proximity_runner_up": 0.4365,
+              "proximity_gap": 0.3199,
+              "proximity_relative_gap": 0.4229,
+              "proximity_relative_gap_threshold": 0.05,
+              "proximity_minimum_threshold": 0.05,
+              "proximity_candidates": 2.0,
+              "swing": 0.0,
+              "angle_deg": 100.123,
+              "speed_before": 1.158,
+              "speed_after": 14.2883,
+              "body_h": 207.1909
+            }
+          },
+          "original_family": "unknown",
+          "placement": null,
+          "court_side": null,
+          "court_side_reason": "unsupported_or_missing_classification_context",
+          "hitter_court_xy": null,
+          "classification_context_source": null
+        },
+        {
+          "time_s": 203.32,
+          "family": "unknown",
+          "event_id": "01M61RZRG71ARTYCDZC7HTE0XK",
+          "confidence": null,
+          "participant_hypothesis": {
+            "status": "unresolved",
+            "participant_id": null,
+            "track_id": null,
+            "observation_id": null,
+            "reason": "player_not_detector_matched",
+            "policy": "relative_proximity_gap_v1",
+            "components": {
+              "redirect": 1.0,
+              "impulse": 1.0,
+              "proximity": 0.4465,
+              "proximity_runner_up": 0.1907,
+              "proximity_gap": 0.2559,
+              "proximity_relative_gap": 0.573,
+              "proximity_relative_gap_threshold": 0.05,
+              "proximity_minimum_threshold": 0.05,
+              "proximity_candidates": 2.0,
+              "swing": 0.188,
+              "angle_deg": 152.7301,
+              "speed_before": 0.8342,
+              "speed_after": 3.1128,
+              "body_h": 128.2156
+            }
+          },
+          "original_family": "unknown",
+          "placement": null,
+          "court_side": null,
+          "court_side_reason": "unsupported_or_missing_classification_context",
+          "hitter_court_xy": null,
+          "classification_context_source": null
+        },
+        {
+          "time_s": 203.64,
+          "family": "unknown",
+          "event_id": "01M61RZRHRMP49KF53P8AMVE8A",
+          "confidence": null,
+          "participant_hypothesis": {
+            "status": "unresolved",
+            "participant_id": null,
+            "track_id": null,
+            "observation_id": null,
+            "reason": "ambiguous_proximity",
+            "policy": "relative_proximity_gap_v1",
+            "components": {
+              "redirect": 1.0,
+              "impulse": 1.0,
+              "proximity": 0.3227,
+              "proximity_runner_up": 0.3164,
+              "proximity_gap": 0.0064,
+              "proximity_relative_gap": 0.0197,
+              "proximity_relative_gap_threshold": 0.05,
+              "proximity_minimum_threshold": 0.05,
+              "proximity_candidates": 2.0,
+              "swing": 0.7429,
+              "angle_deg": 145.2824,
+              "speed_before": 8.6872,
+              "speed_after": 24.6887,
+              "body_h": 198.694
+            }
+          },
+          "original_family": "unknown",
+          "placement": null,
+          "court_side": null,
+          "court_side_reason": "unsupported_or_missing_classification_context",
+          "hitter_court_xy": null,
+          "classification_context_source": null
+        },
+        {
+          "time_s": 204.56,
+          "family": "unknown",
+          "event_id": "01M61RZRJA6S2AJHM4PDNTF7BK",
+          "confidence": null,
+          "participant_hypothesis": {
+            "status": "provisional",
+            "participant_id": "participant-5bfdbe36d5673200-000001",
+            "track_id": 0,
+            "observation_id": "01M61RZR6H21NV58MJ841MK35D",
+            "reason": "nearest_proximity",
+            "policy": "relative_proximity_gap_v1",
+            "components": {
+              "redirect": 1.0,
+              "impulse": 0.7925,
+              "proximity": 0.3494,
+              "proximity_runner_up": 0.0497,
+              "proximity_gap": 0.2997,
+              "proximity_relative_gap": 0.8578,
+              "proximity_relative_gap_threshold": 0.05,
+              "proximity_minimum_threshold": 0.05,
+              "proximity_candidates": 2.0,
+              "swing": 0.5997,
+              "angle_deg": 108.6676,
+              "speed_before": 14.5865,
+              "speed_after": 36.0004,
+              "body_h": 235.9953
+            }
+          },
+          "original_family": "unknown",
+          "placement": null,
+          "court_side": "bottom",
+          "court_side_reason": "supported_event_context_and_finite_court_position",
+          "hitter_court_xy": [
+            0.7300196124503647,
+            -4.17425780424855
+          ],
+          "classification_context_source": "provisional_track_episode"
+        }
+      ],
+      "contact_detection": {
+        "truth_count": 13,
+        "prediction_count": 8,
+        "matched": 3,
+        "false_positives": 5,
+        "false_negatives": 10,
+        "metric_label": "agreement with published hit anchors at \u00b10.2 s"
+      },
+      "shot_family": {
+        "per_class": {
+          "block": {
+            "support": 3,
+            "predicted": 0,
+            "true_positive": 0,
+            "precision": null,
+            "recall": 0.0,
+            "f1": 0.0
+          },
+          "lift": {
+            "support": 1,
+            "predicted": 0,
+            "true_positive": 0,
+            "precision": null,
+            "recall": 0.0,
+            "f1": 0.0
+          },
+          "long_serve": {
+            "support": 0,
+            "predicted": 1,
+            "true_positive": 0,
+            "precision": 0.0,
+            "recall": null,
+            "f1": 0.0
+          },
+          "net_shot": {
+            "support": 3,
+            "predicted": 0,
+            "true_positive": 0,
+            "precision": null,
+            "recall": 0.0,
+            "f1": 0.0
+          },
+          "push": {
+            "support": 2,
+            "predicted": 0,
+            "true_positive": 0,
+            "precision": null,
+            "recall": 0.0,
+            "f1": 0.0
+          },
+          "short_serve": {
+            "support": 1,
+            "predicted": 0,
+            "true_positive": 0,
+            "precision": null,
+            "recall": 0.0,
+            "f1": 0.0
+          },
+          "smash": {
+            "support": 3,
+            "predicted": 0,
+            "true_positive": 0,
+            "precision": null,
+            "recall": 0.0,
+            "f1": 0.0
+          },
+          "unknown": {
+            "support": 0,
+            "predicted": 7,
+            "true_positive": 0,
+            "precision": 0.0,
+            "recall": null,
+            "f1": 0.0
+          }
+        },
+        "known_family": {
+          "truth_support": 13,
+          "excluded_unknown_truth": 0,
+          "excluded_predictions_on_unknown_truth": 0,
+          "per_class": {
+            "block": {
+              "support": 3,
+              "predicted": 0,
+              "true_positive": 0,
+              "precision": null,
+              "recall": 0.0,
+              "f1": 0.0
+            },
+            "lift": {
+              "support": 1,
+              "predicted": 0,
+              "true_positive": 0,
+              "precision": null,
+              "recall": 0.0,
+              "f1": 0.0
+            },
+            "long_serve": {
+              "support": 0,
+              "predicted": 1,
+              "true_positive": 0,
+              "precision": 0.0,
+              "recall": null,
+              "f1": 0.0
+            },
+            "net_shot": {
+              "support": 3,
+              "predicted": 0,
+              "true_positive": 0,
+              "precision": null,
+              "recall": 0.0,
+              "f1": 0.0
+            },
+            "push": {
+              "support": 2,
+              "predicted": 0,
+              "true_positive": 0,
+              "precision": null,
+              "recall": 0.0,
+              "f1": 0.0
+            },
+            "short_serve": {
+              "support": 1,
+              "predicted": 0,
+              "true_positive": 0,
+              "precision": null,
+              "recall": 0.0,
+              "f1": 0.0
+            },
+            "smash": {
+              "support": 3,
+              "predicted": 0,
+              "true_positive": 0,
+              "precision": null,
+              "recall": 0.0,
+              "f1": 0.0
+            }
+          },
+          "macro_f1": 0.0
+        },
+        "confusion": {
+          "block": {
+            "long_serve": 1,
+            "unknown": 1,
+            "__missed__": 1
+          },
+          "push": {
+            "unknown": 1,
+            "__missed__": 1
+          },
+          "short_serve": {
+            "__missed__": 1
+          },
+          "net_shot": {
+            "__missed__": 3
+          },
+          "lift": {
+            "__missed__": 1
+          },
+          "smash": {
+            "__missed__": 3
+          },
+          "__spurious__": {
+            "unknown": 5
+          },
+          "long_serve": {},
+          "unknown": {}
+        },
+        "unknown_predictions": 7
+      },
+      "court_side": {
+        "labelled_truth": 13,
+        "matched_labelled_truth": 3,
+        "unmatched_labelled_truth": 10,
+        "correct": 0,
+        "wrong": 0,
+        "unresolved_matched": 3,
+        "resolved_matched": 0,
+        "spurious_assigned_predictions": 1,
+        "per_side": {
+          "bottom": {
+            "truth_count": 7,
+            "prediction_count": 1,
+            "true_positives": 0,
+            "false_positives": 1,
+            "false_negatives": 7,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0
+          },
+          "top": {
+            "truth_count": 6,
+            "prediction_count": 0,
+            "true_positives": 0,
+            "false_positives": 0,
+            "false_negatives": 6,
+            "precision": null,
+            "recall": 0.0,
+            "f1": 0.0
+          }
+        }
+      },
+      "joint_contact_family_court_side": {
+        "truth_count": 13,
+        "prediction_count": 8,
+        "true_positives": 0,
+        "false_positives": 8,
+        "false_negatives": 13,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "excluded_ambiguous_truth": 0,
+        "excluded_predictions_on_ambiguous_truth": 0
+      },
+      "timestamp_mae_s": 0.13333333333333522
+    }
+  ],
+  "provenance": {
+    "catalogue_sha256": "10a58a3e5311a11d78007ff10574f11ebac1582982328dda023d383bb76af948",
+    "event_log_sha256": "6ec98714156270f6e1008ad457d454ad25331560c330db6cb0fbc1dce68c3815",
+    "media_files": {
+      "/home/administrator/Desktop/sport-analytics/task2-local-dev-20261028/public-context-replay-3a17473/data/media/1ac5999828f4d789e246d3cfce2ef0fbd7b647cd4e40326a6629157b368899e7/source.mp4": "1ac5999828f4d789e246d3cfce2ef0fbd7b647cd4e40326a6629157b368899e7",
+      "/home/administrator/Desktop/sport-analytics/task2-local-dev-20261028/public-context-replay-3a17473/data/media/1ac5999828f4d789e246d3cfce2ef0fbd7b647cd4e40326a6629157b368899e7/proxy.mp4": "8c9f89690008e5ff37864a1fd0bfc8a6246068ff64a685ca2ce65dc7d83d654a"
+    },
+    "annotation_files": [
+      {
+        "path": "/home/administrator/Desktop/sport-analytics/task2-local-dev-20261028/reference/normalized-0044-development/0044-rally-0000.json",
+        "sha256": "03593da9299a0504cdabf5aaf07f410d2f0dd158de7a3ca9f48b0c06f5159234"
+      },
+      {
+        "path": "/home/administrator/Desktop/sport-analytics/task2-local-dev-20261028/reference/normalized-0044-development/0044-rally-0001.json",
+        "sha256": "4d9b5e20e51d29b5a7d16f3088f32185491532ed46f17fa56c5ae82ec62ef5c2"
+      },
+      {
+        "path": "/home/administrator/Desktop/sport-analytics/task2-local-dev-20261028/reference/normalized-0044-development/0044-rally-0002.json",
+        "sha256": "aa39e7b939b926432447fe3b31160f59c1b4334ff7eb63024836e11ab4f53c3c"
+      },
+      {
+        "path": "/home/administrator/Desktop/sport-analytics/task2-local-dev-20261028/reference/normalized-0044-development/0044-rally-0003.json",
+        "sha256": "4f11338377a9c22ab55eeb3fd2bbf9719d68cdf30b6ee1db70d2150ba30acce2"
+      }
+    ],
+    "published_source_json_sha256": "51d940300a7386253f3af63d8b2f15ecc13b48be02b5c4144bc48f7bc74785b1",
+    "published_reference": {
+      "converter_version": "finebadminton-reference-v1",
+      "mapping_version": "finebadminton-reference-map-v1",
+      "dataset": "iLearn-Lab/Finebadminton-20K",
+      "dataset_revision": "72cae601e08c83ee8ec7e19f8fd7850e9158af7d",
+      "annotations_sha256": "51d940300a7386253f3af63d8b2f15ecc13b48be02b5c4144bc48f7bc74785b1",
+      "annotations_url": "https://huggingface.co/datasets/iLearn-Lab/Finebadminton-20K/resolve/72cae601e08c83ee8ec7e19f8fd7850e9158af7d/finebadminton-20K/0044_updated.json",
+      "media_url": "https://huggingface.co/datasets/iLearn-Lab/Finebadminton-20K/resolve/72cae601e08c83ee8ec7e19f8fd7850e9158af7d/videos/0044.mp4",
+      "source_media_sha256": "1ac5999828f4d789e246d3cfce2ef0fbd7b647cd4e40326a6629157b368899e7",
+      "publication": "https://arxiv.org/html/2508.07554v1",
+      "publication_sections": [
+        "3.1",
+        "3.2"
+      ],
+      "license": "Apache-2.0",
+      "annotation_process": "Provider: manual annotation or machine proposals refined and verified by human annotators.",
+      "coverage": "published annotated rally windows only",
+      "anchor_semantics": "published hitting.start_frame, without retiming or deriving contacts from model predictions"
+    }
+  },
+  "limitations": [
+    "Court side is not durable person identity, four-player attribution or player-name accuracy.",
+    "Only annotated source rally windows are evaluated; unlabelled spans are excluded.",
+    "Published hitting.start_frame anchors are external reference timestamps; their exact physical racket-contact precision and uncertainty were not independently verified.",
+    "The tolerance is a declared anchor-matching criterion, not a validated physical-contact error bound.",
+    "Predictions outside the half-open reference windows are excluded, including early boundary candidates.",
+    "Contact detection here uses current confirmed machine stroke candidates, not all raw contact proposals.",
+    "Side uses supported stored event context and finite court XY; cached pixel geometry is not independently revalidated.",
+    "Provider labels include machine assistance and reported human refinement, not our own human review.",
+    "Pretrained model training overlap is unknown; project reservation does not prove model-level holdout.",
+    "Professional singles results do not establish amateur or four-player identity performance."
+  ]
+}

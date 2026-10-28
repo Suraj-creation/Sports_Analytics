@@ -1,0 +1,35 @@
+{
+  "implementation": "b97c069",
+  "status": "analysed",
+  "elapsed_s": 327.28149103792384,
+  "media": {
+    "fps_num": 25,
+    "fps_den": 1,
+    "n_frames": 7616,
+    "width": 1280,
+    "height": 720,
+    "duration_us": 304661000,
+    "codec": "h264",
+    "has_audio": true,
+    "source_width": 1280,
+    "source_height": 720,
+    "source_codec": "h264",
+    "source_fps": "25",
+    "variable_frame_rate": false
+  },
+  "frontier": 7615,
+  "event_counts": {
+    "calibration": 1,
+    "scene": 60,
+    "activity_interval": 79,
+    "identity_ambiguity": 38,
+    "rally_start": 23,
+    "rally_end": 23,
+    "participant_observation": 81,
+    "stroke": 135,
+    "contact": 135
+  },
+  "degraded": [],
+  "source_sha256": "263c7456643f96f37ad5ccc7d04c01c08d201209d49f141997405325709d0a2d",
+  "proxy_sha256": "b7c83ab716f4ca959395de826c8f5d226870a43bc780a2728e17bfbb55140a3b"
+}

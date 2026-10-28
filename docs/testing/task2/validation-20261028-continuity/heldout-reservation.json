@@ -1,0 +1,12 @@
+{
+  "recording": "0046.mp4",
+  "dataset": "iLearn-Lab/Finebadminton-20K",
+  "revision": "72cae601e08c83ee8ec7e19f8fd7850e9158af7d",
+  "reserved_at_utc": "2026-10-28T17:13:21.0189127+00:00",
+  "split": "held_out",
+  "reserved_before_tuning": true,
+  "prediction_outputs_seen": false,
+  "selection_basis": "Compact published recording (20,019,008 bytes), distinct match: Lakshya Sen vs Shogo Ogawa; development 0044 is Sen vs Teh.",
+  "expected_media_sha256": "263c7456643f96f37ad5ccc7d04c01c08d201209d49f141997405325709d0a2d",
+  "pretrained_training_overlap": "unknown"
+}

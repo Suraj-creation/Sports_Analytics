@@ -1,0 +1,37 @@
+"""Reanalyse a copied observation snapshot; source events and media remain unchanged."""
+from pathlib import Path
+import hashlib
+import json
+import shutil
+import sqlite3
+
+from bai_engine.schema.session import Session
+from bai_engine.store import SessionRepository
+from research.replay_cached_observations import replay_session
+from research.evaluation.benchmark_reference_session import benchmark_session
+
+root=Path('/home/administrator/Desktop/sport-analytics/task2-local-dev-20261028')
+source=root/'public-candidate/data'
+output=root/'public-context-replay-3a17473'
+output.mkdir(exist_ok=False)
+with sqlite3.connect(f'{(source/"sessions.sqlite").as_uri()}?mode=ro',uri=True) as connection:
+    raw=json.loads(connection.execute('select body from sessions where session_id=?',('Fine0044',)).fetchone()[0])
+result=replay_session(raw,source,output,discipline='singles',persist_tracks=True)
+data=output/'data'
+(data/'media').mkdir(parents=True)
+shutil.copytree(source/'media',data/'media',dirs_exist_ok=True)
+repo=SessionRepository(data)
+repo.save(Session.model_validate(raw))
+repo.close()
+destination=data/'sessions/Fine0044'
+destination.mkdir(exist_ok=True,parents=True)
+shutil.copy2(output/'Fine0044.sqlite',destination/'events.sqlite')
+shutil.copytree(output/'Fine0044-tracks',destination/'tracks')
+result['scope']='semantic_replay_of_cached_gpu_observations_not_new_model_inference'
+result['implementation_sha256']=hashlib.sha256(Path(__import__('bai_badminton.engine',fromlist=['x']).__file__).read_bytes()).hexdigest()
+(output/'report.json').write_text(json.dumps(result,indent=2)+'\n')
+scores=benchmark_session(data,'Fine0044',root/'reference/normalized-0044-development')
+(output/'scores.json').write_text(json.dumps(scores,indent=2)+'\n')
+print(json.dumps({'status':'complete','contact':scores['aggregate']['contact_detection'],
+                 'family_macro_f1':scores['aggregate']['shot_family']['known_family']['macro_f1'],
+                 'court_side':scores['aggregate']['court_side']},indent=2))

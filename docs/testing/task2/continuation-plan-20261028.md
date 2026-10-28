@@ -69,12 +69,12 @@ server session results remain preserved.
   validate exact JSON/media hashes, FPS, frame bounds, rally windows and taxonomy;
   retain hitter names/side, raw family, subtype and provider-review provenance.
   Published review is an explicit opt-in; our own human review is never fabricated.
-- [ ] Run local unit/integration and frontend checks, push the candidate branch,
+- [x] Run unit/integration and frontend checks, push the candidate branch,
   fetch it into the isolated GPU checkout, and run matched before/after inference
   against downloaded doubles and published per-hit windows. Report class scores,
   contact P/R, timestamp error, conditional hitter metrics, identity consistency,
   memory and timing; retain recording-separated evaluation and abstention support.
-- [ ] Test the actual browser flow at localhost with the GPU app, verify preserved
+- [x] Test the actual browser flow at localhost with the GPU app, verify preserved
   session ledgers, review the final diff and integrate only verified changes.
 
 At the start of this phase the GPU host stopped responding to SSH, and a fresh
@@ -101,3 +101,9 @@ data; recording 0046 was reserved before the fix as a separate match for held-ou
 evaluation. Anonymous two-person geometry may inform classification without
 restoring player names, credit or scoring slots. These changes do not complete
 the unresolved four-player identity and high-accuracy requirements.
+
+The [continuity validation report](validation-20261028-continuity/README.md)
+records GPU-server regression checks, fresh inference on a reserved 72-hit match,
+development replay, neural tracking regression and unchanged original session
+ledgers. The separate optional experiment is not evidence of improved default
+identity accuracy.

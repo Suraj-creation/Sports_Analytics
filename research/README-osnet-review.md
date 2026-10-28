@@ -19,3 +19,5 @@ del features
 ```
 
 Frames are BGR uint8 up to 4K and crops must be wholly within the frame. The default batch is limited to eight crops, with a hard maximum of 16. The adapter does not save frames or features, but the caller is responsible for not writing them to disk, logs or external services. Real-video feasibility was checked on four approximate crops of one unlabelled frame; no identity accuracy or long-video stability was established.
+
+The later [Task 2 continuity experiment](../docs/testing/task2/validation-20261028-continuity/README.md) processed a 250-frame doubles clip. Neural association regressed on sampled AI-draft identity agreement and remains experimental; it did not establish independently reviewed identity accuracy.
