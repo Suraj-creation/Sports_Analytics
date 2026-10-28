@@ -275,6 +275,7 @@ class BadmintonMatchEngine:
         self._replay: list[bool] = []
         self._shot: list[int] = []
         self._geometry_valid: list[bool] = []
+        self._pose_stride: list[int] = []
         self._participant_frames: list[dict[str, ParticipantSnapshot]] = []
         self._players: dict[str, dict[str, list[Any]]] = {
             pid: {"bbox": [], "kps": [], "court": [], "track_id": []} for pid in ("P1", "P2")
@@ -481,7 +482,12 @@ class BadmintonMatchEngine:
         # visual track IDs. Start a fresh deterministic epoch rather than link them.
         geometry_valid = not geometry_unavailable and calib is not None
         self._geometry_valid.append(geometry_valid)
+        self._pose_stride.append(
+            (fp.pose_stride if type(fp.pose_stride) is int and fp.pose_stride >= 0 else -1)
+            if geometry_valid and not fp.replay else 0
+        )
         coverage_valid = geometry_valid and bool(self._provenance.get("player_detector")) and not fp.replay
+        detector_coverage_valid = coverage_valid and fp.detector_observed is True
         reason = None
         if self.participants is not None:
             if self._participant_reference_changed:
@@ -489,7 +495,7 @@ class BadmintonMatchEngine:
             elif self._participant_shot_id is not None and fp.shot_id != self._participant_shot_id:
                 reason = "visual_tracker_reset"
             elif (
-                coverage_valid
+                detector_coverage_valid
                 and self._participant_last_coverage is not None
                 and fp.frame_idx - self._participant_last_coverage > max(1, round(2 * self.cfg.fps))
             ):
@@ -517,7 +523,7 @@ class BadmintonMatchEngine:
                 )
         self._participant_reference_changed = False
         self._participant_shot_id = fp.shot_id
-        if coverage_valid:
+        if detector_coverage_valid:
             self._participant_last_coverage = fp.frame_idx
         participant_frame = self.participants.update(
             fp.frame_idx,
@@ -591,7 +597,8 @@ class BadmintonMatchEngine:
             ActivityObservation(
                 frame_idx=fp.frame_idx,
                 view_valid=geometry_valid and not fp.replay,
-                person_count=len(participant_frame.participants) if coverage_valid else None,
+                person_count=len(participant_frame.participants)
+                if coverage_valid and (detector_coverage_valid or participant_frame.participants) else None,
                 moving=movement,
                 shuttle_visible=True if fp.shuttle_xy is not None and fp.shuttle_conf >= 0.5 else None,
                 shuttle_position=(sxy[0] / self.cfg.frame_width, sxy[1] / self.cfg.frame_height)
@@ -783,6 +790,7 @@ class BadmintonMatchEngine:
             self._shot,
             self._cam,
             self._geometry_valid,
+            self._pose_stride,
             self._participant_frames,
         ):
             del lst[:drop]
@@ -815,7 +823,8 @@ class BadmintonMatchEngine:
                     s.court_xy[i] = c
             players[pid] = s
         return WindowObs(
-            frame0=lo, fps=self.cfg.fps, shuttle=track, players=players, replay=np.array(self._replay[a:b], bool)
+            frame0=lo, fps=self.cfg.fps, shuttle=track, players=players, replay=np.array(self._replay[a:b], bool),
+            pose_stride=np.array(self._pose_stride[a:b], dtype=np.int64),
         )
 
     # ================================================================== frame advance

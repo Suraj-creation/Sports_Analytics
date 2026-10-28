@@ -933,6 +933,57 @@ def _close(A: Mat, B: Mat, size: tuple[int, int], tol: float = 3.0) -> bool:
     return float(np.linalg.norm(pa - pb, axis=1).max()) < tol
 
 
+
+def _close_in_view(A: Mat, reference: Mat, size: tuple[int, int], tol: float) -> bool:
+    """Compare sampled painted-line projections visible in the locked reference.
+
+    Offscreen corners of a cropped court are extrapolations. Their amplified
+    jitter must not discard a measured, unchanged visible court. Visibility is
+    reference-only: moving a candidate anchor out of view cannot hide its error.
+    """
+    w, h = size
+    if w <= 0 or h <= 0 or not np.isfinite(tol) or tol <= 0:
+        return False
+    matrices = []
+    for matrix in (reference, A):
+        matrix = np.asarray(matrix, dtype=np.float64)
+        if matrix.shape != (3, 3) or not np.isfinite(matrix).all():
+            return False
+        scale = float(np.abs(matrix).max())
+        if scale == 0:
+            return False
+        matrix = matrix / scale
+        if np.linalg.matrix_rank(matrix) < 3:
+            return False
+        matrices.append(matrix)
+    points = np.unique(COARSE.xy, axis=0)
+    homogeneous = np.column_stack((points, np.ones(len(points))))
+    ref = homogeneous @ matrices[0].T
+    epsilon = np.finfo(np.float64).eps
+    valid = np.isfinite(ref).all(axis=1) & (np.abs(ref[:, 2]) > epsilon)
+    projected = np.full((len(points), 2), np.nan)
+    projected[valid] = ref[valid, :2] / ref[valid, 2:3]
+    visible = valid & (projected[:, 0] >= 0) & (projected[:, 0] < w)
+    visible &= (projected[:, 1] >= 0) & (projected[:, 1] < h)
+    if int(visible.sum()) < 4:
+        return False
+    ref = ref[visible]
+    selected = projected[visible]
+    hull = cv2.convexHull(selected.astype(np.float32))
+    # This hull only guards numerical degeneracy. Sampled anchors can cover
+    # less area than the clipped court; fit.ok already enforces court area.
+    if cv2.contourArea(hull) <= epsilon * w * h:
+        return False
+    candidate = homogeneous[visible] @ matrices[1].T
+    if not np.isfinite(candidate).all() or (np.abs(candidate[:, 2]) <= epsilon).any():
+        return False
+    for denominators in (ref[:, 2], candidate[:, 2]):
+        if (denominators > 0).any() and (denominators < 0).any():
+            return False
+    compared = candidate[:, :2] / candidate[:, 2:3]
+    return bool((np.linalg.norm(compared - selected, axis=1) < tol).all())
+
+
 def detect_court(frame: Frame, work_width: int = 960) -> CourtFit | None:
     """Measure the court in a single frame (``None``: no court found)."""
     feat = line_features(frame, work_width)
@@ -1073,7 +1124,7 @@ class CourtTracker:
             fit = refine_court(frame, self._locked, self.search_width)
             # A moving camera, changed scene or mismatched lines invalidate the
             # lock. Do not search the frame for another equally plausible court.
-            if fit is None or not fit.ok or not _close(fit.H, self._locked, full, tol=0.02 * full[0]):
+            if fit is None or not fit.ok or not _close_in_view(fit.H, self._locked, full, tol=0.02 * full[0]):
                 return None, None
             self.stats.refined += 1
             # Preserve the reference geometry instead of accumulating line jitter.

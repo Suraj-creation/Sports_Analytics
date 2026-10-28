@@ -54,11 +54,20 @@ class WindowObs:
     shuttle: Track
     players: dict[str, PlayerSeries]
     replay: NDArray[np.bool_] = field(default_factory=lambda: np.zeros(0, bool))
+    pose_stride: NDArray[np.int64] | None = None  # -1 unknown; 0 disabled; >0 actual schedule
 
     def __post_init__(self) -> None:
         n = len(self.shuttle)
         if self.replay.shape[0] == 0:
             self.replay = np.zeros(n, bool)
+        if self.pose_stride is None:
+            self.pose_stride = np.full(n, -1, dtype=np.int64)
+        elif (
+            self.pose_stride.shape != (n,)
+            or not np.issubdtype(self.pose_stride.dtype, np.integer)
+            or (self.pose_stride < -1).any()
+        ):
+            raise ValueError("pose schedule must contain one integer >= -1 per frame")
         for pid, s in self.players.items():
             if s.bbox.shape[0] != n:
                 raise ValueError(f"player {pid} series length {s.bbox.shape[0]} != {n}")

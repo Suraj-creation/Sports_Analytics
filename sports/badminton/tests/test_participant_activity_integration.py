@@ -247,3 +247,22 @@ def test_restart_withholds_old_doubles_hypothesis_until_reobserved(tmp_path: Pat
     resumed.flush()
     events = store.query(types=["doubles_team_hypothesis"])
     assert len(events) == 2 and events[-1].payload["status"] == "unknown"
+
+
+def test_unavailable_empty_detector_frames_are_unknown_count_not_observed_zero(tmp_path, monkeypatch):
+    match = make_match(['P1'])
+    store = EventStore(tmp_path / 'count_source.sqlite', 'S1')
+    engine = BadmintonMatchEngine('S1', EngineConfig(fps=30, frame_width=1280, frame_height=720), store)
+    engine.set_calibration(0, match.homography)
+    inputs = []
+    real_update = engine.activity.update
+
+    def capture(observation):
+        inputs.append(observation)
+        return real_update(observation)
+
+    monkeypatch.setattr(engine.activity, 'update', capture)
+    frames = [FramePerception(frame_idx=i, shuttle_xy=None, shuttle_conf=0.,
+        detector_observed=detector) for i, detector in enumerate((False, None, True))]
+    engine.ingest(ChunkPerception(0, 2, frames, models={'player_detector': 'test'}))
+    assert [item.person_count for item in inputs] == [None, None, 0]

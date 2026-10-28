@@ -45,6 +45,8 @@ class FramePerception:
     calibration_state: CalibrationState | None = None
     # True only for a frame where the person detector actually ran.
     detector_observed: bool | None = None
+    # Scheduled pose cadence, not a claim of successful keypoint observation.
+    pose_stride: int | None = None  # None legacy/unknown, 0 disabled
 
     @property
     def scene(self) -> str:

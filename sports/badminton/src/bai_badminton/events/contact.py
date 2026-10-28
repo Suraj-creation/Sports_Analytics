@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
+from itertools import pairwise
 
 import numpy as np
 from numpy.typing import NDArray
@@ -80,31 +81,59 @@ def _player_point(s: PlayerSeries, i: int) -> list[NDArray[np.float64]]:
     """Candidate racket-hand points for player at frame i: wrists if posed, else upper box."""
     pts: list[NDArray[np.float64]] = []
     k = s.kps[i]
-    if np.isfinite(k[0, 0]):
-        for kp in (KP.L_WRIST, KP.R_WRIST):
-            if k[kp, 2] >= 0.3:
-                pts.append(k[kp, :2])
-    if not pts and np.isfinite(s.bbox[i, 0]):
+    for kp in (KP.L_WRIST, KP.R_WRIST):
+        if np.isfinite(k[kp]).all() and k[kp, 2] >= 0.3:
+            pts.append(k[kp, :2])
+    if not pts and np.isfinite(s.bbox[i]).all():
         x1, y1, x2, y2 = s.bbox[i]
         # the racket head is typically above/beside the head at contact
         pts.append(np.array([(x1 + x2) / 2, y1 + 0.15 * (y2 - y1)]))
     return pts
 
 
-def _wrist_speed(s: PlayerSeries, i: int, win: int = 3) -> float | None:
-    """Max wrist speed (body heights per frame) in [i-win, i+win]."""
+def _wrist_speed(
+    s: PlayerSeries, i: int, win: int = 3, *, frame0: int = 0,
+    pose_stride: NDArray[np.int64] | None = None,
+) -> float | None:
+    """Observed wrist motion in body heights/frame, respecting pose scheduling.
+
+    Sparse pairs can bridge only known unscheduled frames with continuous boxes.
+    Missing scheduled observations and unknown/disabled cadence cannot bridge.
+    """
     n = s.kps.shape[0]
+    lo, hi = max(0, i - win - 1), min(n, i + win + 1)
     best = None
     for kp in (KP.L_WRIST, KP.R_WRIST):
-        for j in range(max(1, i - win), min(n, i + win + 1)):
-            a, b = s.kps[j - 1, kp], s.kps[j, kp]
-            if a[2] < 0.3 or b[2] < 0.3 or not np.isfinite(a[0]) or not np.isfinite(b[0]):
+        points = s.kps[lo:hi, kp]
+        valid = np.isfinite(points).all(axis=1) & (points[:, 2] >= 0.3)
+        observed = np.flatnonzero(valid) + lo
+        for left, right in pairwise(observed):
+            delta = int(right - left)
+            if not np.isfinite(s.bbox[left : right + 1]).all():
                 continue
-            h = s.height[j]
-            if not np.isfinite(h) or h <= 1:
+            if pose_stride is None:
+                if delta != 1:
+                    continue
+            else:
+                cadence = pose_stride[left : right + 1]
+                if (cadence == 0).any():
+                    continue
+                ends = np.array([left, right])
+                end_cadence = pose_stride[ends]
+                known = end_cadence > 0
+                if ((ends[known] + frame0) % end_cadence[known] != 0).any():
+                    continue
+                if delta > 1:
+                    if (cadence <= 0).any():
+                        continue
+                    intermediate = np.arange(left + 1, right) + frame0
+                    if (intermediate % cadence[1:-1] == 0).any():
+                        continue
+            height = s.height[right]
+            if not np.isfinite(height) or height <= 1:
                 continue
-            v = float(np.hypot(*(b[:2] - a[:2]))) / h
-            best = v if best is None else max(best, v)
+            speed = float(np.linalg.norm(s.kps[right, kp, :2] - s.kps[left, kp, :2])) / delta / height
+            best = speed if best is None else max(best, speed)
     return best
 
 
@@ -160,7 +189,9 @@ def score_frame(w: WindowObs, i: int, half: int = 3) -> ContactCandidate | None:
     swing_players = [best_pid] if best_pid is not None and attribution_reason != "insufficient_proximity" else []
     if attribution_reason == "ambiguous_proximity":
         swing_players = [pid for pid, prox, _ in ranked if (best_prox - prox) / best_prox <= ATTRIBUTION_PROXIMITY_GAP]
-    wrist_speeds = [_wrist_speed(w.players[pid], i) for pid in swing_players]
+    wrist_speeds = [
+        _wrist_speed(w.players[pid], i, frame0=w.frame0, pose_stride=w.pose_stride) for pid in swing_players
+    ]
     observed_speeds = [speed for speed in wrist_speeds if speed is not None]
     s_swing = float(np.clip((max(observed_speeds) - 0.05) / 0.25, 0.0, 1.0)) if observed_speeds else 0.0
     z = W_BIAS + W_REDIRECT * s_redirect + W_IMPULSE * s_impulse + W_PROX * best_prox + W_SWING * s_swing

@@ -1,0 +1,18 @@
+{
+  "python": "3.12.12 (main, Jan 14 2026, 19:35:58) [Clang 21.1.4 ]",
+  "av": "19.0.1",
+  "opencv": "5.0.0",
+  "torch": "2.14.1+cu126",
+  "torch_cuda": "12.6",
+  "onnxruntime": "1.29.0",
+  "gpu_inventory": [
+    "NVIDIA GeForce GTX 1080 Ti, 580.178.04, 11264 MiB",
+    "NVIDIA GeForce GTX 1080 Ti, 580.178.04, 11264 MiB"
+  ],
+  "visible_gpu_for_benchmark": "1",
+  "config_sha256": {
+    "/home/administrator/Desktop/sport-analytics/Sports_Analytics/config/profiles/gpu-rtx4000.yaml": "d35417229de590867c4ff043a51267b01e5fe594dbdc09df7c05c12addb47552",
+    "/home/administrator/Desktop/sport-analytics/Sports_Analytics/models/manifest.yaml": "39cd98ae90f87a4393956d9d0117af920c9cd3583c49f0ac8ba4874ee5f5c16f",
+    "/home/administrator/Desktop/sport-analytics/gpu-env.sh": "7139b6e55c7d2089a93afa7310a6a3f0abf9f69a6afd124dbfc375548a6fb294"
+  }
+}

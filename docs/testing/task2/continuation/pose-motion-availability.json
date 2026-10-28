@@ -1,0 +1,12 @@
+{
+  "kind": "identical_observation_component_diagnostic",
+  "input_cache_sha256": "3952bd0474d8b9bec8d40248c3833682127fd7302ea2ed40a7bc44f094a2a796",
+  "counts": {
+    "tested_track_frame_windows": 17696,
+    "before_motion_available": 10251,
+    "after_motion_available": 12684,
+    "newly_available": 2433
+  },
+  "accuracy_claim": false,
+  "limitations": "Temporary-track local windows only; presence of a finite motion cue is not contact correctness or durable identity. Both methods consume identical new-run pose/box observations."
+}

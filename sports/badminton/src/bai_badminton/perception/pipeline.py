@@ -354,6 +354,8 @@ class BadmintonPerception:
                         head=scene.heads[i],
                         court_q=scene.quality[i],
                         calibration_state=states[i],
+                        pose_stride=int(rates_pose)
+                        if not replay[i] and getattr(self.players, "pose", None) is not None else 0,
                         detector_observed=bool(
                             not replay[i] and getattr(self.players, "last_detector_observed", False)
                         ),

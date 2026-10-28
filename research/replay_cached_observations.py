@@ -45,6 +45,10 @@ def decode_observations(data: bytes, n_frames: int) -> ChunkPerception | None:
         detector_observed = frame.get("do")
         if detector_observed is not None and not isinstance(detector_observed, bool):
             raise ValueError("invalid detector observation flag")
+        pose_stride = frame.get("ps")
+        if pose_stride is not None and (type(pose_stride) is not int or pose_stride < 0):
+            raise ValueError("invalid pose schedule")
+        pose_kwargs = {"pose_stride": pose_stride} if "pose_stride" in FramePerception.__dataclass_fields__ else {}
         calibration_state = frame.get("cs")
         if calibration_state is not None:
             calibration_state = CalibrationState(calibration_state)
@@ -73,6 +77,7 @@ def decode_observations(data: bytes, n_frames: int) -> ChunkPerception | None:
                 court_q=frame.get("q"),
                 calibration_state=calibration_state,
                 detector_observed=detector_observed,
+                **pose_kwargs,
             )
         )
     if not frames:
@@ -180,6 +185,8 @@ def replay_session(
             if frame["f"] < media["n_frames"]:
                 cs_key = "calibration_state_present" if frame.get("cs") is not None else "calibration_state_missing"
                 do_key = "detector_observed_present" if frame.get("do") is not None else "detector_observed_missing"
+                ps_key = "pose_schedule_present" if frame.get("ps") is not None else "pose_schedule_missing"
+                frame_metadata[ps_key] += 1
                 frame_metadata[cs_key] += 1
                 frame_metadata[do_key] += 1
         chunk = decode_observations(content, media["n_frames"])
@@ -197,6 +204,7 @@ def replay_session(
         "tracks_persisted": persist_tracks,
         "track_samples_persisted": tracks_persisted,
         "cached_frame_metadata": dict(frame_metadata),
+        "pose_schedule_supported": "pose_stride" in FramePerception.__dataclass_fields__,
         "cached_codec_versions": sorted(versions),
         "media_sha256": session["source"].get("sha256"),
         "cached_observations_sha256": cache_hash.hexdigest(),

@@ -1,0 +1,20 @@
+{
+  "baseline_revision": "a555260",
+  "after_source_sha256": {
+    "sports/badminton/src/bai_badminton/perception/court_lines.py": "a9ac0d9cb30e43622bd6f50148015a3a96f51f2c2e03c64a9a80f7b71a074781",
+    "sports/badminton/src/bai_badminton/events/contact.py": "9bd4b4e0b7c80af4e4c2bc54db4bda62b894eb481e032c3255e1dbeb64b89c98",
+    "sports/badminton/src/bai_badminton/plugin.py": "7aede37cebb9e000a54163af86d2659f4d237f87d4ac532005f9e9520d1a8dac",
+    "sports/badminton/src/bai_badminton/engine.py": "b272ccca0e99a673bc457332a79b7d9ce4a9370e9965d7d534d3bcaa0f8724dc",
+    "sports/badminton/src/bai_badminton/observations.py": "67b3020c3947e70216a184281ad3f7ff913211c9705dc39b578672a836f5b25b",
+    "sports/badminton/src/bai_badminton/participant_contact.py": "fb50e82d5deb5068641fd54ed0d89e0f9dd0fe3ce75708d4c170e05b665fbb00",
+    "sports/badminton/src/bai_badminton/perception/pipeline.py": "f1a55ebde65efc5050239ebc3b8c7a20ae4e7855c64e64fdaa42a5c4754437df",
+    "sports/badminton/src/bai_badminton/perception_types.py": "234e681d2821e38a184baf8d470ffc299e118cf488373043e179ac601c4a04ab"
+  },
+  "source_sessions": {
+    "01M55MFY9GQF6ZXP2SQPQ8X1KG": "02b683ddf281f0bcea356802dd3714df65b23d80c8b178d17664318c348c0431",
+    "01M55NQMRAS0ATB73XE3XA6S74": "c51e7d39e99d0338187074428a545e72106dc56588209fbf6d83f75d77a6d971",
+    "01M56T2EED5Z7W9VTGG19FHNTF": "45f4f22343ea0f9fdae090f8a0fb6a1988d324cdb58a45bc57c1739afb291626",
+    "01M5EXGZNEVGYAJ3AR6CJS5ZG9": "2e8802fcfe3f200ad309ef7958c15293a8e4b93f06e3f019e8578cb6a1013bee",
+    "01M5MBR3087FH07N5B1XR5VGHW": "7b38c0a606cf4b85092907556f1639734ae59f56c9b1c8a90cf13a7df7259967"
+  }
+}

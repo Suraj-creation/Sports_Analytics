@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from bai_badminton.engine import BadmintonMatchEngine, EngineConfig
 from bai_badminton.perception.calibration_state import CalibrationState
@@ -84,3 +85,53 @@ def test_brief_invalid_coverage_preserves_same_track(tmp_path: Path):
     ids = {e.payload["participant_id"] for e in store.query(types=["participant_observation"])}
     assert ids == {first_id}
     assert not store.query(types=["identity_ambiguity"])
+
+
+def send_detector_frames(engine, start, end, *, detector, carried):
+    frames = [FramePerception(
+        frame_idx=i, shuttle_xy=None, shuttle_conf=0.,
+        persons=[PersonObs(5, np.array([300., 400., 330., 650.]), .95)] if carried else [],
+        calibration_state=CalibrationState.VALID, detector_observed=detector,
+    ) for i in range(start, end + 1)]
+    engine.ingest(ChunkPerception(start, end, frames, models={'player_detector': 'test'}))
+
+
+@pytest.mark.parametrize('detector', [False, None])
+def test_long_empty_detector_outage_starts_new_epoch_only_when_observations_return(tmp_path, detector):
+    engine, store, _, first_id = first_episode(tmp_path)
+    send_detector_frames(engine, 4, 64, detector=detector, carried=False)
+    assert not store.query(types=['identity_ambiguity'])
+    assert not any(e.payload['kind'] == 'PLAYER_EXITED' for e in store.query(types=['participant_observation']))
+    send(engine, 65, 68)
+    births = [e for e in store.query(types=['participant_observation'])
+        if e.payload['participant_id'] != first_id
+        and e.payload['kind'] in ('PLAYER_ENTERED', 'PARTICIPANT_FIRST_OBSERVED')]
+    assert len(births) == 1
+    returned = [t for t in engine._track_out if t.obj == TrackObject.PLAYER and t.frame_idx in (67, 68)]
+    assert {t.frame_idx for t in returned} == {67, 68}
+    assert all(t.participant_observation_id == births[0].event_id for t in returned)
+    assert_new_episode_without_singles_assignment(engine, store, first_id, 65)
+    reset = store.query(types=['identity_ambiguity'])
+    assert len(reset) == 1 and reset[0].frame_start == 65
+    assert reset[0].payload['reason'] == 'prolonged_coverage_loss'
+
+
+def test_long_carried_detector_outage_cannot_refresh_identity_coverage(tmp_path):
+    engine, store, _, first_id = first_episode(tmp_path)
+    send_detector_frames(engine, 4, 64, detector=False, carried=True)
+    carried = engine._participant_frames[4:65]
+    assert carried and all(first_id in frame for frame in carried)
+    assert all(frame[first_id].detector_observed is False for frame in carried)
+    assert all(frame[first_id].observation_id is not None for frame in carried)
+    assert not store.query(types=['identity_ambiguity'])
+    assert {e.payload['participant_id'] for e in store.query(types=['participant_observation'])} == {first_id}
+    send(engine, 65, 68)
+    assert_new_episode_without_singles_assignment(engine, store, first_id, 65)
+
+
+def test_detector_continuity_has_the_existing_two_second_boundary(tmp_path):
+    engine, store, _, first_id = first_episode(tmp_path)
+    send_detector_frames(engine, 4, 62, detector=False, carried=True)
+    send(engine, 63, 66)  # last observed frame 3 -> 63 is exactly two seconds
+    assert {e.payload['participant_id'] for e in store.query(types=['participant_observation'])} == {first_id}
+    assert not store.query(types=['identity_ambiguity'])

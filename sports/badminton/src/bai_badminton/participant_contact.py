@@ -80,7 +80,7 @@ def participant_window(
             if snapshot.court_xy is not None:
                 item.court_xy[i] = snapshot.court_xy
     return WindowObs(frame0=window.frame0, fps=window.fps, shuttle=window.shuttle,
-                     players=series, replay=window.replay)
+                     players=series, replay=window.replay, pose_stride=window.pose_stride)
 
 
 def participant_contact_evidence(

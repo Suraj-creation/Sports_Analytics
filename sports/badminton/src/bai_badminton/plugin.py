@@ -32,7 +32,7 @@ from bai_engine.store import EventStore
 log = get_logger(__name__)
 AUTO_CALIBRATION_MIN_SCORE = 0.6
 REF_FILE = "camera_ref.png"  # the frame the calibration was made on (lossless: its id is a content hash)
-CODEC_VERSION = 7  # v7 persists per-frame calibration validity and recovery state
+CODEC_VERSION = 8  # v8 records pose cadence and cropped-court verification policy
 MAX_ADJUST = 0.03  # a human calibration the court lines move by more than this (× frame width) is kept as is
 
 
@@ -509,6 +509,7 @@ class BadmintonSession:
                     "q": fp.court_q,
                     "cs": fp.calibration_state.value if fp.calibration_state is not None else None,
                     "do": fp.detector_observed,
+                    "ps": fp.pose_stride,
                     "p": [
                         {
                             "t": q.track_id,
@@ -547,13 +548,18 @@ class BadmintonSession:
                 f"perception segment {d['start']} has stale codec/calibration policy "
                 f"(version {d.get('v', 1)} vs {CODEC_VERSION}; reference {d.get('cr')} vs {ref_id})"
             )
-        # A v7 cache without explicit validity is incomplete, even if its version
+        # A cache without explicit validity is incomplete, even if its version
         # and geometry fingerprint otherwise match. Never trust it as legacy.
         valid_states = {state.value for state in CalibrationState}
         if any(frame.get("cs") not in valid_states for frame in d["frames"]):
             raise StaleCacheError("perception segment lacks valid calibration state")
         if any(not isinstance(frame.get("do"), bool) for frame in d["frames"]):
             raise StaleCacheError("perception segment lacks detector observation metadata")
+        if any(
+            "ps" not in frame or (frame["ps"] is not None and (type(frame["ps"]) is not int or frame["ps"] < 0))
+            for frame in d["frames"]
+        ):
+            raise StaleCacheError("perception segment lacks valid pose schedule metadata")
         frames = [
             FramePerception(
                 frame_idx=f["f"],
@@ -568,6 +574,7 @@ class BadmintonSession:
                 court_q=f.get("q"),
                 calibration_state=CalibrationState(f["cs"]) if f.get("cs") is not None else None,
                 detector_observed=f["do"],
+                pose_stride=f["ps"],
                 persons=[
                     PersonObs(
                         track_id=q["t"],

@@ -184,3 +184,20 @@ def test_opt_in_persists_tracks_only_in_fresh_isolated_replay_output(tmp_path, m
     rows = TrackStore(output / "A1-tracks").read([TrackObject.PLAYER], 0, 0).to_pylist()
     assert len(rows) == 1 and rows[0]["participant_observation_id"] == "birth-1"
     assert not (source / "tracks").exists()
+
+
+@pytest.mark.parametrize('stride', [None, 0, 2])
+def test_pose_schedule_survives_historical_replay_decode(stride):
+    chunk = replay.decode_observations(encoded_frame(ps=stride), 1)
+    assert chunk is not None and chunk.frames[0].pose_stride == stride
+
+
+@pytest.mark.parametrize('stride', [-1, True, 1.5, '2'])
+def test_replay_rejects_invalid_pose_schedule(stride):
+    with pytest.raises(ValueError):
+        replay.decode_observations(encoded_frame(ps=stride), 1)
+
+
+def test_missing_historical_pose_schedule_remains_unknown():
+    chunk = replay.decode_observations(encoded_frame(), 1)
+    assert chunk is not None and chunk.frames[0].pose_stride is None

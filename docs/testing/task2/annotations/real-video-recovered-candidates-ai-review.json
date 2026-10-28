@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "session_id": "01M5MBR3087FH07N5B1XR5VGHW",
+  "proxy_sha256": "ca1fb9357fbc54cbe82aebc9c429d813671bd63b2e5984bd0b810d8c883ea0bc3",
+  "fps": 30,
+  "frames": [
+    460,
+    490
+  ],
+  "sampling_step_frames": 2,
+  "status": "draft",
+  "exhaustive": false,
+  "human_verified": false,
+  "review_method": "AI visual inspection prompted by recovered model candidates; model-guided diagnostic, not independent ground truth",
+  "observations": "Four players are visible. The sampled sequence shows waiting/repositioning and limited racket movement. Exact racket-shuttle contacts and the automatic serve/push labels are not established by these frames. No durable individual identity is assigned.",
+  "reviewed_candidates": [
+    {
+      "frame": 472,
+      "predicted_family": "short_serve",
+      "review_result": "unconfirmed"
+    },
+    {
+      "frame": 480,
+      "predicted_family": "push",
+      "review_result": "unconfirmed"
+    },
+    {
+      "frame": 487,
+      "predicted_family": "unknown",
+      "review_result": "unconfirmed; exact frame is between sampled images"
+    }
+  ],
+  "accuracy_claim": false,
+  "evidence": {
+    "path": "/home/administrator/Desktop/sport-analytics/task2-continuation.ZBsh8B/real-460-490-motion-review.jpg",
+    "sha256": "be0e24c4499a7f84fe3a1354703809f024135d3a410c4aa312cae3cddbb3b524"
+  }
+}

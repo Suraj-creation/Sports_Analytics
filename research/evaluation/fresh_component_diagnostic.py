@@ -137,7 +137,7 @@ def main() -> None:
         loaded = time.perf_counter()
         detections = shuttle.detect(frames, step=8)
         shuttle_done = time.perf_counter()
-        people = [players.process(i, frame) for i, frame in enumerate(frames)]
+        people = [players.process(args.start + i, frame) for i, frame in enumerate(frames)]
         people_done = time.perf_counter()
         track = process(
             Track.from_arrays(
@@ -156,7 +156,13 @@ def main() -> None:
                 series[name].bbox[i] = person.bbox
                 if person.kps is not None:
                     series[name].kps[i] = person.kps
-        candidates = detect_contacts(WindowObs(frame0=args.start, fps=args.fps, shuttle=track, players=series))
+        pose_kwargs = (
+            {"pose_stride": np.full(len(frames), 2, dtype=np.int64)}
+            if "pose_stride" in WindowObs.__dataclass_fields__ else {}
+        )
+        candidates = detect_contacts(WindowObs(
+            frame0=args.start, fps=args.fps, shuttle=track, players=series, **pose_kwargs,
+        ))
         classifier = RuleStrokeClassifier()
         hypotheses = []
         for candidate in candidates:
@@ -196,6 +202,8 @@ def main() -> None:
             {
                 **provenance,
                 "source_frames": [args.start, args.start + args.count - 1],
+                "inference_frame_schedule": "canonical_source_frame",
+                "pose_schedule_supported": bool(pose_kwargs),
                 "fps": args.fps,
                 "resize": "1280x720",
                 "visible_cuda_device": os.environ["CUDA_VISIBLE_DEVICES"],
