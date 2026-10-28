@@ -1,0 +1,80 @@
+{
+  "version": "unlabelled-shuttle-motion-v1",
+  "accuracy_claim_eligible": false,
+  "note": "Same processed observations; neither physical speed nor labelled shot accuracy.",
+  "source_video_sha256": "a940a9441d48eb09d758b82dc7f53bdb4a1dac9c69b4e7c7e67cffcbe5486d54",
+  "probe_sha256": "cf6405a1cfec0fd93bd83b5adbbf4226a12d85f85d651a4d620bcafd1cff977b",
+  "engine_sha256": "31b6dc17fb85088b6d12823bacfe63295c7b34196392ec986dd0ec51d4779689",
+  "fps": 25.0,
+  "frame_height_px": 720,
+  "source_frames": [
+    1500,
+    1749
+  ],
+  "events": [
+    {
+      "frame": 1508,
+      "observed_samples": 5,
+      "interpolated_samples": 0,
+      "speed_px_s": 86.84094609817852,
+      "vy_px_s": 83.07012010063985
+    },
+    {
+      "frame": 1518,
+      "observed_samples": 5,
+      "interpolated_samples": 0,
+      "speed_px_s": 797.9201693483597,
+      "vy_px_s": -758.4742956126462
+    },
+    {
+      "frame": 1557,
+      "observed_samples": 5,
+      "interpolated_samples": 0,
+      "speed_px_s": 638.1657225721868,
+      "vy_px_s": -638.1656233250093
+    },
+    {
+      "frame": 1586,
+      "observed_samples": 4,
+      "interpolated_samples": 1,
+      "speed_px_s": 498.6994001279102,
+      "vy_px_s": -295.9834523228242
+    },
+    {
+      "frame": 1616,
+      "observed_samples": 4,
+      "interpolated_samples": 1,
+      "speed_px_s": 532.0749657882335,
+      "vy_px_s": -499.73314813028776
+    },
+    {
+      "frame": 1650,
+      "observed_samples": 3,
+      "interpolated_samples": 2,
+      "speed_px_s": 1156.252119760183,
+      "vy_px_s": -1073.2126999729094
+    },
+    {
+      "frame": 1699,
+      "observed_samples": 5,
+      "interpolated_samples": 0,
+      "speed_px_s": 660.7945810825094,
+      "vy_px_s": -639.1981500926157
+    },
+    {
+      "frame": 1711,
+      "observed_samples": 5,
+      "interpolated_samples": 0,
+      "speed_px_s": null,
+      "vy_px_s": null
+    },
+    {
+      "frame": 1744,
+      "observed_samples": 4,
+      "interpolated_samples": 1,
+      "speed_px_s": 1088.6770282791629,
+      "vy_px_s": -1001.2079492948945
+    }
+  ],
+  "stroke_sha256": "875b7239b6ccf662ca2489260c53da5d17ca7779c19380b2fa77ab7f0a7ac8aa"
+}

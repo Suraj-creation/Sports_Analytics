@@ -1,0 +1,94 @@
+{
+  "version": "unlabelled-shuttle-motion-v1",
+  "accuracy_claim_eligible": false,
+  "note": "Same processed observations; neither physical speed nor labelled shot accuracy.",
+  "source_video_sha256": "205132cc64f0d269ca67bd0eea1dfc9e08352f68202cdb8754a19a58217d958f",
+  "probe_sha256": "a416418ee704982e283e2c7373c9aef76ca50481c94cf0c66308dec7fe335eb5",
+  "engine_sha256": "31b6dc17fb85088b6d12823bacfe63295c7b34196392ec986dd0ec51d4779689",
+  "fps": 25.0,
+  "frame_height_px": 720,
+  "source_frames": [
+    1500,
+    1749
+  ],
+  "events": [
+    {
+      "frame": 1511,
+      "observed_samples": 5,
+      "interpolated_samples": 0,
+      "speed_px_s": 306.2291637306517,
+      "vy_px_s": 1.9004738640498196
+    },
+    {
+      "frame": 1522,
+      "observed_samples": 5,
+      "interpolated_samples": 0,
+      "speed_px_s": 266.0071834011901,
+      "vy_px_s": -252.58186949674518
+    },
+    {
+      "frame": 1536,
+      "observed_samples": 5,
+      "interpolated_samples": 0,
+      "speed_px_s": 183.9462431889946,
+      "vy_px_s": -34.2266882881038
+    },
+    {
+      "frame": 1550,
+      "observed_samples": 5,
+      "interpolated_samples": 0,
+      "speed_px_s": 499.77643512963544,
+      "vy_px_s": -395.8802574834738
+    },
+    {
+      "frame": 1559,
+      "observed_samples": 5,
+      "interpolated_samples": 0,
+      "speed_px_s": 132.27285987993903,
+      "vy_px_s": 108.50703319357429
+    },
+    {
+      "frame": 1601,
+      "observed_samples": 4,
+      "interpolated_samples": 1,
+      "speed_px_s": 444.607416560527,
+      "vy_px_s": -168.77468396518532
+    },
+    {
+      "frame": 1628,
+      "observed_samples": 4,
+      "interpolated_samples": 1,
+      "speed_px_s": 1232.6864836063457,
+      "vy_px_s": -1189.9817962200498
+    },
+    {
+      "frame": 1666,
+      "observed_samples": 4,
+      "interpolated_samples": 1,
+      "speed_px_s": 624.9043495643543,
+      "vy_px_s": -610.7959871834734
+    },
+    {
+      "frame": 1676,
+      "observed_samples": 5,
+      "interpolated_samples": 0,
+      "speed_px_s": 603.5138786945087,
+      "vy_px_s": 603.4567545280264
+    },
+    {
+      "frame": 1689,
+      "observed_samples": 5,
+      "interpolated_samples": 0,
+      "speed_px_s": 155.85848005435233,
+      "vy_px_s": -155.4795187749221
+    },
+    {
+      "frame": 1711,
+      "observed_samples": 5,
+      "interpolated_samples": 0,
+      "speed_px_s": 65.22047238067863,
+      "vy_px_s": 65.09292872848604
+    }
+  ],
+  "stroke_sha256": "875b7239b6ccf662ca2489260c53da5d17ca7779c19380b2fa77ab7f0a7ac8aa"
+}

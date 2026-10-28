@@ -29,6 +29,7 @@ export interface OverlayCtx {
   layers: Layers;
   colors: Record<PlayerId, string>;
   names: Record<PlayerId, string>;
+  reviewBox?: { frame: number; trackId: number; bbox: [number, number, number, number] } | null;
 }
 
 /** Map video intrinsic pixels → canvas pixels for an object-fit: contain video. */
@@ -82,6 +83,10 @@ export function drawOverlay(o: OverlayCtx, frame: number): void {
     }
   }
 
+  if (o.reviewBox && o.reviewBox.frame === frame) {
+    drawBrackets(g, o.reviewBox.bbox, "#ffdf51", px);
+    drawLabel(g, o.reviewBox.bbox, `Review track ${o.reviewBox.trackId}`, "#ffdf51", px);
+  }
   if (layers.shuttle) drawShuttle(g, tracks, frame, px);
 
   // contact flash: a ring at the contact point for ~6 frames after a hit

@@ -15,7 +15,13 @@ from bai_engine.store import EventStore
 from bai_engine.timeline import Timeline
 
 TRACKER_IDENTITY_EVIDENCE_TYPES = frozenset(
-    {"identity_review", "identity_ambiguity", "participant_observation", "doubles_team_hypothesis"}
+    {
+        "identity_review",
+        "identity_ambiguity",
+        "participant_observation",
+        "doubles_team_hypothesis",
+        "stroke_participant_review",
+    }
 )
 
 
@@ -52,8 +58,20 @@ class IdentityReviewLedger:
             return "invalid participant observation"
         epoch = match.group(1)
         for other in self.store.query(types=["identity_ambiguity", "participant_observation"]):
-            if not obs.frame_start < other.frame_start <= end:
+            if other.event_id == obs.event_id or not obs.frame_start <= other.frame_start <= end:
                 continue
+            if other.frame_start == obs.frame_start:
+                # Two births using the same tracker ID at one frame are ambiguous,
+                # independent of append order. For reset/exit, event order matters.
+                if (
+                    other.type == "participant_observation"
+                    and other.payload.get("kind") in ("PARTICIPANT_FIRST_OBSERVED", "PLAYER_ENTERED")
+                    and other.payload.get("track_id") == track
+                    and other.payload.get("participant_id") != participant
+                ):
+                    return "interval crosses track reuse"
+                if other.seq is not None and obs.seq is not None and other.seq < obs.seq:
+                    continue
             if other.type == "identity_ambiguity":
                 reason = other.payload.get("reason")
                 if reason in (

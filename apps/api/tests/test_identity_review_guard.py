@@ -5,7 +5,14 @@ from bai_engine.schema import Event, Provenance, Session, Source, SourceKind
 
 
 @pytest.mark.parametrize(
-    "event_type", ["identity_review", "identity_ambiguity", "participant_observation", "doubles_team_hypothesis"]
+    "event_type",
+    [
+        "identity_review",
+        "identity_ambiguity",
+        "participant_observation",
+        "doubles_team_hypothesis",
+        "stroke_participant_review",
+    ],
 )
 def test_generic_verify_rejects_tracker_evidence_before_queueing(
     client: TestClient, monkeypatch, event_type: str

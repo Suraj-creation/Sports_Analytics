@@ -1,0 +1,70 @@
+{
+  "version": "motion-window-diagnostic-v1",
+  "accuracy_claim_eligible": false,
+  "review_exhaustive": false,
+  "note": "AI motion windows are unconfirmed and incomplete; outside-window hypotheses are not false positives.",
+  "source_video_sha256": "1ad1eac44150a0a23e2bad1f3d4204bd41f2d257ff6b35156234d38cfa2b9d9c",
+  "fps": 30.0,
+  "review_window_s": [
+    6.0,
+    15.0
+  ],
+  "motion_windows_s": [
+    [
+      6.7,
+      7.1
+    ],
+    [
+      11.8,
+      12.5
+    ],
+    [
+      13.5,
+      13.9
+    ]
+  ],
+  "before": {
+    "hypothesis_count": 12,
+    "unknown_family_count": 12,
+    "hypotheses_in_windows": [
+      [],
+      [
+        366
+      ],
+      []
+    ],
+    "hypotheses_outside_windows": [
+      186,
+      223,
+      255,
+      278,
+      303,
+      323,
+      340,
+      376,
+      400,
+      418,
+      446
+    ],
+    "implementation": {
+      "diagnostic": "7de16ef2aa79a0b2356f0cf7a2631825cfd61c07b7b27b681291bf789e9a7ff2",
+      "contact": "9db0c068d9b0b61506e075511ce48c182c54532d9358ccdbfb4420449ee34efc",
+      "stroke": "2d0ab87fcceabd49b44d446278cd146c284c728f3e1e376a4414ea71fda5cbe2",
+      "players": "01f5204596cfda5a429bb86fca41103de90a86a7b6004cec2cef8ed599a4bb9a",
+      "tracknet": "8962bd6de8080b23e0eaa0e5bbcb06a6fa16c3dbc586cbef4f10272f32151f2d",
+      "shuttle_post": "f14e12e2f9ee3d2f12e62be7004cd2c1ccb42372f6057ab686b721db8afb0075"
+    },
+    "model_sha256": {
+      "tracknet": "df867641a02712b021f04548ff4b1208ddfdb47f629ab2094ceb978667e83b1a",
+      "detector": "fcd3c3c4e0d3d5533ee9c3a174deb7f02dfe4b042b6fdd3d29040f3c6da7845e",
+      "pose": "5c0a4bf67953e6d2ac43ce15e77dc9d5d354ae18430a47d2c5963a7bc5683e3c"
+    }
+  },
+  "after": null,
+  "provenance": {
+    "draft_sha256": "82694987a37af22c0a797649ef377400fc6cd48023ea2d97f299bf85bc076277",
+    "before_sha256": "7bfeb75bd80dcb515b28d5063a969f8b752325ad167208f87ab6ebe6e59ca241",
+    "after_sha256": null,
+    "video_sha256_verified": true
+  }
+}

@@ -17,6 +17,9 @@ import { usePlayback } from "@/stores/playback";
 import { useSession } from "@/stores/session";
 import { LiveFeed } from "./LiveFeed";
 import { PlayerSelector } from "./PlayerSelector";
+import { IndividualAnalytics } from "./IndividualAnalytics";
+import { ParticipantReview } from "./ParticipantReview";
+import { ParticipantRoster } from "./ParticipantRoster";
 import { ReanalysisFeedback } from "./ReanalysisFeedback";
 import { ExportTab } from "./tabs/ExportTab";
 import { VisualObservations } from "./VisualObservations";
@@ -284,6 +287,9 @@ function SessionWorkspace({ session, search }: { session: Session; search: Analy
       </div>
       <EvidenceDetails session={session} />
       <VisualObservations session={session} />
+      <ParticipantRoster key={session.session_id} session={session} />
+      <IndividualAnalytics session={session} />
+      <ParticipantReview key={session.session_id} session={session} />
       <details className="analysis-panel mt-5">
         <summary className="cursor-pointer text-sm font-medium">Live event feed</summary>
         <div className="mt-4 max-h-64 overflow-y-auto">

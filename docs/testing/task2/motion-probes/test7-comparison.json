@@ -1,0 +1,128 @@
+{
+  "version": "paired-shuttle-motion-v1",
+  "accuracy_claim_eligible": false,
+  "note": "Unlabelled same-input comparison; changes are not measured improvements.",
+  "source_video_sha256": "1ad1eac44150a0a23e2bad1f3d4204bd41f2d257ff6b35156234d38cfa2b9d9c",
+  "probe_sha256": "7bfeb75bd80dcb515b28d5063a969f8b752325ad167208f87ab6ebe6e59ca241",
+  "source_frames": [
+    180,
+    449
+  ],
+  "before_engine_sha256": "32962f5f34b384a6f90c705e3ec117a34feb9d83225a1050a937a5c3d570f505",
+  "before_stroke_sha256": "2d0ab87fcceabd49b44d446278cd146c284c728f3e1e376a4414ea71fda5cbe2",
+  "after_stroke_sha256": "875b7239b6ccf662ca2489260c53da5d17ca7779c19380b2fa77ab7f0a7ac8aa",
+  "after_engine_sha256": "31b6dc17fb85088b6d12823bacfe63295c7b34196392ec986dd0ec51d4779689",
+  "candidate_count": 12,
+  "before_available": 11,
+  "after_available": 11,
+  "changes": [
+    {
+      "frame": 186,
+      "before_speed_px_s": null,
+      "after_speed_px_s": null,
+      "before_vy_px_s": null,
+      "after_vy_px_s": null,
+      "observed_samples": 1,
+      "interpolated_samples": 4
+    },
+    {
+      "frame": 223,
+      "before_speed_px_s": 109.29415201736214,
+      "after_speed_px_s": 108.0102360932668,
+      "before_vy_px_s": 109.23713640658477,
+      "after_vy_px_s": 107.9661673748327,
+      "observed_samples": 5,
+      "interpolated_samples": 0
+    },
+    {
+      "frame": 255,
+      "before_speed_px_s": 862.932703512428,
+      "after_speed_px_s": 846.2001063912876,
+      "before_vy_px_s": -862.4723492989816,
+      "after_vy_px_s": -845.6812524481392,
+      "observed_samples": 5,
+      "interpolated_samples": 0
+    },
+    {
+      "frame": 278,
+      "before_speed_px_s": 51.205062953062495,
+      "after_speed_px_s": 62.93643978682835,
+      "before_vy_px_s": -20.810812852755305,
+      "after_vy_px_s": -12.065028482921605,
+      "observed_samples": 5,
+      "interpolated_samples": 0
+    },
+    {
+      "frame": 303,
+      "before_speed_px_s": 1105.144831679707,
+      "after_speed_px_s": 1077.0464352858894,
+      "before_vy_px_s": -1102.400716044374,
+      "after_vy_px_s": -1073.9078688665816,
+      "observed_samples": 5,
+      "interpolated_samples": 0
+    },
+    {
+      "frame": 323,
+      "before_speed_px_s": 86.30886877471667,
+      "after_speed_px_s": 82.90246672871902,
+      "before_vy_px_s": 86.20527706279596,
+      "after_vy_px_s": 82.79880940517297,
+      "observed_samples": 5,
+      "interpolated_samples": 0
+    },
+    {
+      "frame": 340,
+      "before_speed_px_s": 238.9337772780726,
+      "after_speed_px_s": 239.21547713287302,
+      "before_vy_px_s": -231.23523478152586,
+      "after_vy_px_s": -228.67151168416666,
+      "observed_samples": 5,
+      "interpolated_samples": 0
+    },
+    {
+      "frame": 366,
+      "before_speed_px_s": 139.63464963160573,
+      "after_speed_px_s": 136.83295994735835,
+      "before_vy_px_s": -20.052659269822044,
+      "after_vy_px_s": -9.330026790795927,
+      "observed_samples": 5,
+      "interpolated_samples": 0
+    },
+    {
+      "frame": 376,
+      "before_speed_px_s": 197.66204811177815,
+      "after_speed_px_s": 199.11231122294149,
+      "before_vy_px_s": -197.10901356550252,
+      "after_vy_px_s": -198.3610006081607,
+      "observed_samples": 5,
+      "interpolated_samples": 0
+    },
+    {
+      "frame": 400,
+      "before_speed_px_s": 822.3157976629166,
+      "after_speed_px_s": 914.3714259512296,
+      "before_vy_px_s": -821.5338566862392,
+      "after_vy_px_s": -913.6466769712017,
+      "observed_samples": 5,
+      "interpolated_samples": 0
+    },
+    {
+      "frame": 418,
+      "before_speed_px_s": 66.18785895290337,
+      "after_speed_px_s": 69.7342134358819,
+      "before_vy_px_s": 60.108161157714655,
+      "after_vy_px_s": 64.38433916265585,
+      "observed_samples": 5,
+      "interpolated_samples": 0
+    },
+    {
+      "frame": 446,
+      "before_speed_px_s": 27.770093192074587,
+      "after_speed_px_s": 27.770093192074587,
+      "before_vy_px_s": -26.979202831630857,
+      "after_vy_px_s": -26.979202831630857,
+      "observed_samples": 3,
+      "interpolated_samples": 0
+    }
+  ]
+}

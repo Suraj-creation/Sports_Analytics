@@ -226,32 +226,178 @@ def test_generic_verification_cannot_rewrite_tracker_reset(tmp_path: Path) -> No
     obs = observation(store)
     ledger = IdentityReviewLedger(store, {"P1"}, max_frame=100, fps=30)
     ledger.confirm(obs.event_id, "P1", 5, 10)
-    reset = store.append(Event(session_id="S1", type="identity_ambiguity", frame_start=8, frame_end=8,
-                               pts_us=0, payload={"reason": "visual_tracker_reset", "tracker_instance": "efgh"},
-                               provenance=Provenance(model="participant_tracker_v1")))
+    reset = store.append(
+        Event(
+            session_id="S1",
+            type="identity_ambiguity",
+            frame_start=8,
+            frame_end=8,
+            pts_us=0,
+            payload={"reason": "visual_tracker_reset", "tracker_instance": "efgh"},
+            provenance=Provenance(model="participant_tracker_v1"),
+        )
+    )
     assert ledger.current() == []
     session = BadmintonSession.__new__(BadmintonSession)
     session.store = store
     session.engine = SimpleNamespace(on_superseded=lambda event: None)
     session._emit = lambda events: None
-    result = session.handle({"cmd": "verify_event", "event_id": reset.event_id,
-                             "payload": {"reason": "none", "tracker_instance": "abcd"}})
+    result = session.handle(
+        {"cmd": "verify_event", "event_id": reset.event_id, "payload": {"reason": "none", "tracker_instance": "abcd"}}
+    )
     assert result["ok"] is False
     assert ledger.current() == []
 
 
-@pytest.mark.parametrize("event_type", ["identity_ambiguity", "participant_observation"])
+@pytest.mark.parametrize("event_type", ["identity_ambiguity", "participant_observation", "stroke_participant_review"])
 def test_tracker_evidence_is_never_carried_to_a_new_analysis(tmp_path: Path, event_type: str) -> None:
     from bai_badminton.engine import BadmintonMatchEngine, EngineConfig
 
     old = EventStore(tmp_path / "old.sqlite", "S1")
-    event = old.append(Event(session_id="S1", type=event_type, frame_start=10, frame_end=10, pts_us=0,
-                             payload={"tracker_instance": "old", "reason": "multiple_court_tracks"},
-                             status=EventStatus.HUMAN_VERIFIED, provenance=Provenance(model="human")))
+    event = old.append(
+        Event(
+            session_id="S1",
+            type=event_type,
+            frame_start=10,
+            frame_end=10,
+            pts_us=0,
+            payload={"tracker_instance": "old", "reason": "multiple_court_tracks"},
+            status=EventStatus.HUMAN_VERIFIED,
+            provenance=Provenance(model="human"),
+        )
+    )
     new = EventStore(tmp_path / "new.sqlite", "S1")
-    current = new.append(Event(session_id="S1", type=event_type, frame_start=10, frame_end=10, pts_us=0,
-                               payload={"tracker_instance": "new", "reason": "visual_tracker_reset"},
-                               provenance=Provenance(model="participant_tracker_v1")))
+    current = new.append(
+        Event(
+            session_id="S1",
+            type=event_type,
+            frame_start=10,
+            frame_end=10,
+            pts_us=0,
+            payload={"tracker_instance": "new", "reason": "visual_tracker_reset"},
+            provenance=Provenance(model="participant_tracker_v1"),
+        )
+    )
     engine = BadmintonMatchEngine("S1", EngineConfig(fps=30, frame_width=1280, frame_height=720), new)
     assert engine.carry_over([event], Provenance(model="human")) == 0
     assert new.query(types=[event_type])[0].event_id == current.event_id
+
+
+def test_reanalysis_preserves_new_stroke_episode_when_carrying_old_classification(tmp_path: Path) -> None:
+    from bai_badminton.engine import BadmintonMatchEngine, EngineConfig
+
+    old = EventStore(tmp_path / "old_stroke.sqlite", "S1")
+    previous = old.append(
+        Event(
+            session_id="S1",
+            type="stroke",
+            frame_start=10,
+            frame_end=10,
+            pts_us=0,
+            payload={
+                "stroke": "drop",
+                "participant_hypothesis": {"participant_id": "participant-old-000001", "track_id": 1},
+            },
+            status=EventStatus.HUMAN_VERIFIED,
+            provenance=Provenance(model="human"),
+        )
+    )
+    new = EventStore(tmp_path / "new_stroke.sqlite", "S1")
+    hypothesis = {"participant_id": "participant-new-000002", "track_id": 2, "status": "provisional"}
+    new.append(
+        Event(
+            session_id="S1",
+            type="stroke",
+            frame_start=10,
+            frame_end=10,
+            pts_us=0,
+            payload={"stroke": "clear", "participant_hypothesis": hypothesis},
+            provenance=Provenance(model="stroke_rules_v0"),
+        )
+    )
+    engine = BadmintonMatchEngine("S1", EngineConfig(fps=30, frame_width=1280, frame_height=720), new)
+    assert engine.carry_over([previous], Provenance(model="human")) == 1
+    current = new.query(types=["stroke"])[0]
+    assert current.payload["stroke"] == "drop"
+    assert current.payload["participant_hypothesis"] == hypothesis
+
+
+def test_worker_generic_verify_rejects_scoped_participant_review(tmp_path: Path) -> None:
+    from types import SimpleNamespace
+
+    from bai_badminton.plugin import BadmintonSession
+
+    store = EventStore(tmp_path / "guard.sqlite", "S1")
+    event = store.append(
+        Event(
+            session_id="S1",
+            type="stroke_participant_review",
+            frame_start=10,
+            frame_end=10,
+            pts_us=0,
+            payload={"scope": "participant_only"},
+            status=EventStatus.HUMAN_VERIFIED,
+            provenance=Provenance(model="human"),
+        )
+    )
+    session = BadmintonSession.__new__(BadmintonSession)
+    session.store = store
+    session.engine = SimpleNamespace(on_superseded=lambda event: None)
+    session._emit = lambda events: None
+    result = session.handle({"cmd": "verify_event", "event_id": event.event_id, "payload": {"player_id": "U2"}})
+    assert result["ok"] is False
+    assert store.get(event.event_id).payload == {"scope": "participant_only"}
+
+
+@pytest.mark.parametrize(
+    "kind,payload",
+    [
+        ("identity_ambiguity", {"reason": "visual_tracker_reset"}),
+        (
+            "participant_observation",
+            {"kind": "PLAYER_EXITED", "participant_id": "participant-abcd-000001", "track_id": 1},
+        ),
+        (
+            "participant_observation",
+            {"kind": "PARTICIPANT_FIRST_OBSERVED", "participant_id": "participant-other-000002", "track_id": 1},
+        ),
+    ],
+)
+def test_same_frame_boundary_after_birth_invalidates_identity_review(tmp_path: Path, kind, payload):
+    store = EventStore(tmp_path / "sameframe.sqlite", "S1")
+    obs = observation(store)
+    ledger = IdentityReviewLedger(store, {"P1"}, max_frame=100, fps=30)
+    ledger.confirm(obs.event_id, "P1", obs.frame_start, 20)
+    store.append(
+        Event(
+            session_id="S1",
+            type=kind,
+            frame_start=obs.frame_start,
+            frame_end=obs.frame_start,
+            pts_us=0,
+            payload=payload,
+            provenance=Provenance(model="participant_tracker_v1"),
+        )
+    )
+    assert ledger.current() == []
+    with pytest.raises(ValueError):
+        ledger.confirm(obs.event_id, "P1", obs.frame_start, 20)
+
+
+def test_same_frame_reset_before_birth_starts_valid_new_epoch(tmp_path: Path):
+    store = EventStore(tmp_path / "sameframe-new.sqlite", "S1")
+    store.append(
+        Event(
+            session_id="S1",
+            type="identity_ambiguity",
+            frame_start=5,
+            frame_end=5,
+            pts_us=0,
+            payload={"reason": "visual_tracker_reset"},
+            provenance=Provenance(model="participant_tracker_v1"),
+        )
+    )
+    obs = observation(store)
+    ledger = IdentityReviewLedger(store, {"P1"}, max_frame=100, fps=30)
+    review = ledger.confirm(obs.event_id, "P1", 5, 20)
+    assert [e.event_id for e in ledger.current()] == [review.event_id]

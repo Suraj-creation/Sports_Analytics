@@ -11,10 +11,12 @@ from pydantic import BaseModel, Field, StrictInt
 
 from bai_api.deps import BusDep, Repo, SessionDep, SettingsDep, User
 from bai_api.public import public_session
+from bai_badminton.analytics.individual import build_individual_analytics
 from bai_badminton.identity_review import TRACKER_IDENTITY_EVIDENCE_TYPES
 from bai_engine.bus import topic
 from bai_engine.config import load_profile
 from bai_engine.schema import PlayerInfo, Session, Source, SourceKind, TrackObject, table_to_samples
+from bai_engine.schema.session import ParticipantRoster
 from bai_engine.sources import SourceError, parse_youtube_url, store_upload
 from bai_engine.wire import encode_tracks
 
@@ -145,6 +147,28 @@ def patch(session: SessionDep, body: SessionPatch, r: Repo) -> Session:
     return public_session(r.update(session.session_id, **changes) if changes else session)
 
 
+@router.put("/{session_id}/roster")
+def update_roster(session: SessionDep, roster: ParticipantRoster, r: Repo) -> Session:
+    """Record explicit participants and teams without asserting track identity."""
+    reviewed = r.events(session.session_id).query(types=["identity_review"])
+    known = {person.participant_id: person.team_id for person in roster.participants}
+    reviewed_ids = {event.actors.player_id for event in reviewed if event.actors.player_id is not None}
+    if not reviewed_ids <= known.keys():
+        raise HTTPException(status.HTTP_409_CONFLICT, "Cannot remove a participant referenced by an identity review")
+    if session.roster is not None and reviewed_ids:
+        previous = {person.participant_id: person.team_id for person in session.roster.participants}
+        old_slots = {team.team_id: team.score_slot for team in session.roster.teams}
+        new_slots = {team.team_id: team.score_slot for team in roster.teams}
+        if session.roster.match_format != roster.match_format or any(
+            previous.get(pid) != known[pid] or old_slots.get(previous.get(pid)) != new_slots.get(known[pid])
+            for pid in reviewed_ids
+        ):
+            raise HTTPException(
+                status.HTTP_409_CONFLICT, "Cannot reassign a participant referenced by an identity review"
+            )
+    return public_session(r.update(session.session_id, roster=roster))
+
+
 @router.delete("/{session_id}", status_code=204)
 def delete(session: SessionDep, r: Repo, b: BusDep, request: Request) -> Response:
     engine = request.app.state.engine
@@ -185,6 +209,16 @@ def reanalyse(session: SessionDep, b: BusDep) -> dict[str, str]:
 
 
 # ---------------------------------------------------------------------- events / state / tracks
+@router.get("/{session_id}/individual-analytics")
+def individual_analytics(session: SessionDep, r: Repo) -> dict[str, Any]:
+    if session.media is None or session.media.n_frames <= 0:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Video timeline is not available")
+    return build_individual_analytics(
+        r.events(session.session_id), session.roster,
+        max_frame=session.media.n_frames - 1, fps=float(session.media.fps),
+    )
+
+
 @router.get("/{session_id}/events")
 def events(
     session: SessionDep,

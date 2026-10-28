@@ -1,14 +1,10 @@
 """Stroke classification at a contact.
 
-Two classifiers share one interface (``StrokeClassifier``):
-
-* :class:`RuleStrokeClassifier` (``stroke_rules_v0``) — a deterministic fallback from the hitter's
-  court zone, the shuttle's post-contact speed and its flight time.  Always available; confidence
-  is capped so its labels surface as ``probable``/``uncertain``.
-* ``BSTStrokeClassifier`` (``bai_badminton.perception.bst``) — the BST-CG-AP transformer with
-  released ShuttleSet weights (pose + shuttle + court), used when its weights are installed.
-
-Both return a probability distribution over the canonical strokes of the ontology.
+The available :class:`RuleStrokeClassifier` (``stroke_rules_v0``) is a
+heuristic using the hitter's court zone, the shuttle's post-contact speed and
+flight time. Its scores are not calibrated classification probabilities.
+The configured BST-CG-AP model is not implemented in this checkout; specifying
+its name in a profile does not load pretrained weights.
 """
 
 from __future__ import annotations
@@ -70,6 +66,50 @@ def _softmax(scores: dict[str, float], temp: float = 1.0) -> dict[str, float]:
     return {k: v / s for k, v in e.items()}
 
 
+def post_contact_motion(
+    x: np.ndarray,
+    y: np.ndarray,
+    visible: np.ndarray,
+    interpolated: np.ndarray,
+    contact_idx: int,
+    fps: float,
+    frame_height_px: float,
+) -> tuple[float | None, float | None]:
+    """Estimate image-space speed from observed shuttle positions after a hit.
+
+    At least three real positions are needed to check consistency; interpolated
+    points and non-finite coordinates do not count as observations. Use a
+    median pairwise slope rather than relying on two endpoints. A large
+    residual means that the positions may include a false detection, so the
+    estimate is withheld. The residual tolerance is a conservative heuristic,
+    not a calibrated prediction confidence or a guarantee of correct tracking.
+    """
+    if not (math.isfinite(fps) and fps > 0 and math.isfinite(frame_height_px)
+            and frame_height_px > 0):
+        return None, None
+    n = min(len(x), len(y), len(visible), len(interpolated))
+    if contact_idx < 0 or contact_idx >= n:
+        return None, None
+    indices = [j for j in range(contact_idx + 1, min(n, contact_idx + 6))
+               if visible[j] and not interpolated[j]
+               and math.isfinite(x[j]) and math.isfinite(y[j])]
+    if len(indices) < 3:
+        return None, None
+    points = np.asarray([(x[j], y[j]) for j in indices], dtype=float)
+    t = np.asarray(indices, dtype=float) - indices[0]
+    slopes = np.asarray([(points[j] - points[i]) / (t[j] - t[i])
+                         for i in range(len(t)) for j in range(i + 1, len(t))])
+    slope = np.median(slopes, axis=0)
+    intercept = np.median(points - t[:, None] * slope, axis=0)
+    residuals = np.linalg.norm(points - (intercept + t[:, None] * slope), axis=1)
+    travel = float(np.linalg.norm(slope) * (t[-1] - t[0]))
+    tolerance = max(0.01 * frame_height_px, 0.3 * travel)
+    if np.max(residuals) > tolerance:
+        return None, None
+    vx, vy = slope * fps
+    return float(np.hypot(vx, vy)), float(vy)
+
+
 class RuleStrokeClassifier:
     name = "stroke_rules_v0"
     MAX_CONF = 0.7  # never "confirmed" from rules alone
@@ -81,7 +121,7 @@ class RuleStrokeClassifier:
         speed_valid = (ctx.speed_after_px_s is not None and math.isfinite(ctx.speed_after_px_s)
                        and ctx.speed_after_px_s >= 0 and math.isfinite(ctx.frame_height_px)
                        and ctx.frame_height_px > 0)
-        if not flight_valid or (not ctx.is_serve and not (court_valid and speed_valid)):
+        if not flight_valid or not speed_valid or (not ctx.is_serve and not court_valid):
             return StrokePrediction({"unknown": 0.0}, self.name, "missing_required_evidence")
         strokes = [s for s in get_ontology().strokes if s != "unknown"]
         scores = dict.fromkeys(strokes, 0.0)

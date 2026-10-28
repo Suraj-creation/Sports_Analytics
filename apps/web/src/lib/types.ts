@@ -21,6 +21,23 @@ export interface PlayerInfo {
   name: string | null;
 }
 
+export interface RosterTeam {
+  team_id: string;
+  score_slot: "P1" | "P2" | null;
+}
+
+export interface RosterParticipant {
+  participant_id: string;
+  name: string | null;
+  team_id: string | null;
+}
+
+export interface SessionRoster {
+  match_format: "singles" | "doubles";
+  teams: RosterTeam[];
+  participants: RosterParticipant[];
+}
+
 export interface Session {
   session_id: string;
   title: string;
@@ -33,6 +50,7 @@ export interface Session {
   };
   media: MediaInfo | null;
   players: PlayerInfo[];
+  roster?: SessionRoster | null;
   profile: string;
   status: SessionStatus;
   status_detail: string | null;
@@ -204,4 +222,20 @@ export interface AskAnswer {
   issues: string[];
   provider: string;
   model: string;
+}
+
+export interface IndividualAnalyticsData {
+  available: boolean;
+  match_format: "singles" | "doubles" | null;
+  participants: Record<string, {
+    name: string | null; team_id: string | null; total_shots: number;
+    shot_distribution: Record<string, number>; event_ids: string[];
+    events: Array<{ event_id: string; frame: number; stroke: string; track_id: number; review_id: string; rally_id: string }>;
+    rally_ids: string[];
+  }>;
+  teams: Record<string, { score_slot: "P1" | "P2" | null; attributed_shots: number }>;
+  accounting: { total_shots: number; attributed_shots: number; unattributed_shots: number };
+  unattributed_event_ids: string[];
+  legacy_unlinked_shots: number;
+  counting_scope: string;
 }

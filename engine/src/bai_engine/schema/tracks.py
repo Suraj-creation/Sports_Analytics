@@ -32,6 +32,7 @@ class TrackSample(BaseModel):
     obj: TrackObject
     track_id: int = -1  # -1 for the shuttle (single object)
     player_id: str | None = None
+    participant_observation_id: str | None = None  # Exact emitted episode-birth evidence, not a person ID.
     x: float | None = None  # image coordinates of the reference point (px, analysis proxy)
     y: float | None = None
     court_x: float | None = None  # metres in court coordinates (origin: court centre)
@@ -54,6 +55,7 @@ TRACK_ARROW_SCHEMA = pa.schema(
         pa.field("obj", pa.dictionary(pa.int8(), pa.string()), nullable=False),
         pa.field("track_id", pa.int32(), nullable=False),
         pa.field("player_id", pa.dictionary(pa.int8(), pa.string())),
+        pa.field("participant_observation_id", pa.string()),
         pa.field("x", pa.float32()),
         pa.field("y", pa.float32()),
         pa.field("court_x", pa.float32()),
@@ -76,6 +78,7 @@ def samples_to_table(samples: list[TrackSample]) -> pa.Table:
         cols["obj"].append(s.obj.value)
         cols["track_id"].append(s.track_id)
         cols["player_id"].append(s.player_id)
+        cols["participant_observation_id"].append(s.participant_observation_id)
         cols["x"].append(s.x)
         cols["y"].append(s.y)
         cols["court_x"].append(s.court_x)
@@ -102,6 +105,7 @@ def table_to_samples(table: pa.Table) -> list[TrackSample]:
                 obj=TrackObject(row["obj"]),
                 track_id=row["track_id"],
                 player_id=row["player_id"],
+                participant_observation_id=row.get("participant_observation_id"),
                 x=row["x"],
                 y=row["y"],
                 court_x=row["court_x"],

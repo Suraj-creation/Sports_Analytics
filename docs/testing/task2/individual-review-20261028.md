@@ -1,0 +1,9 @@
+# Task 2: individual participant review
+
+The roster stores stable person IDs separately from the two legacy scoring slots. A doubles roster can name four people and their teams, but entering names or teams does not identify tracks and does not change the scoring rules or analysis mode.
+
+The player-evidence workflow first shows the selected track's stored box on an exact video frame. A reviewer can then explicitly associate that one frame with a roster person, and separately confirm a shot's player at the same frame. The UI deliberately limits the interval to one frame because a tracker can switch people without an explicit reset. The identity review and shot-player review are independent, revocable records. A player review does not verify the predicted shot category.
+
+Individual totals count only current unique stroke events referenced by official rallies with both live review records. Unreviewed events are unassigned; old unlinked rally shots are reported separately. Tracking episodes, proximity hypotheses, and left/right court sides do not themselves identify a person. The list of shot categories is still model-generated unless independently corrected.
+
+Old recordings lack the necessary per-episode track-box provenance and cannot use the visual player review until they are reanalysed with this implementation. Reanalysis can change session results: back them up first as required by the project instructions. No existing session was reanalysed during this work. Setting a roster to doubles does not yet configure a complete doubles rules or identity model, nor does this feature provide independently validated four-player detection, full-match coverage, or high shot-classification accuracy. See `motion-probes/README.md` for bounded three-recording diagnostics and the missing ground truth.

@@ -1,4 +1,4 @@
-import type { Analytics, AskAnswer, BaiEvent, Calibration, Heatmap, Highlight, Session } from "./types";
+import type { IndividualAnalyticsData, Analytics, AskAnswer, BaiEvent, Calibration, Heatmap, Highlight, Session, SessionRoster } from "./types";
 
 let csrf: string | null = null;
 export const setCsrf = (t: string | null) => {
@@ -46,6 +46,8 @@ export const api = {
 
   sessions: () => req<Session[]>("/api/sessions"),
   session: (id: string) => req<Session>(`/api/sessions/${id}`),
+  updateRoster: (id: string, roster: SessionRoster) =>
+    req<Session>(`/api/sessions/${id}/roster`, { method: "PUT", body: JSON.stringify(roster) }),
   patchSession: (id: string, body: { title?: string; player1?: string; player2?: string }) =>
     req<Session>(`/api/sessions/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteSession: (id: string) => req<void>(`/api/sessions/${id}`, { method: "DELETE" }),
@@ -63,6 +65,7 @@ export const api = {
     req<{ last_seq: number; events: BaiEvent[] }>(
       `/api/sessions/${id}/events?${new URLSearchParams(Object.entries(q).map(([k, v]) => [k, String(v)]))}`,
     ),
+  individualAnalytics: (id: string) => req<IndividualAnalyticsData>(`/api/sessions/${id}/individual-analytics`),
   analytics: (id: string) => req<Analytics>(`/api/sessions/${id}/analytics`),
   heatmap: (id: string, player: string, kind: string) =>
     req<Heatmap>(`/api/sessions/${id}/heatmap?player=${player}&kind=${kind}`),

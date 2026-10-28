@@ -48,11 +48,13 @@ from bai_badminton.events.stroke import (
     StrokeContext,
     assess_smash,
     jump_features,
+    post_contact_motion,
 )
 from bai_badminton.identity import IdentityResolver
 from bai_badminton.identity_review import TRACKER_IDENTITY_EVIDENCE_TYPES
 from bai_badminton.observations import PlayerSeries, WindowObs
 from bai_badminton.ontology import get_ontology
+from bai_badminton.participant_contact import ParticipantSnapshot, participant_contact_evidence
 from bai_badminton.participation import ParticipantTracker
 from bai_badminton.perception.calibration_state import CalibrationState
 from bai_badminton.perception.camera import project
@@ -227,6 +229,7 @@ class BadmintonMatchEngine:
         self.stroke_clf: StrokeClassifier = stroke_classifier or RuleStrokeClassifier()
         self.identity = IdentityResolver(frame_height=float(cfg.frame_height))
         self.participants: ParticipantTracker | None = None
+        self._participant_births: dict[str, str] = {}
         self._participant_shot_id: int | None = None
         self._participant_last_coverage: int | None = None
         self._participant_reference_changed = False
@@ -267,6 +270,7 @@ class BadmintonMatchEngine:
         self._replay: list[bool] = []
         self._shot: list[int] = []
         self._geometry_valid: list[bool] = []
+        self._participant_frames: list[dict[str, ParticipantSnapshot]] = []
         self._players: dict[str, dict[str, list[Any]]] = {
             pid: {"bbox": [], "kps": [], "court": [], "track_id": []} for pid in ("P1", "P2")
         }
@@ -488,6 +492,7 @@ class BadmintonMatchEngine:
         if self.participants is None or reason is not None:
             epoch = sha256(f"{self.session_id}:{fp.frame_idx}".encode()).hexdigest()[:16]
             self.participants = ParticipantTracker(float(self.cfg.frame_height), fps=self.cfg.fps, instance_id=epoch)
+            self._participant_births.clear()
             if reason is not None:
                 self._participant_last_coverage = None
                 self.doubles_teams = DoublesTeamTracker(self.cfg.fps)
@@ -515,6 +520,20 @@ class BadmintonMatchEngine:
             coverage_valid=coverage_valid,
             absence_valid=coverage_valid and fp.detector_observed is True,
         )
+        # Keep only the current observation of each provisional tracker episode.
+        # Episode IDs never become durable roster IDs without explicit review.
+        persons_by_track = {person.track_id: person for person in persons}
+        snapshots: dict[str, ParticipantSnapshot] = {}
+        for participant in participant_frame.participants:
+            person = persons_by_track.get(participant.track_id)
+            if person is not None:
+                snapshots[participant.participant_id] = ParticipantSnapshot(
+                    track_id=participant.track_id,
+                    bbox=person.bbox.copy(),
+                    kps=person.kps.copy() if person.kps is not None else None,
+                    court_xy=person.court_xy,
+                )
+        self._participant_frames.append(snapshots)
         participant_events = [
             self._event(
                 "participant_observation",
@@ -526,7 +545,16 @@ class BadmintonMatchEngine:
             )
             for event in participant_frame.events
         ]
-        self._emit(participant_events)
+        for event in self._emit(participant_events):
+            if event.payload.get("kind") in ("PARTICIPANT_FIRST_OBSERVED", "PLAYER_ENTERED"):
+                self._participant_births[event.payload["participant_id"]] = event.event_id
+            elif event.payload.get("kind") == "PLAYER_EXITED":
+                self._participant_births.pop(event.payload["participant_id"], None)
+        observation_by_track = {
+            snapshot.track_id: self._participant_births[participant_id]
+            for participant_id, snapshot in snapshots.items()
+            if participant_id in self._participant_births
+        }
         # Movement is a supporting visual cue, not evidence of match intent.
         positions = {
             p.track_id: (float((p.bbox[0] + p.bbox[2]) / 2), float(p.bbox[3]))
@@ -668,6 +696,7 @@ class BadmintonMatchEngine:
                         obj=TrackObject.PLAYER,
                         track_id=p.track_id,
                         player_id=None,
+                        participant_observation_id=observation_by_track.get(p.track_id),
                         x=float((p.bbox[0] + p.bbox[2]) / 2),
                         y=float(p.bbox[3]),
                         bbox=box_tuple(p.bbox),
@@ -684,6 +713,7 @@ class BadmintonMatchEngine:
                     obj=TrackObject.PLAYER,
                     track_id=p.track_id,
                     player_id=pid,
+                    participant_observation_id=observation_by_track.get(p.track_id),
                     x=float((r.bbox[0] + r.bbox[2]) / 2),
                     y=float(r.bbox[3]),
                     court_x=p.court_xy[0] if p.court_xy else None,
@@ -736,6 +766,7 @@ class BadmintonMatchEngine:
             self._shot,
             self._cam,
             self._geometry_valid,
+            self._participant_frames,
         ):
             del lst[:drop]
         for buf in self._players.values():
@@ -828,14 +859,25 @@ class BadmintonMatchEngine:
         i = c.frame - self._buf0
         buf = self._players.get(c.player_id or "")
         track_id = buf["track_id"][i] if buf is not None and 0 <= i < len(buf["track_id"]) else None
+        payload: dict[str, Any] = {
+            "shuttle_xy": list(self._raw_xy(c.frame, c.shuttle_xy) or ()) or None,
+            "attribution_reason": c.attribution_reason,
+            "attribution_policy": ATTRIBUTION_POLICY if c.attribution_reason else None,
+        }
+        # For an unresolved named hitter, retain separately-scored provisional
+        # track-episode evidence without asserting a player or team identity.
+        lo = w.frame0 - self._buf0
+        hi = lo + w.n
+        if c.player_id is None and 0 <= lo <= hi <= len(self._participant_frames):
+            payload["participant_hypothesis"] = participant_contact_evidence(
+                w, self._participant_frames[lo:hi], c.frame - w.frame0
+            )
         ev = self._event(
             "contact",
             c.frame,
             c.frame,
             actors=Actors(player_id=c.player_id, track_id=track_id),
-            payload={"shuttle_xy": list(self._raw_xy(c.frame, c.shuttle_xy) or ()) or None,
-                     "attribution_reason": c.attribution_reason,
-                     "attribution_policy": ATTRIBUTION_POLICY if c.attribution_reason else None},
+            payload=payload,
             confidence=c.p,
             evidence=(
                 Evidence(kind=EvidenceKind.COMPONENT_SCORES, scores=c.components),
@@ -865,18 +907,12 @@ class BadmintonMatchEngine:
         return w.shuttle, frame - lo
 
     def _post_contact_kinematics(self, frame: int) -> tuple[float | None, float | None]:
-        """Initial shuttle speed (px/s) and vertical velocity over the 4 frames after contact."""
+        """Estimate shuttle velocity from consistent observed positions after contact."""
         located = self._shuttle_around(frame)
         if located is None:
             return None, None
         t, i = located
-        idx = [j for j in range(i + 1, min(len(t), i + 6)) if t.vis[j] and not t.interp[j]]
-        if len(idx) < 2:
-            return None, None
-        dt = (idx[-1] - idx[0]) / self.cfg.fps
-        vx = (t.x[idx[-1]] - t.x[idx[0]]) / dt
-        vy = (t.y[idx[-1]] - t.y[idx[0]]) / dt
-        return float(np.hypot(vx, vy)), float(vy)
+        return post_contact_motion(t.x, t.y, t.vis, t.interp, i, self.cfg.fps, float(self.cfg.frame_height))
 
     def _player_at(
         self, pid: str | None, frame: int
@@ -925,6 +961,8 @@ class BadmintonMatchEngine:
             "contact_event_id": c.event.event_id,
             "receiver_id": receiver.player_id if receiver else None,
         }
+        if "participant_hypothesis" in c.event.payload:
+            payload["participant_hypothesis"] = c.event.payload["participant_hypothesis"]
         if cand.attribution_reason is not None:
             payload["attribution_reason"] = cand.attribution_reason
             payload["attribution_policy"] = ATTRIBUTION_POLICY
@@ -1644,7 +1682,10 @@ class BadmintonMatchEngine:
             if cur is None:
                 continue
             # labels only: ids inside the old payload point at the previous analysis
-            labels = {k: v for k, v in h.payload.items() if not (k.endswith("_id") or k.endswith("_ids"))}
+            labels = {
+                k: v for k, v in h.payload.items()
+                if k != "participant_hypothesis" and not (k.endswith("_id") or k.endswith("_ids"))
+            }
             payload = {**cur.payload, **labels}
             if cur.status is EventStatus.HUMAN_VERIFIED and payload == cur.payload:
                 continue

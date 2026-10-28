@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import hashlib
+import inspect
 import json
 import os
 import subprocess
@@ -29,6 +31,51 @@ from bai_badminton.perception.tracknet import TrackNetV3
 from bai_engine.runtime.device import ort_providers
 
 
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(8 * 1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def input_provenance(video: Path, tracknet: Path, detector: Path, pose: Path) -> dict:
+    return {
+        "source_video_sha256": file_sha256(video),
+        "model_sha256": {
+            "tracknet": file_sha256(tracknet),
+            "detector": file_sha256(detector),
+            "pose": file_sha256(pose),
+        },
+        "implementation_sha256": {
+            "diagnostic": file_sha256(Path(__file__).resolve()),
+            "contact": file_sha256(Path(inspect.getfile(detect_contacts)).resolve()),
+            "stroke": file_sha256(Path(inspect.getfile(RuleStrokeClassifier)).resolve()),
+            "players": file_sha256(Path(inspect.getfile(PlayerPerception)).resolve()),
+            "tracknet": file_sha256(Path(inspect.getfile(TrackNetV3)).resolve()),
+            "shuttle_post": file_sha256(Path(inspect.getfile(process)).resolve()),
+        },
+    }
+
+
+def track_observations(track: Track, start: int) -> list[dict]:
+    rows = []
+    for i in range(len(track)):
+        visible = bool(track.vis[i] and np.isfinite(track.x[i]) and np.isfinite(track.y[i]))
+        confidence = float(track.conf[i]) if np.isfinite(track.conf[i]) else None
+        rows.append(
+            {
+                "frame": start + i,
+                "x": float(track.x[i]) if visible else None,
+                "y": float(track.y[i]) if visible else None,
+                "visible": visible,
+                "interpolated": bool(track.interp[i]),
+                "confidence": confidence,
+            }
+        )
+    return rows
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--video", required=True, type=Path)
@@ -38,11 +85,15 @@ def main() -> None:
     parser.add_argument("--start", required=True, type=int)
     parser.add_argument("--count", required=True, type=int)
     parser.add_argument("--fps", required=True, type=float)
+    parser.add_argument(
+        "--include-observations", action="store_true", help="include processed per-frame shuttle track evidence"
+    )
     args = parser.parse_args()
     if args.start < 0 or not 8 <= args.count <= 300 or not np.isfinite(args.fps) or args.fps <= 0:
         parser.error("start must be nonnegative, count 8–300 and fps positive")
     if not os.environ.get("CUDA_VISIBLE_DEVICES") or not torch.cuda.is_available():
         parser.error("explicit CUDA_VISIBLE_DEVICES and CUDA availability required")
+    provenance = input_provenance(args.video, args.tracknet, args.detector, args.pose)
     cap = cv2.VideoCapture(str(args.video))
     cap.set(cv2.CAP_PROP_POS_FRAMES, args.start)
     frames = []
@@ -143,6 +194,7 @@ def main() -> None:
     print(
         json.dumps(
             {
+                **provenance,
                 "source_frames": [args.start, args.start + args.count - 1],
                 "fps": args.fps,
                 "resize": "1280x720",
@@ -166,6 +218,7 @@ def main() -> None:
                 "person_count_min_max": [min(map(len, people)), max(map(len, people))],
                 "track_ids": sorted(series),
                 "contact_candidates": hypotheses,
+                **({"shuttle_track": track_observations(track, args.start)} if args.include_observations else {}),
                 "limitations": (
                     "Uncalibrated full frame, no court mask, scene or rally segmentation; cold single-shot background; "
                     "pose/detection stride 2. Temporary tracks are not verified identities; contact scores are not "
