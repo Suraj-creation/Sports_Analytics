@@ -1,0 +1,159 @@
+{
+  "source_frames": [
+    886,
+    1005
+  ],
+  "fps": 30.0,
+  "resize": "1280x720",
+  "visible_cuda_device": "1",
+  "gpu": "NVIDIA GeForce GTX 1080 Ti",
+  "models": [
+    "TrackNetV3 fp16",
+    "RF-DETR small",
+    "RTMPose M body7",
+    "contact_fusion_v0",
+    "stroke_rules_v0"
+  ],
+  "onnx_providers": [
+    "CUDAExecutionProvider",
+    "CPUExecutionProvider"
+  ],
+  "elapsed_load_s": 1.81,
+  "elapsed_shuttle_s": 1.2,
+  "elapsed_player_pose_s": 3.82,
+  "elapsed_total_s": 6.85,
+  "sampled_peak_process_gpu_memory_mib": 1382,
+  "torch_peak_reserved_mib": 794.0,
+  "shuttle_detections": 58,
+  "person_count_min_max": [
+    0,
+    6
+  ],
+  "track_ids": [
+    "track-0",
+    "track-1",
+    "track-2",
+    "track-3",
+    "track-4",
+    "track-5",
+    "track-6"
+  ],
+  "contact_candidates": [
+    {
+      "frame": 921,
+      "t_s": 30.7,
+      "contact_fusion_score": 0.8149,
+      "temporary_nearest_track_hypothesis": "track-2",
+      "components": {
+        "redirect": 0.9126,
+        "impulse": 1.0,
+        "proximity": 0.4006,
+        "proximity_runner_up": 0.0784,
+        "proximity_gap": 0.3222,
+        "proximity_relative_gap": 0.8043,
+        "proximity_relative_gap_threshold": 0.05,
+        "proximity_candidates": 6.0,
+        "swing": 0.0,
+        "angle_deg": 88.8804,
+        "speed_before": 0.6989,
+        "speed_after": 3.292,
+        "body_h": 225.523
+      },
+      "shot_family": "unknown",
+      "classification_abstention_reason": "missing_required_evidence"
+    },
+    {
+      "frame": 941,
+      "t_s": 31.366666666666667,
+      "contact_fusion_score": 0.7555,
+      "temporary_nearest_track_hypothesis": "track-6",
+      "components": {
+        "redirect": 0.9687,
+        "impulse": 1.0,
+        "proximity": 0.2436,
+        "proximity_runner_up": 0.116,
+        "proximity_gap": 0.1276,
+        "proximity_relative_gap": 0.5238,
+        "proximity_relative_gap_threshold": 0.05,
+        "proximity_candidates": 6.0,
+        "swing": 0.0,
+        "angle_deg": 92.8109,
+        "speed_before": 0.9546,
+        "speed_after": 16.429,
+        "body_h": 125.8828
+      },
+      "shot_family": "unknown",
+      "classification_abstention_reason": "missing_required_evidence"
+    },
+    {
+      "frame": 979,
+      "t_s": 32.63333333333333,
+      "contact_fusion_score": 0.4598,
+      "temporary_nearest_track_hypothesis": "track-1",
+      "components": {
+        "redirect": 1.0,
+        "impulse": 0.0,
+        "proximity": 0.2467,
+        "proximity_runner_up": 0.0553,
+        "proximity_gap": 0.1914,
+        "proximity_relative_gap": 0.7758,
+        "proximity_relative_gap_threshold": 0.05,
+        "proximity_candidates": 6.0,
+        "swing": 0.0,
+        "angle_deg": 174.9687,
+        "speed_before": 5.4124,
+        "speed_after": 0.506,
+        "body_h": 262.183
+      },
+      "shot_family": "unknown",
+      "classification_abstention_reason": "missing_required_evidence"
+    },
+    {
+      "frame": 993,
+      "t_s": 33.1,
+      "contact_fusion_score": 0.3634,
+      "temporary_nearest_track_hypothesis": "track-6",
+      "components": {
+        "redirect": 0.0,
+        "impulse": 1.0,
+        "proximity": 0.6587,
+        "proximity_runner_up": 0.1689,
+        "proximity_gap": 0.4898,
+        "proximity_relative_gap": 0.7436,
+        "proximity_relative_gap_threshold": 0.05,
+        "proximity_candidates": 6.0,
+        "swing": 0.0,
+        "angle_deg": 14.1232,
+        "speed_before": 2.2227,
+        "speed_after": 17.378,
+        "body_h": 119.1106
+      },
+      "shot_family": "unknown",
+      "classification_abstention_reason": "missing_required_evidence"
+    },
+    {
+      "frame": 1004,
+      "t_s": 33.46666666666667,
+      "contact_fusion_score": 0.7072,
+      "temporary_nearest_track_hypothesis": "track-1",
+      "components": {
+        "redirect": 1.0,
+        "impulse": 0.0,
+        "proximity": 0.5534,
+        "proximity_runner_up": 0.3264,
+        "proximity_gap": 0.2271,
+        "proximity_relative_gap": 0.4103,
+        "proximity_relative_gap_threshold": 0.05,
+        "proximity_candidates": 6.0,
+        "swing": 0.0,
+        "angle_deg": 125.3324,
+        "speed_before": 5.4044,
+        "speed_after": 1.1682,
+        "body_h": 277.3903
+      },
+      "shot_family": "unknown",
+      "classification_abstention_reason": "missing_required_evidence"
+    }
+  ],
+  "limitations": "Uncalibrated full frame, no court mask, scene or rally segmentation; cold single-shot background; pose/detection stride 2. Temporary tracks are not verified identities; contact scores are not calibrated hitter confidence. Shot classifier receives no court/flight evidence and must abstain. Not the full application pipeline; no labelled accuracy."
+}

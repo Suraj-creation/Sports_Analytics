@@ -30,7 +30,7 @@ import numpy as np
 from bai_badminton.analytics.match import MatchAnalytics, RallyRecord
 from bai_badminton.court import Homography
 from bai_badminton.events.activity import ActivityInterval, ActivityObservation, ActivityState, ActivityTracker
-from bai_badminton.events.contact import CONTACT_MODEL, ContactCandidate, detect_contacts
+from bai_badminton.events.contact import ATTRIBUTION_POLICY, CONTACT_MODEL, ContactCandidate, detect_contacts
 from bai_badminton.events.match_phase import (
     MatchPhaseTracker,
     Phase,
@@ -50,6 +50,7 @@ from bai_badminton.events.stroke import (
     jump_features,
 )
 from bai_badminton.identity import IdentityResolver
+from bai_badminton.identity_review import TRACKER_IDENTITY_EVIDENCE_TYPES
 from bai_badminton.observations import PlayerSeries, WindowObs
 from bai_badminton.ontology import get_ontology
 from bai_badminton.participation import ParticipantTracker
@@ -832,7 +833,9 @@ class BadmintonMatchEngine:
             c.frame,
             c.frame,
             actors=Actors(player_id=c.player_id, track_id=track_id),
-            payload={"shuttle_xy": list(self._raw_xy(c.frame, c.shuttle_xy) or ()) or None},
+            payload={"shuttle_xy": list(self._raw_xy(c.frame, c.shuttle_xy) or ()) or None,
+                     "attribution_reason": c.attribution_reason,
+                     "attribution_policy": ATTRIBUTION_POLICY if c.attribution_reason else None},
             confidence=c.p,
             evidence=(
                 Evidence(kind=EvidenceKind.COMPONENT_SCORES, scores=c.components),
@@ -922,6 +925,9 @@ class BadmintonMatchEngine:
             "contact_event_id": c.event.event_id,
             "receiver_id": receiver.player_id if receiver else None,
         }
+        if cand.attribution_reason is not None:
+            payload["attribution_reason"] = cand.attribution_reason
+            payload["attribution_policy"] = ATTRIBUTION_POLICY
         if pred.abstention_reason is not None:
             payload["classification_abstention_reason"] = pred.abstention_reason
         if receiver is not None:
@@ -1592,6 +1598,10 @@ class BadmintonMatchEngine:
                 latest_markers[marker] = item
         for h in sorted(events, key=lambda e: e.frame_start):
             if h.status is not EventStatus.HUMAN_VERIFIED:
+                continue
+            # A participant episode can change on reanalysis even at the same
+            # frame. Identity reviews require fresh evidence and confirmation.
+            if h.type in TRACKER_IDENTITY_EVIDENCE_TYPES:
                 continue
             if h.type == "match_phase":
                 marker = h.payload.get("marker")

@@ -1,0 +1,1121 @@
+{
+  "provenance": {
+    "kind": "cached_perception_semantic_replay",
+    "implementation_label": "3cc74e2",
+    "status": "complete",
+    "accuracy_claim": false,
+    "gpu_inference": false,
+    "source_data_dir": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/data",
+    "started_at_utc": "2026-10-28T04:57:40.362563+00:00",
+    "implementation_file": "/tmp/bai-task2-contact.jRbqKE/base/sports/badminton/src/bai_badminton/engine.py",
+    "implementation_sha256": "bdb849d61795dac842025531096bcac55795300ca4ca2bf54984244e5ba2cc04",
+    "python": "3.12.12 (main, Jan 14 2026, 19:35:58) [Clang 21.1.4 ]",
+    "initial_calibration_only": true,
+    "human_corrections_applied": false,
+    "finished_at_utc": "2026-10-28T04:58:23.273942+00:00"
+  },
+  "sessions": [
+    {
+      "session_id": "01M55MFY9GQF6ZXP2SQPQ8X1KG",
+      "title": "SampleRally",
+      "cached_codec_versions": [
+        1
+      ],
+      "media_sha256": "44ae09ac4369edc971588158a5b4eb2df7586b95c8992770277d4d36f93ea790",
+      "cached_observations_sha256": "cf43ce403bdaee00dd83c9d03f3068c45370c63981aa7963320b1abb1285b8da",
+      "frames": 480,
+      "expected_frames": 480,
+      "coverage_complete": true,
+      "fps": 30.0,
+      "seconds": 0.23,
+      "rallies": 1,
+      "official": 0,
+      "unresolved": 1,
+      "points": 0,
+      "strokes": 2,
+      "score": {
+        "P1": 0,
+        "P2": 0
+      },
+      "end_reasons": {
+        "gap": 1
+      },
+      "phase_basis": {
+        "insufficient": 1
+      },
+      "intervals": [
+        {
+          "start": 377,
+          "end": 447,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c2a_cable_bounce_out"
+        }
+      ]
+    },
+    {
+      "session_id": "01M55NQMRAS0ATB73XE3XA6S74",
+      "title": "Anders Antonsen vs Alwi Farhan | Intense play with swift court coverage",
+      "cached_codec_versions": [
+        3
+      ],
+      "media_sha256": "314b4997fde9670c17cde76a256ff64c9a5f565317078f1d9826f5ffee8602c0",
+      "cached_observations_sha256": "0d2b03c92fe708697451c62fcf102587c7beca7e8024a5561056b8a7f5d86c80",
+      "frames": 12075,
+      "expected_frames": 12075,
+      "coverage_complete": true,
+      "fps": 25.0,
+      "seconds": 6.943,
+      "rallies": 25,
+      "official": 1,
+      "unresolved": 25,
+      "points": 0,
+      "strokes": 235,
+      "score": {
+        "P1": 0,
+        "P2": 0
+      },
+      "end_reasons": {
+        "gap": 4,
+        "stationary": 20,
+        "cut": 1
+      },
+      "phase_basis": {
+        "insufficient": 24,
+        "scoreboard": 1
+      },
+      "intervals": [
+        {
+          "start": 235,
+          "end": 401,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c7_landing"
+        },
+        {
+          "start": 625,
+          "end": 724,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c1_crossed_in"
+        },
+        {
+          "start": 1043,
+          "end": 1406,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c0_static_out"
+        },
+        {
+          "start": 1491,
+          "end": 1897,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c7_landing"
+        },
+        {
+          "start": 2194,
+          "end": 2365,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c1_crossed_out"
+        },
+        {
+          "start": 2507,
+          "end": 2709,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c2a_cable_bounce_out"
+        },
+        {
+          "start": 2784,
+          "end": 3121,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c1_crossed_in"
+        },
+        {
+          "start": 3223,
+          "end": 3288,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "invalid_court_geometry"
+        },
+        {
+          "start": 3534,
+          "end": 3880,
+          "reason": "stationary",
+          "official": true,
+          "winner": null,
+          "check": "c7_landing"
+        },
+        {
+          "start": 4037,
+          "end": 4273,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c3_extrap_out"
+        },
+        {
+          "start": 4533,
+          "end": 4994,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c7_landing"
+        },
+        {
+          "start": 5149,
+          "end": 5291,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c2a_cable_bounce_out"
+        },
+        {
+          "start": 5328,
+          "end": 5639,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c0_static_in"
+        },
+        {
+          "start": 5892,
+          "end": 6341,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c2a_cable_bounce_out"
+        },
+        {
+          "start": 6480,
+          "end": 6828,
+          "reason": "cut",
+          "official": false,
+          "winner": null,
+          "check": "incomplete_rally"
+        },
+        {
+          "start": 7017,
+          "end": 7190,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c1_crossed_in"
+        },
+        {
+          "start": 7290,
+          "end": 7558,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c0_static_out"
+        },
+        {
+          "start": 8120,
+          "end": 8485,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c1_crossed_in"
+        },
+        {
+          "start": 8623,
+          "end": 8914,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c7_landing"
+        },
+        {
+          "start": 9044,
+          "end": 9168,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c1_crossed_in"
+        },
+        {
+          "start": 9352,
+          "end": 9698,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c1_crossed_out"
+        },
+        {
+          "start": 9813,
+          "end": 10123,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c7_landing"
+        },
+        {
+          "start": 10294,
+          "end": 10550,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c3_extrap_out"
+        },
+        {
+          "start": 10733,
+          "end": 11047,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c3_extrap_out"
+        },
+        {
+          "start": 11234,
+          "end": 11362,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c2a_cable_bounce_out"
+        }
+      ]
+    },
+    {
+      "session_id": "01M56T2EED5Z7W9VTGG19FHNTF",
+      "title": "He/Ren vs Rankireddy/Shetty | Fast and furious men's doubles action",
+      "cached_codec_versions": [
+        3
+      ],
+      "media_sha256": "f9a419327a85b4e17d524d2fae24245ae9fc862b06a05c8fc11ed457eb487cba",
+      "cached_observations_sha256": "fd0018a896e66fcb6d3c505cbb0eb7d497956a258045b24c0d449c6102a0c8f0",
+      "frames": 12148,
+      "expected_frames": 12148,
+      "coverage_complete": true,
+      "fps": 25.0,
+      "seconds": 8.665,
+      "rallies": 27,
+      "official": 1,
+      "unresolved": 27,
+      "points": 0,
+      "strokes": 202,
+      "score": {
+        "P1": 0,
+        "P2": 0
+      },
+      "end_reasons": {
+        "gap": 10,
+        "stationary": 14,
+        "cut": 3
+      },
+      "phase_basis": {
+        "insufficient": 26,
+        "scoreboard": 1
+      },
+      "intervals": [
+        {
+          "start": 326,
+          "end": 849,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c1_crossed_in"
+        },
+        {
+          "start": 1110,
+          "end": 1323,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c7_landing"
+        },
+        {
+          "start": 1504,
+          "end": 1706,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c7_net"
+        },
+        {
+          "start": 1867,
+          "end": 1939,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c2b_steep_fall_net"
+        },
+        {
+          "start": 2187,
+          "end": 2264,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c1_crossed_in"
+        },
+        {
+          "start": 2459,
+          "end": 2629,
+          "reason": "stationary",
+          "official": true,
+          "winner": null,
+          "check": "c1_crossed_in"
+        },
+        {
+          "start": 2722,
+          "end": 2776,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "invalid_court_geometry"
+        },
+        {
+          "start": 2917,
+          "end": 3181,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c2c_died_at_net"
+        },
+        {
+          "start": 3287,
+          "end": 3349,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c6_out"
+        },
+        {
+          "start": 3372,
+          "end": 3445,
+          "reason": "cut",
+          "official": false,
+          "winner": null,
+          "check": "incomplete_rally"
+        },
+        {
+          "start": 3626,
+          "end": 3806,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c0_static_out"
+        },
+        {
+          "start": 4185,
+          "end": 4552,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c2b_steep_fall_net"
+        },
+        {
+          "start": 5125,
+          "end": 5323,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c7_landing"
+        },
+        {
+          "start": 5433,
+          "end": 5541,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c1_crossed_in"
+        },
+        {
+          "start": 5840,
+          "end": 5919,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "invalid_court_geometry"
+        },
+        {
+          "start": 6125,
+          "end": 6307,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c1_crossed_in"
+        },
+        {
+          "start": 6633,
+          "end": 6727,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c2a_cable_bounce_out"
+        },
+        {
+          "start": 6962,
+          "end": 7167,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c7_landing"
+        },
+        {
+          "start": 7215,
+          "end": 7273,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c3_extrap_out"
+        },
+        {
+          "start": 7650,
+          "end": 7915,
+          "reason": "cut",
+          "official": false,
+          "winner": null,
+          "check": "incomplete_rally"
+        },
+        {
+          "start": 8351,
+          "end": 8422,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c1_crossed_in"
+        },
+        {
+          "start": 8562,
+          "end": 8862,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c1_crossed_out"
+        },
+        {
+          "start": 8977,
+          "end": 9123,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c1_crossed_out"
+        },
+        {
+          "start": 9440,
+          "end": 9581,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c1_crossed_in"
+        },
+        {
+          "start": 9820,
+          "end": 10228,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c0_static_net"
+        },
+        {
+          "start": 10369,
+          "end": 11047,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c0_static_out"
+        },
+        {
+          "start": 11363,
+          "end": 11441,
+          "reason": "cut",
+          "official": false,
+          "winner": null,
+          "check": "incomplete_rally"
+        }
+      ]
+    },
+    {
+      "session_id": "01M5EXGZNEVGYAJ3AR6CJS5ZG9",
+      "title": "A02 20261010205221",
+      "cached_codec_versions": [
+        5
+      ],
+      "media_sha256": "90d1f399c05312ede173de2f2c8cd2fee09f1d201df46b476119660a00039ff0",
+      "cached_observations_sha256": "8b72389039fb73807a5798d38acff68517e5351dda76620d9633b16066101e4e",
+      "frames": 22802,
+      "expected_frames": 22802,
+      "coverage_complete": true,
+      "fps": 30.0,
+      "seconds": 23.785,
+      "rallies": 65,
+      "official": 0,
+      "unresolved": 65,
+      "points": 0,
+      "strokes": 272,
+      "score": {
+        "P1": 0,
+        "P2": 0
+      },
+      "end_reasons": {
+        "gap": 29,
+        "stationary": 35,
+        "cut": 1
+      },
+      "phase_basis": {
+        "insufficient": 65
+      },
+      "intervals": [
+        {
+          "start": 615,
+          "end": 815,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c3_extrap_out"
+        },
+        {
+          "start": 886,
+          "end": 1034,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c0_static_net"
+        },
+        {
+          "start": 1084,
+          "end": 1177,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c0_static_out"
+        },
+        {
+          "start": 1350,
+          "end": 1409,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c7_landing"
+        },
+        {
+          "start": 1786,
+          "end": 1864,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c1_crossed_out"
+        },
+        {
+          "start": 1943,
+          "end": 2027,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c1_crossed_out"
+        },
+        {
+          "start": 2059,
+          "end": 2181,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c0_static_in"
+        },
+        {
+          "start": 2382,
+          "end": 2492,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c7_landing"
+        },
+        {
+          "start": 2667,
+          "end": 2754,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c2b_past_far_baseline"
+        },
+        {
+          "start": 2818,
+          "end": 2878,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c1_crossed_out"
+        },
+        {
+          "start": 2985,
+          "end": 3137,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c7_landing"
+        },
+        {
+          "start": 3323,
+          "end": 3389,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c0_static_net"
+        },
+        {
+          "start": 3661,
+          "end": 3804,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c2a_cable_bounce_out"
+        },
+        {
+          "start": 3941,
+          "end": 4019,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c2a_cable_bounce_out"
+        },
+        {
+          "start": 5009,
+          "end": 5159,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c1_crossed_in"
+        },
+        {
+          "start": 5399,
+          "end": 5575,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c2a_cable_bounce_out"
+        },
+        {
+          "start": 6598,
+          "end": 6660,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c1_crossed_out"
+        },
+        {
+          "start": 6725,
+          "end": 6826,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c0_static_out"
+        },
+        {
+          "start": 7062,
+          "end": 7131,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c1_crossed_out"
+        },
+        {
+          "start": 7311,
+          "end": 7371,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c7_landing"
+        },
+        {
+          "start": 7651,
+          "end": 7710,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c1_crossed_out"
+        },
+        {
+          "start": 7890,
+          "end": 8047,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c2a_cable_bounce_out"
+        },
+        {
+          "start": 8107,
+          "end": 8261,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c0_static_in"
+        },
+        {
+          "start": 8574,
+          "end": 8670,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c2a_cable_bounce_out"
+        },
+        {
+          "start": 8798,
+          "end": 8860,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c6_out"
+        },
+        {
+          "start": 9048,
+          "end": 9216,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c1_crossed_in"
+        },
+        {
+          "start": 9641,
+          "end": 9707,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c2a_cable_bounce_out"
+        },
+        {
+          "start": 10139,
+          "end": 10223,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c7_landing"
+        },
+        {
+          "start": 10289,
+          "end": 10367,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c1_crossed_out"
+        },
+        {
+          "start": 10656,
+          "end": 10779,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c7_landing"
+        },
+        {
+          "start": 10869,
+          "end": 10952,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c2a_cable_bounce_out"
+        },
+        {
+          "start": 11293,
+          "end": 11412,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c2b_past_far_baseline"
+        },
+        {
+          "start": 11932,
+          "end": 12041,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c3_extrap_out"
+        },
+        {
+          "start": 12084,
+          "end": 12193,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c7_landing"
+        },
+        {
+          "start": 12225,
+          "end": 12341,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c1_crossed_in"
+        },
+        {
+          "start": 12371,
+          "end": 12446,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c7_landing"
+        },
+        {
+          "start": 12600,
+          "end": 12774,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c2b_past_far_baseline"
+        },
+        {
+          "start": 13054,
+          "end": 13119,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c2a_cable_bounce_out"
+        },
+        {
+          "start": 13284,
+          "end": 13343,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c7_landing"
+        },
+        {
+          "start": 13508,
+          "end": 13580,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c2a_cable_bounce_out"
+        },
+        {
+          "start": 14121,
+          "end": 14414,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c7_landing"
+        },
+        {
+          "start": 14465,
+          "end": 14532,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c2b_past_far_baseline"
+        },
+        {
+          "start": 14648,
+          "end": 14779,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c2b_past_far_baseline"
+        },
+        {
+          "start": 14810,
+          "end": 14924,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c1_crossed_in"
+        },
+        {
+          "start": 15061,
+          "end": 15139,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c1_linger_net"
+        },
+        {
+          "start": 15217,
+          "end": 15282,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c1_crossed_in"
+        },
+        {
+          "start": 15327,
+          "end": 15501,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c6_out"
+        },
+        {
+          "start": 15540,
+          "end": 15707,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c2b_past_far_baseline"
+        },
+        {
+          "start": 15737,
+          "end": 15876,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c7_landing"
+        },
+        {
+          "start": 16027,
+          "end": 16523,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c7_landing"
+        },
+        {
+          "start": 16597,
+          "end": 17072,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c3_extrap_out"
+        },
+        {
+          "start": 17100,
+          "end": 17251,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c1_crossed_out"
+        },
+        {
+          "start": 17356,
+          "end": 17415,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c7_landing"
+        },
+        {
+          "start": 17633,
+          "end": 17695,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c2a_cable_bounce_out"
+        },
+        {
+          "start": 17759,
+          "end": 18203,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c2a_cable_bounce_out"
+        },
+        {
+          "start": 18376,
+          "end": 18460,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c2a_cable_bounce_out"
+        },
+        {
+          "start": 18485,
+          "end": 18562,
+          "reason": "cut",
+          "official": false,
+          "winner": null,
+          "check": "incomplete_rally"
+        },
+        {
+          "start": 19132,
+          "end": 19197,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c6_out"
+        },
+        {
+          "start": 19683,
+          "end": 19752,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c1_crossed_out"
+        },
+        {
+          "start": 20781,
+          "end": 20891,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c2a_cable_bounce_out"
+        },
+        {
+          "start": 21179,
+          "end": 21305,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c0_static_in"
+        },
+        {
+          "start": 21532,
+          "end": 21624,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c2a_cable_bounce_out"
+        },
+        {
+          "start": 21719,
+          "end": 21824,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c0_static_in"
+        },
+        {
+          "start": 21848,
+          "end": 21977,
+          "reason": "gap",
+          "official": false,
+          "winner": null,
+          "check": "c1_crossed_out"
+        },
+        {
+          "start": 22063,
+          "end": 22128,
+          "reason": "stationary",
+          "official": false,
+          "winner": null,
+          "check": "c7_net"
+        }
+      ]
+    },
+    {
+      "session_id": "01M5MBR3087FH07N5B1XR5VGHW",
+      "title": "Real  Video",
+      "cached_codec_versions": [
+        6
+      ],
+      "media_sha256": "06a5cb888e58c64421114fecc582f60b85466900efec6db0bbf99420f4f6c010",
+      "cached_observations_sha256": "a5d528d2343a183e3ba89255ffe0351107f4e0736d0dec1f7192b9cbb2b9e08e",
+      "frames": 4462,
+      "expected_frames": 4462,
+      "coverage_complete": true,
+      "fps": 30.0,
+      "seconds": 2.859,
+      "rallies": 0,
+      "official": 0,
+      "unresolved": 0,
+      "points": 0,
+      "strokes": 0,
+      "score": {
+        "P1": 0,
+        "P2": 0
+      },
+      "end_reasons": {},
+      "phase_basis": {},
+      "intervals": []
+    }
+  ]
+}

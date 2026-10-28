@@ -16,8 +16,10 @@ import type { PlayerId, Session } from "@/lib/types";
 import { usePlayback } from "@/stores/playback";
 import { useSession } from "@/stores/session";
 import { LiveFeed } from "./LiveFeed";
+import { PlayerSelector } from "./PlayerSelector";
 import { ReanalysisFeedback } from "./ReanalysisFeedback";
 import { ExportTab } from "./tabs/ExportTab";
+import { VisualObservations } from "./VisualObservations";
 
 const TABS = [
   ["overview", "Overview"],
@@ -281,30 +283,14 @@ function SessionWorkspace({ session, search }: { session: Session; search: Analy
         </div>
       </div>
       <EvidenceDetails session={session} />
+      <VisualObservations session={session} />
       <details className="analysis-panel mt-5">
         <summary className="cursor-pointer text-sm font-medium">Live event feed</summary>
         <div className="mt-4 max-h-64 overflow-y-auto">
           <LiveFeed session={session} />
         </div>
       </details>
-      <div className="match-people">
-        <span className="mr-2 text-xs text-line-2">Showing numbers for</span>
-        {availablePlayers.map((p) => (
-          <button
-            type="button"
-            key={p.player_id}
-            className="match-person"
-            aria-pressed={selected === p.player_id}
-            aria-label={`Show ${shortName(session, p.player_id)} numbers`}
-            onClick={() => patch({ who: p.player_id })}
-          >
-            <span className={`match-person-glyph ${p.player_id === "P2" ? "other" : ""}`} aria-hidden>
-              {p.player_id === "P1" ? "●" : "■"}
-            </span>
-            {shortName(session, p.player_id)}
-          </button>
-        ))}
-      </div>
+      <PlayerSelector session={session} selected={selected} onSelect={(who) => patch({ who })} />
       <nav className="match-tabs" aria-label="Match analysis">
         {TABS.map(([id, label]) => (
           <button

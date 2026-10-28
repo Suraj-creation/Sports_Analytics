@@ -1,0 +1,3 @@
+2026-10-28 10:33:02 [info     ] tracknet.loaded                backend=torch-cuda seq_len=8
+load $TASK2_ROOT/models/cache/rfdetr_small/rfdetr_s_v142_512x512.onnx with onnxruntime backend
+load $TASK2_ROOT/models/cache/rtmpose_m_body7/extracted/20230831/rtmpose_onnx/rtmpose-m_simcc-body7_pt-body7_420e-256x192-e48f03d0_20230504/end2end.onnx with onnxruntime backend

@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field, StrictInt
 
 from bai_api.deps import BusDep, Repo, SessionDep, SettingsDep, User
 from bai_api.public import public_session
+from bai_badminton.identity_review import TRACKER_IDENTITY_EVIDENCE_TYPES
 from bai_engine.bus import topic
 from bai_engine.config import load_profile
 from bai_engine.schema import PlayerInfo, Session, Source, SourceKind, TrackObject, table_to_samples
@@ -351,7 +352,7 @@ class Correction(BaseModel):
 
 
 @router.post("/{session_id}/corrections", status_code=202)
-def correct(session: SessionDep, body: Correction, b: BusDep) -> dict[str, str]:
+def correct(session: SessionDep, body: Correction, b: BusDep, r: Repo) -> dict[str, str]:
     sid = session.session_id
     if body.kind == "official":
         if not body.rally_event_id or body.official is None:
@@ -401,6 +402,12 @@ def correct(session: SessionDep, body: Correction, b: BusDep) -> dict[str, str]:
     else:
         if not body.event_id:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "event_id is required")
+        event = r.events(sid).get(body.event_id)
+        if event is not None and event.type in TRACKER_IDENTITY_EVIDENCE_TYPES:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                "Tracker identity evidence cannot be edited by generic verification",
+            )
         b.send_command(
             {
                 "cmd": "verify_event",

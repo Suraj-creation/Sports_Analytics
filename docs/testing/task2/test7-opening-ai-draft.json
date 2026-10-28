@@ -1,0 +1,91 @@
+{
+  "schema_version": "ai-motion-review-v1",
+  "status": "draft",
+  "human_reviewed": false,
+  "reviewer": {
+    "kind": "AI",
+    "method": "sequential frames decoded with OpenCV at 30 fps; visual contact sheets sampled every 3 frames (10 fps)"
+  },
+  "media": {
+    "name": "Test7_Full.mp4",
+    "sha256": "1ad1eac44150a0a23e2bad1f3d4204bd41f2d257ff6b35156234d38cfa2b9d9c",
+    "fps_num": 30,
+    "fps_den": 1,
+    "frame_count": 10725,
+    "resolution": [
+      1920,
+      1080
+    ]
+  },
+  "timebase": "canonical_media_seconds",
+  "review_window_s": [
+    6.0,
+    15.0
+  ],
+  "exhaustive": false,
+  "purpose": "Source-bound visual review candidates for a human to inspect, not labelled contacts or evaluation ground truth.",
+  "limitations": [
+    "The inspected contact sheets sample every third frame; racket-shuttle collision is not reliably visible at this displayed scale.",
+    "Only selected visible swing or reach movements are listed. They may not correspond to a shuttle hit, and other hits may be missed.",
+    "No stable participant ID convention is established for Player A or B. Shot family, forehand/backhand and outcome are not established.",
+    "Broadcast scoreboard changes across cuts; a scoreboard after a rally does not alone establish player-slot mapping."
+  ],
+  "participant_context": {
+    "near": "Carolina Marin, jersey visible after rally",
+    "far": "Tai Tzu-ying, broadcast identification"
+  },
+  "candidate_motion_windows": [
+    {
+      "frame_range_inclusive": [
+        201,
+        213
+      ],
+      "time_range_s": [
+        6.7,
+        7.1
+      ],
+      "participant_id": null,
+      "visible_player": "near",
+      "shot_family": "unknown",
+      "contact_confirmed": false,
+      "note": "Near player raises and moves racket arm; exact collision and whether this is serve contact are unverified."
+    },
+    {
+      "frame_range_inclusive": [
+        354,
+        375
+      ],
+      "time_range_s": [
+        11.8,
+        12.5
+      ],
+      "participant_id": null,
+      "visible_player": "near",
+      "shot_family": "unknown",
+      "contact_confirmed": false,
+      "note": "Near player executes overhead racket-arm motion; shuttle collision and shot family are unverified."
+    },
+    {
+      "frame_range_inclusive": [
+        405,
+        417
+      ],
+      "time_range_s": [
+        13.5,
+        13.9
+      ],
+      "participant_id": null,
+      "visible_player": "far",
+      "shot_family": "unknown",
+      "contact_confirmed": false,
+      "note": "Far player advances and reaches near net; whether a racket-shuttle collision occurs is unverified."
+    }
+  ],
+  "outcome": {
+    "winner": "Carolina Marin",
+    "winner_evidence": "Physical arena scoreboard 0-0 at frame 0, broadcast scoreboard Tai 0 / Marin 1 at frame 510 (17.0 s); no intervening cut is visible in sampled opening-rally frames before the post-rally close-up; brief cuts between samples cannot be ruled out.",
+    "fault": null,
+    "note": "Provisional AI visual inference; A/B slot mapping unverified and sample-based, no judgement about exact landing or fault. Part2 and legacy disagree on A/B."
+  },
+  "evaluation_eligible": false
+}

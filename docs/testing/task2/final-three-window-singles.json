@@ -1,0 +1,170 @@
+{
+  "source_frames": [
+    0,
+    119
+  ],
+  "fps": 25.0,
+  "resize": "1280x720",
+  "visible_cuda_device": "1",
+  "gpu": "NVIDIA GeForce GTX 1080 Ti",
+  "models": [
+    "TrackNetV3 fp16",
+    "RF-DETR small",
+    "RTMPose M body7",
+    "contact_fusion_v0",
+    "stroke_rules_v0"
+  ],
+  "onnx_providers": [
+    "CUDAExecutionProvider",
+    "CPUExecutionProvider"
+  ],
+  "elapsed_load_s": 1.58,
+  "elapsed_shuttle_s": 1.33,
+  "elapsed_player_pose_s": 2.52,
+  "elapsed_total_s": 5.45,
+  "sampled_peak_process_gpu_memory_mib": 1376,
+  "torch_peak_reserved_mib": 794.0,
+  "shuttle_detections": 119,
+  "person_count_min_max": [
+    0,
+    3
+  ],
+  "track_ids": [
+    "track-0",
+    "track-1",
+    "track-2"
+  ],
+  "contact_candidates": [
+    {
+      "frame": 16,
+      "t_s": 0.64,
+      "contact_fusion_score": 0.7424,
+      "temporary_nearest_track_hypothesis": "track-0",
+      "attribution_reason": "nearest_proximity",
+      "attribution_policy": "relative_proximity_gap_v1",
+      "components": {
+        "redirect": 1.0,
+        "impulse": 1.0,
+        "proximity": 0.1937,
+        "proximity_runner_up": 0.0222,
+        "proximity_gap": 0.1715,
+        "proximity_relative_gap": 0.8852,
+        "proximity_relative_gap_threshold": 0.05,
+        "proximity_minimum_threshold": 0.05,
+        "proximity_candidates": 2.0,
+        "swing": 0.0,
+        "angle_deg": 114.0699,
+        "speed_before": 25.3306,
+        "speed_after": 90.3063,
+        "body_h": 195.584
+      },
+      "shot_family": "unknown",
+      "classification_abstention_reason": "missing_required_evidence"
+    },
+    {
+      "frame": 36,
+      "t_s": 1.44,
+      "contact_fusion_score": 0.7917,
+      "temporary_nearest_track_hypothesis": "track-1",
+      "attribution_reason": "nearest_proximity",
+      "attribution_policy": "relative_proximity_gap_v1",
+      "components": {
+        "redirect": 0.709,
+        "impulse": 1.0,
+        "proximity": 0.549,
+        "proximity_runner_up": 0.0825,
+        "proximity_gap": 0.4665,
+        "proximity_relative_gap": 0.8498,
+        "proximity_relative_gap_threshold": 0.05,
+        "proximity_minimum_threshold": 0.05,
+        "proximity_candidates": 2.0,
+        "swing": 0.0,
+        "angle_deg": 74.6274,
+        "speed_before": 4.7262,
+        "speed_after": 16.6945,
+        "body_h": 119.4824
+      },
+      "shot_family": "unknown",
+      "classification_abstention_reason": "missing_required_evidence"
+    },
+    {
+      "frame": 59,
+      "t_s": 2.36,
+      "contact_fusion_score": 0.896,
+      "temporary_nearest_track_hypothesis": "track-0",
+      "attribution_reason": "nearest_proximity",
+      "attribution_policy": "relative_proximity_gap_v1",
+      "components": {
+        "redirect": 1.0,
+        "impulse": 1.0,
+        "proximity": 0.5159,
+        "proximity_runner_up": 0.0213,
+        "proximity_gap": 0.4946,
+        "proximity_relative_gap": 0.9588,
+        "proximity_relative_gap_threshold": 0.05,
+        "proximity_minimum_threshold": 0.05,
+        "proximity_candidates": 3.0,
+        "swing": 0.0,
+        "angle_deg": 163.7554,
+        "speed_before": 17.0268,
+        "speed_after": 53.4985,
+        "body_h": 173.4809
+      },
+      "shot_family": "unknown",
+      "classification_abstention_reason": "missing_required_evidence"
+    },
+    {
+      "frame": 79,
+      "t_s": 3.16,
+      "contact_fusion_score": 0.6116,
+      "temporary_nearest_track_hypothesis": null,
+      "attribution_reason": "insufficient_proximity",
+      "attribution_policy": "relative_proximity_gap_v1",
+      "components": {
+        "redirect": 1.0,
+        "impulse": 1.0,
+        "proximity": 0.016,
+        "proximity_runner_up": 0.0091,
+        "proximity_gap": 0.0068,
+        "proximity_relative_gap": 0.4272,
+        "proximity_relative_gap_threshold": 0.05,
+        "proximity_minimum_threshold": 0.05,
+        "proximity_candidates": 3.0,
+        "swing": 0.0,
+        "angle_deg": 179.346,
+        "speed_before": 0.562,
+        "speed_after": 2.8451,
+        "body_h": 109.9092
+      },
+      "shot_family": "unknown",
+      "classification_abstention_reason": "missing_required_evidence"
+    },
+    {
+      "frame": 90,
+      "t_s": 3.6,
+      "contact_fusion_score": 0.712,
+      "temporary_nearest_track_hypothesis": "track-1",
+      "attribution_reason": "nearest_proximity",
+      "attribution_policy": "relative_proximity_gap_v1",
+      "components": {
+        "redirect": 1.0,
+        "impulse": 0.432,
+        "proximity": 0.3825,
+        "proximity_runner_up": 0.0134,
+        "proximity_gap": 0.3691,
+        "proximity_relative_gap": 0.9649,
+        "proximity_relative_gap_threshold": 0.05,
+        "proximity_minimum_threshold": 0.05,
+        "proximity_candidates": 3.0,
+        "swing": 0.0,
+        "angle_deg": 98.4086,
+        "speed_before": 9.7639,
+        "speed_after": 18.4658,
+        "body_h": 110.8208
+      },
+      "shot_family": "unknown",
+      "classification_abstention_reason": "missing_required_evidence"
+    }
+  ],
+  "limitations": "Uncalibrated full frame, no court mask, scene or rally segmentation; cold single-shot background; pose/detection stride 2. Temporary tracks are not verified identities; contact scores are not calibrated hitter confidence. Shot classifier receives no court/flight evidence and must abstain. Not the full application pipeline; no labelled accuracy."
+}

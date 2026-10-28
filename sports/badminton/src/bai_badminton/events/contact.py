@@ -34,6 +34,12 @@ W_IMPULSE = 1.4
 W_PROX = 3.4
 W_SWING = 1.1
 P_MIN = 0.35
+# Conservative ambiguity policy on the *relative difference of heuristic proximity scores*.
+# This threshold is not a calibrated probability or evidence of contact accuracy.
+ATTRIBUTION_POLICY = "relative_proximity_gap_v1"
+ATTRIBUTION_PROXIMITY_GAP = 0.05
+# Minimum proximity support is a conservative heuristic, not calibrated identity confidence.
+ATTRIBUTION_MIN_PROXIMITY = 0.05
 
 
 @dataclass
@@ -43,6 +49,7 @@ class ContactCandidate:
     p: float
     scores: dict[str, float] = field(default_factory=dict)
     shuttle_xy: tuple[float, float] | None = None
+    attribution_reason: str | None = None
 
     @property
     def components(self) -> dict[str, float]:
@@ -120,31 +127,58 @@ def score_frame(w: WindowObs, i: int, half: int = 3) -> ContactCandidate | None:
     s_impulse = float(np.clip((ratio - 1.2) / 1.6, 0.0, 1.0))
 
     sx, sy = t.x[i], t.y[i]
-    best_pid, best_prox, best_h = None, 0.0, None
-    for pid, s in w.players.items():
-        h = s.height[i]
+    # Rank players, not their wrists: two wrists of one person are not competitors.
+    ranked: list[tuple[str, float, float]] = []
+    for pid, player in w.players.items():
+        h = player.height[i]
         if not np.isfinite(h) or h <= 1:
             continue
-        for p in _player_point(s, i):
-            d = float(np.hypot(sx - p[0], sy - p[1])) / h
-            prox = math.exp(-d / 0.45)
-            if prox > best_prox:
-                best_pid, best_prox, best_h = pid, prox, h
-    s_swing = 0.0
-    if best_pid is not None:
-        ws = _wrist_speed(w.players[best_pid], i)
-        if ws is not None:
-            s_swing = float(np.clip((ws - 0.05) / 0.25, 0.0, 1.0))
+        proximities = []
+        for point in _player_point(player, i):
+            distance = float(np.hypot(sx - point[0], sy - point[1])) / h
+            if math.isfinite(distance):
+                proximities.append(math.exp(-distance / 0.45))
+        if proximities and max(proximities) > 0.0:
+            ranked.append((pid, max(proximities), float(h)))
+    # Python's stable sort preserves the prior best-candidate choice for exact ties,
+    # keeping its swing cue for contact scoring while attribution abstains.
+    ranked.sort(key=lambda item: item[1], reverse=True)
+    best_pid, best_prox, best_h = ranked[0] if ranked else (None, 0.0, None)
+    second_prox = ranked[1][1] if len(ranked) > 1 else 0.0
+    gap = best_prox - second_prox
+    relative_gap = gap / best_prox if best_prox > 0 else 0.0
+    if not ranked:
+        attributed_pid, attribution_reason = None, "no_player_observation"
+    elif best_prox < ATTRIBUTION_MIN_PROXIMITY:
+        attributed_pid, attribution_reason = None, "insufficient_proximity"
+    elif len(ranked) > 1 and relative_gap <= ATTRIBUTION_PROXIMITY_GAP:
+        attributed_pid, attribution_reason = None, "ambiguous_proximity"
+    else:
+        attributed_pid, attribution_reason = best_pid, "nearest_proximity"
+    # On an attribution tie, aggregate swing over all near-tied candidates so
+    # contact scoring does not depend on the order players entered the mapping.
+    swing_players = [best_pid] if best_pid is not None and attribution_reason != "insufficient_proximity" else []
+    if attribution_reason == "ambiguous_proximity":
+        swing_players = [pid for pid, prox, _ in ranked if (best_prox - prox) / best_prox <= ATTRIBUTION_PROXIMITY_GAP]
+    wrist_speeds = [_wrist_speed(w.players[pid], i) for pid in swing_players]
+    observed_speeds = [speed for speed in wrist_speeds if speed is not None]
+    s_swing = float(np.clip((max(observed_speeds) - 0.05) / 0.25, 0.0, 1.0)) if observed_speeds else 0.0
     z = W_BIAS + W_REDIRECT * s_redirect + W_IMPULSE * s_impulse + W_PROX * best_prox + W_SWING * s_swing
     p = _sigmoid(z)
     return ContactCandidate(
         frame=w.frame0 + i,
-        player_id=best_pid,
+        player_id=attributed_pid,
         p=p,
         scores={
             "redirect": s_redirect,
             "impulse": s_impulse,
             "proximity": best_prox,
+            "proximity_runner_up": second_prox,
+            "proximity_gap": gap,
+            "proximity_relative_gap": relative_gap,
+            "proximity_relative_gap_threshold": ATTRIBUTION_PROXIMITY_GAP,
+            "proximity_minimum_threshold": ATTRIBUTION_MIN_PROXIMITY,
+            "proximity_candidates": float(len(ranked)),
             "swing": s_swing,
             "angle_deg": angle,
             "speed_before": nb,
@@ -152,6 +186,7 @@ def score_frame(w: WindowObs, i: int, half: int = 3) -> ContactCandidate | None:
             "body_h": float(best_h) if best_h else 0.0,
         },
         shuttle_xy=(float(sx), float(sy)),
+        attribution_reason=attribution_reason,
     )
 
 

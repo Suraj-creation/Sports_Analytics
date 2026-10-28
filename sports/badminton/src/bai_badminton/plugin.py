@@ -13,6 +13,7 @@ import numpy as np
 from bai_badminton.court import REFERENCE_POINTS, WIDTH_DOUBLES, Homography, fit_homography
 from bai_badminton.engine import BadmintonMatchEngine, EngineConfig, box_tuple, camera_sample, keypoint_rows
 from bai_badminton.events.rally_fsm import RallyState
+from bai_badminton.identity_review import TRACKER_IDENTITY_EVIDENCE_TYPES
 from bai_badminton.perception.calibration_state import CalibrationState
 from bai_badminton.perception.court_lines import METHOD as LINES_METHOD
 from bai_badminton.perception.court_lines import CourtFit, camera_pose, choose_main, detect_court, refine_court
@@ -433,6 +434,8 @@ class BadmintonSession:
             ev = self.store.get(command["event_id"])
             if ev is None:
                 return {"ok": False, "error": "unknown event"}
+            if ev.type in TRACKER_IDENTITY_EVIDENCE_TYPES:
+                return {"ok": False, "error": "tracker identity evidence requires its dedicated review flow"}
             payload = {**ev.payload, **(command.get("payload") or {})}
             corrected = ev.correct(
                 payload=payload,
