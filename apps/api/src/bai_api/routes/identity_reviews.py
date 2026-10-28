@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
 from bai_api.deps import Repo, SessionDep
+from bai_badminton.analytics.individual import machine_hypothesis_unchanged
 from bai_badminton.analytics.rebuild import lineage_ids
 from bai_badminton.identity_review import IdentityReviewLedger
 from bai_engine.schema import Actors, Event, EventStatus, Evidence, EvidenceKind, Provenance
@@ -113,6 +114,8 @@ def review_stroke_participant(
             and hypothesis.get("status") in ("provisional", "human_verified")
             and hypothesis.get("participant_id") == body.participant_id
             and hypothesis.get("track_id") == body.track_id
+            and hypothesis.get("observation_id") == observation.event_id
+            and machine_hypothesis_unchanged(store, stroke)
         ):
             raise HTTPException(
                 status.HTTP_422_UNPROCESSABLE_ENTITY,

@@ -34,6 +34,7 @@ export function ParticipantReview({ session }: { session: Session }) {
     void client.invalidateQueries({queryKey: ["identity-reviews", session.session_id]});
     void client.invalidateQueries({queryKey: ["stroke-participant-reviews", session.session_id]});
     void client.invalidateQueries({queryKey: ["individual-analytics", session.session_id]});
+    void client.invalidateQueries({queryKey: ["estimated-individual-analytics", session.session_id]});
   };
   const preview = useMutation({mutationFn: async ({ observation, frame, track, shot }: {observation: string; frame: number; track: number; shot?: string}) => {
     const currentVideo = usePlayback.getState().video;

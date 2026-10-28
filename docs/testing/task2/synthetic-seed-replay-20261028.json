@@ -1,0 +1,92 @@
+{
+  "kind": "synthetic_seed_track_replay_integration_smoke",
+  "accuracy_claim": false,
+  "identity_mapping_real": false,
+  "limitations": "The identities and human reviews are simulated on a copied replay database. Cached detector outputs, contact candidates, boundaries and shot labels are not independently verified. Episode tracks are temporary and may switch or split; these numbers do not establish identity or shot accuracy. Historical cache lacks calibration-state and detector-observed metadata.",
+  "source": {
+    "session_id": "01M56T2EED5Z7W9VTGG19FHNTF",
+    "title": "He/Ren vs Rankireddy/Shetty | Fast and furious men's doubles action",
+    "media_sha256": "f9a419327a85b4e17d524d2fae24245ae9fc862b06a05c8fc11ed457eb487cba",
+    "cached_observations_sha256": "fd0018a896e66fcb6d3c505cbb0eb7d497956a258045b24c0d449c6102a0c8f0",
+    "frames": 12148,
+    "expected_frames": 12148,
+    "fps": 25.0,
+    "frame_width": 1280,
+    "frame_height": 720,
+    "discipline": "doubles",
+    "initial_calibration_only": true,
+    "human_corrections_applied": false
+  },
+  "provenance": {
+    "engine_sha256": "4f3b5be9f1281cbb3ac247293e81213477015c005c4c47f26af122ee0bbd8479",
+    "track_replay_harness_sha256": "8cef01c52017f03fc33bf8810f649aac4392b072e1e3332f80f26679c25c63fd",
+    "track_replay_harness": "research/replay_cached_observations.py",
+    "synthetic_seed_harness": "docs/testing/task2/synthetic-seed-smoke-harness.py",
+    "synthetic_seed_harness_sha256": "9185eebc45035737eb59d146635c47c402698fb4fd75401d62546d492e5dded5"
+  },
+  "track_samples_persisted": 51904,
+  "rallies": 28,
+  "explicit_official_rallies": 1,
+  "stroke_events": 305,
+  "anonymous_episode_official": {
+    "total_linked_shots": 14,
+    "episode_candidate_shots": 13,
+    "unresolved_shots": 1,
+    "episode_count": 4
+  },
+  "anonymous_episode_all_linked": {
+    "total_linked_shots": 305,
+    "episode_candidate_shots": 296,
+    "unresolved_shots": 9,
+    "episode_count": 88
+  },
+  "unlinked_stroke_events": 0,
+  "policy": {
+    "seed_max_seconds": 10,
+    "max_track_sample_gap_frames": 6,
+    "min_track_confidence": 0.5,
+    "max_box_height_ratio": 2.0,
+    "min_footpoint_jump_limit_body_heights": 0.5,
+    "max_footpoint_jump_per_frame_body_heights": 0.25
+  },
+  "synthetic_seeds": [
+    {
+      "synthetic_player": "U1",
+      "seed_frame": 329,
+      "shot_frame": 330
+    },
+    {
+      "synthetic_player": "U2",
+      "seed_frame": 338,
+      "shot_frame": 339
+    },
+    {
+      "synthetic_player": "U3",
+      "seed_frame": 431,
+      "shot_frame": 432
+    },
+    {
+      "synthetic_player": "U4",
+      "seed_frame": 464,
+      "shot_frame": 465
+    }
+  ],
+  "synthetic_all_linked_counts": {
+    "U1": 2,
+    "U2": 5,
+    "U3": 1,
+    "U4": 6
+  },
+  "synthetic_official_accounting": {
+    "total_linked_shots": 14,
+    "estimated_shots": 0,
+    "unresolved_shots": 14,
+    "verified_shots": 0
+  },
+  "synthetic_all_linked_accounting": {
+    "total_linked_shots": 305,
+    "estimated_shots": 14,
+    "unresolved_shots": 291
+  },
+  "reproduction": "Source ../gpu-env.sh; run research/replay_cached_observations.py with --session-id and --doubles-session-id set to source.session_id, --persist-tracks, the source data directory, and a fresh isolated output directory. Then set TASK2_TRACK_REPLAY to that directory and run docs/testing/task2/synthetic-seed-smoke-harness.py using the same worktree PYTHONPATH and existing .venv. The simulated event database and summary are written only under the fresh replay directory."
+}

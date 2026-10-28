@@ -67,6 +67,7 @@ function UploadCard({ maxMb }: { maxMb?: number }) {
   const [file, setFile] = useState<File | null>(null);
   const [drag, setDrag] = useState(false);
   const [title, setTitle] = useState("");
+  const [format, setFormat] = useState<"" | "singles" | "doubles">("");
   const [p1, setP1] = useState("");
   const [p2, setP2] = useState("");
   const [progress, setProgress] = useState<number | null>(null);
@@ -91,6 +92,7 @@ function UploadCard({ maxMb }: { maxMb?: number }) {
     const form = new FormData();
     form.append("file", file);
     if (title) form.append("title", title);
+    if (format) form.append("match_format", format);
     if (p1) form.append("player1", p1);
     if (p2) form.append("player2", p2);
     setProgress(0);
@@ -162,6 +164,7 @@ function UploadCard({ maxMb }: { maxMb?: number }) {
         tabIndex={-1}
         onChange={(e) => pick(e.target.files?.[0])}
       />
+      <MatchFormatField value={format} onChange={setFormat} />
       <div className="grid gap-3 sm:grid-cols-3">
         <Field label="Title">
           <input
@@ -171,10 +174,10 @@ function UploadCard({ maxMb }: { maxMb?: number }) {
             maxLength={120}
           />
         </Field>
-        <Field label="Player 1" hint="Starts on the near side">
+        <Field label={format === "doubles" ? "Team 1 label" : "Player 1"} hint="Starts on the near side">
           <input className={inputClass} value={p1} onChange={(e) => setP1(e.target.value)} maxLength={80} />
         </Field>
-        <Field label="Player 2" hint="Starts on the far side">
+        <Field label={format === "doubles" ? "Team 2 label" : "Player 2"} hint="Starts on the far side">
           <input className={inputClass} value={p2} onChange={(e) => setP2(e.target.value)} maxLength={80} />
         </Field>
       </div>
@@ -207,12 +210,13 @@ function YouTubeCard({ enabled, loading }: { enabled: boolean; loading: boolean 
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [url, setUrl] = useState("");
+  const [format, setFormat] = useState<"" | "singles" | "doubles">("");
   const [p1, setP1] = useState("");
   const [p2, setP2] = useState("");
   const [ack, setAck] = useState(false);
   const create = useMutation({
     mutationFn: () =>
-      api.youtube({ url, player1: p1 || undefined, player2: p2 || undefined, acknowledge_rights: ack }),
+      api.youtube({ url, player1: p1 || undefined, player2: p2 || undefined, match_format: format || undefined, acknowledge_rights: ack }),
     onSuccess: async (s) => {
       await qc.invalidateQueries({ queryKey: ["sessions"] });
       navigate({ to: "/sessions/$sessionId", params: { sessionId: s.session_id } });
@@ -250,8 +254,9 @@ function YouTubeCard({ enabled, loading }: { enabled: boolean; loading: boolean 
               maxLength={300}
             />
           </Field>
+          <MatchFormatField value={format} onChange={setFormat} />
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Player 1">
+            <Field label={format === "doubles" ? "Team 1 label" : "Player 1"}>
               <input
                 className={inputClass}
                 value={p1}
@@ -259,7 +264,7 @@ function YouTubeCard({ enabled, loading }: { enabled: boolean; loading: boolean 
                 maxLength={80}
               />
             </Field>
-            <Field label="Player 2">
+            <Field label={format === "doubles" ? "Team 2 label" : "Player 2"}>
               <input
                 className={inputClass}
                 value={p2}
@@ -374,4 +379,12 @@ function SessionCard({ s }: { s: Session }) {
       </Dialog.Root>
     </li>
   );
+}
+
+function MatchFormatField({ value, onChange }: {value: "" | "singles" | "doubles"; onChange: (value: "" | "singles" | "doubles") => void}) {
+  return <Field label="Match format" hint="Unspecified uses singles geometry. Doubles uses wider court boundaries; doubles service and scoring still require review.">
+    <select className={inputClass} value={value} onChange={(event) => onChange(event.target.value as "" | "singles" | "doubles")}>
+      <option value="">Not specified</option><option value="singles">Singles</option><option value="doubles">Doubles</option>
+    </select>
+  </Field>;
 }

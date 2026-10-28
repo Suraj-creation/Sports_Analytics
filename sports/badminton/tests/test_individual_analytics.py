@@ -64,13 +64,14 @@ def _stroke(store, frame, obs, *, verified=True, hypothesis_status="human_verifi
             "stroke",
             frame,
             status=EventStatus.HUMAN_VERIFIED if verified else EventStatus.CONFIRMED,
-            model="human" if verified else "stroke_rules_v0",
+            model="stroke_rules_v0",
             payload={
                 "stroke": "drive",
                 "participant_hypothesis": {
                     "status": hypothesis_status,
                     "participant_id": obs.payload["participant_id"],
                     "track_id": track,
+                    "observation_id": obs.event_id,
                 },
             },
         )
@@ -124,10 +125,7 @@ def test_corrections_retractions_and_review_revoke_refold_without_duplicates(tmp
     initial = _stroke(store, 5, obs, verified=False, hypothesis_status="provisional")
     _rally(store, [initial, initial])
     assert fold(store, _roster(), max_frame=100, fps=30)["accounting"]["unattributed_shots"] == 1
-    payload = {
-        **initial.payload,
-        "participant_hypothesis": {**initial.payload["participant_hypothesis"], "status": "human_verified"},
-    }
+    payload = dict(initial.payload)
     corrected = store.append(
         initial.correct(payload=payload, status=EventStatus.HUMAN_VERIFIED, provenance=Provenance(model="human"))
     )
@@ -250,3 +248,60 @@ def test_stale_and_duplicate_scoped_reviews_do_not_attribute(tmp_path: Path):
     changed = {**shot.payload, "participant_hypothesis": {**shot.payload["participant_hypothesis"], "track_id": 2}}
     store.append(shot.correct(payload=changed))
     assert fold(store, _roster(), max_frame=100, fps=30)["accounting"]["unattributed_shots"] == 1
+
+
+
+def test_verified_fold_rejects_missing_or_mismatched_birth_after_correction(tmp_path: Path):
+    fold = _module().build_individual_analytics
+    store = EventStore(tmp_path / "stale-birth.sqlite", "S1")
+    obs = _observation(store, 1)
+    identity = IdentityReviewLedger(store, {"U1"}, max_frame=100, fps=30).confirm(obs.event_id, "U1", 1, 40)
+    shot = _stroke(store, 5, obs, verified=False, hypothesis_status="provisional")
+    _rally(store, [shot])
+    _review_stroke(store, shot, obs, identity)
+    assert fold(store, _roster(), max_frame=100, fps=30)["accounting"]["attributed_shots"] == 1
+    for bad_id in (None, "other-birth"):
+        changed = {
+            **shot.payload,
+            "participant_hypothesis": {**shot.payload["participant_hypothesis"], "observation_id": bad_id},
+        }
+        shot = store.append(shot.correct(payload=changed))
+        result = fold(store, _roster(), max_frame=100, fps=30)
+        assert result["accounting"]["unattributed_shots"] == 1
+        assert result["participants"]["U1"]["total_shots"] == 0
+
+
+def test_verified_fold_rejects_preexisting_human_hypothesis_rewrite(tmp_path: Path):
+    fold = _module().build_individual_analytics
+    store = EventStore(tmp_path / "rewritten.sqlite", "S1")
+    obs = _observation(store, 1)
+    identity = IdentityReviewLedger(store, {"U1"}, max_frame=100, fps=30).confirm(obs.event_id, "U1", 1, 40)
+    machine = _stroke(store, 5, obs, verified=False, hypothesis_status="provisional")
+    _rally(store, [machine])
+    forged = store.append(machine.correct(
+        payload={**machine.payload, "participant_hypothesis": {
+            **machine.payload["participant_hypothesis"], "reason": "forged"
+        }},
+        provenance=Provenance(model="human"),
+    ))
+    _review_stroke(store, forged, obs, identity)
+    result = fold(store, _roster(), max_frame=100, fps=30)
+    assert result["accounting"]["unattributed_shots"] == 1
+    assert result["participants"]["U1"]["total_shots"] == 0
+
+
+def test_verified_fold_requires_explicit_true_official_status(tmp_path: Path):
+    fold = _module().build_individual_analytics
+    store = EventStore(tmp_path / "legacy-rally.sqlite", "S1")
+    obs = _observation(store, 1)
+    identity = IdentityReviewLedger(store, {"U1"}, max_frame=100, fps=30).confirm(obs.event_id, "U1", 1, 40)
+    stroke = _stroke(store, 5, obs, verified=False, hypothesis_status="provisional")
+    _review_stroke(store, stroke, obs, identity)
+    legacy = store.append(_event("rally_end", 50, payload={"shots": [{"event_id": stroke.event_id}]}))
+    assert fold(store, _roster(), max_frame=100, fps=30)["accounting"]["total_shots"] == 0
+    malformed = store.append(legacy.correct(payload={**legacy.payload, "official": "yes"}))
+    assert fold(store, _roster(), max_frame=100, fps=30)["accounting"]["total_shots"] == 0
+    confirmed = store.append(malformed.correct(payload={**malformed.payload, "official": True}))
+    data = fold(store, _roster(), max_frame=100, fps=30)
+    assert data["accounting"]["attributed_shots"] == 1
+    assert data["participants"]["U1"]["rally_ids"] == [confirmed.event_id]

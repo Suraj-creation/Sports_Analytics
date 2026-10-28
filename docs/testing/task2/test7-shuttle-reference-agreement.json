@@ -1,0 +1,21 @@
+{
+  "purpose": "unverified reference agreement only; not detection or shot-classification accuracy",
+  "limitations": "The filled CSV is not independently human-reviewed; interpolation, algorithm overlap and timebase/origin assumptions may inflate agreement.",
+  "video_sha256": "1ad1eac44150a0a23e2bad1f3d4204bd41f2d257ff6b35156234d38cfa2b9d9c",
+  "reference_csv_sha256": "ab8a89adff001cbe1c90d89c4b15231599982bffbd2478832bf0d1a90380dfdd",
+  "probe_sha256": "7bfeb75bd80dcb515b28d5063a969f8b752325ad167208f87ab6ebe6e59ca241",
+  "frames_inclusive": [
+    180,
+    449
+  ],
+  "fps": 30.0,
+  "coordinate_pixels": "1280x720",
+  "n_frames": 270,
+  "reference_visible": 262,
+  "probe_visible_non_interpolated": 254,
+  "both_visible": 253,
+  "median_separation_px": 1.433740963619664,
+  "mean_separation_px": 1.4964376092060432,
+  "within_10px": 253,
+  "within_20px": 253
+}

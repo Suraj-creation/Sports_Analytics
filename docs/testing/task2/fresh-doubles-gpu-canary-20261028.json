@@ -1,0 +1,48 @@
+{
+  "kind": "isolated_real_video_end_to_end",
+  "status": "analysed",
+  "status_detail": "Analysis complete",
+  "session_id": "01M60K38M17QTHTE7QFC1RDG0N",
+  "video_sha256": "e50e00223bf41468ac4c913ff5a7647d909563326d256be8037fe79fedace640",
+  "duration_s": 28.33,
+  "sampled_peak_gpu_mib": 2122,
+  "gpu_index": 1,
+  "frame_count": 250,
+  "media_frames": 250,
+  "event_counts": {
+    "rally_end": 1,
+    "participant_observation": 6,
+    "stroke": 16,
+    "contact": 17
+  },
+  "stroke_families": {
+    "short_serve": 1,
+    "net_shot": 1,
+    "push": 6,
+    "lift": 1,
+    "clear": 1,
+    "drop": 5,
+    "unknown": 1
+  },
+  "episode_counts": {
+    "total_linked_shots": 16,
+    "episode_candidate_shots": 16,
+    "unresolved_shots": 0
+  },
+  "movement_available": true,
+  "accuracy_claim": false,
+  "limitations": "Ten-second clip, no independently reviewed contact, shot or player labels. Isolated session, not the user live database.",
+  "source_proxy_sha256": "205132cc64f0d269ca67bd0eea1dfc9e08352f68202cdb8754a19a58217d958f",
+  "source_window_s": [
+    60,
+    70
+  ],
+  "resolution": "1280x720",
+  "fps": 25,
+  "output_track_episodes_with_candidate_shots": 3,
+  "movement_episodes": 5,
+  "movement_valid_segments": 186,
+  "engine_sha256": "4f3b5be9f1281cbb3ac247293e81213477015c005c4c47f26af122ee0bbd8479",
+  "extraction": "ffmpeg -ss 60 -i proxy.mp4 -t 10 -an -c:v libx264 -preset veryfast -crf 20 -pix_fmt yuv420p doubles-probe.mp4",
+  "measurements_note": "Wall time includes upload, media preparation, model loading, processing, polling and post-run API reads. GPU memory is sampled and can miss peaks. Outputs and labels are unverified; three observed candidate episodes do not establish four-player coverage."
+}

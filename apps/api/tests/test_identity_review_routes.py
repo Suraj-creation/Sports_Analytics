@@ -51,6 +51,7 @@ def setup_review(client):
                     "status": "provisional",
                     "participant_id": "participant-abc123-000001",
                     "track_id": 7,
+                    "observation_id": obs.event_id,
                 },
             },
             provenance=Provenance(model="stroke_rules_v0"),
@@ -218,3 +219,44 @@ def test_scoped_api_review_drives_individual_analytics_and_revoke(client: TestCl
     assert store.get(stroke.event_id).status == EventStatus.PROVISIONAL
     assert client.delete(root + "/stroke-participant-reviews/" + scoped.json()["event_id"]).status_code == 200
     assert client.get(analytics).json()["accounting"]["unattributed_shots"] == 1
+
+
+
+def test_review_rejects_missing_or_different_birth_provenance(client: TestClient):
+    root, store, obs, stroke = setup_review(client)
+    identity = client.post(
+        root + "/identity-reviews",
+        json={"observation_id": obs.event_id, "player_id": "U1", "frame_start": 10, "frame_end": 30},
+    ).json()
+    body = {
+        "identity_review_id": identity["event_id"],
+        "player_id": "U1",
+        "participant_id": "participant-abc123-000001",
+        "track_id": 7,
+    }
+    for bad_id in (None, "other-birth"):
+        hypothesis = {**stroke.payload["participant_hypothesis"], "observation_id": bad_id}
+        wrong = store.append(stroke.correct(payload={**stroke.payload, "participant_hypothesis": hypothesis}))
+        response = client.post(root + f"/strokes/{wrong.event_id}/participant-review", json=body)
+        assert response.status_code == 422
+        stroke = wrong
+    assert not store.query(types=["stroke_participant_review"])
+
+
+def test_review_rejects_preexisting_human_rewrite_of_machine_hypothesis(client: TestClient):
+    root, store, obs, stroke = setup_review(client)
+    forged = store.append(stroke.correct(
+        payload={**stroke.payload, "participant_hypothesis": {
+            **stroke.payload["participant_hypothesis"], "reason": "forged"
+        }},
+        provenance=Provenance(model="human"),
+    ))
+    identity = client.post(
+        root + "/identity-reviews",
+        json={"observation_id": obs.event_id, "player_id": "U1", "frame_start": 10, "frame_end": 30},
+    ).json()
+    body = {"identity_review_id": identity["event_id"], "player_id": "U1",
+            "participant_id": "participant-abc123-000001", "track_id": 7}
+    result = client.post(root + f"/strokes/{forged.event_id}/participant-review", json=body)
+    assert result.status_code == 422
+    assert not store.query(types=["stroke_participant_review"])

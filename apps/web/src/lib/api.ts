@@ -1,4 +1,4 @@
-import type { IndividualAnalyticsData, Analytics, AskAnswer, BaiEvent, Calibration, Heatmap, Highlight, Session, SessionRoster } from "./types";
+import type { EpisodeMovementData, EstimatedIndividualAnalyticsData, IndividualAnalyticsData, Analytics, AskAnswer, BaiEvent, Calibration, Heatmap, Highlight, Session, SessionRoster } from "./types";
 
 let csrf: string | null = null;
 export const setCsrf = (t: string | null) => {
@@ -58,6 +58,7 @@ export const api = {
     title?: string;
     player1?: string;
     player2?: string;
+    match_format?: "singles" | "doubles";
     acknowledge_rights: boolean;
   }) => req<Session>("/api/sessions/youtube", { method: "POST", body: JSON.stringify(body) }),
 
@@ -65,6 +66,8 @@ export const api = {
     req<{ last_seq: number; events: BaiEvent[] }>(
       `/api/sessions/${id}/events?${new URLSearchParams(Object.entries(q).map(([k, v]) => [k, String(v)]))}`,
     ),
+  episodeMovement: (id: string, from: number, to: number) => req<EpisodeMovementData>(`/api/sessions/${id}/episode-movement?from=${from}&to=${to}`),
+  estimatedIndividualAnalytics: (id: string) => req<EstimatedIndividualAnalyticsData>(`/api/sessions/${id}/estimated-individual-analytics`),
   individualAnalytics: (id: string) => req<IndividualAnalyticsData>(`/api/sessions/${id}/individual-analytics`),
   analytics: (id: string) => req<Analytics>(`/api/sessions/${id}/analytics`),
   heatmap: (id: string, player: string, kind: string) =>

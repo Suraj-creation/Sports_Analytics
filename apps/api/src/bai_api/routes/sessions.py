@@ -8,6 +8,7 @@ from typing import Annotated, Any, Literal
 from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import Response
 from pydantic import BaseModel, Field, StrictInt
+from ulid import ULID
 
 from bai_api.deps import BusDep, Repo, SessionDep, SettingsDep, User
 from bai_api.public import public_session
@@ -16,7 +17,7 @@ from bai_badminton.identity_review import TRACKER_IDENTITY_EVIDENCE_TYPES
 from bai_engine.bus import topic
 from bai_engine.config import load_profile
 from bai_engine.schema import PlayerInfo, Session, Source, SourceKind, TrackObject, table_to_samples
-from bai_engine.schema.session import ParticipantRoster
+from bai_engine.schema.session import ParticipantInfo, ParticipantRoster, TeamInfo
 from bai_engine.sources import SourceError, parse_youtube_url, store_upload
 from bai_engine.wire import encode_tracks
 
@@ -28,6 +29,18 @@ def _players(p1: str | None, p2: str | None) -> list[PlayerInfo]:
         PlayerInfo(player_id="P1", name=(p1 or "").strip()[:80] or None),
         PlayerInfo(player_id="P2", name=(p2 or "").strip()[:80] or None),
     ]
+
+
+def _initial_roster(match_format: Literal["singles", "doubles"] | None) -> ParticipantRoster | None:
+    if match_format is None:
+        return None
+    return ParticipantRoster(
+        match_format=match_format,
+        teams=[TeamInfo(team_id="T1"), TeamInfo(team_id="T2")],
+        participants=[
+            ParticipantInfo(participant_id=f"person-{ULID()}") for _ in range(4 if match_format == "doubles" else 2)
+        ],
+    )
 
 
 def _check_profile(name: str, settings: Any) -> str:
@@ -54,6 +67,7 @@ def create_upload(
     player1: Annotated[str | None, Form()] = None,
     player2: Annotated[str | None, Form()] = None,
     profile: Annotated[str | None, Form()] = None,
+    match_format: Annotated[Literal["singles", "doubles"] | None, Form()] = None,
 ) -> Session:
     prof = _check_profile(profile or s.profile, s)
     try:
@@ -68,6 +82,7 @@ def create_upload(
                 kind=SourceKind.UPLOAD, uri=str(stored.path), original_name=file.filename, sha256=stored.sha256
             ),
             players=_players(player1, player2),
+            roster=_initial_roster(match_format),
             profile=prof,
         )
     )
@@ -81,6 +96,7 @@ class YouTubeRequest(BaseModel):
     player1: str | None = Field(default=None, max_length=80)
     player2: str | None = Field(default=None, max_length=80)
     profile: str | None = None
+    match_format: Literal["singles", "doubles"] | None = None
     acknowledge_rights: bool = False
 
 
@@ -103,6 +119,7 @@ def create_youtube(body: YouTubeRequest, r: Repo, b: BusDep, s: SettingsDep, _: 
             title=body.title or "YouTube video",
             source=Source(kind=SourceKind.YOUTUBE, uri=f"https://www.youtube.com/watch?v={vid}"),
             players=_players(body.player1, body.player2),
+            roster=_initial_roster(body.match_format),
             profile=_check_profile(body.profile or s.profile, s),
         )
     )
@@ -214,8 +231,10 @@ def individual_analytics(session: SessionDep, r: Repo) -> dict[str, Any]:
     if session.media is None or session.media.n_frames <= 0:
         raise HTTPException(status.HTTP_409_CONFLICT, "Video timeline is not available")
     return build_individual_analytics(
-        r.events(session.session_id), session.roster,
-        max_frame=session.media.n_frames - 1, fps=float(session.media.fps),
+        r.events(session.session_id),
+        session.roster,
+        max_frame=session.media.n_frames - 1,
+        fps=float(session.media.fps),
     )
 
 
@@ -441,6 +460,16 @@ def correct(session: SessionDep, body: Correction, b: BusDep, r: Repo) -> dict[s
             raise HTTPException(
                 status.HTTP_422_UNPROCESSABLE_ENTITY,
                 "Tracker identity evidence cannot be edited by generic verification",
+            )
+        patch = body.payload or {}
+        if "participant_hypothesis" in patch and (
+            event is None
+            or "participant_hypothesis" not in event.payload
+            or patch["participant_hypothesis"] != event.payload["participant_hypothesis"]
+        ):
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                "Participant evidence cannot be edited by generic verification",
             )
         b.send_command(
             {

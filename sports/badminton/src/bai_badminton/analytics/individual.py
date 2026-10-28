@@ -10,13 +10,36 @@ from typing import Any
 
 from bai_badminton.analytics.rebuild import lineage_ids, rally_records
 from bai_badminton.identity_review import IdentityReviewLedger
-from bai_engine.schema import EventStatus
+from bai_engine.schema import Event, EventStatus
 from bai_engine.schema.session import ParticipantRoster
 from bai_engine.store import EventStore
 
 
+def machine_hypothesis_unchanged(store: EventStore, event: Any) -> bool:
+    """Require current track evidence to match the original machine stroke."""
+    current = event.payload.get("participant_hypothesis")
+    if not isinstance(current, dict):
+        return False
+    ancestry = lineage_ids(store, event)
+    origin = store.get(ancestry[-1])
+    return bool(
+        origin is not None
+        and origin.supersedes is None
+        and origin.type == "stroke"
+        and origin.provenance.model
+        and origin.provenance.model != "human"
+        and origin.frame_start == event.frame_start
+        and origin.payload.get("participant_hypothesis") == current
+    )
+
+
 def build_individual_analytics(
-    store: EventStore, roster: ParticipantRoster | None, *, max_frame: int, fps: float
+    store: EventStore,
+    roster: ParticipantRoster | None,
+    *,
+    max_frame: int,
+    fps: float,
+    boundary_events: list[Event] | None = None,
 ) -> dict[str, Any]:
     """Fold current, referenced official strokes; leave all unproven identities unresolved."""
     people = {
@@ -33,14 +56,21 @@ def build_individual_analytics(
     }
     teams = {t.team_id: {"score_slot": t.score_slot, "attributed_shots": 0} for t in (roster.teams if roster else [])}
     observations = {e.event_id: e for e in store.query(types=["participant_observation"])}
-    reviews = IdentityReviewLedger(store, people, max_frame=max_frame, fps=fps).current() if roster else []
+    reviews = (
+        IdentityReviewLedger(store, people, max_frame=max_frame, fps=fps).current(boundary_events=boundary_events)
+        if roster
+        else []
+    )
     events = {e.event_id: e for e in store.query(types=["stroke"])}
     scoped_reviews = store.query(types=["stroke_participant_review"])
+    official_rally_ids = {
+        event.event_id for event in store.query(types=["rally_end"]) if event.payload.get("official") is True
+    }
     seen: set[str] = set()
     unresolved: list[str] = []
     legacy = 0
     for rally in rally_records(store):
-        if not rally.official:
+        if rally.rally_id not in official_rally_ids:
             continue
         for shot in rally.shots:
             event_id = shot.get("event_id")
@@ -53,7 +83,7 @@ def build_individual_analytics(
             event = events.get(event_id)
             hypothesis = event.payload.get("participant_hypothesis") if event else None
             matching = []
-            if event and isinstance(hypothesis, dict):
+            if event and isinstance(hypothesis, dict) and machine_hypothesis_unchanged(store, event):
                 episode = hypothesis.get("participant_id")
                 track = hypothesis.get("track_id")
                 if isinstance(episode, str) and isinstance(track, int) and not isinstance(track, bool) and track >= 0:
@@ -68,6 +98,7 @@ def build_individual_analytics(
                             and obs.payload.get("kind") in ("PARTICIPANT_FIRST_OBSERVED", "PLAYER_ENTERED")
                             and obs.payload.get("participant_id") == episode
                             and obs.payload.get("track_id") == track
+                            and hypothesis.get("observation_id") == obs.event_id
                             and review.payload.get("participant_id") == episode
                             and review.actors.track_id == track
                             and review.actors.player_id in people
@@ -136,7 +167,7 @@ def build_individual_analytics(
         "unattributed_event_ids": unresolved,
         "legacy_unlinked_shots": legacy,
         "counting_scope": (
-            "Unique current stroke events referenced by official rallies; "
+            "Unique current stroke events referenced by rallies explicitly marked official; "
             "unlinked legacy shots excluded. Shot labels may be model predictions."
         ),
     }

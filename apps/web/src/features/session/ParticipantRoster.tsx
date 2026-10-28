@@ -25,6 +25,7 @@ export function ParticipantRoster({ session }: { session: Session }) {
       );
       void queryClient.invalidateQueries({ queryKey: ["session", session.session_id] });
       void queryClient.invalidateQueries({ queryKey: ["individual-analytics", session.session_id] });
+      void queryClient.invalidateQueries({ queryKey: ["estimated-individual-analytics", session.session_id] });
     },
   });
   const chooseFormat = (value: string) => {
@@ -47,7 +48,7 @@ export function ParticipantRoster({ session }: { session: Session }) {
     <section className="analysis-panel mt-5" aria-labelledby="participants-heading">
       <h2 id="participants-heading" className="font-medium">Participants</h2>
       <p className="analysis-panel-hint mt-2">
-        Names and teams are supplied by you; entering them does not link people to video tracks or verify shot events.
+        Names and teams are supplied by you; entering them does not link people to video tracks or verify shot events. Format applies when analysis starts; an existing recording needs a backed-up reanalysis to apply a format change. Doubles scoring still requires review.
       </p>
       {!editing && saved && (
         <ul className="mt-3 space-y-1 text-sm">

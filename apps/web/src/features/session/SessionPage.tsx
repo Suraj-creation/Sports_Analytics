@@ -17,6 +17,8 @@ import { usePlayback } from "@/stores/playback";
 import { useSession } from "@/stores/session";
 import { LiveFeed } from "./LiveFeed";
 import { PlayerSelector } from "./PlayerSelector";
+import { EpisodeMovement } from "./EpisodeMovement";
+import { EstimatedIndividualAnalytics } from "./EstimatedIndividualAnalytics";
 import { IndividualAnalytics } from "./IndividualAnalytics";
 import { ParticipantReview } from "./ParticipantReview";
 import { ParticipantRoster } from "./ParticipantRoster";
@@ -287,9 +289,11 @@ function SessionWorkspace({ session, search }: { session: Session; search: Analy
       </div>
       <EvidenceDetails session={session} />
       <VisualObservations session={session} />
-      <ParticipantRoster key={session.session_id} session={session} />
+      <ParticipantRoster key={`roster-${session.session_id}`} session={session} />
       <IndividualAnalytics session={session} />
-      <ParticipantReview key={session.session_id} session={session} />
+      <EstimatedIndividualAnalytics session={session} />
+      <EpisodeMovement session={session} />
+      <ParticipantReview key={`review-${session.session_id}`} session={session} />
       <details className="analysis-panel mt-5">
         <summary className="cursor-pointer text-sm font-medium">Live event feed</summary>
         <div className="mt-4 max-h-64 overflow-y-auto">

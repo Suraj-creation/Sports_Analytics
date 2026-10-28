@@ -198,6 +198,7 @@ def detect_contacts(
     min_same_player_gap_s: float = 0.9,
     start: int = 0,
     stop: int | None = None,
+    enforce_alternation: bool = True,
 ) -> list[ContactCandidate]:
     """Detect contacts in window indices ``[start, stop)``; scoring may look ±3 frames around."""
     stop = w.n if stop is None else stop
@@ -210,6 +211,8 @@ def detect_contacts(
         if all(abs(c.frame - k.frame) > nms for k in kept):
             kept.append(c)
     kept.sort(key=lambda c: c.frame)
+    if not enforce_alternation:
+        return kept
     # singles alternation: the same player cannot hit twice in a row (within a short time)
     gap = int(round(min_same_player_gap_s * w.fps))
     out: list[ContactCandidate] = []

@@ -20,6 +20,7 @@ from bai_badminton.perception.court_lines import CourtFit, camera_pose, choose_m
 from bai_badminton.perception.isolation import is_fixed_camera
 from bai_badminton.perception.pipeline import BadmintonPerception, lines_ref_id
 from bai_badminton.perception_types import ChunkPerception, FramePerception, PersonObs, ScoreReading
+from bai_badminton.rules.bwf import MatchConfig
 from bai_engine.config import Profile, get_settings
 from bai_engine.decode import DecodedChunk
 from bai_engine.obs import get_logger
@@ -73,9 +74,19 @@ class BadmintonSession:
         m = session.media
         fps = float(m.fps)
         names = {p.player_id: p.name for p in session.players}
+        # Format controls the rally in/out court geometry. The rules engine still
+        # exposes two score-side slots and does not implement doubles partner
+        # service rotation; the roster does not imply individual scoring.
+        discipline = session.roster.match_format if session.roster else "singles"
         self.engine = BadmintonMatchEngine(
             session.session_id,
-            EngineConfig(fps=fps, frame_width=m.width, frame_height=m.height, profile=profile.name),
+            EngineConfig(
+                fps=fps,
+                frame_width=m.width,
+                frame_height=m.height,
+                profile=profile.name,
+                match=MatchConfig(discipline=discipline),
+            ),
             store,
             emit=emit,
             player_names=names,
@@ -436,7 +447,13 @@ class BadmintonSession:
                 return {"ok": False, "error": "unknown event"}
             if ev.type in TRACKER_IDENTITY_EVIDENCE_TYPES:
                 return {"ok": False, "error": "tracker identity evidence requires its dedicated review flow"}
-            payload = {**ev.payload, **(command.get("payload") or {})}
+            patch = command.get("payload") or {}
+            if "participant_hypothesis" in patch and (
+                "participant_hypothesis" not in ev.payload
+                or patch["participant_hypothesis"] != ev.payload["participant_hypothesis"]
+            ):
+                return {"ok": False, "error": "participant evidence cannot be changed by generic verification"}
+            payload = {**ev.payload, **patch}
             corrected = ev.correct(
                 payload=payload,
                 status=EventStatus.HUMAN_VERIFIED,

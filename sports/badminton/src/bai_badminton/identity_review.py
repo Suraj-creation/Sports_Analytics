@@ -39,16 +39,16 @@ class IdentityReviewLedger:
             if e.status == EventStatus.HUMAN_VERIFIED and e.provenance.model == "human"
         ]
 
-    def current(self) -> list[Event]:
+    def current(self, *, boundary_events: list[Event] | None = None) -> list[Event]:
         observations = {e.event_id: e for e in self.store.query(types=["participant_observation"])}
         return [
             e
             for e in self._reviews()
             if (obs := observations.get(e.payload.get("observation_id"))) is not None
-            and self._episode_error(obs, e.frame_end) is None
+            and self._episode_error(obs, e.frame_end, boundary_events=boundary_events) is None
         ]
 
-    def _episode_error(self, obs: Event, end: int) -> str | None:
+    def _episode_error(self, obs: Event, end: int, *, boundary_events: list[Event] | None = None) -> str | None:
         participant = obs.payload.get("participant_id")
         track = obs.payload.get("track_id")
         match = (
@@ -57,7 +57,12 @@ class IdentityReviewLedger:
         if not match:
             return "invalid participant observation"
         epoch = match.group(1)
-        for other in self.store.query(types=["identity_ambiguity", "participant_observation"]):
+        events = (
+            boundary_events
+            if boundary_events is not None
+            else self.store.query(types=["identity_ambiguity", "participant_observation"])
+        )
+        for other in events:
             if other.event_id == obs.event_id or not obs.frame_start <= other.frame_start <= end:
                 continue
             if other.frame_start == obs.frame_start:

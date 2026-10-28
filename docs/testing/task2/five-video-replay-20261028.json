@@ -1,0 +1,267 @@
+{
+  "kind": "unlabelled_matched_cached_observation_replay",
+  "accuracy_claim": false,
+  "limitations": "No independent contact, shot, or player ground truth; changes in counts and known-label rate do not establish correctness. Existing caches predate current observation validity metadata, and initial calibration only was applied. Doubles scoring and service rules remain incomplete.",
+  "baseline_engine_sha256": "72f89dbdc6797c25c573222a9c4a2e560d88a6860f4ca1588c40cbce4ec62535",
+  "candidate_engine_sha256": "c4bc68fe21bab4b3ccd2902140dedf47954c17bf2b7333230e512b01e1df33d3",
+  "harness_sha256": "c1db982385b844091913b5cad12216e88fa5c50eda15c0fdfc19d6565743484a",
+  "sessions": [
+    {
+      "session_id": "01M55MFY9GQF6ZXP2SQPQ8X1KG",
+      "title": "SampleRally",
+      "media_sha256": "44ae09ac4369edc971588158a5b4eb2df7586b95c8992770277d4d36f93ea790",
+      "cached_observations_sha256": "cf43ce403bdaee00dd83c9d03f3068c45370c63981aa7963320b1abb1285b8da",
+      "frames": 480,
+      "expected_frames": 480,
+      "coverage_complete": true,
+      "fps": 30.0,
+      "discipline": "singles",
+      "cached_codec_versions": [
+        1
+      ],
+      "cached_frame_metadata": {
+        "calibration_state_missing": 480,
+        "detector_observed_missing": 480
+      },
+      "before": {
+        "strokes": 2,
+        "rallies": 1,
+        "official_rallies": 0,
+        "points": 0,
+        "shot_families": {
+          "unknown": 2
+        },
+        "track_hypotheses": {
+          "absent": 2
+        },
+        "classification_context": {
+          "none": 2
+        }
+      },
+      "after": {
+        "strokes": 2,
+        "rallies": 1,
+        "official_rallies": 0,
+        "points": 0,
+        "shot_families": {
+          "unknown": 2
+        },
+        "track_hypotheses": {
+          "absent": 2
+        },
+        "classification_context": {
+          "named_player": 2
+        }
+      }
+    },
+    {
+      "session_id": "01M55NQMRAS0ATB73XE3XA6S74",
+      "title": "Anders Antonsen vs Alwi Farhan | Intense play with swift court coverage",
+      "media_sha256": "314b4997fde9670c17cde76a256ff64c9a5f565317078f1d9826f5ffee8602c0",
+      "cached_observations_sha256": "0d2b03c92fe708697451c62fcf102587c7beca7e8024a5561056b8a7f5d86c80",
+      "frames": 12075,
+      "expected_frames": 12075,
+      "coverage_complete": true,
+      "fps": 25.0,
+      "discipline": "singles",
+      "cached_codec_versions": [
+        3
+      ],
+      "cached_frame_metadata": {
+        "calibration_state_missing": 12075,
+        "detector_observed_missing": 12075
+      },
+      "before": {
+        "strokes": 235,
+        "rallies": 25,
+        "official_rallies": 1,
+        "points": 0,
+        "shot_families": {
+          "short_serve": 5,
+          "unknown": 226,
+          "long_serve": 4
+        },
+        "track_hypotheses": {
+          "provisional": 215,
+          "unresolved": 20
+        },
+        "classification_context": {
+          "none": 235
+        }
+      },
+      "after": {
+        "strokes": 235,
+        "rallies": 25,
+        "official_rallies": 1,
+        "points": 0,
+        "shot_families": {
+          "short_serve": 5,
+          "unknown": 226,
+          "long_serve": 4
+        },
+        "track_hypotheses": {
+          "provisional": 215,
+          "unresolved": 20
+        },
+        "classification_context": {
+          "none": 235
+        }
+      }
+    },
+    {
+      "session_id": "01M56T2EED5Z7W9VTGG19FHNTF",
+      "title": "He/Ren vs Rankireddy/Shetty | Fast and furious men's doubles action",
+      "media_sha256": "f9a419327a85b4e17d524d2fae24245ae9fc862b06a05c8fc11ed457eb487cba",
+      "cached_observations_sha256": "fd0018a896e66fcb6d3c505cbb0eb7d497956a258045b24c0d449c6102a0c8f0",
+      "frames": 12148,
+      "expected_frames": 12148,
+      "coverage_complete": true,
+      "fps": 25.0,
+      "discipline": "doubles",
+      "cached_codec_versions": [
+        3
+      ],
+      "cached_frame_metadata": {
+        "calibration_state_missing": 12148,
+        "detector_observed_missing": 12148
+      },
+      "before": {
+        "strokes": 202,
+        "rallies": 27,
+        "official_rallies": 1,
+        "points": 0,
+        "shot_families": {
+          "long_serve": 6,
+          "unknown": 186,
+          "short_serve": 10
+        },
+        "track_hypotheses": {
+          "provisional": 194,
+          "unresolved": 8
+        },
+        "classification_context": {
+          "none": 202
+        }
+      },
+      "after": {
+        "strokes": 305,
+        "rallies": 28,
+        "official_rallies": 1,
+        "points": 0,
+        "shot_families": {
+          "short_serve": 15,
+          "net_shot": 23,
+          "lift": 32,
+          "push": 107,
+          "drive": 7,
+          "drop": 31,
+          "unknown": 76,
+          "clear": 7,
+          "smash": 3,
+          "long_serve": 3,
+          "rush": 1
+        },
+        "track_hypotheses": {
+          "provisional": 296,
+          "unresolved": 9
+        },
+        "classification_context": {
+          "provisional_track_episode": 296,
+          "none": 9
+        }
+      }
+    },
+    {
+      "session_id": "01M5EXGZNEVGYAJ3AR6CJS5ZG9",
+      "title": "A02 20261010205221",
+      "media_sha256": "90d1f399c05312ede173de2f2c8cd2fee09f1d201df46b476119660a00039ff0",
+      "cached_observations_sha256": "8b72389039fb73807a5798d38acff68517e5351dda76620d9633b16066101e4e",
+      "frames": 22802,
+      "expected_frames": 22802,
+      "coverage_complete": true,
+      "fps": 30.0,
+      "discipline": "singles",
+      "cached_codec_versions": [
+        5
+      ],
+      "cached_frame_metadata": {
+        "calibration_state_missing": 22802,
+        "detector_observed_missing": 22802
+      },
+      "before": {
+        "strokes": 272,
+        "rallies": 65,
+        "official_rallies": 0,
+        "points": 0,
+        "shot_families": {
+          "unknown": 254,
+          "short_serve": 13,
+          "long_serve": 5
+        },
+        "track_hypotheses": {
+          "provisional": 245,
+          "unresolved": 27
+        },
+        "classification_context": {
+          "none": 272
+        }
+      },
+      "after": {
+        "strokes": 272,
+        "rallies": 65,
+        "official_rallies": 0,
+        "points": 0,
+        "shot_families": {
+          "unknown": 254,
+          "short_serve": 13,
+          "long_serve": 5
+        },
+        "track_hypotheses": {
+          "provisional": 245,
+          "unresolved": 27
+        },
+        "classification_context": {
+          "none": 272
+        }
+      }
+    },
+    {
+      "session_id": "01M5MBR3087FH07N5B1XR5VGHW",
+      "title": "Real  Video",
+      "media_sha256": "06a5cb888e58c64421114fecc582f60b85466900efec6db0bbf99420f4f6c010",
+      "cached_observations_sha256": "a5d528d2343a183e3ba89255ffe0351107f4e0736d0dec1f7192b9cbb2b9e08e",
+      "frames": 4462,
+      "expected_frames": 4462,
+      "coverage_complete": true,
+      "fps": 30.0,
+      "discipline": "singles",
+      "cached_codec_versions": [
+        6
+      ],
+      "cached_frame_metadata": {
+        "calibration_state_missing": 4462,
+        "detector_observed_missing": 4462
+      },
+      "before": {
+        "strokes": 0,
+        "rallies": 0,
+        "official_rallies": 0,
+        "points": 0,
+        "shot_families": {},
+        "track_hypotheses": {},
+        "classification_context": {}
+      },
+      "after": {
+        "strokes": 0,
+        "rallies": 0,
+        "official_rallies": 0,
+        "points": 0,
+        "shot_families": {},
+        "track_hypotheses": {},
+        "classification_context": {}
+      }
+    }
+  ],
+  "synthetic_seed_integration_report": "synthetic-seed-replay-20261028.json",
+  "harness_snapshot": "five-video-replay-harness.py"
+}

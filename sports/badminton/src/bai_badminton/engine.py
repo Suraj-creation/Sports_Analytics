@@ -54,7 +54,12 @@ from bai_badminton.identity import IdentityResolver
 from bai_badminton.identity_review import TRACKER_IDENTITY_EVIDENCE_TYPES
 from bai_badminton.observations import PlayerSeries, WindowObs
 from bai_badminton.ontology import get_ontology
-from bai_badminton.participant_contact import ParticipantSnapshot, participant_contact_evidence
+from bai_badminton.participant_contact import (
+    ParticipantSnapshot,
+    has_target_court_provenance,
+    participant_contact_evidence,
+    participant_window,
+)
 from bai_badminton.participation import ParticipantTracker
 from bai_badminton.perception.calibration_state import CalibrationState
 from bai_badminton.perception.camera import project
@@ -233,7 +238,7 @@ class BadmintonMatchEngine:
         self._participant_shot_id: int | None = None
         self._participant_last_coverage: int | None = None
         self._participant_reference_changed = False
-        self._multi_person_identity_ambiguous = False
+        self._multi_person_identity_ambiguous = cfg.match.discipline == "doubles"
         self.activity = ActivityTracker(cfg.fps)
         self.doubles_teams = DoublesTeamTracker(cfg.fps)
         self._current_team_key: tuple[Any, ...] | None = None
@@ -533,7 +538,6 @@ class BadmintonMatchEngine:
                     kps=person.kps.copy() if person.kps is not None else None,
                     court_xy=person.court_xy,
                 )
-        self._participant_frames.append(snapshots)
         participant_events = [
             self._event(
                 "participant_observation",
@@ -550,6 +554,11 @@ class BadmintonMatchEngine:
                 self._participant_births[event.payload["participant_id"]] = event.event_id
             elif event.payload.get("kind") == "PLAYER_EXITED":
                 self._participant_births.pop(event.payload["participant_id"], None)
+        snapshots = {
+            participant_id: replace(snapshot, observation_id=self._participant_births.get(participant_id))
+            for participant_id, snapshot in snapshots.items()
+        }
+        self._participant_frames.append(snapshots)
         observation_by_track = {
             snapshot.track_id: self._participant_births[participant_id]
             for participant_id, snapshot in snapshots.items()
@@ -687,9 +696,12 @@ class BadmintonMatchEngine:
         if self._multi_person_identity_ambiguous and geometry_valid:
             # Keep visual trajectories usable for overlays without assigning a
             # singles player or allowing them into player-specific statistics.
+            snapshots_by_track = {snapshot.track_id: snapshot for snapshot in snapshots.values()}
             for p in fp.persons:
                 if p.track_id < 0 or not np.isfinite(p.conf) or not 0 <= p.conf <= 1 or not np.isfinite(p.bbox).all():
                     continue
+                snapshot = snapshots_by_track.get(p.track_id)
+                court_xy = snapshot.court_xy if snapshot is not None and has_target_court_provenance(snapshot) else None
                 self._track_out.append(
                     TrackSample(
                         frame_idx=fp.frame_idx,
@@ -699,6 +711,8 @@ class BadmintonMatchEngine:
                         participant_observation_id=observation_by_track.get(p.track_id),
                         x=float((p.bbox[0] + p.bbox[2]) / 2),
                         y=float(p.bbox[3]),
+                        court_x=court_xy[0] if court_xy else None,
+                        court_y=court_xy[1] if court_xy else None,
                         bbox=box_tuple(p.bbox),
                         keypoints=keypoint_rows(p.kps),
                         conf=float(p.conf),
@@ -810,7 +824,22 @@ class BadmintonMatchEngine:
         w = self._window(lo, self._last_frame)
         self._proc, self._proc0 = w.shuttle, lo
         i0, i1 = w.idx(start), w.idx(upto) + 1
-        contacts = {c.frame: c for c in detect_contacts(w, start=i0, stop=i1)}
+        if self.match_cfg.discipline == "doubles" and self._multi_person_identity_ambiguous:
+            a = w.frame0 - self._buf0
+            b = a + w.n
+            frames = (
+                self._participant_frames[a:b]
+                if 0 <= a <= b <= len(self._participant_frames)
+                else [{} for _ in range(w.n)]
+            )
+            episode_window = participant_window(w, frames, restrict_target_court=True)
+            # Episode hypotheses affect contact scoring, but never become P1/P2 actors.
+            contacts = {
+                c.frame: replace(c, player_id=None)
+                for c in detect_contacts(episode_window, start=i0, stop=i1, enforce_alternation=False)
+            }
+        else:
+            contacts = {c.frame: c for c in detect_contacts(w, start=i0, stop=i1)}
         t = w.shuttle
         spd = np.zeros(w.n)
         spd[1:] = np.nan_to_num(np.hypot(np.diff(t.x), np.diff(t.y)))
@@ -870,7 +899,8 @@ class BadmintonMatchEngine:
         hi = lo + w.n
         if c.player_id is None and 0 <= lo <= hi <= len(self._participant_frames):
             payload["participant_hypothesis"] = participant_contact_evidence(
-                w, self._participant_frames[lo:hi], c.frame - w.frame0
+                w, self._participant_frames[lo:hi], c.frame - w.frame0,
+                restrict_target_court=self.match_cfg.discipline == "doubles",
             )
         ev = self._event(
             "contact",
@@ -928,6 +958,28 @@ class BadmintonMatchEngine:
     def _classify(self, c: _Contact, next_frame: int | None, is_serve: bool, receiver: ContactCandidate | None) -> None:
         cand = c.cand
         bbox, _, court_xy = self._player_at(cand.player_id, cand.frame)
+        context_source = "named_player" if cand.player_id is not None else None
+        if self.match_cfg.discipline == "doubles" and cand.player_id is None:
+            hypothesis = c.event.payload.get("participant_hypothesis")
+            index = cand.frame - self._buf0
+            if (
+                isinstance(hypothesis, dict)
+                and hypothesis.get("status") == "provisional"
+                and 0 <= index < len(self._participant_frames)
+            ):
+                snapshot = self._participant_frames[index].get(hypothesis.get("participant_id"))
+                if (
+                    snapshot is not None
+                    and snapshot.track_id == hypothesis.get("track_id")
+                    and snapshot.observation_id is not None
+                    and snapshot.observation_id == hypothesis.get("observation_id")
+                ):
+                    if np.asarray(snapshot.bbox).shape == (4,) and np.isfinite(snapshot.bbox).all():
+                        bbox = snapshot.bbox
+                    if snapshot.court_xy is not None and np.isfinite(snapshot.court_xy).all():
+                        court_xy = snapshot.court_xy
+                    if bbox is not None or court_xy is not None:
+                        context_source = "provisional_track_episode"
         speed, vy = self._post_contact_kinematics(cand.frame)
         above_head: bool | None = None
         if bbox is not None and cand.shuttle_xy is not None:
@@ -961,6 +1013,8 @@ class BadmintonMatchEngine:
             "contact_event_id": c.event.event_id,
             "receiver_id": receiver.player_id if receiver else None,
         }
+        if context_source is not None:
+            payload["classification_context_source"] = context_source
         if "participant_hypothesis" in c.event.payload:
             payload["participant_hypothesis"] = c.event.payload["participant_hypothesis"]
         if cand.attribution_reason is not None:
@@ -1568,7 +1622,9 @@ class BadmintonMatchEngine:
         re-running (and re-emitting) the analysis. Returns the number of rallies restored."""
         from bai_badminton.analytics.rebuild import lineage_ids, rally_records
 
-        self._multi_person_identity_ambiguous = bool(self.store.query(types=["identity_ambiguity"]))
+        self._multi_person_identity_ambiguous = (
+            self.match_cfg.discipline == "doubles" or bool(self.store.query(types=["identity_ambiguity"]))
+        )
         prior_teams = self.store.query(types=["doubles_team_hypothesis"])
         if prior_teams and prior_teams[-1].payload.get("status") == "provisional":
             # Restart does not restore visual continuity; close the old hypothesis on the next frame.

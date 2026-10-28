@@ -401,3 +401,27 @@ def test_same_frame_reset_before_birth_starts_valid_new_epoch(tmp_path: Path):
     ledger = IdentityReviewLedger(store, {"P1"}, max_frame=100, fps=30)
     review = ledger.confirm(obs.event_id, "P1", 5, 20)
     assert [e.event_id for e in ledger.current()] == [review.event_id]
+
+
+def test_worker_rejects_generic_hypothesis_rewrite_but_accepts_label_correction(tmp_path: Path):
+    from types import SimpleNamespace
+    from bai_badminton.plugin import BadmintonSession
+
+    store = EventStore(tmp_path / "verify.sqlite", "S1")
+    hypothesis = {"participant_id": "participant-abcd-000001", "track_id": 1, "observation_id": "birth-one"}
+    event = store.append(Event(session_id="S1", type="stroke", frame_start=10, frame_end=10, pts_us=0,
+                               payload={"stroke": "drive", "participant_hypothesis": hypothesis},
+                               provenance=Provenance(model="stroke_rules_v0")))
+    session = BadmintonSession.__new__(BadmintonSession)
+    session.store = store
+    session.engine = SimpleNamespace(on_superseded=lambda _event: None)
+    session._emit = lambda _events: None
+    rejected = session.handle({"cmd": "verify_event", "event_id": event.event_id,
+                               "payload": {"participant_hypothesis": {**hypothesis, "observation_id": "forged"}}})
+    assert rejected["ok"] is False
+    assert store.get(event.event_id).payload["participant_hypothesis"] == hypothesis
+    accepted = session.handle({"cmd": "verify_event", "event_id": event.event_id, "payload": {"stroke": "clear"}})
+    assert accepted["ok"] is True
+    corrected = store.get(accepted["event_id"])
+    assert corrected.payload["stroke"] == "clear"
+    assert corrected.payload["participant_hypothesis"] == hypothesis
