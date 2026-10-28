@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "session_id": "01M5MBR3087FH07N5B1XR5VGHW",
+  "source_sha256": "06a5cb888e58c64421114fecc582f60b85466900efec6db0bbf99420f4f6c010",
+  "proxy_sha256": "ca1fb9357fbc54cbe82aebc9c429d813671bd63b2e5984bd0b810d8c883ea0bc3",
+  "timebase": "proxy_seconds",
+  "fps": 30,
+  "window_s": [30.0, 32.0],
+  "status": "draft",
+  "split": "diagnostic",
+  "exhaustive": false,
+  "review": {
+    "method": "AI visual inspection of 8 fps contact sheet before looking at model results for this window",
+    "human_verified": false,
+    "contact_is_not_visibly_confirmed": true,
+    "independent_ground_truth": false
+  },
+  "persons": [
+    {"alias": "near_left_blue_dark_yellow_shoes", "actual_name": null, "continuity": "local visual description only"},
+    {"alias": "near_right_dark", "actual_name": null, "continuity": "local visual description only"},
+    {"alias": "far_left_dark", "actual_name": null, "continuity": "distant and visually uncertain"},
+    {"alias": "far_right_light", "actual_name": null, "continuity": "distant and visually uncertain"}
+  ],
+  "shots": [{
+    "time_s": 30.35,
+    "time_window_s": [30.1, 30.6],
+    "family": "unknown",
+    "player_id": null,
+    "visual_swing_person": "near_left_blue_dark_yellow_shoes",
+    "contact_status": "possible_not_confirmed",
+    "confidence": "low",
+    "notes": "Near-left player appears to extend and move a racket; the shuttle contact, actual hitter and flight family are not visually established."
+  }],
+  "limitations": [
+    "Only two seconds sampled at 8 fps; other hits may be missing and timing is approximate.",
+    "These aliases do not establish identities through the full match.",
+    "Possible motion is not a verified contact; do not use as precision, recall or classification accuracy ground truth."
+  ],
+  "evidence": [{"path": "/home/administrator/Desktop/sport-analytics/evaluation-task3-20261028/real-30-32-sheet.jpg", "sha256": "61be14a1bfd408c8594eb2c4b54487f2420927d7db953df43241fb655c32ce01"}],
+  "reproduction": "ffmpeg -ss 30 -i proxy.mp4 -t 2 -vf fps=8,scale=300:284,tile=4x4 -frames:v 1 -q:v 5 real-30-32-sheet.jpg"
+}
