@@ -177,3 +177,58 @@ def test_late_classification_reads_the_right_shuttle_samples(tmp_path: Path) -> 
     assert prompt.keys() == late.keys() and prompt
     for f, v in prompt.items():
         assert late[f] == pytest.approx(v, rel=1e-6), f"stroke at frame {f}"
+
+
+def test_missing_shuttle_kinematics_are_persisted_as_unknown(tmp_path: Path) -> None:
+    m = make_match(["P1", "P2"])
+    store = EventStore(tmp_path / "missing-kinematics.sqlite", "S1")
+    eng = BadmintonMatchEngine("S1", EngineConfig(fps=m.fps, frame_width=1280, frame_height=720), store)
+    eng.set_calibration(0, m.homography)
+    eng._post_contact_kinematics = lambda frame: (None, None)
+    for chunk in m.chunks:
+        eng.ingest(chunk)
+    eng.flush()
+    strokes = [event for event in store.query(types=["stroke"]) if not event.payload["is_serve"]]
+    assert strokes
+    assert all(event.payload["stroke"] == "unknown" for event in strokes)
+    assert all(event.confidence is None and event.band.value == "unknown" for event in strokes)
+    assert all(event.payload["classification_abstention_reason"] == "missing_required_evidence" for event in strokes)
+
+
+def test_interpolated_shuttle_points_do_not_supply_shot_speed(tmp_path: Path) -> None:
+    import numpy as np
+
+    from bai_badminton.perception.shuttle_post import Track
+
+    store = EventStore(tmp_path / "interpolated.sqlite", "S1")
+    eng = BadmintonMatchEngine("S1", EngineConfig(fps=30, frame_width=1280, frame_height=720), store)
+    track = Track.from_arrays(np.arange(6, dtype=float) * 10, np.arange(6, dtype=float), np.ones(6, dtype=bool))
+    track.interp[1:] = True
+    eng._shuttle_around = lambda frame: (track, 0)
+    assert eng._post_contact_kinematics(0) == (None, None)
+
+
+def test_contacts_and_strokes_retain_track_at_contact_frame(tmp_path: Path) -> None:
+    from bai_engine.schema import TrackObject
+
+    m = make_match(["P1", "P2"])
+    store = EventStore(tmp_path / "track-provenance.sqlite", "S1")
+    eng = BadmintonMatchEngine("S1", EngineConfig(fps=m.fps, frame_width=1280, frame_height=720), store)
+    eng.set_calibration(0, m.homography)
+    tracks = {}
+    for chunk in m.chunks:
+        eng.ingest(chunk)
+        for sample in eng.drain_tracks():
+            if sample.obj == TrackObject.PLAYER:
+                tracks[(sample.frame_idx, sample.player_id)] = sample.track_id
+    eng.flush()
+    strokes = store.query(types=["stroke"])
+    assert strokes
+    for stroke in strokes:
+        if stroke.actors.player_id is None:
+            assert stroke.actors.track_id is None
+            continue
+        expected = tracks[(stroke.frame_start, stroke.actors.player_id)]
+        assert stroke.actors.track_id == expected
+        contact = store.get(stroke.payload["contact_event_id"])
+        assert contact is not None and contact.actors.track_id == expected

@@ -229,3 +229,19 @@ def test_canonical_point_marks_rally_score_as_available(tmp_path: Path) -> None:
         assert record.score_available is True
         assert record.score_after == {"P1": 1, "P2": 0}
         assert build(store, None, 30).score_timeline[0]["score"] == {"P1": 1, "P2": 0}
+
+
+def test_official_shot_totals_reconcile_attributed_and_unattributed_events(tmp_path: Path) -> None:
+    with EventStore(tmp_path / "events.db", "analytics") as store:
+        assigned = [store.append(event("stroke", i, i, actors=Actors(player_id=f"P{i}"),
+                                       payload={"stroke": "drive"})) for i in range(1, 5)]
+        unresolved = store.append(event("stroke", 5, 5, actors=Actors(), payload={"stroke": "unknown"}))
+        rally(store, [*assigned, unresolved, unresolved])
+        practice = store.append(event("stroke", 8, 8, actors=Actors(), payload={"stroke": "smash"}))
+        rally(store, [practice], official=False)
+        public = build(store, None, 30).to_public()
+        assert public["shot_accounting"] == {"total": 5, "attributed": 4, "unattributed": 1}
+        assert sum(sum(player["strokes"].values()) for player in public["players"].values()) == 4
+        store.append(unresolved.correct(actors=Actors(player_id="P3")))
+        corrected = build(store, None, 30).to_public()
+        assert corrected["shot_accounting"] == {"total": 5, "attributed": 5, "unattributed": 0}

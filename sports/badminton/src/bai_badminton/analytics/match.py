@@ -128,6 +128,7 @@ class MatchAnalytics:
         self.rallies: list[RallyRecord] = []  # official rallies only
         self.unofficial: list[RallyRecord] = []  # warm-up / practice / replays: timeline only
         self.players: dict[str, PlayerStats] = defaultdict(PlayerStats)
+        self.unattributed_strokes = 0
         self.heatmaps = HeatmapSet()
         self.momentum: list[dict[str, Any]] = []  # per point: {rally_no, value, leader}
         self._ewma = 0.0
@@ -139,6 +140,7 @@ class MatchAnalytics:
     def on_stroke(self, ev: Event, *, spatial_valid: bool = False) -> None:
         pid = ev.actors.player_id
         if pid is None:
+            self.unattributed_strokes += 1
             return
         st = ev.payload.get("stroke", "unknown")
         self.players[pid].strokes[st] += 1
@@ -166,6 +168,7 @@ class MatchAnalytics:
     def on_stroke_retracted(self, ev: Event) -> None:
         pid = ev.actors.player_id
         if pid is None:
+            self.unattributed_strokes = max(0, self.unattributed_strokes - 1)
             return
         st = ev.payload.get("stroke", "unknown")
         ps = self.players[pid]
@@ -351,8 +354,14 @@ class MatchAnalytics:
 
     # ------------------------------------------------------------------ public
     def to_public(self) -> dict[str, Any]:
+        attributed = sum(sum(player.strokes.values()) for player in self.players.values())
         return {
             "metric_version": 2,
+            "shot_accounting": {
+                "total": attributed + self.unattributed_strokes,
+                "attributed": attributed,
+                "unattributed": self.unattributed_strokes,
+            },
             "rallies": len(self.rallies),
             "unofficial_rallies": len(self.unofficial),
             # operational definitions: sums of segmented rally durations (shuttle in play), not

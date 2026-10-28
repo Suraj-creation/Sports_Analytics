@@ -279,3 +279,22 @@ def test_jump_smash_evidence() -> None:
     assert f0 is not None
     a0 = assess_smash(0.9, 2400, 720, True, f0)
     assert a0.p_jump is not None and a0.p_jump < 0.2
+
+@pytest.mark.parametrize("missing", ["speed_after_px_s", "flight_time_s", "hitter_court_xy"])
+def test_rule_classifier_abstains_when_required_observation_is_missing(missing: str) -> None:
+    fields = dict(frame=0, player_id="P1", is_serve=False, hitter_court_xy=(0.0, -5.5),
+                  speed_after_px_s=1500.0, frame_height_px=720.0, flight_time_s=0.8,
+                  vy_after_px_s=100.0, hitter_side="near", contact_above_head=True)
+    fields[missing] = None
+    prediction = RuleStrokeClassifier().predict(StrokeContext(**fields))
+    assert prediction.top == ("unknown", 0.0)
+    assert prediction.abstention_reason == "missing_required_evidence"
+
+
+def test_rule_classifier_abstains_on_serve_without_observed_flight() -> None:
+    context = StrokeContext(frame=0, player_id="P1", is_serve=True, hitter_court_xy=None,
+                            speed_after_px_s=None, frame_height_px=720, flight_time_s=None,
+                            vy_after_px_s=None, hitter_side=None, contact_above_head=None)
+    prediction = RuleStrokeClassifier().predict(context)
+    assert prediction.top == ("unknown", 0.0)
+    assert prediction.abstention_reason == "missing_required_evidence"

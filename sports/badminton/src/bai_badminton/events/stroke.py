@@ -44,6 +44,7 @@ class StrokeContext:
 class StrokePrediction:
     probs: dict[str, float]
     model: str
+    abstention_reason: str | None = None
 
     @property
     def top(self) -> tuple[str, float]:
@@ -74,6 +75,14 @@ class RuleStrokeClassifier:
     MAX_CONF = 0.7  # never "confirmed" from rules alone
 
     def predict(self, ctx: StrokeContext) -> StrokePrediction:
+        # An absent observation is not a zero-speed flight or a mid-court hit.
+        flight_valid = ctx.flight_time_s is not None and math.isfinite(ctx.flight_time_s) and ctx.flight_time_s > 0
+        court_valid = ctx.hitter_court_xy is not None and all(math.isfinite(v) for v in ctx.hitter_court_xy)
+        speed_valid = (ctx.speed_after_px_s is not None and math.isfinite(ctx.speed_after_px_s)
+                       and ctx.speed_after_px_s >= 0 and math.isfinite(ctx.frame_height_px)
+                       and ctx.frame_height_px > 0)
+        if not flight_valid or (not ctx.is_serve and not (court_valid and speed_valid)):
+            return StrokePrediction({"unknown": 0.0}, self.name, "missing_required_evidence")
         strokes = [s for s in get_ontology().strokes if s != "unknown"]
         scores = dict.fromkeys(strokes, 0.0)
         v = (ctx.speed_after_px_s or 0.0) / max(ctx.frame_height_px, 1.0)  # frame heights per second

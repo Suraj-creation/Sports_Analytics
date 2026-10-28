@@ -1,0 +1,46 @@
+{
+  "frame_no": 300,
+  "frame_size": {
+    "width": 1280,
+    "height": 720
+  },
+  "corners": {
+    "TL": [
+      474,
+      264
+    ],
+    "TR": [
+      803,
+      263
+    ],
+    "BR": [
+      936,
+      657
+    ],
+    "BL": [
+      344,
+      659
+    ]
+  },
+  "net": {
+    "net_Y": 402.0,
+    "net_top_Y": 285.0,
+    "left_bottom": [
+      392,
+      403
+    ],
+    "right_bottom": [
+      889,
+      401
+    ],
+    "cable_left": [
+      388,
+      285
+    ],
+    "cable_right": [
+      894,
+      285
+    ]
+  },
+  "source": "manual"
+}

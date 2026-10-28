@@ -272,3 +272,23 @@ def test_reviewed_match_intervals_are_validated_and_dispatched(
         assert client.post(url, json={"kind": "match_intervals", "intervals": [[0, 20], [30, 50]]}).status_code == 202
     assert sent[-1]["cmd"] == "set_reviewed_match_intervals"
     assert sent[-1]["intervals"] == [[0, 20], [30, 50]]
+
+
+def test_renaming_a_player_preserves_other_participants_and_metadata(client: TestClient) -> None:
+    from bai_engine.schema import PlayerInfo
+
+    session = client.app.state.repo.save(Session(
+        title="Doubles", source=Source(kind=SourceKind.UPLOAD, uri="none"),
+        players=[PlayerInfo(player_id="P1", name="A", color="red"),
+                 PlayerInfo(player_id="P2", name="B", color="blue"),
+                 PlayerInfo(player_id="P3", name="C", color="green"),
+                 PlayerInfo(player_id="P4", name="D", color="yellow")],
+    ))
+    result = client.patch(f"/api/sessions/{session.session_id}", json={"player1": "  Alice  "})
+    assert result.status_code == 200
+    players = result.json()["players"]
+    assert [(p["player_id"], p["name"], p["color"]) for p in players] == [
+        ("P1", "Alice", "red"), ("P2", "B", "blue"),
+        ("P3", "C", "green"), ("P4", "D", "yellow"),
+    ]
+    assert client.get(f"/api/sessions/{session.session_id}").json()["players"] == players

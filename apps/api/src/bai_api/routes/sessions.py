@@ -129,11 +129,18 @@ def patch(session: SessionDep, body: SessionPatch, r: Repo) -> Session:
     if body.title is not None:
         changes["title"] = body.title.strip() or session.title
     if body.player1 is not None or body.player2 is not None:
-        cur = {p.player_id: p.name for p in session.players}
-        changes["players"] = _players(
-            body.player1 if body.player1 is not None else cur.get("P1"),
-            body.player2 if body.player2 is not None else cur.get("P2"),
-        )
+        updates = {"P1": body.player1, "P2": body.player2}
+        players = list(session.players)
+        for player_id, name in updates.items():
+            if name is None:
+                continue
+            cleaned = name.strip()[:80] or None
+            index = next((i for i, player in enumerate(players) if player.player_id == player_id), None)
+            if index is None:
+                players.append(PlayerInfo(player_id=player_id, name=cleaned))
+            else:
+                players[index] = players[index].model_copy(update={"name": cleaned})
+        changes["players"] = players
     return public_session(r.update(session.session_id, **changes) if changes else session)
 
 

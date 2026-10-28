@@ -267,7 +267,7 @@ class BadmintonMatchEngine:
         self._shot: list[int] = []
         self._geometry_valid: list[bool] = []
         self._players: dict[str, dict[str, list[Any]]] = {
-            pid: {"bbox": [], "kps": [], "court": []} for pid in ("P1", "P2")
+            pid: {"bbox": [], "kps": [], "court": [], "track_id": []} for pid in ("P1", "P2")
         }
         self._proc: Track | None = None  # processed shuttle over the current window
         self._proc0 = 0
@@ -641,6 +641,7 @@ class BadmintonMatchEngine:
             buf["bbox"].append(a.bbox if a is not None else None)
             buf["kps"].append(a.kps if a is not None and a.kps is not None else None)
             buf["court"].append(a.court_xy if a is not None else None)
+            buf["track_id"].append(a.track_id if a is not None and a.track_id >= 0 else None)
         # identity-resolved track samples for the track store / live overlays (raw frame pixels)
         self._track_out.append(
             TrackSample(
@@ -823,11 +824,14 @@ class BadmintonMatchEngine:
         self._emit(out)
 
     def _on_contact(self, c: ContactCandidate, w: WindowObs) -> None:
+        i = c.frame - self._buf0
+        buf = self._players.get(c.player_id or "")
+        track_id = buf["track_id"][i] if buf is not None and 0 <= i < len(buf["track_id"]) else None
         ev = self._event(
             "contact",
             c.frame,
             c.frame,
-            actors=Actors(player_id=c.player_id),
+            actors=Actors(player_id=c.player_id, track_id=track_id),
             payload={"shuttle_xy": list(self._raw_xy(c.frame, c.shuttle_xy) or ()) or None},
             confidence=c.p,
             evidence=(
@@ -863,7 +867,7 @@ class BadmintonMatchEngine:
         if located is None:
             return None, None
         t, i = located
-        idx = [j for j in range(i + 1, min(len(t), i + 6)) if t.vis[j]]
+        idx = [j for j in range(i + 1, min(len(t), i + 6)) if t.vis[j] and not t.interp[j]]
         if len(idx) < 2:
             return None, None
         dt = (idx[-1] - idx[0]) / self.cfg.fps
@@ -918,6 +922,8 @@ class BadmintonMatchEngine:
             "contact_event_id": c.event.event_id,
             "receiver_id": receiver.player_id if receiver else None,
         }
+        if pred.abstention_reason is not None:
+            payload["classification_abstention_reason"] = pred.abstention_reason
         if receiver is not None:
             _, _, rc = self._player_at(receiver.player_id, receiver.frame)
             payload["receiver_court_xy"] = list(rc) if rc else None
@@ -940,7 +946,7 @@ class BadmintonMatchEngine:
                         payload["subtype"] = "jump_smash"
                         payload["label"] = self.ont.subtypes["jump_smash"]["label"]
         margin = pred.margin
-        conf = float(min(p, 0.99))
+        conf = None if stroke == "unknown" else float(min(p, 0.99))
         band = self.ont.band(conf)
         if margin < 0.15 and band is ConfidenceBand.CONFIRMED:
             band = ConfidenceBand.PROBABLE
@@ -948,7 +954,10 @@ class BadmintonMatchEngine:
             "stroke",
             cand.frame,
             cand.frame,
-            actors=Actors(player_id=cand.player_id, opponent_id=_OPPONENT.get(cand.player_id or "")),
+            actors=Actors(
+                player_id=cand.player_id, track_id=c.event.actors.track_id,
+                opponent_id=_OPPONENT.get(cand.player_id or ""),
+            ),
             payload=payload,
             confidence=conf,
             band=band,
