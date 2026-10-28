@@ -10,10 +10,11 @@ import sqlite3
 from collections import Counter, defaultdict
 from pathlib import Path
 
+from bai_badminton.ontology import get_ontology
 from bai_engine.schema.events import Event, EventStatus, current_view
 from bai_engine.schema.session import Session
 
-VERSION = "shot-benchmark-v1"
+VERSION = "shot-benchmark-v2"
 MISSED, SPURIOUS = "__missed__", "__spurious__"
 
 
@@ -55,7 +56,7 @@ def validate_inputs(labels: dict, predictions: dict, *, allow_draft: bool = Fals
                 or not window[0] <= t < window[1]
             ):
                 raise ValueError(f"{name}: shot outside window")
-            if not isinstance(family, str) or not family or family in (MISSED, SPURIOUS):
+            if not isinstance(family, str) or family not in get_ontology().strokes:
                 raise ValueError(f"{name}: invalid family")
             if row.get("player_id") is not None and (not isinstance(row["player_id"], str) or not row["player_id"]):
                 raise ValueError(f"{name}: invalid player identity")
@@ -147,9 +148,36 @@ def evaluate(labels: dict, predictions: dict, *, tolerance_s: float = 0.2, allow
     correct = sum(a["player_id"] == b.get("player_id") for a, b in labelled)
     resolved = sum(b.get("player_id") is not None for _, b in labelled)
     errors = [abs(gt[i]["time_s"] - pred[j]["time_s"]) for i, j in pairs]
+    eligible = labels["status"] == "reviewed" and labels["split"] == "held_out"
+    # Unknown truth is an unobservable class, not a successful unknown class.
+    # Preserve the legacy confusion metric while exposing scoreable support.
+    excluded_family = {j for i, j in pairs if gt[i]["family"] == "unknown"}
+    known_truth = [row for row in gt if row["family"] != "unknown"]
+    family_pred = [row for j, row in enumerate(pred) if j not in excluded_family]
+    known_metrics = {}
+    for family in sorted({r["family"] for r in known_truth + family_pred} - {"unknown"}):
+        support = sum(r["family"] == family for r in known_truth)
+        predicted = sum(r["family"] == family for r in family_pred)
+        tp = sum(gt[i]["family"] == family == pred[j]["family"] for i, j in pairs)
+        known_metrics[family] = {
+            "support": support,
+            "predicted": predicted,
+            "true_positive": tp,
+            "precision": _ratio(tp, predicted),
+            "recall": _ratio(tp, support),
+            "f1": _ratio(2 * tp, support + predicted),
+        }
+    end_to_end = end_to_end_metrics(gt, pred, pairs)
     return {
         "evaluator_version": VERSION,
-        "accuracy_claim_eligible": labels["status"] == "reviewed" and labels["split"] == "held_out",
+        "accuracy_claim_eligible": eligible,
+        "taxonomy_version": get_ontology().version,
+        "metric_eligibility": {
+            "contact_detection": eligible and bool(gt),
+            "known_family_classification": eligible and bool(known_truth),
+            "hitter_attribution": eligible and any(r.get("player_id") is not None for r in gt),
+            "joint_contact_family_hitter": eligible and bool(end_to_end["joint_contact_family_hitter"]["truth_count"]),
+        },
         "session_id": labels["session_id"],
         "media_sha256": labels["media_sha256"],
         "window_s": labels["window_s"],
@@ -167,6 +195,18 @@ def evaluate(labels: dict, predictions: dict, *, tolerance_s: float = 0.2, allow
         "macro_f1": sum(m["f1"] for m in metrics.values()) / len(metrics) if metrics else None,
         "confusion": {k: dict(v) for k, v in confusion.items()},
         "unknown_prediction_fraction": _ratio(sum(r["family"] == "unknown" for r in pred), len(pred)),
+        "known_family": {
+            "truth_support": len(known_truth),
+            "excluded_unknown_truth": len(gt) - len(known_truth),
+            "excluded_predictions_on_unknown_truth": len(excluded_family),
+            "per_class": known_metrics,
+            "macro_f1": (
+                sum(v["f1"] for v in known_metrics.values()) / len(known_metrics)
+                if known_truth and known_metrics
+                else None
+            ),
+        },
+        "end_to_end": end_to_end,
         "attribution": {
             "labelled": len(labelled),
             "correct": correct,
@@ -179,6 +219,54 @@ def evaluate(labels: dict, predictions: dict, *, tolerance_s: float = 0.2, allow
             {"truth_time_s": gt[i]["time_s"], "event_id": pred[j]["event_id"], "prediction_time_s": pred[j]["time_s"]}
             for i, j in pairs
         ],
+    }
+
+
+def end_to_end_metrics(gt: list[dict], pred: list[dict], pairs: list[tuple[int, int]]) -> dict:
+    """Count wrong, missed, unresolved and spurious events without rebinding actors.
+
+    A prediction matched to unobservable truth is excluded for that property.
+    Unmatched predictions remain false positives, including unknown predictions
+    for the joint metric. This makes conditional accuracy distinct from event P/R.
+    """
+    excluded_person = {j for i, j in pairs if gt[i].get("player_id") is None}
+    people = sorted({r["player_id"] for r in gt + pred if r.get("player_id") is not None})
+    metrics = {}
+    for person in people:
+        support = sum(r.get("player_id") == person for r in gt)
+        predicted = sum(r.get("player_id") == person for j, r in enumerate(pred) if j not in excluded_person)
+        tp = sum(gt[i].get("player_id") == person == pred[j].get("player_id") for i, j in pairs)
+        metrics[person] = {
+            "truth_count": support,
+            "prediction_count": predicted,
+            "true_positives": tp,
+            "false_positives": predicted - tp,
+            "false_negatives": support - tp,
+            "precision": _ratio(tp, predicted),
+            "recall": _ratio(tp, support),
+            "f1": _ratio(2 * tp, support + predicted),
+        }
+    scorable = {i for i, row in enumerate(gt) if row["family"] != "unknown" and row.get("player_id") is not None}
+    excluded_joint = {j for i, j in pairs if i not in scorable}
+    predicted = len(pred) - len(excluded_joint)
+    tp = sum(
+        i in scorable and gt[i]["family"] == pred[j]["family"] and gt[i]["player_id"] == pred[j].get("player_id")
+        for i, j in pairs
+    )
+    return {
+        "per_person": metrics,
+        "joint_contact_family_hitter": {
+            "truth_count": len(scorable),
+            "prediction_count": predicted,
+            "true_positives": tp,
+            "false_positives": predicted - tp,
+            "false_negatives": len(scorable) - tp,
+            "precision": _ratio(tp, predicted),
+            "recall": _ratio(tp, len(scorable)),
+            "f1": _ratio(2 * tp, len(scorable) + predicted),
+            "excluded_ambiguous_truth": len(gt) - len(scorable),
+            "excluded_predictions_on_ambiguous_truth": len(excluded_joint),
+        },
     }
 
 

@@ -1,0 +1,105 @@
+{
+  "baseline_revision": "449ec48e6c6193e65a213c200323a998b8494be9",
+  "implementation_sha256": {
+    "research/tracking_benchmark.py": "bb277d3687611bfeac772986a5dfd5656b8d3f1841472989b01b62f547b4389d",
+    "research/shot_benchmark.py": "393c3e2da023bf9092b7475449973102f59eb417328084458fc4f8953171b9e7",
+    "research/participant_benchmark.py": "6cbff103b6b0f2cfbc1c9e7a88feef25542b1a977e576c32ae40e12b03d1f37c",
+    "sports/badminton/src/bai_badminton/analytics/automatic_individual.py": "e3200464ca174b833b940ab93493ac520c9ad5aa54973af3377bf795a8bca4dc",
+    "docs/testing/task2/continuation/fresh_session_benchmark.py": "0708491da992956a1c3f3c49de085a5a8b1a531b3ff0ab1f5a7ac67acb16478b"
+  },
+  "annotation_sha256": {
+    "doubles-62-64-blind-motion-ai-draft.json": "6b794c3fc33ea1fc3f82dc69ccc7609b133096739fed894c17d08e75e63dd581",
+    "doubles-tracking-60-70-ai-draft.json": "7b27b7fe05190e28f8e4fea8d844db8214fd8603757731d42b1c06e12eb9a995",
+    "doubles-tracking-60-70-independent-ai-draft.json": "57661ce73ff6ca680e0e39ebf143ac32550da00591d3382f96946d090edad98f"
+  },
+  "original_session_integrity": {
+    "01M55MFY9GQF6ZXP2SQPQ8X1KG": {
+      "unchanged": true,
+      "sha256": "02b683ddf281f0bcea356802dd3714df65b23d80c8b178d17664318c348c0431",
+      "method": "newline_joined_event_bodies"
+    },
+    "01M55NQMRAS0ATB73XE3XA6S74": {
+      "unchanged": true,
+      "sha256": "c51e7d39e99d0338187074428a545e72106dc56588209fbf6d83f75d77a6d971",
+      "method": "newline_joined_event_bodies"
+    },
+    "01M56T2EED5Z7W9VTGG19FHNTF": {
+      "unchanged": true,
+      "sha256": "45f4f22343ea0f9fdae090f8a0fb6a1988d324cdb58a45bc57c1739afb291626",
+      "method": "newline_joined_event_bodies"
+    },
+    "01M5EXGZNEVGYAJ3AR6CJS5ZG9": {
+      "unchanged": true,
+      "sha256": "2e8802fcfe3f200ad309ef7958c15293a8e4b93f06e3f019e8578cb6a1013bee",
+      "method": "newline_joined_event_bodies"
+    },
+    "01M5MBR3087FH07N5B1XR5VGHW": {
+      "unchanged": true,
+      "sha256": "7b38c0a606cf4b85092907556f1639734ae59f56c9b1c8a90cf13a7df7259967",
+      "method": "newline_joined_event_bodies"
+    }
+  },
+  "production_profile_unchanged": true,
+  "models": {
+    "tracknetv3": {
+      "version": "3.0",
+      "license": "MIT (qaz812345/TrackNetV3 code + checkpoints); HF mirror of the official Google Drive release",
+      "sha256": "df867641a02712b021f04548ff4b1208ddfdb47f629ab2094ceb978667e83b1a",
+      "filename": "TrackNet_best.pt"
+    },
+    "rfdetr_small": {
+      "version": "1.4.2",
+      "license": "Apache-2.0 (RF-DETR); ONNX export mirror",
+      "sha256": "fcd3c3c4e0d3d5533ee9c3a174deb7f02dfe4b042b6fdd3d29040f3c6da7845e",
+      "filename": "rfdetr_s_v142_512x512.onnx"
+    },
+    "rtmpose_m_body7": {
+      "version": "1.0",
+      "license": "Apache-2.0 (MMPose RTMPose)",
+      "sha256": "5c0a4bf67953e6d2ac43ce15e77dc9d5d354ae18430a47d2c5963a7bc5683e3c",
+      "filename": "end2end.onnx"
+    }
+  },
+  "runtime_versions": {
+    "torch": "2.14.1+cu126",
+    "onnxruntime-gpu": "1.29.0",
+    "opencv-python": "5.0.0.93",
+    "av": "19.0.1",
+    "numpy": "2.5.3",
+    "scipy": "1.18.1"
+  },
+  "gpu_environment_sha256": "7139b6e55c7d2089a93afa7310a6a3f0abf9f69a6afd124dbfc375548a6fb294",
+  "gpu": [
+    "0, NVIDIA GeForce GTX 1080 Ti, 580.178.04",
+    "1, NVIDIA GeForce GTX 1080 Ti, 580.178.04"
+  ],
+  "independent_review_images_sha256": {
+    "blind-frame-150-fullheight.jpg": "5a41f8c6e95ed73d5c0f7b33b09285aa3a49effd58f05603a49ae0ed43cc18b1",
+    "blind-frame-075.jpg": "536ae5f43180cf7a10ebd8ca617335c087277496815029e39c2f60dea429bc7b",
+    "blind-frame-225.jpg": "756deb6178021266e3464320e739fba653e767e4b3b1b48c4cd10882b0cc2902",
+    "blind-frame-060.jpg": "4240c9308226f33dbc3408ac8e11283713a44315236d5730d443662d6f15164a",
+    "blind-frame-105.jpg": "e3f59972c2d6e94167dbc5bdbd7c1e1a629828eddda6b611286685889a730079",
+    "blind-frame-090.jpg": "838c943bf65da3350dfc96135bc3ae2245ae7b0c0ff561065b3f84db1eee7aa9",
+    "blind-frame-120.jpg": "37c8fd71a396ba37ff0cb5ebccadc51ae2d726014cf176a7965c5d61064fc5e4",
+    "blind-frame-195.jpg": "f84598c9e139d820a94db7361ca42df075b769fb57cf37787e0b9987675c89fc",
+    "blind-frame-165.jpg": "f1b1f2885ea1205b8b2d617d3369ffe7ca819ec39020e1ec04782bb0accf8895",
+    "blind-frame-135.jpg": "8c63649b474838f5feee838f59de51f77ca372dd2d74c36d1497b3737be48314",
+    "blind-frame-210.jpg": "82cae49014b6791c4506acf5940f9682523e446acfce171063126d68e19d5cd6",
+    "blind-frame-180.jpg": "b9d991581bb06673e5c127960a2cc94451ea43a7aba9a1ad719da0e97e5451ff",
+    "blind-frame-150.jpg": "f00206a8c486945e03d7fa3392c886420ffbae2a3a20f383e90ca2a754e1f738",
+    "blind-frame-015.jpg": "806101535e0a4cf45363905150cbf682fc6200f5525f4e58f5d4be6e4d0c4042",
+    "blind-frame-045.jpg": "65aa2a256abb5c6458081124c51db65342e1f9c3310120a1edf6084e8a08cc47",
+    "blind-frame-030.jpg": "5eef06ff3c0d26a617f2b131cf81ead638f6c1ef131b9142926347cae4492b8c",
+    "blind-frame-000.jpg": "9d3b465c2b4a5450ad71798edb82614edb163933a1c9b0852a890b6bf2bcd483"
+  },
+  "contact_review_images_sha256": {
+    "contact-sheet-3.jpg": "e8227b9e846e913e50fa680e38a293d9e1c86712ce72d75fdf8b41124aa186e0",
+    "contact-sheet-0.jpg": "b3bf2d50d448a9ebe18e86552c86d38b9c200d696199fc4ba1fc5ff4b2fbfd1e",
+    "contact-sheet-6.jpg": "34ce52a849df80b876c9786e1359905d994c6ac91444c9857a3181fda03e5ffd",
+    "contact-sheet-2.jpg": "602c893d9e7238f855557e63faa457a33230384dd7e1bff9b9d62c0f03a6ca31",
+    "contact-sheet-4.jpg": "1c4715880cd7169e39255adb9030713a3b329a3db8f6aca6af9c7108c29fbcfc",
+    "contact-sheet-5.jpg": "7827043ca89321d66782b4134c21a4e08171eaa4603f5ccf74e5c39bb105747f",
+    "contact-sheet-1.jpg": "bda34a919278550a92f9da82edefd3d5ebeba20e298106629760c1450b521f63"
+  },
+  "accuracy_claim_eligible": false
+}

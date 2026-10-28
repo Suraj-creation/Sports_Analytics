@@ -1,0 +1,46 @@
+{
+  "schema_version": "ai-motion-review-v1",
+  "status": "draft",
+  "human_reviewed": false,
+  "exhaustive": false,
+  "evaluation_eligible": false,
+  "media": {
+    "sha256": "e50e00223bf41468ac4c913ff5a7647d909563326d256be8037fe79fedace640",
+    "fps_num": 25,
+    "fps_den": 1,
+    "width": 1280,
+    "height": 720
+  },
+  "review_window_s": [2.0, 4.0],
+  "parent_window_s": [62.0, 64.0],
+  "review": {
+    "origin": "independent_ai_source_video_review",
+    "blind_to_predictions": true,
+    "method": "Every source frame 50 through 99, chronological sheets, no model overlays.",
+    "hitter_identity_status": "unverified_visual_draft",
+    "limitation": "The opening begins during a follow-through, contact is blurred, and the closing action lacks following flight. This is not an exhaustive contact annotation."
+  },
+  "candidate_motion_windows": [
+    {
+      "frames_inclusive": [57, 62],
+      "time_range_s": [2.28, 2.48],
+      "contact_confirmed": false,
+      "family": "unknown",
+      "hitter_draft": "far-initial-right",
+      "evidence": "Compact racket movement while crouching, followed by the shuttle returning toward the near-right side. Block versus drive is unresolved; exact racket-shuttle conjunction is blurred."
+    },
+    {
+      "frames_inclusive": [80, 83],
+      "time_range_s": [3.2, 3.32],
+      "contact_confirmed": false,
+      "family": "unknown",
+      "hitter_draft": "near-initial-rear",
+      "evidence": "Deep lateral lunge with a low racket sweep, followed by upward/forward shuttle motion toward the far-left player. Net, block and lift distinctions are unresolved."
+    }
+  ],
+  "boundary_cases": [
+    {"frames_inclusive": [50, 51], "hitter_draft": "near-initial-rear", "family": "unknown", "contact_confirmed": false, "note": "Contact may precede the window; broad forehand follow-through is already underway."},
+    {"frames_inclusive": [97, 99], "hitter_draft": "far-initial-left", "family": "unknown", "contact_confirmed": false, "note": "Compact forward action; outgoing flight beyond this window is unavailable."}
+  ],
+  "negative_evidence": "Near-initial-front racket adjustments around frames 62-69 do not establish a contact. No outcome or winner is assigned."
+}

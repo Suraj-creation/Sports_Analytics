@@ -1,0 +1,50 @@
+{
+  "label": "main449",
+  "status": "analysed",
+  "source_session": "01M60K38M17QTHTE7QFC1RDG0N",
+  "source_sha256": "e50e00223bf41468ac4c913ff5a7647d909563326d256be8037fe79fedace640",
+  "proxy_sha256": "316120c31b96e17aeebc4d8b3977affbdbb46c00637069cd4147b51d928d6b4c",
+  "calibration_sha256": "2fe48a9799561a7b3205d0b91be8a15833b61da4bb14488cf460f96e50b83d64",
+  "media_frames": 250,
+  "analysed_frames": 250,
+  "analysis_wall_s": 21.149,
+  "sampled_peak_gpu_mib": 2126,
+  "event_counts": {
+    "calibration": 1,
+    "activity_interval": 3,
+    "scene": 1,
+    "rally_start": 1,
+    "rally_end": 1,
+    "participant_observation": 6,
+    "stroke": 15,
+    "contact": 16,
+    "doubles_team_hypothesis": 3
+  },
+  "stroke_families": {
+    "short_serve": 1,
+    "push": 4,
+    "unknown": 5,
+    "clear": 1,
+    "drop": 4
+  },
+  "calibration_state_frames": {
+    "REACQUIRING": 2,
+    "VALID": 248
+  },
+  "pose_stride_frames": {
+    "6": 50,
+    "1": 200
+  },
+  "detector_run_frames": {
+    "True": 109,
+    "False": 141
+  },
+  "visible_shuttle_frames": 211,
+  "activity_state_frames": {
+    "reacquiring": 2,
+    "unknown": 77,
+    "active_play": 171
+  },
+  "accuracy_claim": false,
+  "measurement_note": "Fresh perception and semantic analysis, including model loading and seeding; copied source media/calibration. Timing is one run, not a controlled performance study. No labelled contact, family or identity accuracy."
+}

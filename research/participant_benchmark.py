@@ -135,7 +135,7 @@ def evaluate_participants(
         for a, b in labelled
     )
     return {
-        "version": "participant-benchmark-v1",
+        "version": "participant-benchmark-v2",
         "accuracy_claim_eligible": (
             base["accuracy_claim_eligible"]
             and bindings["status"] == "reviewed"
@@ -161,7 +161,12 @@ def evaluate_participants(
             )
         },
         "shot_classification": {
-            key: base[key] for key in ("per_class", "macro_f1", "confusion", "unknown_prediction_fraction")
+            key: base[key]
+            for key in ("per_class", "macro_f1", "confusion", "unknown_prediction_fraction", "known_family")
+        },
+        "end_to_end": base["end_to_end"],
+        "metric_eligibility": {
+            key: value and bindings["status"] == "reviewed" for key, value in base["metric_eligibility"].items()
         },
         "participant": {
             "labelled_truth": truth_total,

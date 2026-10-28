@@ -1,0 +1,20 @@
+{
+  "scope": "isolated_detector_cadence_experiment",
+  "base_profile_sha256": "d35417229de590867c4ff043a51267b01e5fe594dbdc09df7c05c12addb47552",
+  "experiment_profile_sha256": "074fc3cf4d99ce8e6ed68956767ba7ecb6df50d61c537c03108a6175b655890e",
+  "change": {
+    "detector_rates": {
+      "before": {
+        "in_play": 2,
+        "idle": 6,
+        "replay": 0
+      },
+      "after": {
+        "in_play": 1,
+        "idle": 1,
+        "replay": 0
+      }
+    }
+  },
+  "production_profile_changed": false
+}

@@ -26,6 +26,7 @@ p.add_argument("--source-data", type=pathlib.Path, required=True)
 p.add_argument("--session-id", required=True)
 p.add_argument("--output", type=pathlib.Path, required=True)
 p.add_argument("--label", required=True)
+p.add_argument("--runtime-root", type=pathlib.Path, help="Existing model/config root when source data is a backup")
 args = p.parse_args()
 source = args.source_data.resolve()
 out = args.output.resolve()
@@ -69,7 +70,7 @@ repo.save(
     )
 )
 repo.events(session.session_id).append(Event.model_validate(calibration.model_dump(exclude={"seq", "supersedes"})))
-primary = source.parent
+primary = args.runtime_root.resolve() if args.runtime_root else source.parent
 settings = Settings(
     _env_file=None,
     data_dir=data,

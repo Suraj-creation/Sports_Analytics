@@ -29,6 +29,7 @@ MIN_TRACK_CONFIDENCE = 0.5
 MAX_HEIGHT_RATIO = 2.0
 MIN_DISPLACEMENT_LIMIT = 0.5
 MAX_DISPLACEMENT_PER_GAP_FRAME = 0.25
+MAX_COMPETING_BOX_IOU = 0.3
 
 
 def _continuous(
@@ -41,8 +42,14 @@ def _continuous(
     frame_height: int,
     *,
     require_detector_runs: bool = True,
+    reject_competing_overlap: bool = True,
 ) -> bool:
     """Require bounded track continuity; detector runs are frame-level, not person matches."""
+    competitors: dict[int, list[dict[str, Any]]] = {}
+    if reject_competing_overlap:
+        for row in rows:
+            if row["track_id"] != track_id and start <= row["frame_idx"] <= end:
+                competitors.setdefault(row["frame_idx"], []).append(row)
     rows = [row for row in rows if row["track_id"] == track_id and start <= row["frame_idx"] <= end]
     counts = Counter(row["frame_idx"] for row in rows)
     if not rows or any(count != 1 for count in counts.values()):
@@ -66,6 +73,27 @@ def _continuous(
             and 0 <= box[1] < box[3] <= frame_height
         ):
             return False
+        for other in competitors.get(row["frame_idx"], []):
+            b, score = other.get("bbox"), other.get("conf")
+            if not (
+                other.get("visible") is True
+                and isinstance(score, (float, int))
+                and not isinstance(score, bool)
+                and isfinite(score)
+                and MIN_TRACK_CONFIDENCE <= score <= 1
+                and b is not None
+                and len(b) == 4
+                and all(isinstance(v, (int, float)) and not isinstance(v, bool) and isfinite(v) for v in b)
+                and 0 <= b[0] < b[2] <= frame_width
+                and 0 <= b[1] < b[3] <= frame_height
+            ):
+                continue
+            intersection = max(0, min(box[2], b[2]) - max(box[0], b[0])) * max(0, min(box[3], b[3]) - max(box[1], b[1]))
+            union = (box[2] - box[0]) * (box[3] - box[1]) + (b[2] - b[0]) * (b[3] - b[1]) - intersection
+            # Overlap cannot prove an ID switch, but invalidates propagation of
+            # a named seed through that ambiguous interval. It never merges IDs.
+            if intersection / union >= MAX_COMPETING_BOX_IOU:
+                return False
     if require_detector_runs:
         # None is legacy/unknown provenance; False means the detector explicitly did not run.
         flags = [row.get("detector_observed") for row in rows]
@@ -218,8 +246,15 @@ def build_estimated_individual_analytics(
             return None, "episode_boundary"
         shot_rows = track_interval(frame, frame)
         if not _continuous(
-            shot_rows, obs.event_id, track, frame, frame, frame_width, frame_height,
+            shot_rows,
+            obs.event_id,
+            track,
+            frame,
+            frame,
+            frame_width,
+            frame_height,
             require_detector_runs=False,
+            reject_competing_overlap=False,
         ):
             return None, "shot_frame_track_unavailable"
         sample = next(row for row in shot_rows if row["track_id"] == track and row["frame_idx"] == frame)
@@ -424,6 +459,8 @@ def build_estimated_individual_analytics(
             "max_box_height_ratio": MAX_HEIGHT_RATIO,
             "min_footpoint_jump_limit_body_heights": MIN_DISPLACEMENT_LIMIT,
             "max_footpoint_jump_per_frame_body_heights": MAX_DISPLACEMENT_PER_GAP_FRAME,
+            "max_competing_box_iou": MAX_COMPETING_BOX_IOU,
+            "overlap_policy": "abstain_named_propagation_preserve_anonymous_candidates",
             "warning": "A detector run is frame-level evidence, not proof that it matched this person. "
             "Estimates may be wrong if a tracker switches people without recording an ambiguity. "
             "All-linked counts include non-official rallies and are not match scores.",

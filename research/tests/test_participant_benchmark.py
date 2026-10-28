@@ -269,3 +269,17 @@ def test_empty_identity_labels_cannot_support_participant_accuracy_claim():
     assert result["participant"]["labelled_truth"] == 0
     assert result["participant"]["accuracy_all_labelled_truth"] is None
     assert result["accuracy_claim_eligible"] is False
+
+
+def test_person_precision_counts_spurious_and_wrong_episode_selection():
+    labels, predictions, bindings = inputs()
+    result = evaluate_participants(labels, predictions, bindings)
+    person = result["end_to_end"]["per_person"]
+    assert person["alice"]["true_positives"] == 1
+    assert person["alice"]["false_positives"] == 1
+    assert person["alice"]["false_negatives"] == 1
+    assert person["bob"]["false_positives"] == 1
+    joint = result["end_to_end"]["joint_contact_family_hitter"]
+    assert joint["precision"] == 0.25
+    assert joint["recall"] == pytest.approx(1 / 3)
+    assert result["shot_classification"]["known_family"]["truth_support"] == 3

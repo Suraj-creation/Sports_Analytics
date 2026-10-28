@@ -46,4 +46,26 @@ source ../gpu-env.sh
 
 The tool reads the existing catalogue and session event store without modifying them. It compares the reviewed manifest with the current event view and emits hashes of both annotation file and event log. Draft files require `--allow-draft` and are explicitly ineligible for accuracy claims. `accuracy_claim_eligible` signals only reviewed held-out status and human-attestation; it does not verify recording separation or annotation quality. Save the JSON report outside historical session stores before making changes, then use the same labels, tolerance, session and windows to compare; retain version, code revision, analysis configuration and resource measurements separately.
 
-Matches maximize the number of chronological one-to-one pairs within tolerance, then minimize total absolute timestamp error. Missed truth events and spurious predictions appear in the confusion matrix and lower per-class F1; `unknown` is a class, not a missing event. Macro-F1 averages over classes appearing in truth or predictions. Precision or recall without a denominator is null. Attribution accuracy is conditional on a matched shot with a labelled hitter; `accuracy_all_labelled` includes unresolved predictions as incorrect, while `accuracy_resolved` excludes them and must be reported with the unresolved count. Timestamp error is conditional on a match. These are not end-to-end per-player accuracy estimates; use the detection and unresolved counts alongside them. A small/nonrepresentative sample cannot justify a general accuracy claim. Manual corrections in the current event view affect the result: distinguish machine-only from corrected evaluations.
+Matches maximize the number of chronological one-to-one pairs within tolerance,
+then minimize total absolute timestamp error. Missed truth events and spurious
+predictions appear in the confusion matrix and lower per-class F1. Version 2
+validates family keys against the project ontology and reports its taxonomy
+version. The legacy `per_class`, `confusion` and `macro_f1` fields retain
+`unknown` as a class for comparison with previous reports. **An unknown-to-unknown
+match is not evidence of correct known-family classification.** Use
+`known_family`: it excludes unknown truth and predictions matched to that
+unobservable truth, while missed known truth, wrong known families and spurious
+known predictions lower its scores. Its macro-F1 is null without known truth.
+Report `metric_eligibility` and support separately for each property.
+
+Attribution accuracy remains conditional on matched shots with labelled hitters.
+`accuracy_all_labelled` counts unresolved predictions as incorrect;
+`accuracy_resolved` excludes them and must accompany unresolved/missed counts.
+For event accounting, use `end_to_end.per_person` precision/recall/F1 and
+`joint_contact_family_hitter`. The joint metric requires time, family and person
+to agree; missed, wrong, unresolved and spurious events are errors. Predictions
+matched to unobservable family/person truth are excluded only for that property,
+with joint exclusion counts shown. Timestamp error is conditional on a match.
+Small/nonrepresentative samples cannot establish general accuracy. Manual
+corrections affect the current event view: distinguish machine-only from
+corrected evaluations.

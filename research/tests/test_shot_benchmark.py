@@ -225,3 +225,58 @@ def test_review_metadata_must_be_a_mapping(review):
     labels["review"] = review
     with pytest.raises(ValueError, match="human"):
         evaluate(labels, predictions)
+
+
+def test_unknown_only_is_no_evidence_of_known_family_classification():
+    labels, predictions = documents()
+    labels["shots"] = [{"time_s": 1, "family": "unknown"}]
+    predictions["shots"] = [{"time_s": 1, "family": "unknown", "event_id": "e1"}]
+    result = evaluate(labels, predictions)
+    assert result["known_family"]["truth_support"] == 0
+    assert result["known_family"]["macro_f1"] is None
+    assert result["metric_eligibility"]["known_family_classification"] is False
+
+
+def test_unrecognized_family_is_rejected_instead_of_silently_scored():
+    labels, predictions = documents()
+    predictions["shots"][0]["family"] = "smsh"
+    with pytest.raises(ValueError, match="family"):
+        evaluate(labels, predictions)
+
+
+def test_joint_hitter_precision_penalizes_spurious_assigned_shots():
+    labels, predictions = documents()
+    labels["shots"] = [{"time_s": 1, "family": "smash", "player_id": "P1"}]
+    predictions["shots"] = [
+        {"time_s": 1, "family": "smash", "player_id": "P1", "event_id": "right"},
+        {"time_s": 2, "family": "smash", "player_id": "P1", "event_id": "extra"},
+    ]
+    result = evaluate(labels, predictions)
+    assert result["end_to_end"]["per_person"]["P1"]["precision"] == 0.5
+    assert result["end_to_end"]["per_person"]["P1"]["recall"] == 1
+    assert result["end_to_end"]["joint_contact_family_hitter"]["precision"] == 0.5
+
+
+def test_wrong_family_and_hitter_cannot_count_as_joint_success():
+    labels, predictions = documents()
+    labels["shots"] = [{"time_s": 1, "family": "smash", "player_id": "P1"}]
+    predictions["shots"] = [{"time_s": 1, "family": "clear", "player_id": "P2", "event_id": "bad"}]
+    result = evaluate(labels, predictions)["end_to_end"]
+    assert result["per_person"]["P1"]["false_negatives"] == 1
+    assert result["per_person"]["P2"]["false_positives"] == 1
+    assert result["joint_contact_family_hitter"]["f1"] == 0
+
+
+def test_joint_metric_reconciles_all_major_error_types():
+    labels, predictions = documents()
+    labels["shots"] = [{"time_s": t, "family": "smash", "player_id": "P1"} for t in range(1, 6)]
+    predictions["shots"] = [
+        {"time_s": 1, "family": "smash", "player_id": "P1", "event_id": "correct"},
+        {"time_s": 2, "family": "clear", "player_id": "P1", "event_id": "wrong_family"},
+        {"time_s": 3, "family": "smash", "player_id": "P2", "event_id": "wrong_hitter"},
+        {"time_s": 4, "family": "smash", "player_id": None, "event_id": "unresolved"},
+        {"time_s": 6, "family": "smash", "player_id": "P1", "event_id": "spurious"},
+    ]
+    result = evaluate(labels, predictions)["end_to_end"]["joint_contact_family_hitter"]
+    assert (result["true_positives"], result["false_positives"], result["false_negatives"]) == (1, 4, 4)
+    assert result["precision"] == result["recall"] == result["f1"] == 0.2

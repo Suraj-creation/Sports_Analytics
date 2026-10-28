@@ -11,3 +11,24 @@ This continuation addresses existing processing defects. It does not install an 
 - [x] Inspect resulting evidence and reconcile the latest findings with the prior audit. Commit the incremental fixes and reports; keep deployment and original results unchanged.
 
 Remaining Task 2 requirements after these bounded fixes: exhaustive independently reviewed contact/family/hitter annotations split by recording; validated persistent four-person identities across crossings and occlusion; trained temporal alternatives and class-specific accuracy comparisons. AI motion drafts and rally-level CSV rows do not supply those labels. A lower unknown rate or a higher candidate count does not establish a correct classification.
+
+## Further identity and evaluation continuation
+
+- [x] Reproduce named propagation through competing overlapping player boxes;
+  abstain for involved people, preserve anonymous candidates and support re-seeding
+  after separation. Keep the 0.3 IoU threshold explicitly uncalibrated.
+- [x] Add source-bound sampled tracking evaluation with one global identity map,
+  ambiguity-aware switch counts, stale-birth/revision checks and missed-frame
+  denominators. Add known-family, per-person event P/R and joint shot/hitter scores.
+- [x] Review sixteen four-person source frames and fifty consecutive action frames
+  independently of predictions. Preserve both box drafts and the partial motion
+  review, with AI provenance and accuracy eligibility false.
+- [x] Run fresh matched GPU inference on the saved doubles clip with main versus
+  denser detection. Retain production cadence because the dense experiment adds
+  sampled switches despite slightly better draft box agreement.
+- [x] Run regression checks, preserve original sessions and save the complete
+  [validation report](validation-20261028/README.md) and reproduction artifacts.
+
+The full Task 2 requirements listed above remain open. Neither sampled AI
+agreement nor the overlap abstention guard demonstrates uninterrupted automatic
+four-person identity or independently measured shot-family/hitter accuracy.

@@ -65,7 +65,7 @@ def _setup(tmp_path: Path, *, frames=(1, 5, 10), detector_observed=True):
                 frame_idx=f,
                 obj=TrackObject.PLAYER,
                 track_id=i,
-                bbox=(1, 1, 20, 30),
+                bbox=(i * 50, 1, i * 50 + 19, 30),
                 conf=0.9,
                 participant_observation_id=obs.event_id,
             )
@@ -104,6 +104,81 @@ def _fold(store, tracks):
     )
 
 
+def test_overlap_between_seed_and_shot_abstains_for_involved_people_only(tmp_path):
+    store, tracks, observations, seeds, shots = _setup(tmp_path)
+    rows = []
+    for i in range(1, 5):
+        for frame in (1, 5, 10):
+            # Both smooth, confident tracks overlap mid-window. An ID swap here
+            # would be invisible to a one-track displacement check.
+            x = 55 if i == 2 and frame == 5 else i * 50
+            rows.append(
+                TrackSample(
+                    frame_idx=frame,
+                    obj=TrackObject.PLAYER,
+                    track_id=i,
+                    bbox=(x, 1, x + 19, 100),
+                    conf=0.9,
+                    detector_observed=True,
+                    participant_observation_id=observations[i - 1].event_id,
+                )
+            )
+    tracks.write_chunk(TrackObject.PLAYER, 1, 10, samples_to_table(rows))
+    result = _fold(store, tracks)
+    assert result["official"]["participants"]["U1"]["estimated_shots"] == 0
+    assert result["official"]["participants"]["U2"]["estimated_shots"] == 0
+    assert result["official"]["accounting"]["estimated_shots"] == 2
+    assert result["official"]["accounting"]["unresolved_shots"] == 2
+    assert result["episode_profiles"]["official"]["accounting"]["episode_candidate_shots"] == 4
+    # A fresh, separately reviewed seed after separation restores only that
+    # supported interval; it does not erase the ambiguity in earlier history.
+    ledger = IdentityReviewLedger(store, {f"U{i}" for i in range(1, 5)}, max_frame=300, fps=30)
+    for i in (0, 1):
+        ledger.confirm(observations[i].event_id, f"U{i + 1}", 10, 10)
+    assert _fold(store, tracks)["official"]["accounting"]["estimated_shots"] == 4
+
+
+def test_small_box_overlap_does_not_break_continuity():
+    from bai_badminton.analytics.automatic_individual import _continuous
+
+    rows = [
+        {
+            "frame_idx": f,
+            "track_id": tid,
+            "bbox": [x, 10, x + 40, 100],
+            "conf": 0.9,
+            "visible": True,
+            "participant_observation_id": f"obs{tid}",
+            "detector_observed": True,
+        }
+        for f in (0, 2, 4)
+        for tid, x in ((1, 10), (2, 45))
+    ]
+    assert _continuous(rows, "obs1", 1, 0, 4, 1280, 720)
+
+
+def test_competing_overlap_guard_includes_seed_and_shot_endpoints():
+    from bai_badminton.analytics.automatic_individual import _continuous
+
+    rows = [
+        {
+            "frame_idx": f,
+            "track_id": 1,
+            "bbox": [0, 10, 13, 100],
+            "conf": 0.9,
+            "visible": True,
+            "participant_observation_id": "obs",
+            "detector_observed": True,
+        }
+        for f in (0, 2, 4)
+    ]
+    for frame in (0, 4):
+        competitor = {**rows[0], "frame_idx": frame, "track_id": 2, "bbox": [7, 10, 20, 100]}
+        assert not _continuous(rows + [competitor], "obs", 1, 0, 4, 1280, 720)
+        competitor["bbox"] = [7.001, 10, 20.001, 100]
+        assert _continuous(rows + [competitor], "obs", 1, 0, 4, 1280, 720)
+
+
 def test_four_participants_are_separate_estimates_and_not_verified(tmp_path):
     store, tracks, observations, seeds, shots = _setup(tmp_path)
     result = _fold(store, tracks)
@@ -137,7 +212,7 @@ def test_missing_track_sample_gap_and_reset_abstain(tmp_path):
             frame_idx=f,
             obj=TrackObject.PLAYER,
             track_id=i,
-            bbox=(1, 1, 20, 30),
+            bbox=(i * 50, 1, i * 50 + 19, 30),
             conf=0.9,
             participant_observation_id=observations[i - 1].event_id,
         )
@@ -229,7 +304,7 @@ def test_invalid_sample_never_infers_an_identity(tmp_path, problem):
                 "detector_observed": True,
                 "obj": TrackObject.PLAYER,
                 "track_id": i,
-                "bbox": (1, 1, 20, 30),
+                "bbox": (i * 50, 1, i * 50 + 19, 30),
                 "conf": 0.9,
                 "participant_observation_id": observations[i - 1].event_id,
             }
@@ -389,7 +464,7 @@ def test_seed_expires_after_bounded_duration(tmp_path):
                     frame_idx=250,
                     obj=TrackObject.PLAYER,
                     track_id=1,
-                    bbox=(1, 1, 20, 30),
+                    bbox=(50, 1, 69, 30),
                     conf=0.9,
                     participant_observation_id=observations[0].event_id,
                 )
@@ -461,7 +536,7 @@ def test_anonymous_episode_does_not_count_stale_or_invalid_shot_frame_box(tmp_pa
             frame_idx=10,
             obj=TrackObject.PLAYER,
             track_id=i,
-            bbox=(1, 1, 20, 30),
+            bbox=(i * 50, 1, i * 50 + 19, 30),
             conf=0.9,
             participant_observation_id=("old-observation" if i == 1 else observations[i - 1].event_id),
         )
@@ -535,7 +610,7 @@ def test_offscreen_shot_box_does_not_support_an_episode(tmp_path):
             frame_idx=10,
             obj=TrackObject.PLAYER,
             track_id=i,
-            bbox=((1281, 1, 1300, 30) if i == 1 else (1, 1, 20, 30)),
+            bbox=((1281, 1, 1300, 30) if i == 1 else (i * 50, 1, i * 50 + 19, 30)),
             conf=0.9,
             participant_observation_id=observations[i - 1].event_id,
         )
@@ -595,8 +670,15 @@ def test_carried_boxes_without_detector_evidence_do_not_propagate_identity():
     from bai_badminton.analytics.automatic_individual import _continuous
 
     rows = [
-        {"frame_idx": frame, "track_id": 4, "visible": True, "participant_observation_id": "obs",
-         "conf": 0.9, "bbox": [10, 10, 30, 50], "detector_observed": False}
+        {
+            "frame_idx": frame,
+            "track_id": 4,
+            "visible": True,
+            "participant_observation_id": "obs",
+            "conf": 0.9,
+            "bbox": [10, 10, 30, 50],
+            "detector_observed": False,
+        }
         for frame in range(7)
     ]
     rows[0]["detector_observed"] = True
@@ -611,8 +693,15 @@ def test_detector_run_gap_and_unknown_intermediate_provenance_abstain():
     from bai_badminton.analytics.automatic_individual import _continuous
 
     rows = [
-        {"frame_idx": frame, "track_id": 4, "visible": True, "participant_observation_id": "obs",
-         "conf": 0.9, "bbox": [10, 10, 30, 50], "detector_observed": False}
+        {
+            "frame_idx": frame,
+            "track_id": 4,
+            "visible": True,
+            "participant_observation_id": "obs",
+            "conf": 0.9,
+            "bbox": [10, 10, 30, 50],
+            "detector_observed": False,
+        }
         for frame in range(14)
     ]
     rows[0]["detector_observed"] = rows[-1]["detector_observed"] = True
@@ -631,17 +720,25 @@ def test_legacy_unknown_detector_provenance_never_becomes_named_but_anonymous_re
     assert scope["accounting"]["episode_candidate_shots"] == 4
     assert scope["detector_run_counts"] == {"ran": 0, "not_run": 0, "unknown": 4}
     assert all(ep["events"][0]["detector_observed"] is None for ep in scope["episodes"])
-    assert all(ep["events"][0]["detector_observation_scope"] == "frame_only_not_person_match"
-               for ep in scope["episodes"])
+    assert all(
+        ep["events"][0]["detector_observation_scope"] == "frame_only_not_person_match" for ep in scope["episodes"]
+    )
 
 
 def test_carried_shot_sample_abstains_named_but_discloses_anonymous_status(tmp_path):
     store, tracks, observations, seeds, shots = _setup(tmp_path)
     rows = [
-        TrackSample(frame_idx=frame, obj=TrackObject.PLAYER, track_id=i, bbox=(1, 1, 20, 30),
-                    conf=0.9, participant_observation_id=observations[i - 1].event_id,
-                    detector_observed=(frame != 10))
-        for i in range(1, 5) for frame in (1, 5, 10)
+        TrackSample(
+            frame_idx=frame,
+            obj=TrackObject.PLAYER,
+            track_id=i,
+            bbox=(i * 50, 1, i * 50 + 19, 30),
+            conf=0.9,
+            participant_observation_id=observations[i - 1].event_id,
+            detector_observed=(frame != 10),
+        )
+        for i in range(1, 5)
+        for frame in (1, 5, 10)
     ]
     tracks.write_chunk(TrackObject.PLAYER, 1, 10, samples_to_table(rows))
     result = _fold(store, tracks)

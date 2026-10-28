@@ -1,0 +1,103 @@
+{
+  "source_frames": 250,
+  "proxy_frames": 250,
+  "hls_frames": 250,
+  "samples": [
+    {
+      "frame": 0,
+      "best_proxy_frame": 0,
+      "same_frame_source_proxy_mae": 0.8196504237288136,
+      "proxy_hls_mae": 0.0
+    },
+    {
+      "frame": 15,
+      "best_proxy_frame": 15,
+      "same_frame_source_proxy_mae": 0.9052259887005649,
+      "proxy_hls_mae": 0.0
+    },
+    {
+      "frame": 30,
+      "best_proxy_frame": 30,
+      "same_frame_source_proxy_mae": 0.8520303672316384,
+      "proxy_hls_mae": 0.0
+    },
+    {
+      "frame": 45,
+      "best_proxy_frame": 45,
+      "same_frame_source_proxy_mae": 0.8782132768361582,
+      "proxy_hls_mae": 0.0
+    },
+    {
+      "frame": 60,
+      "best_proxy_frame": 60,
+      "same_frame_source_proxy_mae": 0.8696857344632768,
+      "proxy_hls_mae": 0.0
+    },
+    {
+      "frame": 75,
+      "best_proxy_frame": 75,
+      "same_frame_source_proxy_mae": 1.005861581920904,
+      "proxy_hls_mae": 0.0
+    },
+    {
+      "frame": 90,
+      "best_proxy_frame": 90,
+      "same_frame_source_proxy_mae": 0.9170021186440678,
+      "proxy_hls_mae": 0.0
+    },
+    {
+      "frame": 105,
+      "best_proxy_frame": 105,
+      "same_frame_source_proxy_mae": 0.78954802259887,
+      "proxy_hls_mae": 0.0
+    },
+    {
+      "frame": 120,
+      "best_proxy_frame": 120,
+      "same_frame_source_proxy_mae": 0.8972987288135593,
+      "proxy_hls_mae": 0.0
+    },
+    {
+      "frame": 135,
+      "best_proxy_frame": 135,
+      "same_frame_source_proxy_mae": 1.0769420903954803,
+      "proxy_hls_mae": 0.0
+    },
+    {
+      "frame": 150,
+      "best_proxy_frame": 150,
+      "same_frame_source_proxy_mae": 0.7223340395480226,
+      "proxy_hls_mae": 0.0
+    },
+    {
+      "frame": 165,
+      "best_proxy_frame": 165,
+      "same_frame_source_proxy_mae": 1.0018008474576272,
+      "proxy_hls_mae": 0.0
+    },
+    {
+      "frame": 180,
+      "best_proxy_frame": 180,
+      "same_frame_source_proxy_mae": 1.1046610169491526,
+      "proxy_hls_mae": 0.0
+    },
+    {
+      "frame": 195,
+      "best_proxy_frame": 195,
+      "same_frame_source_proxy_mae": 1.1715042372881357,
+      "proxy_hls_mae": 0.0
+    },
+    {
+      "frame": 210,
+      "best_proxy_frame": 210,
+      "same_frame_source_proxy_mae": 1.0857168079096045,
+      "proxy_hls_mae": 0.0
+    },
+    {
+      "frame": 225,
+      "best_proxy_frame": 225,
+      "same_frame_source_proxy_mae": 1.066754943502825,
+      "proxy_hls_mae": 0.0
+    }
+  ]
+}

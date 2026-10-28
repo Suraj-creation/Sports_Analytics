@@ -33,4 +33,18 @@ source ../gpu-env.sh
   --data-dir /path/to/snapshot --tolerance-s 0.2
 ```
 
-The evaluator rejects changed logs, human-corrected or retracted shot/contact records and unsupported source bindings, then pairs contacts chronologically one-to-one. `accuracy_all_labelled_truth` includes missed and unresolved contacts as incorrect; `accuracy_resolved_matched` excludes unresolved and missed contacts and must be read alongside `resolved_fraction_matched`, `unmatched_labelled_truth`, false positives, and detection recall. Shot-family macro F1 includes missed and spurious events. Hashes identify both annotation files and the exact event log. Results remain restricted to the tested windows and independent map; small or unrepresentative windows cannot establish general accuracy.
+The evaluator rejects changed logs, human-corrected or retracted shot/contact
+records and unsupported source bindings, then pairs contacts chronologically
+one-to-one. `accuracy_all_labelled_truth` includes missed/unresolved contacts;
+`accuracy_resolved_matched` excludes them and must accompany coverage and
+detection counts. Version 2 adds `end_to_end.per_person` precision/recall and
+joint contact/family/hitter scores, so spurious assigned events lower precision.
+`shot_classification.known_family` excludes unknown ground-truth families;
+the legacy macro-F1 still includes unknown as a class. Read metric-specific
+eligibility and support. Hashes identify annotation files and the event log.
+Results remain conditional on the external map and tested windows.
+
+Use the separate [sampled tracking protocol](tracking-annotation-protocol.md)
+to test automatic identity continuity with one global mapping, explicit missed
+frames and hashed track evidence. Episode-to-person rebinding can conceal
+fragmentation and swaps; it cannot substitute for that tracking test.

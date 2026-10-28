@@ -1,0 +1,728 @@
+{
+  "schema_version": 1,
+  "session_id": "01M60K38M17QTHTE7QFC1RDG0N",
+  "media_sha256": "e50e00223bf41468ac4c913ff5a7647d909563326d256be8037fe79fedace640",
+  "proxy_sha256": "316120c31b96e17aeebc4d8b3977affbdbb46c00637069cd4147b51d928d6b4c",
+  "fps_num": 25,
+  "fps_den": 1,
+  "width": 1280,
+  "height": 720,
+  "window_frames": [
+    0,
+    250
+  ],
+  "timebase": "analysis_proxy_frames",
+  "sampled_frames": [
+    0,
+    15,
+    30,
+    45,
+    60,
+    75,
+    90,
+    105,
+    120,
+    135,
+    150,
+    165,
+    180,
+    195,
+    210,
+    225
+  ],
+  "status": "draft",
+  "split": "diagnostic",
+  "review": {
+    "origin": "ai_video_review",
+    "human_verified": false,
+    "blind_to_predictions": true,
+    "reviewed_source": "doubles-probe.mp4",
+    "source_window_in_parent_s": [
+      60,
+      70
+    ],
+    "method": "Sixteen chronological decoded source frames with a coordinate grid; no model boxes, events or identity overlays were shown before labels were frozen.",
+    "identity_convention": "Initial positions label anonymous people once. Later labels follow appearance and visible trajectory; position is not re-assigned per frame.",
+    "limitations": [
+      "Approximate AI-drawn body boxes, not human-reviewed ground truth.",
+      "Sampling every 15 frames does not establish identity continuity between samples.",
+      "Shirt colors are shared within each team; facial/trajectory judgments may be wrong.",
+      "The airborne far player at frame150 extends above the review crop; its top bound is approximate."
+    ],
+    "original_json_capture_sha256": "eaffba98b49340e24f977dfd115d8104e9350ae4bc6b3c52fea7626d87fbbd4c"
+  },
+  "frames": [
+    {
+      "frame_idx": 0,
+      "exhaustive": true,
+      "persons": [
+        {
+          "person_id": "near-initial-front",
+          "bbox": [
+            587,
+            311,
+            675,
+            474
+          ]
+        },
+        {
+          "person_id": "near-initial-rear",
+          "bbox": [
+            578,
+            383,
+            696,
+            557
+          ]
+        },
+        {
+          "person_id": "far-initial-left",
+          "bbox": [
+            600,
+            215,
+            701,
+            315
+          ]
+        },
+        {
+          "person_id": "far-initial-right",
+          "bbox": [
+            673,
+            237,
+            740,
+            350
+          ]
+        }
+      ]
+    },
+    {
+      "frame_idx": 15,
+      "exhaustive": true,
+      "persons": [
+        {
+          "person_id": "near-initial-front",
+          "bbox": [
+            589,
+            313,
+            689,
+            476
+          ]
+        },
+        {
+          "person_id": "near-initial-rear",
+          "bbox": [
+            579,
+            378,
+            703,
+            549
+          ]
+        },
+        {
+          "person_id": "far-initial-left",
+          "bbox": [
+            610,
+            196,
+            682,
+            325
+          ]
+        },
+        {
+          "person_id": "far-initial-right",
+          "bbox": [
+            690,
+            258,
+            750,
+            381
+          ]
+        }
+      ]
+    },
+    {
+      "frame_idx": 30,
+      "exhaustive": true,
+      "persons": [
+        {
+          "person_id": "near-initial-front",
+          "bbox": [
+            648,
+            322,
+            792,
+            466
+          ]
+        },
+        {
+          "person_id": "near-initial-rear",
+          "bbox": [
+            617,
+            382,
+            755,
+            534
+          ]
+        },
+        {
+          "person_id": "far-initial-left",
+          "bbox": [
+            590,
+            224,
+            683,
+            354
+          ]
+        },
+        {
+          "person_id": "far-initial-right",
+          "bbox": [
+            695,
+            208,
+            775,
+            305
+          ]
+        }
+      ]
+    },
+    {
+      "frame_idx": 45,
+      "exhaustive": true,
+      "persons": [
+        {
+          "person_id": "near-initial-front",
+          "bbox": [
+            650,
+            327,
+            756,
+            470
+          ]
+        },
+        {
+          "person_id": "near-initial-rear",
+          "bbox": [
+            655,
+            379,
+            791,
+            540
+          ]
+        },
+        {
+          "person_id": "far-initial-left",
+          "bbox": [
+            615,
+            215,
+            700,
+            340
+          ]
+        },
+        {
+          "person_id": "far-initial-right",
+          "bbox": [
+            788,
+            241,
+            861,
+            349
+          ]
+        }
+      ]
+    },
+    {
+      "frame_idx": 60,
+      "exhaustive": true,
+      "persons": [
+        {
+          "person_id": "near-initial-front",
+          "bbox": [
+            630,
+            338,
+            742,
+            493
+          ]
+        },
+        {
+          "person_id": "near-initial-rear",
+          "bbox": [
+            769,
+            374,
+            875,
+            550
+          ]
+        },
+        {
+          "person_id": "far-initial-left",
+          "bbox": [
+            602,
+            206,
+            687,
+            319
+          ]
+        },
+        {
+          "person_id": "far-initial-right",
+          "bbox": [
+            760,
+            242,
+            847,
+            327
+          ]
+        }
+      ]
+    },
+    {
+      "frame_idx": 75,
+      "exhaustive": true,
+      "persons": [
+        {
+          "person_id": "near-initial-front",
+          "bbox": [
+            605,
+            340,
+            705,
+            508
+          ]
+        },
+        {
+          "person_id": "near-initial-rear",
+          "bbox": [
+            814,
+            393,
+            929,
+            556
+          ]
+        },
+        {
+          "person_id": "far-initial-left",
+          "bbox": [
+            610,
+            193,
+            679,
+            322
+          ]
+        },
+        {
+          "person_id": "far-initial-right",
+          "bbox": [
+            775,
+            222,
+            858,
+            334
+          ]
+        }
+      ]
+    },
+    {
+      "frame_idx": 90,
+      "exhaustive": true,
+      "persons": [
+        {
+          "person_id": "near-initial-front",
+          "bbox": [
+            547,
+            351,
+            650,
+            515
+          ]
+        },
+        {
+          "person_id": "near-initial-rear",
+          "bbox": [
+            730,
+            390,
+            847,
+            532
+          ]
+        },
+        {
+          "person_id": "far-initial-left",
+          "bbox": [
+            592,
+            205,
+            656,
+            323
+          ]
+        },
+        {
+          "person_id": "far-initial-right",
+          "bbox": [
+            755,
+            194,
+            845,
+            318
+          ]
+        }
+      ]
+    },
+    {
+      "frame_idx": 105,
+      "exhaustive": true,
+      "persons": [
+        {
+          "person_id": "near-initial-front",
+          "bbox": [
+            520,
+            370,
+            637,
+            544
+          ]
+        },
+        {
+          "person_id": "near-initial-rear",
+          "bbox": [
+            704,
+            384,
+            785,
+            535
+          ]
+        },
+        {
+          "person_id": "far-initial-left",
+          "bbox": [
+            687,
+            263,
+            728,
+            360
+          ]
+        },
+        {
+          "person_id": "far-initial-right",
+          "bbox": [
+            744,
+            195,
+            818,
+            311
+          ]
+        }
+      ]
+    },
+    {
+      "frame_idx": 120,
+      "exhaustive": true,
+      "persons": [
+        {
+          "person_id": "near-initial-front",
+          "bbox": [
+            560,
+            384,
+            655,
+            552
+          ]
+        },
+        {
+          "person_id": "near-initial-rear",
+          "bbox": [
+            720,
+            384,
+            808,
+            530
+          ]
+        },
+        {
+          "person_id": "far-initial-left",
+          "bbox": [
+            630,
+            250,
+            700,
+            355
+          ]
+        },
+        {
+          "person_id": "far-initial-right",
+          "bbox": [
+            690,
+            198,
+            775,
+            313
+          ]
+        }
+      ]
+    },
+    {
+      "frame_idx": 135,
+      "exhaustive": true,
+      "persons": [
+        {
+          "person_id": "near-initial-front",
+          "bbox": [
+            580,
+            365,
+            690,
+            541
+          ]
+        },
+        {
+          "person_id": "near-initial-rear",
+          "bbox": [
+            785,
+            453,
+            878,
+            612
+          ]
+        },
+        {
+          "person_id": "far-initial-left",
+          "bbox": [
+            624,
+            238,
+            726,
+            361
+          ]
+        },
+        {
+          "person_id": "far-initial-right",
+          "bbox": [
+            710,
+            191,
+            805,
+            308
+          ]
+        }
+      ]
+    },
+    {
+      "frame_idx": 150,
+      "exhaustive": true,
+      "persons": [
+        {
+          "person_id": "near-initial-front",
+          "bbox": [
+            530,
+            390,
+            645,
+            550
+          ]
+        },
+        {
+          "person_id": "near-initial-rear",
+          "bbox": [
+            765,
+            403,
+            869,
+            586
+          ]
+        },
+        {
+          "person_id": "far-initial-left",
+          "bbox": [
+            626,
+            225,
+            708,
+            339
+          ]
+        },
+        {
+          "person_id": "far-initial-right",
+          "bbox": [
+            742,
+            133,
+            812,
+            283
+          ]
+        }
+      ]
+    },
+    {
+      "frame_idx": 165,
+      "exhaustive": true,
+      "persons": [
+        {
+          "person_id": "near-initial-front",
+          "bbox": [
+            490,
+            414,
+            637,
+            568
+          ]
+        },
+        {
+          "person_id": "near-initial-rear",
+          "bbox": [
+            770,
+            405,
+            874,
+            576
+          ]
+        },
+        {
+          "person_id": "far-initial-left",
+          "bbox": [
+            650,
+            222,
+            755,
+            328
+          ]
+        },
+        {
+          "person_id": "far-initial-right",
+          "bbox": [
+            735,
+            183,
+            792,
+            276
+          ]
+        }
+      ]
+    },
+    {
+      "frame_idx": 180,
+      "exhaustive": true,
+      "persons": [
+        {
+          "person_id": "near-initial-front",
+          "bbox": [
+            520,
+            410,
+            646,
+            574
+          ]
+        },
+        {
+          "person_id": "near-initial-rear",
+          "bbox": [
+            774,
+            410,
+            893,
+            584
+          ]
+        },
+        {
+          "person_id": "far-initial-left",
+          "bbox": [
+            699,
+            222,
+            814,
+            333
+          ]
+        },
+        {
+          "person_id": "far-initial-right",
+          "bbox": [
+            720,
+            181,
+            793,
+            285
+          ]
+        }
+      ]
+    },
+    {
+      "frame_idx": 195,
+      "exhaustive": true,
+      "persons": [
+        {
+          "person_id": "near-initial-front",
+          "bbox": [
+            553,
+            397,
+            672,
+            577
+          ]
+        },
+        {
+          "person_id": "near-initial-rear",
+          "bbox": [
+            896,
+            402,
+            970,
+            574
+          ]
+        },
+        {
+          "person_id": "far-initial-left",
+          "bbox": [
+            774,
+            222,
+            872,
+            337
+          ]
+        },
+        {
+          "person_id": "far-initial-right",
+          "bbox": [
+            668,
+            180,
+            778,
+            292
+          ]
+        }
+      ]
+    },
+    {
+      "frame_idx": 210,
+      "exhaustive": true,
+      "persons": [
+        {
+          "person_id": "near-initial-front",
+          "bbox": [
+            532,
+            379,
+            610,
+            555
+          ]
+        },
+        {
+          "person_id": "near-initial-rear",
+          "bbox": [
+            875,
+            410,
+            941,
+            604
+          ]
+        },
+        {
+          "person_id": "far-initial-left",
+          "bbox": [
+            730,
+            218,
+            785,
+            349
+          ]
+        },
+        {
+          "person_id": "far-initial-right",
+          "bbox": [
+            583,
+            176,
+            636,
+            318
+          ]
+        }
+      ]
+    },
+    {
+      "frame_idx": 225,
+      "exhaustive": true,
+      "persons": [
+        {
+          "person_id": "near-initial-front",
+          "bbox": [
+            588,
+            386,
+            643,
+            565
+          ]
+        },
+        {
+          "person_id": "near-initial-rear",
+          "bbox": [
+            872,
+            387,
+            936,
+            583
+          ]
+        },
+        {
+          "person_id": "far-initial-left",
+          "bbox": [
+            790,
+            229,
+            841,
+            360
+          ]
+        },
+        {
+          "person_id": "far-initial-right",
+          "bbox": [
+            617,
+            179,
+            672,
+            331
+          ]
+        }
+      ]
+    }
+  ]
+}
