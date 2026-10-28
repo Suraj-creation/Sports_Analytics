@@ -1,0 +1,16 @@
+{
+  "model": "OSNet-AIN-x0.25",
+  "weight_sha256": "ce171fe160b3608f5e4c19489774991419be965b1d6f4bdccc4b4cfd2ef95347",
+  "source_sha256": "6374a978b1b907c28ee86c1d7fea92c07e9be972ec0ac6cdae3f3041aea98679",
+  "sample": "four approximate boxes on one real frame; unlabelled",
+  "gpu": "NVIDIA GeForce GTX 1080 Ti",
+  "batch_size": 4,
+  "embedding_dimension": 512,
+  "latency_p50_ms": 29.399139573797584,
+  "latency_p95_ms": 37.005188851617284,
+  "torch_peak_allocated_bytes": 21467136,
+  "torch_peak_reserved_bytes": 27262976,
+  "max_rss_kib": 1085480,
+  "accuracy_measured": false,
+  "notes": "No identity, tracking or long-video accuracy labels; peak memory covers this process torch allocator only."
+}

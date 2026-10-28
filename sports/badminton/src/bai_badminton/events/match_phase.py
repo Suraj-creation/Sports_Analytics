@@ -29,8 +29,10 @@ The legacy heuristic can be enabled explicitly for backwards-compatible analysis
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from enum import StrEnum
+from itertools import pairwise
 from typing import Any
 
 from bai_badminton.court import HALF_LEN, SHORT_SERVICE, WIDTH_SINGLES
@@ -105,12 +107,52 @@ class MatchPhaseTracker:
     params: PhaseParams = PhaseParams()
     phase: Phase = Phase.UNKNOWN
     match_start_frame: int | None = None  # human marker: rallies starting at/after it are official
+    # None keeps legacy policy; () explicitly accepts no match intervals.
+    reviewed_intervals: tuple[tuple[int, int], ...] | None = None
+
+    def set_reviewed_intervals(self, intervals: Iterable[tuple[int, int]] | None) -> None:
+        """Set disjoint inclusive reviewed match windows, or remove the policy with None.
+
+        Validation is atomic; malformed or overlapping windows leave the previous
+        policy intact. A window confirms activity eligibility, not a winner.
+        """
+        if intervals is None:
+            self.reviewed_intervals = None
+            return
+        checked: list[tuple[int, int]] = []
+        try:
+            for interval in intervals:
+                a, b = interval
+                if type(a) is not int or type(b) is not int or a < 0 or b < a:
+                    raise ValueError("interval bounds must be nonnegative integer frames in order")
+                checked.append((a, b))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("invalid reviewed match intervals") from exc
+        checked.sort()
+        if any(b[0] <= a[1] for a, b in pairwise(checked)):
+            raise ValueError("reviewed match intervals must not overlap")
+        self.reviewed_intervals = tuple(checked)
 
     def decide(
-        self, start: int, ev: RallyEvidence, *, match_finished: bool = False, override: bool | None = None
+        self,
+        start: int,
+        ev: RallyEvidence,
+        *,
+        end: int | None = None,
+        match_finished: bool = False,
+        override: bool | None = None,
     ) -> PhaseDecision:
         if override is not None:
             return self._to(override, "marked by a reviewer", "human")
+        if self.reviewed_intervals is not None:
+            within = (
+                end is not None and end >= start and any(a <= start <= end <= b for a, b in self.reviewed_intervals)
+            )
+            if within:
+                return self._to(True, "entire rally in a reviewed match interval", "human")
+            # Gaps and crossing boundaries are unreviewed, not evidence of warmup.
+            self.phase = Phase.UNKNOWN
+            return PhaseDecision(False, self.phase, "outside reviewed match intervals", "insufficient")
         if self.match_start_frame is not None:
             ok = start >= self.match_start_frame
             return self._to(ok, "after the match-start marker" if ok else "before the match-start marker", "human")

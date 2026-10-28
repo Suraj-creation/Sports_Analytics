@@ -7,7 +7,7 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StrictInt
 
 from bai_api.deps import BusDep, Repo, SessionDep, SettingsDep, User
 from bai_api.public import public_session
@@ -333,11 +333,12 @@ def auto_calibrate(session: SessionDep, b: BusDep) -> dict[str, str]:
 
 # ---------------------------------------------------------------------- corrections
 class Correction(BaseModel):
-    kind: Literal["winner", "verify", "official", "match_start"]
+    kind: Literal["winner", "verify", "official", "match_start", "match_intervals"]
     rally_event_id: str | None = None
     winner: Literal["P1", "P2"] | None = None
     official: bool | None = None  # kind="official": the rally was (not) official play
     frame: int | None = Field(default=None, ge=0)  # kind="match_start": first frame of official play
+    intervals: list[tuple[StrictInt, StrictInt]] | None = Field(default=None, max_length=256)
     event_id: str | None = None
     payload: dict[str, Any] | None = None
 
@@ -354,6 +355,24 @@ def correct(session: SessionDep, body: Correction, b: BusDep) -> dict[str, str]:
                 "session_id": sid,
                 "rally_event_id": body.rally_event_id,
                 "official": body.official,
+            }
+        )
+        return {"status": "accepted"}
+    if body.kind == "match_intervals":
+        if "intervals" not in body.model_fields_set:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "intervals must be provided explicitly")
+        intervals = body.intervals
+        if intervals is not None:
+            intervals = sorted(intervals)
+            if any(
+                a < 0 or b < a or (session.media is not None and b >= session.media.n_frames) for a, b in intervals
+            ) or any(intervals[i][0] <= intervals[i - 1][1] for i in range(1, len(intervals))):
+                raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "invalid or overlapping match intervals")
+        b.send_command(
+            {
+                "cmd": "set_reviewed_match_intervals",
+                "session_id": sid,
+                "intervals": None if intervals is None else [list(pair) for pair in intervals],
             }
         )
         return {"status": "accepted"}

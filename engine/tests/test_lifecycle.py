@@ -278,3 +278,40 @@ def test_interrupted_analysis_restarts_cleanly(env: Any) -> None:
         assert len(winners) == len({r.frame_start for r in _rallies(repo, sid)})  # no duplicates
     finally:
         svc2.shutdown()
+
+
+def test_reanalysis_carries_latest_independent_match_policies_and_unrelated_metadata(env: Any) -> None:
+    settings, repo, sid = env
+    store = repo.events(sid)
+
+    def human(type_: str, frame: int, payload: dict[str, Any]) -> Event:
+        return Event(
+            session_id=sid,
+            type=type_,
+            frame_start=frame,
+            frame_end=frame,
+            pts_us=0,
+            payload=payload,
+            status=EventStatus.HUMAN_VERIFIED,
+            provenance=HUMAN,
+        )
+
+    prior = human("stroke", 42, {"label": "old-correction"}).model_dump(mode="json")
+    repo.update(sid, meta={"untouched": "keep", "carried_human": [prior]})
+    store.append(human("match_phase", 60, {"marker": "match_start", "frame": 60}))
+    store.append(human("match_phase", 80, {"marker": "reviewed_intervals", "intervals": [[80, 90]]}))
+    store.append(human("match_phase", 0, {"marker": "match_start", "frame": None}))
+    store.append(human("match_phase", 0, {"marker": "reviewed_intervals", "intervals": None}))
+    store.append(human("stroke", 0, {"label": "new-correction"}))
+    EngineService(repo, LocalBus(), settings)._reset_semantics(sid)
+    meta = repo.get(sid).meta
+    markers = [x for x in meta["carried_human"] if x["type"] == "match_phase"]
+    assert len(markers) == 2
+    policies = {x["payload"]["marker"]: x["payload"] for x in markers}
+    assert policies["match_start"]["frame"] is None
+    assert policies["reviewed_intervals"]["intervals"] is None
+    assert {(x["type"], x["frame_start"]) for x in meta["carried_human"] if x["type"] != "match_phase"} == {
+        ("stroke", 0),
+        ("stroke", 42),
+    }
+    assert meta["untouched"] == "keep"

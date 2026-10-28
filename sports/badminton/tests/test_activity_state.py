@@ -108,3 +108,47 @@ def test_loss_of_required_evidence_clears_active_status():
     for i in range(8, 12):
         estimate, _ = tracker.update(frame(i, moving=None, shuttle_visible=None))
     assert estimate.state is ActivityState.UNKNOWN
+
+
+def test_sparse_moving_shuttle_supports_observed_activity_without_proving_match():
+    tracker = ActivityTracker(fps=10, window_s=2, hold_s=0.5)
+    for i in range(40):
+        visible = i % 5 == 0
+        estimate, _ = tracker.update(
+            frame(
+                i,
+                shuttle_visible=True if visible else None,
+                shuttle_position=(0.2 + (i % 20) * 0.01, 0.4) if visible else None,
+            )
+        )
+    assert estimate.state is ActivityState.ACTIVE_PLAY
+    assert estimate.basis == "sparse_shuttle_trajectory_and_movement"
+    assert estimate.evidence_coverage == pytest.approx(0.2)
+    assert estimate.match_intent == "unknown"
+
+
+def test_sparse_stationary_shuttle_does_not_establish_active_play():
+    tracker = ActivityTracker(fps=10, window_s=2, hold_s=0.5)
+    for i in range(40):
+        visible = i % 5 == 0
+        estimate, _ = tracker.update(
+            frame(i, shuttle_visible=True if visible else None, shuttle_position=(0.3, 0.4) if visible else None)
+        )
+    assert estimate.state is ActivityState.UNKNOWN
+
+
+def test_shuttle_positions_without_visibility_or_valid_coordinates_are_not_evidence():
+    tracker = ActivityTracker(fps=10, window_s=2, hold_s=0.5)
+    for i in range(40):
+        estimate, _ = tracker.update(frame(i, shuttle_visible=None, shuttle_position=(i / 100, 0.4)))
+    assert estimate.state is ActivityState.UNKNOWN
+
+
+@pytest.mark.parametrize("invalid", [(float("nan"), 0.4), (-1.0, 0.4), (0.2, 1.1)])
+def test_invalid_normalized_shuttle_positions_do_not_support_activity(invalid):
+    tracker = ActivityTracker(fps=10, window_s=2, hold_s=0.5)
+    for i in range(40):
+        estimate, _ = tracker.update(
+            frame(i, shuttle_visible=True if i % 5 == 0 else None, shuttle_position=invalid if i % 5 == 0 else None)
+        )
+    assert estimate.state is ActivityState.UNKNOWN

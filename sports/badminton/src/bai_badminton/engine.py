@@ -29,7 +29,7 @@ import numpy as np
 
 from bai_badminton.analytics.match import MatchAnalytics, RallyRecord
 from bai_badminton.court import Homography
-from bai_badminton.events.activity import ActivityInterval, ActivityObservation, ActivityTracker
+from bai_badminton.events.activity import ActivityInterval, ActivityObservation, ActivityState, ActivityTracker
 from bai_badminton.events.contact import CONTACT_MODEL, ContactCandidate, detect_contacts
 from bai_badminton.events.match_phase import (
     MatchPhaseTracker,
@@ -69,6 +69,7 @@ from bai_badminton.rules import (
     other,
 )
 from bai_badminton.score_ocr import ScoreReconciler
+from bai_badminton.teams import DoublesTeamTracker
 from bai_engine.schema import (
     Actors,
     ConfidenceBand,
@@ -225,8 +226,13 @@ class BadmintonMatchEngine:
         self.stroke_clf: StrokeClassifier = stroke_classifier or RuleStrokeClassifier()
         self.identity = IdentityResolver(frame_height=float(cfg.frame_height))
         self.participants: ParticipantTracker | None = None
+        self._participant_shot_id: int | None = None
+        self._participant_last_coverage: int | None = None
+        self._participant_reference_changed = False
         self._multi_person_identity_ambiguous = False
         self.activity = ActivityTracker(cfg.fps)
+        self.doubles_teams = DoublesTeamTracker(cfg.fps)
+        self._current_team_key: tuple[Any, ...] | None = None
         self._activity_positions: deque[tuple[int, dict[int, tuple[float, float]]]] = deque(
             maxlen=max(3, round(cfg.fps * 0.5))
         )
@@ -279,6 +285,8 @@ class BadmintonMatchEngine:
     def set_camera_reference(self, cam_ref: int | None) -> None:
         """Tracking (re)started against reference view ``cam_ref`` (a restart / re-analysis restoring the
         calibration; ``None``: not tracked)."""
+        if self.participants is not None and cam_ref != self._cam_ref:
+            self._participant_reference_changed = True
         self._cam_ref = cam_ref
 
     def set_calibration(
@@ -301,6 +309,8 @@ class BadmintonMatchEngine:
         the camera is not tracked and the calibration is taken to hold for the whole shot).  ``extra`` is
         the rest of the calibration record (mode, method, validity, quality, camera, …).
         """
+        if self.participants is not None:
+            self._participant_reference_changed = True
         geom = CourtImageGeometry.from_homography(
             homography, net_top_left, net_top_right, singles=self.match_cfg.discipline == "singles"
         )
@@ -457,14 +467,47 @@ class BadmintonMatchEngine:
                 feet = np.array([[(p.bbox[0] + p.bbox[2]) / 2, p.bbox[3]]])
                 cx, cy = calib.homography.image_to_court(feet)[0]
                 p.court_xy = (float(cx), float(cy))
-        # Participant hypotheses are separate from P1/P2 scoring identities.
-        # A restart begins a distinct deterministic epoch; old tracks are not silently joined.
-        if self.participants is None:
-            epoch = sha256(f"{self.session_id}:{fp.frame_idx}".encode()).hexdigest()[:16]
-            self.participants = ParticipantTracker(float(self.cfg.frame_height), fps=self.cfg.fps, instance_id=epoch)
+        # A shot reset, long unavailable coverage, or recalibration can reuse
+        # visual track IDs. Start a fresh deterministic epoch rather than link them.
         geometry_valid = not geometry_unavailable and calib is not None
         self._geometry_valid.append(geometry_valid)
         coverage_valid = geometry_valid and bool(self._provenance.get("player_detector")) and not fp.replay
+        reason = None
+        if self.participants is not None:
+            if self._participant_reference_changed:
+                reason = "calibration_changed"
+            elif self._participant_shot_id is not None and fp.shot_id != self._participant_shot_id:
+                reason = "visual_tracker_reset"
+            elif (
+                coverage_valid
+                and self._participant_last_coverage is not None
+                and fp.frame_idx - self._participant_last_coverage > max(1, round(2 * self.cfg.fps))
+            ):
+                reason = "prolonged_coverage_loss"
+        if self.participants is None or reason is not None:
+            epoch = sha256(f"{self.session_id}:{fp.frame_idx}".encode()).hexdigest()[:16]
+            self.participants = ParticipantTracker(float(self.cfg.frame_height), fps=self.cfg.fps, instance_id=epoch)
+            if reason is not None:
+                self._participant_last_coverage = None
+                self.doubles_teams = DoublesTeamTracker(self.cfg.fps)
+                self._activity_positions.clear()
+                self._multi_person_identity_ambiguous = True
+                self._emit(
+                    [
+                        self._event(
+                            "identity_ambiguity",
+                            fp.frame_idx,
+                            fp.frame_idx,
+                            payload={"reason": reason, "certainty": "hypothesis", "tracker_instance": epoch},
+                            model="participant_tracker_v1",
+                            status=EventStatus.PROVISIONAL,
+                        )
+                    ]
+                )
+        self._participant_reference_changed = False
+        self._participant_shot_id = fp.shot_id
+        if coverage_valid:
+            self._participant_last_coverage = fp.frame_idx
         participant_frame = self.participants.update(
             fp.frame_idx,
             persons,
@@ -505,16 +548,68 @@ class BadmintonMatchEngine:
             self._activity_positions.append((fp.frame_idx, positions))
         else:
             self._activity_positions.clear()
-        _, activity_interval = self.activity.update(
+        activity_estimate, activity_interval = self.activity.update(
             ActivityObservation(
                 frame_idx=fp.frame_idx,
                 view_valid=geometry_valid and not fp.replay,
                 person_count=len(participant_frame.participants) if coverage_valid else None,
                 moving=movement,
                 shuttle_visible=True if fp.shuttle_xy is not None and fp.shuttle_conf >= 0.5 else None,
+                shuttle_position=(sxy[0] / self.cfg.frame_width, sxy[1] / self.cfg.frame_height)
+                if geometry_valid and sxy is not None and fp.shuttle_conf >= 0.5 and np.isfinite(sxy).all()
+                else None,
             )
         )
         self._emit_activity(activity_interval)
+        # Doubles hypotheses require actual court-relative positions, not image-side fallback.
+        by_track = {p.track_id: p for p in persons}
+        team_geometry_valid = geometry_valid and len(participant_frame.participants) == 4
+        if team_geometry_valid:
+            for participant in participant_frame.participants:
+                obs = by_track.get(participant.track_id)
+                if (
+                    obs is None
+                    or obs.court_xy is None
+                    or not np.isfinite(obs.court_xy).all()
+                    or abs(obs.court_xy[1]) < 0.35
+                    or participant.side != ("near" if obs.court_xy[1] < 0 else "far")
+                ):
+                    team_geometry_valid = False
+                    break
+        team_estimate = self.doubles_teams.update(
+            participant_frame,
+            court_valid=team_geometry_valid,
+            active_play_evidence=activity_estimate.state == ActivityState.ACTIVE_PLAY,
+        )
+        team_key = tuple((team.team_id, team.members, team.side) for team in team_estimate.teams)
+        if team_estimate.status == "provisional" and team_key != self._current_team_key:
+            self._emit(
+                [
+                    self._event(
+                        "doubles_team_hypothesis",
+                        fp.frame_idx,
+                        fp.frame_idx,
+                        payload=asdict(team_estimate),
+                        model=team_estimate.version,
+                        status=EventStatus.PROVISIONAL,
+                    )
+                ]
+            )
+            self._current_team_key = team_key
+        elif team_estimate.status != "provisional" and self._current_team_key is not None:
+            self._emit(
+                [
+                    self._event(
+                        "doubles_team_hypothesis",
+                        fp.frame_idx,
+                        fp.frame_idx,
+                        payload=asdict(team_estimate),
+                        model=team_estimate.version,
+                        status=EventStatus.PROVISIONAL,
+                    )
+                ]
+            )
+            self._current_team_key = None
         # The legacy P1/P2 resolver models two individuals. Three or more
         # visible court tracks cannot safely be forced into those slots.
         visible_ids = {p.track_id for p in persons if p.track_id >= 0 and np.isfinite(p.conf) and p.conf >= 0.5}
@@ -920,7 +1015,7 @@ class BadmintonMatchEngine:
             geometry_winner = other(loser)  # type: ignore[arg-type]
         evidence = self._phase_evidence(seg, until)
         phase_before = self.phase.phase
-        decision = self.phase.decide(seg.start, evidence, match_finished=before.finished)
+        decision = self.phase.decide(seg.start, evidence, end=seg.end, match_finished=before.finished)
         observed, source = self.ocr.winner_from_ocr(
             dict(before.score), seg.start, seg.end, until, geometry_winner, lookback=int(30 * self.cfg.fps)
         )
@@ -1285,6 +1380,25 @@ class BadmintonMatchEngine:
         out = self._emit([marker.model_copy(update={"provenance": provenance})])
         return out + self._refold(provenance)
 
+    def set_reviewed_match_intervals(
+        self, intervals: list[tuple[int, int]] | None, provenance: Provenance
+    ) -> list[Event]:
+        """Set inclusive human-reviewed match windows; None removes this policy."""
+        self.phase.set_reviewed_intervals(intervals)
+        value = self.phase.reviewed_intervals
+        frame = value[0][0] if value else 0
+        marker = self._event(
+            "match_phase",
+            frame,
+            frame,
+            payload={"marker": "reviewed_intervals", "intervals": value, "basis": "human"},
+            confidence=1.0,
+            model="human",
+            status=EventStatus.HUMAN_VERIFIED,
+        )
+        out = self._emit([marker.model_copy(update={"provenance": provenance})])
+        return out + self._refold(provenance)
+
     def _rally_index(self, rally_event_id: str) -> int:
         for i, r in enumerate(self._rallies):
             if rally_event_id == r.rally_end.event_id or rally_event_id in self._lineage(r.rally_end):
@@ -1305,7 +1419,11 @@ class BadmintonMatchEngine:
         transitions are retracted and regenerated (the score after it may differ)."""
         human = human or {}
         cfg = self.match_cfg
-        tracker = MatchPhaseTracker(self.cfg.phase, match_start_frame=self.phase.match_start_frame)
+        tracker = MatchPhaseTracker(
+            self.cfg.phase,
+            match_start_frame=self.phase.match_start_frame,
+            reviewed_intervals=self.phase.reviewed_intervals,
+        )
         state = self._base_state
         new_events: list[Event] = []
         retractions: list[Event] = []
@@ -1316,7 +1434,9 @@ class BadmintonMatchEngine:
             # Preserve that policy during refolds so a correction cannot silently reclassify them.
             policy = r.rally_end.payload.get("phase_policy", "legacy_heuristic_v1")
             tracker.params = replace(self.cfg.phase, allow_heuristic_official=policy == "legacy_heuristic_v1")
-            d = tracker.decide(r.record.start, r.evidence, match_finished=state.finished, override=r.override)
+            d = tracker.decide(
+                r.record.start, r.evidence, end=r.record.end, match_finished=state.finished, override=r.override
+            )
             winner = r.observed_winner if d.official else None
             loser = other(winner) if winner in PLAYERS else None
             rally_no = state.rally_no + 1 if d.official else None
@@ -1396,20 +1516,30 @@ class BadmintonMatchEngine:
         from bai_badminton.analytics.rebuild import lineage_ids, rally_records
 
         self._multi_person_identity_ambiguous = bool(self.store.query(types=["identity_ambiguity"]))
+        prior_teams = self.store.query(types=["doubles_team_hypothesis"])
+        if prior_teams and prior_teams[-1].payload.get("status") == "provisional":
+            # Restart does not restore visual continuity; close the old hypothesis on the next frame.
+            self._current_team_key = ("restart_requires_reobservation",)
         rallies = self.store.query(types=["rally_end"])
         records = rally_records(self.store)
         point_by_parent = {p.parent_id: p for p in self.store.query(types=["point"])}
         trans_by_parent: dict[str | None, list[Event]] = {}
         for t in self.store.query(types=[t.value for t in Transition if t is not Transition.POINT]):
             trans_by_parent.setdefault(t.parent_id, []).append(t)
-        for ph in self.store.query(types=["match_phase"]):
+        phases = self.store.query(types=["match_phase"])
+        for ph in phases:
             if ph.payload.get("base_state"):
                 self._base_state = MatchState.model_validate(ph.payload["base_state"])
                 self._seed_checked = True
+            if not ph.payload.get("marker") and ph.payload.get("phase"):
+                self.phase.phase = Phase(ph.payload["phase"])
+        # Marker positions are video timestamps, not edit order. Later user
+        # corrections win even when they move or clear a marker to an earlier frame.
+        for ph in sorted(phases, key=lambda e: e.seq if e.seq is not None else -1):
             if ph.payload.get("marker") == "match_start":
                 self.phase.match_start_frame = ph.payload.get("frame")
-            elif ph.payload.get("phase"):
-                self.phase.phase = Phase(ph.payload["phase"])
+            elif ph.payload.get("marker") == "reviewed_intervals":
+                self.phase.set_reviewed_intervals(ph.payload.get("intervals"))
         state = self._base_state
         self._rallies = []
         for ev, rec in zip(rallies, records, strict=True):
@@ -1440,13 +1570,33 @@ class BadmintonMatchEngine:
         nearest same-type event within a few frames. Idempotent; returns how many applied."""
         applied = 0
         changed_strokes = False
+        # Coalesce policy markers by their append sequence before applying them;
+        # replaying all historical markers would undo clears and break idempotence.
+        latest_markers: dict[str, Event] = {}
+        for _, item in sorted(enumerate(events), key=lambda pair: pair[1].seq if pair[1].seq is not None else pair[0]):
+            marker = item.payload.get("marker")
+            if (
+                item.type == "match_phase"
+                and item.status is EventStatus.HUMAN_VERIFIED
+                and marker in ("match_start", "reviewed_intervals")
+            ):
+                latest_markers[marker] = item
         for h in sorted(events, key=lambda e: e.frame_start):
             if h.status is not EventStatus.HUMAN_VERIFIED:
                 continue
             if h.type == "match_phase":
-                if h.payload.get("marker") == "match_start" and self.phase.match_start_frame != h.payload.get("frame"):
+                marker = h.payload.get("marker")
+                if marker in latest_markers and h.event_id != latest_markers[marker].event_id:
+                    continue
+                if marker == "match_start" and self.phase.match_start_frame != h.payload.get("frame"):
                     self.set_match_start(h.payload.get("frame"), provenance)
                     applied += 1
+                elif h.payload.get("marker") == "reviewed_intervals":
+                    intervals = h.payload.get("intervals")
+                    normalized = None if intervals is None else tuple(tuple(pair) for pair in intervals)
+                    if self.phase.reviewed_intervals != normalized:
+                        self.set_reviewed_match_intervals(intervals, provenance)
+                        applied += 1
                 continue
             if h.type == "rally_end":
                 tgt = self._match_rally(h.frame_start, h.frame_end)

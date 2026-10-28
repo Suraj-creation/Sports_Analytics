@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections import deque
 from dataclasses import dataclass
 from enum import StrEnum
+from math import isfinite
 
 
 class ActivityState(StrEnum):
@@ -32,6 +33,8 @@ class ActivityObservation:
     rally_observed: bool = False
     # Strongly verified absence, not merely a detector miss.
     absence_verified: bool = False
+    # Normalized image position from a visible, court-filtered shuttle detection.
+    shuttle_position: tuple[float, float] | None = None
 
 
 @dataclass(frozen=True)
@@ -42,7 +45,7 @@ class ActivityEstimate:
     # Fraction of the analysis window with required observations; not calibrated probability.
     evidence_coverage: float
     match_intent: str = "unknown"
-    version: str = "temporal_activity_v1"
+    version: str = "temporal_activity_v2"
 
 
 @dataclass(frozen=True)
@@ -53,7 +56,7 @@ class ActivityInterval:
     basis: str
     evidence_coverage: float
     match_intent: str = "unknown"
-    version: str = "temporal_activity_v1"
+    version: str = "temporal_activity_v2"
 
 
 class ActivityTracker:
@@ -106,6 +109,27 @@ class ActivityTracker:
             return ActivityState.RALLY, "rally_observation", rally / self.window_frames
         if people >= required and moving >= required and shuttle >= required:
             return ActivityState.ACTIVE_PLAY, "movement_and_shuttle", min(people, moving, shuttle) / self.window_frames
+        # Sparse shuttle detections are supporting evidence only. Require several
+        # separate observations over time and displacement above image jitter.
+        trajectory = [
+            (s.frame_idx, s.shuttle_position)
+            for s in samples
+            if s.shuttle_visible is True
+            and s.shuttle_position is not None
+            and len(s.shuttle_position) == 2
+            and all(isfinite(v) and 0.0 <= v <= 1.0 for v in s.shuttle_position)
+        ]
+        if people >= required and moving >= required and len(trajectory) >= 3:
+            first, last = trajectory[0][0], trajectory[-1][0]
+            xs = [position[0] for _, position in trajectory]
+            ys = [position[1] for _, position in trajectory]
+            displacement = max(max(xs) - min(xs), max(ys) - min(ys))
+            if last - first >= max(2, self.window_frames // 4) and displacement >= 0.015:
+                return (
+                    ActivityState.ACTIVE_PLAY,
+                    "sparse_shuttle_trajectory_and_movement",
+                    min(people, moving, len(trajectory)) / self.window_frames,
+                )
         if quiet >= required:
             return ActivityState.INACTIVE, "observed_low_motion", quiet / self.window_frames
         return ActivityState.UNKNOWN, "insufficient", min(people, moving + quiet) / self.window_frames

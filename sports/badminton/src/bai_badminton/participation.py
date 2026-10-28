@@ -37,6 +37,8 @@ class ParticipationEvent:
     related_participant_id: str | None = None
     certainty: str = "hypothesis"
     reason: str = ""
+    appearance_similarity: float | None = None
+    position_distance: float | None = None  # image distance in frame heights
 
 
 @dataclass(frozen=True)
@@ -57,6 +59,16 @@ class _Track:
     confidence: float
     missing: int = 0
     user_identity: str | None = None
+    appearance: np.ndarray | None = None
+    position: tuple[float, float] | None = None
+
+
+@dataclass(frozen=True)
+class _ReidMemory:
+    frame_idx: int
+    participant_id: str
+    appearance: np.ndarray
+    position: tuple[float, float]
 
 
 @dataclass(frozen=True)
@@ -122,6 +134,9 @@ class ParticipantTracker:
         self._pending: dict[int, tuple[int, int, int]] = {}
         self._recent_exits: deque[_Exit] = deque(maxlen=max_tracks)
         self._recent_entries: deque[_Entry] = deque(maxlen=max_tracks)
+        # Ephemeral visual descriptors, bounded and never emitted in events.
+        self._reid_memory: deque[_ReidMemory] = deque(maxlen=max_tracks)
+        self._reid_age_frames = round(600 * fps)
 
     def _side(self, obs: PersonObs) -> str:
         if obs.court_xy is not None and np.isfinite(obs.court_xy[1]):
@@ -129,7 +144,15 @@ class ParticipantTracker:
         return "near" if obs.bbox[3] > self.frame_height * 0.5 else "far"
 
     def _event(
-        self, kind: str, track: _Track, frame: int, related: str | None = None, *, reason: str = ""
+        self,
+        kind: str,
+        track: _Track,
+        frame: int,
+        related: str | None = None,
+        *,
+        reason: str = "",
+        appearance_similarity: float | None = None,
+        position_distance: float | None = None,
     ) -> ParticipationEvent:
         return ParticipationEvent(
             kind,
@@ -141,6 +164,49 @@ class ParticipantTracker:
             track.confidence,
             related,
             reason=reason,
+            appearance_similarity=appearance_similarity,
+            position_distance=position_distance,
+        )
+
+    @staticmethod
+    def _appearance(obs: PersonObs) -> np.ndarray | None:
+        if obs.appearance is None:
+            return None
+        try:
+            value = np.asarray(obs.appearance, dtype=np.float32)
+        except (TypeError, ValueError, OverflowError):
+            return None
+        if value.ndim != 1 or not 2 <= value.size <= 256 or not np.isfinite(value).all() or (value < 0).any():
+            return None
+        norm = float(np.linalg.norm(value))
+        return value / norm if np.isfinite(norm) and norm > 1e-8 else None
+
+    def _position(self, obs: PersonObs) -> tuple[float, float]:
+        return (float((obs.bbox[0] + obs.bbox[2]) / (2 * self.frame_height)), float(obs.bbox[3] / self.frame_height))
+
+    def _reid_candidate(self, track: _Track, frame: int) -> ParticipationEvent | None:
+        if track.appearance is None or track.position is None:
+            return None
+        ranked = []
+        for old in self._reid_memory:
+            if frame - old.frame_idx > self._reid_age_frames or old.appearance.shape != track.appearance.shape:
+                continue
+            distance = float(np.linalg.norm(np.asarray(track.position) - old.position))
+            similarity = float(np.clip(np.dot(track.appearance, old.appearance), 0, 1))
+            if distance <= 0.5 and similarity >= 0.95:
+                ranked.append((similarity, distance, old))
+        ranked.sort(key=lambda v: (-v[0], v[1], v[2].participant_id))
+        if not ranked or (len(ranked) > 1 and ranked[0][0] - ranked[1][0] < 0.1):
+            return None
+        score, distance, old = ranked[0]
+        return self._event(
+            "PLAYER_REIDENTIFICATION_UNCERTAIN",
+            track,
+            frame,
+            old.participant_id,
+            reason="weak_appearance_and_position",
+            appearance_similarity=round(score, 4),
+            position_distance=round(distance, 4),
         )
 
     def assign_user_identity(self, participant_id: str, name: str) -> None:
@@ -203,11 +269,19 @@ class ParticipantTracker:
             if track_id in valid:
                 p = valid[track_id]
                 track.side, track.confidence, track.missing = self._side(p), float(p.conf), 0
+                signature = self._appearance(p)
+                if signature is not None:
+                    track.appearance = signature
+                track.position = self._position(p)
             elif absence_usable and track_id not in seen_ids:
                 track.missing += 1
                 if track.missing >= self.exit_frames:
                     events.append(self._event("PLAYER_EXITED", track, frame_idx))
                     self._recent_exits.append(_Exit(frame_idx, track.side, track.participant_id))
+                    if track.appearance is not None and track.position is not None:
+                        self._reid_memory.append(
+                            _ReidMemory(frame_idx, track.participant_id, track.appearance.copy(), track.position)
+                        )
                     del self._tracks[track_id]
                     exited = True
         # Only consecutive confident observations can establish a new hypothesis.
@@ -227,7 +301,9 @@ class ParticipantTracker:
             p = valid[tid]
             pid = f"participant-{self.instance_id}-{self._next_id:06d}"
             self._next_id += 1
-            track = _Track(pid, tid, self._side(p), float(p.conf))
+            track = _Track(
+                pid, tid, self._side(p), float(p.conf), appearance=self._appearance(p), position=self._position(p)
+            )
             self._tracks[tid] = track
             self._pending.pop(tid, None)
             entered.append(track)
@@ -237,6 +313,13 @@ class ParticipantTracker:
             events.append(self._event(kind, track, frame_idx, reason=reason))
             if not initial:
                 self._recent_entries.append(_Entry(frame_idx, track.side, track.participant_id, track.track_id))
+        # Two simultaneous new tracks competing for the same old hypothesis
+        # leave the association unresolved rather than asserting both.
+        suggestions = [s for track in entered if (s := self._reid_candidate(track, frame_idx)) is not None]
+        contenders = Counter(s.related_participant_id for s in suggestions)
+        events.extend(s for s in suggestions if contenders[s.related_participant_id] == 1)
+        while self._reid_memory and frame_idx - self._reid_memory[0].frame_idx > self._reid_age_frames:
+            self._reid_memory.popleft()
         while self._recent_exits and frame_idx - self._recent_exits[0].frame_idx > self.substitution_window_frames:
             self._recent_exits.popleft()
         while self._recent_entries and frame_idx - self._recent_entries[0].frame_idx > self.substitution_window_frames:

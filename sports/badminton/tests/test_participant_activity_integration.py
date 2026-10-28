@@ -183,3 +183,67 @@ def test_carried_or_missing_detector_frames_do_not_assert_player_exit(tmp_path: 
         e.payload["kind"] == "PARTICIPANT_FIRST_OBSERVED" for e in store.query(types=["participant_observation"])
     )
     assert not any(e.payload["kind"] == "PLAYER_EXITED" for e in store.query(types=["participant_observation"]))
+
+
+def test_four_player_teams_require_court_side_and_sparse_activity_evidence(tmp_path: Path):
+    match = make_match(["P1"])
+    store = EventStore(tmp_path / "team.sqlite", "S1")
+    engine = BadmintonMatchEngine("S1", EngineConfig(fps=10, frame_width=1280, frame_height=720), store)
+    engine.set_calibration(0, match.homography)
+    frames = []
+    for i in range(100):
+        people = [
+            PersonObs(
+                track_id=n,
+                bbox=np.array([100.0 * n + 3 * i, y - 80, 100.0 * n + 3 * i + 30, y]),
+                conf=0.9,
+                court_xy=(float(n), -3.0 if n < 3 else 3.0),
+            )
+            for n, y in [(1, 250.0), (2, 270.0), (3, 550.0), (4, 570.0)]
+        ]
+        shuttle = (500.0 + i * 3, 300.0) if i % 4 == 0 else None
+        frames.append(
+            FramePerception(
+                frame_idx=i,
+                shuttle_xy=shuttle,
+                shuttle_conf=0.9 if shuttle else 0.0,
+                persons=people,
+                view="none" if i >= 95 else "main",
+            )
+        )
+    engine.ingest(ChunkPerception(start=0, end=99, frames=frames, models={"player_detector": "test"}))
+    engine.flush()
+    teams = store.query(types=["doubles_team_hypothesis"])
+    assert any(e.payload["status"] == "provisional" and len(e.payload["teams"]) == 2 for e in teams)
+    assert teams[-1].payload["status"] == "unknown"
+    assert all(e.payload["match_intent"] == "unknown" for e in teams)
+    assert not store.query(types=["point"])
+
+
+def test_restart_withholds_old_doubles_hypothesis_until_reobserved(tmp_path: Path):
+    from bai_engine.schema import EventStatus
+
+    match = make_match(["P1"])
+    store = EventStore(tmp_path / "team_restart.sqlite", "S1")
+    cfg = EngineConfig(fps=30, frame_width=1280, frame_height=720)
+    original = BadmintonMatchEngine("S1", cfg, store)
+    original._emit(
+        [
+            original._event(
+                "doubles_team_hypothesis",
+                0,
+                0,
+                payload={"status": "provisional", "teams": [{"team_id": "old"}]},
+                model="doubles_team_hypothesis_v1",
+                status=EventStatus.PROVISIONAL,
+            )
+        ]
+    )
+    resumed = BadmintonMatchEngine("S1", cfg, store)
+    resumed.set_calibration(0, match.homography)
+    resumed.restore_from_log(0)
+    frame = FramePerception(frame_idx=1, shuttle_xy=None, shuttle_conf=0.0, persons=[])
+    resumed.ingest(ChunkPerception(start=1, end=1, frames=[frame], models={"player_detector": "test"}))
+    resumed.flush()
+    events = store.query(types=["doubles_team_hypothesis"])
+    assert len(events) == 2 and events[-1].payload["status"] == "unknown"

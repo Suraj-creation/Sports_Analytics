@@ -418,6 +418,11 @@ class BadmintonSession:
                 command["rally_event_id"], bool(command["official"]), Provenance(model="human", worker="review-ui")
             )
             return {"ok": True, "events": len(evs), "state": self.engine.public_state()}
+        if cmd == "set_reviewed_match_intervals":
+            evs = self.engine.set_reviewed_match_intervals(
+                command.get("intervals"), Provenance(model="human", worker="review-ui")
+            )
+            return {"ok": True, "events": len(evs), "state": self.engine.public_state()}
         if cmd == "set_match_start":
             frame = command.get("frame")
             evs = self.engine.set_match_start(

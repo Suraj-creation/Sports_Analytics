@@ -618,9 +618,22 @@ class EngineService:
         manual_cal = [e for e in live if e.type == "calibration" and e.payload.get("source") == "human"]
         s = self.repo.get(sid)
         meta = dict(s.meta) if s else {}
-        carried = {(d["type"], d["frame_start"]): d for d in meta.get(CARRY_KEY) or []}
-        for e in human:  # newer human input for the same moment wins
-            carried[(e.type, e.frame_start)] = e.model_dump(mode="json")
+
+        def carry_key(event: dict[str, Any]) -> tuple[str, str | int]:
+            # Session-wide policies are independent of the frame at which a
+            # marker is drawn; each marker kind has one latest value.
+            marker = event.get("payload", {}).get("marker") if event.get("type") == "match_phase" else None
+            if marker in ("match_start", "reviewed_intervals"):
+                return ("match_phase", marker)
+            return (event["type"], event["frame_start"])
+
+        # Stored sequence expresses edit order; event queries are ordered by
+        # frame instead. Current-log edits supersede already-carried metadata.
+        previous = sorted(meta.get(CARRY_KEY) or [], key=lambda item: item.get("seq") or 0)
+        carried = {carry_key(d): d for d in previous}
+        for e in sorted(human, key=lambda event: event.seq or 0):
+            data = e.model_dump(mode="json")
+            carried[carry_key(data)] = data
         backup = self.repo.reset_analysis(sid)
         log.info("analysis.backed_up", session=sid, backup=str(backup))
         if manual_cal:

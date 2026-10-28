@@ -1,0 +1,166 @@
+{
+  "kind": "unlabelled_600_frame_probe",
+  "accuracy_measured": false,
+  "windows": [
+    {
+      "start": 0,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 58,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 2
+      },
+      "players": 216,
+      "shuttle": 39,
+      "seconds": 3.91
+    },
+    {
+      "start": 60,
+      "frames": 60,
+      "main": 57,
+      "states": {
+        "VALID": 55,
+        "DEGRADED": 0,
+        "LOST": 3,
+        "REACQUIRING": 2
+      },
+      "players": 228,
+      "shuttle": 23,
+      "seconds": 3.67
+    },
+    {
+      "start": 120,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 10,
+      "seconds": 2.8
+    },
+    {
+      "start": 180,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 216,
+      "shuttle": 25,
+      "seconds": 3.21
+    },
+    {
+      "start": 240,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 230,
+      "shuttle": 52,
+      "seconds": 3.75
+    },
+    {
+      "start": 300,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 232,
+      "shuttle": 9,
+      "seconds": 3.42
+    },
+    {
+      "start": 360,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 0,
+      "seconds": 2.94
+    },
+    {
+      "start": 420,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 9,
+      "seconds": 2.82
+    },
+    {
+      "start": 480,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 25,
+      "seconds": 2.86
+    },
+    {
+      "start": 540,
+      "frames": 60,
+      "main": 60,
+      "states": {
+        "VALID": 60,
+        "DEGRADED": 0,
+        "LOST": 0,
+        "REACQUIRING": 0
+      },
+      "players": 240,
+      "shuttle": 18,
+      "seconds": 3.74
+    }
+  ],
+  "events": {
+    "rally_start": 1,
+    "rally_end": 1,
+    "point": 0,
+    "stroke": 4,
+    "scene": 1
+  },
+  "official_rallies": 0,
+  "participation_event_counts": {
+    "PLAYER_ENTERED": 7,
+    "PLAYER_EXITED": 3
+  },
+  "activity_frame_counts": {
+    "reacquiring": 7,
+    "unknown": 345,
+    "active_play": 248
+  },
+  "teams": [],
+  "engine_sha256": "6427cfa9634968854ba0b3efea1e75f0b5c48eddaf9954597a93494e5df94376",
+  "note": "Unreviewed 600-frame sample; visual evidence and hypotheses are not accuracy measurements."
+}

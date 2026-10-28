@@ -253,3 +253,22 @@ def test_passphrase_auth(tmp_path: Path, settings: Settings) -> None:
             "/api/sessions", files={"file": ("a.mp4", io.BytesIO(b"x"), "video/mp4")}, headers={"X-CSRF-Token": csrf}
         )
         assert r2.status_code in (201, 422)
+
+
+def test_reviewed_match_intervals_are_validated_and_dispatched(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from bai_api.app import create_app
+
+    sid = _seed_match(settings)
+    sent: list[dict] = []
+    with TestClient(create_app(settings)) as client:
+        monkeypatch.setattr(client.app.state.bus, "send_command", sent.append)
+        url = f"/api/sessions/{sid}/corrections"
+        assert client.post(url, json={"kind": "match_intervals"}).status_code == 422
+        assert client.post(url, json={"kind": "match_intervals", "intervals": [[20, 10]]}).status_code == 422
+        assert client.post(url, json={"kind": "match_intervals", "intervals": [[True, 20]]}).status_code == 422
+        assert client.post(url, json={"kind": "match_intervals", "intervals": [[0, 20], [10, 30]]}).status_code == 422
+        assert client.post(url, json={"kind": "match_intervals", "intervals": [[0, 20], [30, 50]]}).status_code == 202
+    assert sent[-1]["cmd"] == "set_reviewed_match_intervals"
+    assert sent[-1]["intervals"] == [[0, 20], [30, 50]]
