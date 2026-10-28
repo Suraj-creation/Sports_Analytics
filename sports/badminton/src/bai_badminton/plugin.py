@@ -32,7 +32,7 @@ from bai_engine.store import EventStore
 log = get_logger(__name__)
 AUTO_CALIBRATION_MIN_SCORE = 0.6
 REF_FILE = "camera_ref.png"  # the frame the calibration was made on (lossless: its id is a content hash)
-CODEC_VERSION = 8  # v8 records pose cadence and cropped-court verification policy
+CODEC_VERSION = 9  # v9 binds canonical identity policy and raw/person-detection provenance
 MAX_ADJUST = 0.03  # a human calibration the court lines move by more than this (× frame width) is kept as is
 
 
@@ -92,7 +92,11 @@ class BadmintonSession:
             player_names=names,
         )
         self.perception = BadmintonPerception(
-            profile, registry, fps, get_settings().models_dir, frame_size=(m.width, m.height),
+            profile,
+            registry,
+            fps,
+            get_settings().models_dir,
+            frame_size=(m.width, m.height),
             match_format=discipline,
         )
         self.calibration: Homography | None = None
@@ -479,6 +483,22 @@ class BadmintonSession:
     def degraded(self) -> list[dict[str, str]]:
         return [{"stage": d.stage, "reason": d.reason} for d in self.perception.degraded]
 
+    @property
+    def requires_sequential_perception(self) -> bool:
+        """Requested ReID uses private history that cached chunks cannot restore.
+
+        Preserve this scheduling contract if model loading or inference degrades:
+        mixing fresh canonical births with old cached IDs can join different people.
+        Galleries are deliberately never persisted in perception caches.
+        """
+        profile = getattr(self.perception, "profile", None)
+        choice = getattr(profile, "player_reid", None)
+        return (
+            getattr(self.perception, "match_format", "singles") == "doubles"
+            and choice is not None
+            and choice.model != "none"
+        )
+
     # ------------------------------------------------------------------ cache codec
     def _isolation_id(self) -> dict[str, Any]:
         policy = {
@@ -490,6 +510,9 @@ class BadmintonSession:
         # reuse them with the expanded policy. Existing singles caches remain valid.
         if getattr(self.perception, "match_format", "singles") == "doubles":
             policy["player_candidate_limit"] = 6
+        identity_policy = getattr(self.perception, "identity_policy", None)
+        if identity_policy is not None:
+            policy["player_identity"] = identity_policy
         return policy
 
     def encode_perception(self, p: ChunkPerception) -> bytes:
@@ -517,6 +540,9 @@ class BadmintonSession:
                             "c": q.conf,
                             "k": q.kps.tolist() if q.kps is not None else None,
                             "a": q.appearance.tolist() if q.appearance is not None else None,
+                            "rt": q.raw_track_id,
+                            "dm": q.detector_matched,
+                            "im": q.identity_method,
                         }
                         for q in fp.persons
                     ],
@@ -539,6 +565,8 @@ class BadmintonSession:
         return out
 
     def decode_perception(self, data: bytes) -> ChunkPerception:
+        if self.requires_sequential_perception:
+            raise StaleCacheError("player identity requires sequential fresh perception; cache is diagnostic only")
         d = msgpack.unpackb(data, raw=False)
         ref_id = self.perception.ref_id
         if d.get("v", 1) != CODEC_VERSION or d.get("cr") != ref_id or d.get("ci") != self._isolation_id():
@@ -560,6 +588,20 @@ class BadmintonSession:
             for frame in d["frames"]
         ):
             raise StaleCacheError("perception segment lacks valid pose schedule metadata")
+        if any(
+            "rt" not in person
+            or "dm" not in person
+            or "im" not in person
+            or (person["rt"] is not None and (type(person["rt"]) is not int or person["rt"] < 0))
+            or (person["dm"] is not None and type(person["dm"]) is not bool)
+            or (
+                person["im"] is not None
+                and (not isinstance(person["im"], str) or not person["im"] or len(person["im"]) > 96)
+            )
+            for frame in d["frames"]
+            for person in frame["p"]
+        ):
+            raise StaleCacheError("perception segment lacks valid player identity provenance")
         frames = [
             FramePerception(
                 frame_idx=f["f"],
@@ -582,6 +624,9 @@ class BadmintonSession:
                         conf=q["c"],
                         kps=np.asarray(q["k"]) if q["k"] is not None else None,
                         appearance=np.asarray(q["a"], np.float32) if q["a"] is not None else None,
+                        raw_track_id=q["rt"],
+                        detector_matched=q["dm"],
+                        identity_method=q["im"],
                     )
                     for q in f["p"]
                 ],

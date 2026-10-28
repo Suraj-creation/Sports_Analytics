@@ -26,7 +26,7 @@ class ParticipantSnapshot:
     observation_id: str | None = None
     # Frame-level detector execution, not evidence that this person was matched.
     detector_observed: bool | None = None
-
+    detector_matched: bool | None = None
 
 
 def has_target_court_provenance(snapshot: ParticipantSnapshot) -> bool:
@@ -52,6 +52,7 @@ def participant_window(
     """
     if len(frames) != window.n:
         raise ValueError("participant observations must align with the window")
+
     def usable(snapshot: ParticipantSnapshot) -> bool:
         if not restrict_target_court:
             return True
@@ -79,12 +80,21 @@ def participant_window(
                 item.kps[i] = snapshot.kps
             if snapshot.court_xy is not None:
                 item.court_xy[i] = snapshot.court_xy
-    return WindowObs(frame0=window.frame0, fps=window.fps, shuttle=window.shuttle,
-                     players=series, replay=window.replay, pose_stride=window.pose_stride)
+    return WindowObs(
+        frame0=window.frame0,
+        fps=window.fps,
+        shuttle=window.shuttle,
+        players=series,
+        replay=window.replay,
+        pose_stride=window.pose_stride,
+    )
 
 
 def participant_contact_evidence(
-    window: WindowObs, frames: list[dict[str, ParticipantSnapshot]], index: int, *,
+    window: WindowObs,
+    frames: list[dict[str, ParticipantSnapshot]],
+    index: int,
+    *,
     restrict_target_court: bool = False,
 ) -> dict[str, Any]:
     """Score only episodes observed at this frame; never link across track IDs.
@@ -108,12 +118,15 @@ def participant_contact_evidence(
             "components": {},
         }
     participant_id = candidate.player_id
+    unmatched = participant_id is not None and active[participant_id].detector_matched is False
+    if unmatched:
+        participant_id = None
     return {
         "status": "provisional" if participant_id is not None else "unresolved",
         "participant_id": participant_id,
         "track_id": active[participant_id].track_id if participant_id is not None else None,
         "observation_id": active[participant_id].observation_id if participant_id is not None else None,
-        "reason": candidate.attribution_reason,
+        "reason": "player_not_detector_matched" if unmatched else candidate.attribution_reason,
         "policy": ATTRIBUTION_POLICY,
         "components": candidate.components,
     }

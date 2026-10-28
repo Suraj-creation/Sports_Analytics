@@ -179,6 +179,25 @@ def test_competing_overlap_guard_includes_seed_and_shot_endpoints():
         assert _continuous(rows + [competitor], "obs", 1, 0, 4, 1280, 720)
 
 
+def test_named_seed_cannot_bridge_a_recorded_unmatched_person_on_detector_frame():
+    from bai_badminton.analytics.automatic_individual import _continuous
+
+    rows = [
+        {
+            "frame_idx": f,
+            "track_id": 1,
+            "bbox": [10, 10, 40, 110],
+            "conf": 0.9,
+            "visible": True,
+            "participant_observation_id": "birth",
+            "detector_observed": True,
+            "detector_matched": f != 2,
+        }
+        for f in (0, 2, 4)
+    ]
+    assert not _continuous(rows, "birth", 1, 0, 4, 1280, 720)
+
+
 def test_four_participants_are_separate_estimates_and_not_verified(tmp_path):
     store, tracks, observations, seeds, shots = _setup(tmp_path)
     result = _fold(store, tracks)

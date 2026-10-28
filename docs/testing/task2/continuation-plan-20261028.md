@@ -32,3 +32,72 @@ Remaining Task 2 requirements after these bounded fixes: exhaustive independentl
 The full Task 2 requirements listed above remain open. Neither sampled AI
 agreement nor the overlap abstention guard demonstrates uninterrupted automatic
 four-person identity or independently measured shot-family/hitter accuracy.
+
+## Local authoring and automatic continuity
+
+The user's latest instruction makes local Windows editing the development path.
+GPU inference and end-to-end validation use an isolated server checkout and the
+existing Pascal environment. Cloudflare stays off; browser testing uses a local
+SSH-forwarded URL. Original local dependency edits/untracked folders and all
+server session results remain preserved.
+
+- [x] Fetch main b97c069 into a clean managed local worktree and establish a CPU
+  regression baseline; preserve the original Windows checkout.
+- [x] Research an actual per-hit reference independent of our predictions:
+  FineBadminton video 0044 and its author-verified hit annotations, pinned to
+  revision 72cae601e08c83ee8ec7e19f8fd7850e9158af7d. Reserve it before tuning;
+  report published-reference provenance and professional-camera limitations.
+- [x] Implement `perception/player_association.py`: private 512-D appearance
+  galleries plus physical-time motion gating, one-to-one matching with row/column
+  margins, one-second retention, no forced assignment, deterministic frame-based
+  canonical IDs. Test crossing/raw swaps, fragmentation, identical appearances,
+  substitution, expiry, changed cadence, resets and order invariance.
+- [x] Integrate the associator in `perception/players.py`, using a bounded OSNet
+  adapter loaded only from a checksum-verified existing checkpoint. Only uniquely
+  matched current detections may teach descriptors. Carries never teach them;
+  inference failure records degradation and cannot revert canonical IDs to raw IDs.
+  Preserve raw IDs, per-person detection matches and association policy as additive
+  provenance. Neural vectors never enter persisted observations.
+- [x] Wire the optional model through `engine/config.py`, the registry and an
+  explicit GPU testing profile. Fingerprint model/policy/failure state in the
+  perception cache, bump the codec, preserve cache/store round trips and prevent
+  old or disabled caches masquerading as canonical identity output.
+- [x] Ensure unresolved visual people cannot silently credit a teammate in
+  participant contact inference. Preserve the existing named overlap guard and
+  reviewed totals. Verify anonymous profiles, player totals and evidence links.
+- [x] Add `research/finebadminton_reference.py` and focused synthetic tests:
+  validate exact JSON/media hashes, FPS, frame bounds, rally windows and taxonomy;
+  retain hitter names/side, raw family, subtype and provider-review provenance.
+  Published review is an explicit opt-in; our own human review is never fabricated.
+- [ ] Run local unit/integration and frontend checks, push the candidate branch,
+  fetch it into the isolated GPU checkout, and run matched before/after inference
+  against downloaded doubles and published per-hit windows. Report class scores,
+  contact P/R, timestamp error, conditional hitter metrics, identity consistency,
+  memory and timing; retain recording-separated evaluation and abstention support.
+- [ ] Test the actual browser flow at localhost with the GPU app, verify preserved
+  session ledgers, review the final diff and integrate only verified changes.
+
+At the start of this phase the GPU host stopped responding to SSH, and a fresh
+connection timed out. Continue local coding/CPU tests and reference preparation;
+GPU/UI results must wait for restored connectivity and must not be invented.
+
+Connectivity subsequently recovered. GPU inference and isolated session replay
+now run on the server. The user's latest clarification requires **all further
+tests and media/model processing on the GPU server**; Windows is for authoring,
+Git and browser access only. No Cloudflare tunnel is used. Local CPU/frontend
+checks completed before that clarification are historical evidence.
+
+Additional correctness fixes prevent camera stabilization from dropping identity
+provenance, an unidentified extra person from preserving inferred teams, and
+mixed cached/fresh chunks from reusing one canonical ID for different people.
+The optional neural mode therefore recomputes sequentially and disables seek-ahead
+perception; private descriptors are not persisted for resuming. Default profiles
+retain their existing cache and preview behavior.
+
+The first neural doubles experiment regressed on sampled AI-draft identity
+agreement and remains opt-in. Published recording 0044 exposed a separate
+classification context loss after singles camera cuts. It is now development
+data; recording 0046 was reserved before the fix as a separate match for held-out
+evaluation. Anonymous two-person geometry may inform classification without
+restoring player names, credit or scoring slots. These changes do not complete
+the unresolved four-player identity and high-accuracy requirements.

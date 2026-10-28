@@ -35,6 +35,23 @@ from bai_engine.schema.tracks import TrackObject, samples_to_table
 from bai_engine.store import EventStore, TrackStore
 
 
+def _identity_metadata(person: dict) -> dict:
+    """Keep uncertainty on current replays while supporting archived dataclasses."""
+    values = {
+        "raw_track_id": person.get("rt"),
+        "detector_matched": person.get("dm"),
+        "identity_method": person.get("im"),
+    }
+    raw, matched, method = values.values()
+    if raw is not None and (type(raw) is not int or raw < 0):
+        raise ValueError("invalid raw identity track id")
+    if matched is not None and not isinstance(matched, bool):
+        raise ValueError("invalid identity detector match")
+    if method is not None and (not isinstance(method, str) or len(method) > 96):
+        raise ValueError("invalid identity method")
+    return {key: value for key, value in values.items() if key in PersonObs.__dataclass_fields__}
+
+
 def decode_observations(data: bytes, n_frames: int) -> ChunkPerception | None:
     """Historical observation replay, intentionally separate from production codecs."""
     decoded = msgpack.unpackb(data, raw=False)
@@ -59,6 +76,7 @@ def decode_observations(data: bytes, n_frames: int) -> ChunkPerception | None:
                 conf=p["c"],
                 kps=np.asarray(p["k"]) if p["k"] is not None else None,
                 appearance=np.asarray(p["a"], np.float32) if p.get("a") is not None else None,
+                **_identity_metadata(p),
             )
             for p in frame["p"]
         ]

@@ -1,8 +1,9 @@
-"""Opt-in, local-only OSNet appearance evidence for human review.
+"""Bounded, checksum-verified local OSNet appearance extraction.
 
 This adapter never downloads weights, stores descriptors, matches tracks, or
 claims identity. The fixed checkpoint is verified before any model is loaded.
-The model is deliberately not part of the production perception pipeline.
+Matching decisions belong to a separate associator; this adapter does not infer
+identities. Neural descriptors are ephemeral and must never enter event/cache data.
 """
 
 from __future__ import annotations
@@ -31,8 +32,8 @@ def _digest(path: Path) -> str:
     return h.hexdigest()
 
 
-class OSNetReviewEmbedder:
-    """Extract bounded appearance vectors; the caller must discard them after review.
+class OSNetAppearanceEmbedder:
+    """Extract bounded appearance vectors for review or private online matching.
 
     `frame` is a BGR uint8 image and `boxes` are in-frame xyxy pixel bounds.
     Device is explicit (e.g. cpu or cuda:0). No tracker or event state is changed.
@@ -47,6 +48,10 @@ class OSNetReviewEmbedder:
         self.max_crops = max_crops
         self.device = device
         self._embedder = _vendor_embedder()(variant=MODEL_NAME, weights=self.checkpoint, device=device)
+
+    @property
+    def fingerprint(self) -> str:
+        return f"{MODEL_NAME}:{CHECKPOINT_SHA256}:fp32:rgb128x256"
 
     def embed(self, frame: np.ndarray, boxes: Any) -> np.ndarray:
         frame = np.asarray(frame)
@@ -83,6 +88,10 @@ class OSNetReviewEmbedder:
         if not np.isfinite(norms).all() or np.any(norms < 1e-8):
             raise ValueError("model returned empty embeddings")
         return result / norms[:, None]
+
+
+# Existing opt-in review scripts keep the same validated adapter and contract.
+OSNetReviewEmbedder = OSNetAppearanceEmbedder
 
 
 def compare_features(a: Any, b: Any) -> dict[str, Any]:

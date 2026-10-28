@@ -9,8 +9,8 @@ One :class:`SessionRunner` thread per active session:
 3. **Progressive analysis** — the *main cursor* walks HLS segments in order (decode → perceive →
    cache → temporal engine → tracks/events/status published).  When the viewer seeks far ahead of
    the analysis frontier, a *preview cursor* perceives segments around the playhead (overlays
-   appear immediately); their perception is cached so the main cursor reuses it — no GPU work is
-   ever done twice.
+   appear immediately); their perception is cached so the main cursor reuses it. A sport with
+   private sequential matcher state opts out of both cache reads and seek-ahead perception.
 4. **Commands** (calibrate, correct, …) are applied between chunks on the runner thread, so the
    temporal engine is never touched concurrently.
 
@@ -276,16 +276,24 @@ class SessionRunner(threading.Thread):
         d.mkdir(parents=True, exist_ok=True)
         return d / f"seg_{k:05d}.msgpack"
 
+    @property
+    def _requires_sequential_perception(self) -> bool:
+        # Optional plugin capability; existing stateless plugins retain previews
+        # and cache reuse. A persisted result cannot restore private matcher state.
+        return getattr(self.sport, "requires_sequential_perception", False) is True
+
     def _perceive(self, dec: SegmentDecoder, k: int) -> Any:
         assert self.sport is not None
         cp = self._cache_path(k)
-        if cp.exists():
+        if not self._requires_sequential_perception and cp.exists():
             try:
                 return self.sport.decode_perception(cp.read_bytes())
             except ValueError as e:  # stale (made against another calibration reference) or unreadable
                 log.info("perception.cache_stale", segment=k, reason=str(e))
         chunk: DecodedChunk = dec.decode_segment(k)
         p = self.sport.perceive(chunk)
+        # Stateful results are still useful diagnostics, but never substitute
+        # for processing every preceding frame with the same live matcher.
         tmp = cp.with_suffix(".tmp")
         tmp.write_bytes(self.sport.encode_perception(p))
         tmp.replace(cp)
@@ -369,9 +377,10 @@ class SessionRunner(threading.Thread):
                     break
                 self.shared.stop.wait(0.15)
                 continue
-            # seek preview: perceive near the playhead when it is far beyond the frontier
+            # Seek previews mutate perception state. Sequential plugins must
+            # advance only the main cursor, including when old caches exist.
             play_k = self.shared.playhead // F
-            if play_k > k + lead_segs + 2:
+            if not self._requires_sequential_perception and play_k > k + lead_segs + 2:
                 for pk in range(play_k, min(play_k + 2, st.segments)):
                     if not self._cache_path(pk).exists():
                         p = self._perceive(dec, pk)

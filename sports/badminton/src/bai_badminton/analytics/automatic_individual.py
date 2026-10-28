@@ -95,6 +95,8 @@ def _continuous(
             if intersection / union >= MAX_COMPETING_BOX_IOU:
                 return False
     if require_detector_runs:
+        if any(row.get("detector_observed") is True and row.get("detector_matched") is False for row in rows):
+            return False
         # None is legacy/unknown provenance; False means the detector explicitly did not run.
         flags = [row.get("detector_observed") for row in rows]
         if any(flag is not True and flag is not False for flag in flags):
@@ -453,6 +455,7 @@ def build_estimated_individual_analytics(
             "seed_max_seconds": MAX_SEED_AGE_SECONDS,
             "max_track_sample_gap_frames": MAX_TRACK_SAMPLE_GAP_FRAMES,
             "named_requires_detector_run_at_seed_and_shot": True,
+            "named_rejects_recorded_unmatched_person": True,
             "max_detector_run_gap_frames": MAX_TRACK_SAMPLE_GAP_FRAMES,
             "detector_run_scope": "frame_only_not_person_match",
             "min_track_confidence": MIN_TRACK_CONFIDENCE,

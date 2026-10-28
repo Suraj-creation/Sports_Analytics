@@ -102,6 +102,7 @@ class Profile(BaseModel):
     shuttle_live: ModelChoice | None = None
     shuttle_second_opinion: ModelChoice | None = None
     player_detector: ModelChoice
+    player_reid: ModelChoice | None = None
     pose: ModelChoice
     racket: ModelChoice | None = None
     stroke: ModelChoice

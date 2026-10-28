@@ -18,6 +18,9 @@ class PersonObs:
     kps: NDArray[np.float64] | None = None  # (17, 3)
     court_xy: tuple[float, float] | None = None  # feet in court metres (if calibrated)
     appearance: NDArray[np.float32] | None = None  # colour signature for re-identification
+    raw_track_id: int | None = None  # ByteTrack ID before optional neural/motion association
+    detector_matched: bool | None = None  # unique match to this frame's person detection
+    identity_method: str | None = None  # uncalibrated association policy/reason, never a person name
 
 
 @dataclass

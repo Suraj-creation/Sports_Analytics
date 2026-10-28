@@ -26,6 +26,7 @@ p.add_argument("--source-data", type=pathlib.Path, required=True)
 p.add_argument("--session-id", required=True)
 p.add_argument("--output", type=pathlib.Path, required=True)
 p.add_argument("--label", required=True)
+p.add_argument("--profile", help="Explicit profile override for an isolated candidate run")
 p.add_argument("--runtime-root", type=pathlib.Path, help="Existing model/config root when source data is a backup")
 args = p.parse_args()
 source = args.source_data.resolve()
@@ -65,6 +66,7 @@ repo.save(
             "status_detail": "Isolated benchmark",
             "analysed_frames": 0,
             "frontier_frame": 0,
+            "profile": args.profile or session.profile,
             "meta": meta,
         }
     )
@@ -76,7 +78,7 @@ settings = Settings(
     data_dir=data,
     models_dir=primary / "models",
     profiles_dir=primary / "config/profiles",
-    profile=session.profile,
+    profile=args.profile or session.profile,
 )
 runner = SessionRunner(session.session_id, repo, LocalBus(), settings, ModelRegistry(settings.models_dir))
 gpu_executable = shutil.which("nvidia-smi")
@@ -138,6 +140,7 @@ for e in events:
         activity[e.payload.get("state")] += e.frame_end - e.frame_start + 1
 report = {
     "label": args.label,
+    "profile": args.profile or session.profile,
     "status": state.status.value,
     "source_session": session.session_id,
     "source_sha256": session.source.sha256,

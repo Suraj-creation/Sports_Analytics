@@ -115,11 +115,25 @@ class BadmintonPerception:
         self.shuttle = self._load_shuttle(profile.shuttle, registry, cache)
         det = self._load_detector(profile.player_detector, registry, cache)
         pose = self._load_pose(profile.pose, registry, cache)
+        reid = self._load_reid(profile.player_reid, registry) if match_format == "doubles" else None
         self.scoreboard = self._load_ocr(profile.ocr, registry, fps)
         self.players = PlayerPerception(
-            det, pose, fps, det_stride=profile.detector_rates.in_play, pose_stride=profile.pose_rates.in_play,
+            det,
+            pose,
+            fps,
+            det_stride=profile.detector_rates.in_play,
+            pose_stride=profile.pose_rates.in_play,
             max_players=4 if match_format == "doubles" else 2,
+            reid=reid,
         )
+
+    @property
+    def identity_policy(self) -> dict[str, Any]:
+        choice = getattr(self.profile, "player_reid", None)
+        return {
+            **getattr(self.players, "identity_policy", {"state": "disabled"}),
+            "requested_model": choice.model if choice is not None else None,
+        }
 
     # ------------------------------------------------------------------ loading
     def _providers(self, choice: ModelChoice, cache: Path) -> list[Any]:
@@ -176,6 +190,30 @@ class BadmintonPerception:
             return p
         except (ModelError, OSError, ValueError, ImportError, RuntimeError) as e:
             self._degrade("pose", f"{c.model}: {e}")
+            return None
+
+    def _load_reid(self, choice: ModelChoice | None, registry: ModelRegistry) -> Any | None:
+        if choice is None or choice.model == "none":
+            return None
+        try:
+            from bai_badminton.perception.offline_reid import OSNetAppearanceEmbedder
+
+            if (
+                choice.model != "osnet_ain_x0_25"
+                or choice.precision != "fp32"
+                or choice.backend not in ("torch-cpu", "torch-cuda")
+            ):
+                raise ValueError(
+                    "OSNet identity inference requires the pinned model, FP32 and an explicit Torch device"
+                )
+            checkpoint = registry.path(choice.model, fetch=False)
+            model = OSNetAppearanceEmbedder(
+                checkpoint, device="cuda:0" if choice.backend == "torch-cuda" else "cpu", max_crops=8
+            )
+            self.models["player_reid"] = registry.get(choice.model).ref
+            return model
+        except (ModelError, OSError, ValueError, ImportError, RuntimeError) as exc:
+            self._degrade("player_identity", f"{choice.model}: {exc}")
             return None
 
     def _load_ocr(self, c: ModelChoice | None, reg: ModelRegistry, fps: float) -> ScoreboardReader | None:
@@ -332,9 +370,17 @@ class BadmintonPerception:
                     h_now = Homography(H_now, 0.0, 4) if H_now is not None else None
                     self.players.set_roi(CourtROI(poly.astype(np.float32), homography=h_now))
                 persons = [] if replay[i] else self.players.process(fidx, img, (rates_det, rates_pose))
+                identity_error = getattr(self.players, "last_identity_error", None)
+                if identity_error is not None and not any(
+                    d.stage == "player_identity" and d.reason == identity_error for d in self.degraded
+                ):
+                    self._degrade("player_identity", identity_error)
                 reason = "Too many court tracks in some frames; player evidence was withheld."
-                if (not replay[i] and getattr(self.players, "last_capacity_limited", False)
-                    and not any(d.stage == "player_tracking" and d.reason == reason for d in self.degraded)):
+                if (
+                    not replay[i]
+                    and getattr(self.players, "last_capacity_limited", False)
+                    and not any(d.stage == "player_tracking" and d.reason == reason for d in self.degraded)
+                ):
                     self._degrade("player_tracking", reason)
                 s = shuttle[i] if not replay[i] else None
                 # lines mode: every calibrated frame carries its pose (other cameras too: the court is drawn
@@ -355,7 +401,8 @@ class BadmintonPerception:
                         court_q=scene.quality[i],
                         calibration_state=states[i],
                         pose_stride=int(rates_pose)
-                        if not replay[i] and getattr(self.players, "pose", None) is not None else 0,
+                        if not replay[i] and getattr(self.players, "pose", None) is not None
+                        else 0,
                         detector_observed=bool(
                             not replay[i] and getattr(self.players, "last_detector_observed", False)
                         ),

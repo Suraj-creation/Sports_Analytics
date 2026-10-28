@@ -9,6 +9,16 @@
 version: 1
 
 models:
+  osnet_ain_x0_25:
+    task: person_reidentification
+    version: "1"
+    format: torch
+    source: {hf: "LibreYOLO/LibreReID-osnet", file: "osnet_ain_x0_25.pt"}
+    sha256: ce171fe160b3608f5e4c19489774991419be965b1d6f4bdccc4b4cfd2ef95347
+    license: MIT (Torchreid/LibreYOLO weights and code); research-data provenance documented in model card
+    input: {width: 128, height: 256, features: 512}
+    status: candidate
+
   tracknetv3:
     task: shuttle
     version: "3.0"

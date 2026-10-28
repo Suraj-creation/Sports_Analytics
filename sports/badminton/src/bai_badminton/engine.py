@@ -176,6 +176,9 @@ def _stabilise(p: PersonObs, Ginv: Any) -> PersonObs:
         conf=p.conf,
         kps=kps,
         appearance=p.appearance,
+        raw_track_id=p.raw_track_id,
+        detector_matched=p.detector_matched,
+        identity_method=p.identity_method,
     )
 
 
@@ -277,6 +280,8 @@ class BadmintonMatchEngine:
         self._geometry_valid: list[bool] = []
         self._pose_stride: list[int] = []
         self._participant_frames: list[dict[str, ParticipantSnapshot]] = []
+        self._participant_visible_counts: list[int] = []
+        self._participant_identity_unresolved: list[bool] = []
         self._players: dict[str, dict[str, list[Any]]] = {
             pid: {"bbox": [], "kps": [], "court": [], "track_id": []} for pid in ("P1", "P2")
         }
@@ -484,9 +489,15 @@ class BadmintonMatchEngine:
         self._geometry_valid.append(geometry_valid)
         self._pose_stride.append(
             (fp.pose_stride if type(fp.pose_stride) is int and fp.pose_stride >= 0 else -1)
-            if geometry_valid and not fp.replay else 0
+            if geometry_valid and not fp.replay
+            else 0
         )
         coverage_valid = geometry_valid and bool(self._provenance.get("player_detector")) and not fp.replay
+        # Pending positive tracks are visual people before the participant
+        # admission streak matures; do not mistake two mature episodes for two people.
+        self._participant_visible_counts.append(len(persons))
+        identity_unresolved = any(person.track_id < 0 for person in persons)
+        self._participant_identity_unresolved.append(identity_unresolved)
         detector_coverage_valid = coverage_valid and fp.detector_observed is True
         reason = None
         if self.participants is not None:
@@ -544,6 +555,7 @@ class BadmintonMatchEngine:
                     kps=person.kps.copy() if person.kps is not None else None,
                     court_xy=person.court_xy,
                     detector_observed=fp.detector_observed,
+                    detector_matched=person.detector_matched,
                 )
         participant_events = [
             self._event(
@@ -598,7 +610,10 @@ class BadmintonMatchEngine:
                 frame_idx=fp.frame_idx,
                 view_valid=geometry_valid and not fp.replay,
                 person_count=len(participant_frame.participants)
-                if coverage_valid and (detector_coverage_valid or participant_frame.participants) else None,
+                if coverage_valid
+                and not identity_unresolved
+                and (detector_coverage_valid or participant_frame.participants)
+                else None,
                 moving=movement,
                 shuttle_visible=True if fp.shuttle_xy is not None and fp.shuttle_conf >= 0.5 else None,
                 shuttle_position=(sxy[0] / self.cfg.frame_width, sxy[1] / self.cfg.frame_height)
@@ -609,7 +624,7 @@ class BadmintonMatchEngine:
         self._emit_activity(activity_interval)
         # Doubles hypotheses require actual court-relative positions, not image-side fallback.
         by_track = {p.track_id: p for p in persons}
-        team_geometry_valid = geometry_valid and len(participant_frame.participants) == 4
+        team_geometry_valid = geometry_valid and not identity_unresolved and len(participant_frame.participants) == 4
         if team_geometry_valid:
             for participant in participant_frame.participants:
                 obs = by_track.get(participant.track_id)
@@ -679,7 +694,10 @@ class BadmintonMatchEngine:
             )
         assigned = (
             self.identity.assign(persons, {k: v.value for k, v in self.state.ends.items()})
-            if geometry_valid and not fp.replay and not self._multi_person_identity_ambiguous
+            if geometry_valid
+            and not fp.replay
+            and not self._multi_person_identity_ambiguous
+            and self.match_cfg.discipline != "doubles"
             else {}
         )
         for pid, buf in self._players.items():
@@ -701,12 +719,17 @@ class BadmintonMatchEngine:
             )
         )
         raw = {q.track_id: q for q in fp.persons}
-        if self._multi_person_identity_ambiguous and geometry_valid:
+        if (self._multi_person_identity_ambiguous or self.match_cfg.discipline == "doubles") and geometry_valid:
             # Keep visual trajectories usable for overlays without assigning a
             # singles player or allowing them into player-specific statistics.
             snapshots_by_track = {snapshot.track_id: snapshot for snapshot in snapshots.values()}
             for p in fp.persons:
-                if p.track_id < 0 or not np.isfinite(p.conf) or not 0 <= p.conf <= 1 or not np.isfinite(p.bbox).all():
+                if (
+                    (p.track_id < 0 and (p.raw_track_id is None or p.raw_track_id < 0))
+                    or not np.isfinite(p.conf)
+                    or not 0 <= p.conf <= 1
+                    or not np.isfinite(p.bbox).all()
+                ):
                     continue
                 snapshot = snapshots_by_track.get(p.track_id)
                 court_xy = snapshot.court_xy if snapshot is not None and has_target_court_provenance(snapshot) else None
@@ -714,7 +737,10 @@ class BadmintonMatchEngine:
                     TrackSample(
                         frame_idx=fp.frame_idx,
                         obj=TrackObject.PLAYER,
-                        track_id=p.track_id,
+                        track_id=p.track_id if p.track_id >= 0 else -int(p.raw_track_id) - 2,
+                        raw_track_id=p.raw_track_id,
+                        detector_matched=p.detector_matched,
+                        identity_method=p.identity_method,
                         player_id=None,
                         participant_observation_id=observation_by_track.get(p.track_id),
                         detector_observed=fp.detector_observed,
@@ -735,6 +761,9 @@ class BadmintonMatchEngine:
                     frame_idx=fp.frame_idx,
                     obj=TrackObject.PLAYER,
                     track_id=p.track_id,
+                    raw_track_id=p.raw_track_id,
+                    detector_matched=p.detector_matched,
+                    identity_method=p.identity_method,
                     player_id=pid,
                     participant_observation_id=observation_by_track.get(p.track_id),
                     detector_observed=fp.detector_observed,
@@ -792,6 +821,8 @@ class BadmintonMatchEngine:
             self._geometry_valid,
             self._pose_stride,
             self._participant_frames,
+            self._participant_visible_counts,
+            self._participant_identity_unresolved,
         ):
             del lst[:drop]
         for buf in self._players.values():
@@ -823,7 +854,11 @@ class BadmintonMatchEngine:
                     s.court_xy[i] = c
             players[pid] = s
         return WindowObs(
-            frame0=lo, fps=self.cfg.fps, shuttle=track, players=players, replay=np.array(self._replay[a:b], bool),
+            frame0=lo,
+            fps=self.cfg.fps,
+            shuttle=track,
+            players=players,
+            replay=np.array(self._replay[a:b], bool),
             pose_stride=np.array(self._pose_stride[a:b], dtype=np.int64),
         )
 
@@ -836,7 +871,7 @@ class BadmintonMatchEngine:
         w = self._window(lo, self._last_frame)
         self._proc, self._proc0 = w.shuttle, lo
         i0, i1 = w.idx(start), w.idx(upto) + 1
-        if self.match_cfg.discipline == "doubles" and self._multi_person_identity_ambiguous:
+        if self.match_cfg.discipline == "doubles":
             a = w.frame0 - self._buf0
             b = a + w.n
             frames = (
@@ -910,10 +945,27 @@ class BadmintonMatchEngine:
         lo = w.frame0 - self._buf0
         hi = lo + w.n
         if c.player_id is None and 0 <= lo <= hi <= len(self._participant_frames):
-            payload["participant_hypothesis"] = participant_contact_evidence(
-                w, self._participant_frames[lo:hi], c.frame - w.frame0,
-                restrict_target_court=self.match_cfg.discipline == "doubles",
-            )
+            if (
+                self.match_cfg.discipline == "doubles"
+                and 0 <= i < len(self._participant_identity_unresolved)
+                and self._participant_identity_unresolved[i]
+            ):
+                payload["participant_hypothesis"] = {
+                    "status": "unresolved",
+                    "participant_id": None,
+                    "track_id": None,
+                    "observation_id": None,
+                    "reason": "ambiguous_player_association",
+                    "policy": ATTRIBUTION_POLICY,
+                    "components": {},
+                }
+            else:
+                payload["participant_hypothesis"] = participant_contact_evidence(
+                    w,
+                    self._participant_frames[lo:hi],
+                    c.frame - w.frame0,
+                    restrict_target_court=self.match_cfg.discipline == "doubles",
+                )
         ev = self._event(
             "contact",
             c.frame,
@@ -956,7 +1008,13 @@ class BadmintonMatchEngine:
         t, i = located
         next_idx = i + next_frame - frame if next_frame is not None else None
         return post_contact_motion(
-            t.x, t.y, t.vis, t.interp, i, self.cfg.fps, float(self.cfg.frame_height),
+            t.x,
+            t.y,
+            t.vis,
+            t.interp,
+            i,
+            self.cfg.fps,
+            float(self.cfg.frame_height),
             next_contact_idx=next_idx,
         )
 
@@ -975,9 +1033,34 @@ class BadmintonMatchEngine:
         cand = c.cand
         bbox, _, court_xy = self._player_at(cand.player_id, cand.frame)
         context_source = "named_player" if cand.player_id is not None else None
-        if self.match_cfg.discipline == "doubles" and cand.player_id is None:
+        index = cand.frame - self._buf0
+        current_snapshots = self._participant_frames[index] if 0 <= index < len(self._participant_frames) else {}
+        # A camera cut can withhold P1/P2 identity while two current court
+        # observations still support shot geometry. Use that evidence only for
+        # classification; never restore names, score slots or credited players.
+        singles_context_supported = (
+            self.match_cfg.discipline == "singles"
+            and 0 <= index < len(self._geometry_valid)
+            and self._geometry_valid[index] is True
+            and 0 <= index < len(self._participant_identity_unresolved)
+            and self._participant_identity_unresolved[index] is False
+            and 0 <= index < len(self._participant_visible_counts)
+            and self._participant_visible_counts[index] == 2
+            and len(current_snapshots) == 2
+            and len({snapshot.track_id for snapshot in current_snapshots.values()}) == 2
+            and all(
+                has_target_court_provenance(snapshot)
+                and snapshot.detector_observed is True
+                and snapshot.detector_matched is not False
+                and np.asarray(snapshot.bbox).shape == (4,)
+                and np.isfinite(snapshot.bbox).all()
+                and snapshot.bbox[2] > snapshot.bbox[0]
+                and snapshot.bbox[3] > snapshot.bbox[1]
+                for snapshot in current_snapshots.values()
+            )
+        )
+        if cand.player_id is None and (self.match_cfg.discipline == "doubles" or singles_context_supported):
             hypothesis = c.event.payload.get("participant_hypothesis")
-            index = cand.frame - self._buf0
             if (
                 isinstance(hypothesis, dict)
                 and hypothesis.get("status") == "provisional"
@@ -987,6 +1070,7 @@ class BadmintonMatchEngine:
                 if (
                     snapshot is not None
                     and snapshot.detector_observed is True
+                    and snapshot.detector_matched is not False
                     and snapshot.track_id == hypothesis.get("track_id")
                     and snapshot.observation_id is not None
                     and snapshot.observation_id == hypothesis.get("observation_id")
@@ -1072,7 +1156,8 @@ class BadmintonMatchEngine:
             cand.frame,
             cand.frame,
             actors=Actors(
-                player_id=cand.player_id, track_id=c.event.actors.track_id,
+                player_id=cand.player_id,
+                track_id=c.event.actors.track_id,
                 opponent_id=_OPPONENT.get(cand.player_id or ""),
             ),
             payload=payload,
@@ -1641,8 +1726,8 @@ class BadmintonMatchEngine:
         re-running (and re-emitting) the analysis. Returns the number of rallies restored."""
         from bai_badminton.analytics.rebuild import lineage_ids, rally_records
 
-        self._multi_person_identity_ambiguous = (
-            self.match_cfg.discipline == "doubles" or bool(self.store.query(types=["identity_ambiguity"]))
+        self._multi_person_identity_ambiguous = self.match_cfg.discipline == "doubles" or bool(
+            self.store.query(types=["identity_ambiguity"])
         )
         prior_teams = self.store.query(types=["doubles_team_hypothesis"])
         if prior_teams and prior_teams[-1].payload.get("status") == "provisional":
@@ -1758,7 +1843,8 @@ class BadmintonMatchEngine:
                 continue
             # labels only: ids inside the old payload point at the previous analysis
             labels = {
-                k: v for k, v in h.payload.items()
+                k: v
+                for k, v in h.payload.items()
                 if k != "participant_hypothesis" and not (k.endswith("_id") or k.endswith("_ids"))
             }
             payload = {**cur.payload, **labels}

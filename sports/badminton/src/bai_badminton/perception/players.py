@@ -24,6 +24,7 @@ from numpy.typing import NDArray
 
 from bai_badminton.court import HALF_LEN, WIDTH_DOUBLES, Homography
 from bai_badminton.identity import hsv_signature
+from bai_badminton.perception.player_association import PersistentPlayerAssociator
 from bai_badminton.perception_types import PersonObs
 
 PERSON = 0
@@ -200,6 +201,7 @@ class PlayerPerception:
         det_stride: int = 2,
         pose_stride: int = 1,
         max_players: int = 2,
+        reid: Any | None = None,
     ) -> None:
         self.detector, self.pose = detector, pose
         self.last_detector_observed = False
@@ -207,10 +209,27 @@ class PlayerPerception:
         self.tracker = PlayerTracker(fps)
         self.det_stride, self.pose_stride = max(1, det_stride), max(1, pose_stride)
         self.max_players = max_players
+        self.reid = reid
+        self._reid_fingerprint = getattr(reid, "fingerprint", None)
+        self._associator = PersistentPlayerAssociator(fps) if reid is not None else None
+        self.last_identity_error: str | None = None
         self.roi: CourtROI | None = None
         self._last: list[PersonObs] = []
         self._admitted: dict[int, int] = {}
         self.fps = fps
+
+    @property
+    def identity_policy(self) -> dict[str, Any]:
+        """Cache provenance for association behavior; no neural features leave this object."""
+        return {
+            "state": "degraded"
+            if self.last_identity_error is not None
+            else "enabled"
+            if self._associator
+            else "disabled",
+            "model": self._reid_fingerprint,
+            "policy": self._associator.policy_fingerprint if self._associator else "bytetrack_v1",
+        }
 
     def set_roi(self, roi: CourtROI | None) -> None:
         self.roi = roi
@@ -219,6 +238,8 @@ class PlayerPerception:
         self.tracker.reset()
         self._last = []
         self._admitted.clear()
+        if self._associator is not None:
+            self._associator.reset()
 
     def process(
         self, frame_idx: int, img: NDArray[np.uint8], strides: tuple[int, int] | None = None
@@ -257,17 +278,70 @@ class PlayerPerception:
             return []
         self._admitted.update({t[0]: frame_idx for t in tracks})
         tracks.sort(key=lambda t: -t[2] * (t[1][3] - t[1][1]))
-        persons = [PersonObs(track_id=tid, bbox=b, conf=c) for tid, b, c in tracks[: self.max_players + 2]]
+        tracks = tracks[: self.max_players + 2]
+        observed = _unique_detection_matches(tracks, boxes)
+        canonical = [tid for tid, _, _ in tracks]
+        reasons = ["bytetrack_v1"] * len(tracks)
+        if self._associator is not None:
+            features = None
+            selected = [
+                i
+                for i, (_, box, conf) in enumerate(tracks)
+                if observed[i]
+                and conf >= 0.5
+                and np.isfinite(box).all()
+                and 0 <= box[0] < box[2] <= w
+                and 0 <= box[1] < box[3] <= h
+            ]
+            if self.reid is not None and selected:
+                try:
+                    features = np.zeros((len(tracks), 512), dtype=np.float32)
+                    features[selected] = self.reid.embed(img, [tracks[i][1] for i in selected])
+                except (OSError, ValueError, RuntimeError, ImportError) as exc:
+                    # Keep the canonical namespace after failure. Reverting to raw
+                    # ByteTrack IDs could silently re-use another person's identity.
+                    self.last_identity_error = f"{type(exc).__name__}: {exc}"[:300]
+                    self.reid, features = None, None
+            canonical = self._associator.update(frame_idx, tracks, features, observed=observed)
+            reasons = self._associator.last_reason
+        persons = [
+            PersonObs(
+                track_id=canonical[i],
+                bbox=b,
+                conf=c,
+                raw_track_id=tid,
+                detector_matched=observed[i],
+                identity_method=reasons[i],
+            )
+            for i, (tid, b, c) in enumerate(tracks)
+        ]
         self._attach(frame_idx, img, persons, pose_stride)
         self._last = persons
         return persons
 
     def _carry(self, frame_idx: int, img: NDArray[np.uint8], pose_stride: int) -> list[PersonObs]:
         persons = [
-            PersonObs(track_id=p.track_id, bbox=p.bbox.copy(), conf=p.conf * 0.98)
+            PersonObs(
+                track_id=p.track_id,
+                bbox=p.bbox.copy(),
+                conf=p.conf * 0.98,
+                raw_track_id=p.raw_track_id,
+                detector_matched=False,
+                identity_method=p.identity_method,
+            )
             for p in self._last
             if self.roi is None or self.roi.contains_feet(p.bbox)
         ]
+        if self._associator is not None:
+            canonical = self._associator.update(
+                frame_idx,
+                [(int(p.raw_track_id), p.bbox, p.conf) for p in persons],
+                None,
+                observed=[False] * len(persons),
+            )
+            for i, person in enumerate(persons):
+                person.track_id = canonical[i]
+                person.identity_method = self._associator.last_reason[i]
         self._attach(frame_idx, img, persons, pose_stride)
         return persons
 
@@ -279,3 +353,22 @@ class PlayerPerception:
             x1, y1, x2, y2 = (int(v) for v in p.bbox)
             crop = img[max(0, y1) : max(0, y2), max(0, x1) : max(0, x2)]
             p.appearance = hsv_signature(crop) if crop.size else None
+
+
+def _unique_detection_matches(tracks: list[tuple[int, NDArray, float]], boxes: NDArray) -> list[bool]:
+    """A tracker output is fresh only when one current detection uniquely supports it.
+
+    ByteTrack can return predictions on a detector-run frame. Neither a raw ID nor
+    the frame-level detector flag establishes that this individual was observed.
+    """
+    if not tracks or len(boxes) == 0:
+        return [False] * len(tracks)
+    a = np.asarray([box for _, box, _ in tracks], dtype=np.float64)
+    b = np.asarray(boxes, dtype=np.float64).reshape(-1, 4)
+    intersection = np.prod(
+        np.maximum(0, np.minimum(a[:, None, 2:], b[None, :, 2:]) - np.maximum(a[:, None, :2], b[None, :, :2])), axis=2
+    )
+    union = np.prod(a[:, 2:] - a[:, :2], axis=1)[:, None] + np.prod(b[:, 2:] - b[:, :2], axis=1)[None, :] - intersection
+    iou = np.divide(intersection, union, out=np.zeros_like(intersection), where=union > 0)
+    valid = np.isfinite(iou) & (iou >= 0.5)
+    return [bool(valid[i].sum() == 1 and valid[:, int(valid[i].argmax())].sum() == 1) for i in range(len(tracks))]

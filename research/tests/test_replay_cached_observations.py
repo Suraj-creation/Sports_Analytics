@@ -186,13 +186,13 @@ def test_opt_in_persists_tracks_only_in_fresh_isolated_replay_output(tmp_path, m
     assert not (source / "tracks").exists()
 
 
-@pytest.mark.parametrize('stride', [None, 0, 2])
+@pytest.mark.parametrize("stride", [None, 0, 2])
 def test_pose_schedule_survives_historical_replay_decode(stride):
     chunk = replay.decode_observations(encoded_frame(ps=stride), 1)
     assert chunk is not None and chunk.frames[0].pose_stride == stride
 
 
-@pytest.mark.parametrize('stride', [-1, True, 1.5, '2'])
+@pytest.mark.parametrize("stride", [-1, True, 1.5, "2"])
 def test_replay_rejects_invalid_pose_schedule(stride):
     with pytest.raises(ValueError):
         replay.decode_observations(encoded_frame(ps=stride), 1)
@@ -201,3 +201,31 @@ def test_replay_rejects_invalid_pose_schedule(stride):
 def test_missing_historical_pose_schedule_remains_unknown():
     chunk = replay.decode_observations(encoded_frame(), 1)
     assert chunk is not None and chunk.frames[0].pose_stride is None
+
+
+def test_replay_preserves_unresolved_identity_and_person_detection_provenance():
+    person = {"t": -1, "b": [10, 20, 40, 80], "c": 0.9, "k": None, "rt": 7, "dm": False, "im": "ambiguous_motion"}
+    chunk = replay.decode_observations(encoded_frame(p=[person]), 1)
+    assert chunk is not None
+    restored = chunk.frames[0].persons[0]
+    assert restored.track_id == -1
+    assert restored.raw_track_id == 7
+    assert restored.detector_matched is False
+    assert restored.identity_method == "ambiguous_motion"
+
+
+def test_historical_person_identity_metadata_remains_unknown():
+    person = {"t": 3, "b": [10, 20, 40, 80], "c": 0.9, "k": None}
+    chunk = replay.decode_observations(encoded_frame(p=[person]), 1)
+    assert chunk is not None
+    restored = chunk.frames[0].persons[0]
+    assert restored.raw_track_id is None
+    assert restored.detector_matched is None
+    assert restored.identity_method is None
+
+
+@pytest.mark.parametrize("extra", [{"rt": True}, {"rt": -1}, {"dm": 1}, {"im": 3}])
+def test_replay_rejects_invalid_person_identity_metadata(extra):
+    person = {"t": 3, "b": [10, 20, 40, 80], "c": 0.9, "k": None, **extra}
+    with pytest.raises(ValueError, match="identity"):
+        replay.decode_observations(encoded_frame(p=[person]), 1)
