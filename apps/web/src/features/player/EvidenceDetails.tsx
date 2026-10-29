@@ -24,7 +24,7 @@ export function EvidenceDetails({ session }: { session: Session }) {
         selection.eventId ? s.event_id === selection.eventId : s.frame_start === selection.start,
       )
     : current;
-  const selectedEvent = (selection?.eventId ? events.get(selection.eventId) : undefined) ?? selected;
+  const selectedEvent = (selection?.eventId ? events.resolve(selection.eventId) : undefined) ?? selected;
   const selectedRally = selection
     ? rows.find((r) => selection.start >= r.start && selection.start <= r.end)
     : rally;
@@ -79,7 +79,12 @@ export function EvidenceDetails({ session }: { session: Session }) {
           )}
           {selectedEvent && (
             <p className="mt-2 text-xs text-line-2">
-              Event · {selectedEvent.status.replaceAll("_", " ")} · {selectedEvent.band} evidence
+              {selectedEvent.status === "human_verified"
+                ? "Human-reviewed event"
+                : ["stroke", "contact"].includes(selectedEvent.type)
+                  ? "Estimated hit / shot"
+                  : "Recorded event"}
+              {` · confidence band: ${selectedEvent.band}`}
               {selectedEvent.provenance?.model ? ` · ${selectedEvent.provenance.model}` : ""}
             </p>
           )}

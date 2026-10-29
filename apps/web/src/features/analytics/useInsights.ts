@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
+import { useAnalysisQueryKey } from "@/lib/analysisQuery";
 import { api, req } from "@/lib/api";
 import type { PlayerId, Session } from "@/lib/types";
 import { useSession } from "@/stores/session";
@@ -33,7 +34,7 @@ export function useInsights(id: string) {
     if (version > 0) void qc.invalidateQueries({ queryKey: ["insights", id] });
   }, [id, qc, version]);
   return useQuery({
-    queryKey: ["insights", id],
+    queryKey: useAnalysisQueryKey("insights", id),
     queryFn: () => req<SessionInsights>(`/api/sessions/${encodeURIComponent(id)}/insights`),
   });
 }
@@ -42,7 +43,7 @@ export function useInsights(id: string) {
 export function useMeasuredMovement(session: Session, player: PlayerId) {
   const calibrated = useSession((s) => s.calibration !== null);
   return useQuery({
-    queryKey: ["movement-evidence", session.session_id, player],
+    queryKey: useAnalysisQueryKey("movement-evidence", session, player),
     queryFn: () => api.heatmap(session.session_id, player, "presence"),
     enabled: calibrated,
     refetchInterval: session.status === "analysing" ? 5000 : false,

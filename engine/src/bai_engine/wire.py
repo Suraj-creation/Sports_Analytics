@@ -35,6 +35,9 @@ def _r(v: float | None, nd: int = 1) -> float | None:
 def encode_tracks(samples: list[TrackSample], frame_from: int, frame_to: int) -> bytes:
     shuttle: dict[str, list[Any]] = {"f": [], "x": [], "y": [], "c": []}
     players: dict[str, dict[str, list[Any]]] = {}
+    # Temporary visual tracks are deliberately separate from P1/P2 score identities.
+    # Doubles and uncertain singles identities still have real boxes and poses.
+    anonymous: dict[str, dict[str, list[Any]]] = {}
     cam: dict[str, list[Any]] = {"f": [], "g": [], "h": [], "q": []}
     for s in samples:
         if s.obj is TrackObject.SHUTTLE:
@@ -48,12 +51,22 @@ def encode_tracks(samples: list[TrackSample], frame_from: int, frame_to: int) ->
             cam["g"].extend(s.cam if s.cam is not None else (0.0,) * 9)
             cam["h"].append(s.track_id)
             cam["q"].append(_r(s.conf, 3))
-        elif s.obj is TrackObject.PLAYER and s.player_id:
-            p = players.setdefault(s.player_id, {"f": [], "b": [], "k": [], "cx": [], "cy": [], "t": []})
+        elif s.obj is TrackObject.PLAYER and s.visible and s.bbox is not None:
+            target = players if s.player_id else anonymous
+            identity = s.player_id or f"{s.participant_observation_id or 'track'}:{s.track_id}"
+            p = target.setdefault(
+                identity, {key: [] for key in ("f", "b", "k", "cx", "cy", "t", "c", "obs", "d", "m", "raw", "method")}
+            )
             p["f"].append(s.frame_idx)
             p["t"].append(s.track_id)
+            p["c"].append(_r(s.conf, 2))
+            p["obs"].append(s.participant_observation_id)
+            p["d"].append(s.detector_observed)
+            p["m"].append(s.detector_matched)
+            p["raw"].append(s.raw_track_id)
+            p["method"].append(s.identity_method)
             p["b"].extend(_r(v) for v in (s.bbox or (0, 0, 0, 0)))
-            if s.keypoints is not None:
+            if s.keypoints is not None and len(s.keypoints) == 17:
                 for x, y, sc in s.keypoints:
                     p["k"].extend((_r(x), _r(y), _r(sc, 2)))
             else:
@@ -61,6 +74,7 @@ def encode_tracks(samples: list[TrackSample], frame_from: int, frame_to: int) ->
             p["cx"].append(_r(s.court_x, 2))
             p["cy"].append(_r(s.court_y, 2))
     payload: dict[str, Any] = {"v": VERSION, "from": frame_from, "to": frame_to, "shuttle": shuttle, "players": players}
+    payload["anonymous"] = anonymous
     if cam["f"]:
         payload["cam"] = cam
     out = msgpack.packb(payload, use_bin_type=True)

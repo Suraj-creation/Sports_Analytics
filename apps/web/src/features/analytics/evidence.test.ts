@@ -4,6 +4,21 @@ import { ev } from "@/test/fixtures";
 import { evidenceRallies, filterRallies, shotRows } from "./evidence";
 
 describe("session evidence", () => {
+  it("follows canonical corrections and never resurrects a retracted embedded shot", () => {
+    const log = new EventLog();
+    log.apply([
+      ev("stroke", 110, { event_id: "shot", payload: { stroke: "smash" } }),
+      ev("rally_end", 100, {
+        frame_end: 150,
+        payload: { n_shots: 1, shots: [{ event_id: "shot", frame: 110, stroke: "smash" }] },
+      }),
+      ev("stroke", 110, { event_id: "corrected", supersedes: "shot", payload: { stroke: "unknown" } }),
+    ]);
+    expect(evidenceRallies(log)[0]?.shots[0]?.payload.stroke).toBe("unknown");
+    log.apply([ev("stroke", 110, { event_id: "removed", supersedes: "corrected", status: "retracted" })]);
+    expect(evidenceRallies(log)[0]?.shots).toEqual([]);
+    expect(evidenceRallies(log)[0]?.shotCount).toBe(0);
+  });
   it("keeps excluded rallies visible but out of counted shot summaries", () => {
     const log = new EventLog();
     log.apply([

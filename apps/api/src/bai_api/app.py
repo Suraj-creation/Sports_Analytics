@@ -81,9 +81,9 @@ def create_app(settings: Settings | None = None, bus: Bus | None = None, start_e
     from bai_api.routes import (
         agents,
         auth_routes,
-        exports,
         episode_movement,
         estimated_individual,
+        exports,
         identity_reviews,
         media,
         participant_observations,

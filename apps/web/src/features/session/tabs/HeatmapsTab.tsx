@@ -3,6 +3,7 @@ import { clsx } from "clsx";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Empty, ErrorNote } from "@/components/ui";
 import { CourtView, prepareCanvas } from "@/features/court/geometry";
+import { useAnalysisQueryKey } from "@/lib/analysisQuery";
 import { api } from "@/lib/api";
 import { PLAYER_HEX, shortName } from "@/lib/format";
 import type { Heatmap, PlayerId, Session } from "@/lib/types";
@@ -93,7 +94,7 @@ function HeatmapCard({
     if (version > 0) void qc.invalidateQueries({ queryKey: ["heatmap", session.session_id, pid, kind] });
   }, [qc, session.session_id, pid, kind, version]);
   const q = useQuery({
-    queryKey: ["heatmap", session.session_id, pid, kind],
+    queryKey: useAnalysisQueryKey("heatmap", session, pid, kind),
     queryFn: () => api.heatmap(session.session_id, pid, kind),
   });
   return (

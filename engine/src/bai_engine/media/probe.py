@@ -39,13 +39,20 @@ class ProbeResult:
 
     @property
     def variable_frame_rate(self) -> bool:
-        if self.avg_frame_rate == 0:
+        if self.avg_frame_rate <= 0 or self.r_frame_rate <= 0:
             return True
         return abs(float(self.r_frame_rate) - float(self.avg_frame_rate)) / float(self.r_frame_rate) > 0.01
 
     @property
     def fps(self) -> Fraction:
         return self.avg_frame_rate if self.avg_frame_rate > 0 else self.r_frame_rate
+
+    @property
+    def display_size(self) -> tuple[int, int]:
+        """Dimensions after FFmpeg's automatic display-matrix rotation."""
+        if self.rotation % 180 == 90:
+            return self.height, self.width
+        return self.width, self.height
 
 
 def _frac(s: object) -> Fraction:

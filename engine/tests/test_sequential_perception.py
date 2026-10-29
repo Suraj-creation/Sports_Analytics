@@ -63,7 +63,7 @@ class Decoder:
 def runner(tmp_path, sport):
     value = runtime.SessionRunner.__new__(runtime.SessionRunner)
     value.session_id = "session"
-    session = SimpleNamespace(media=object(), profile="test", source=SimpleNamespace(sha256="media"))
+    session = SimpleNamespace(media=object(), profile="test", source=SimpleNamespace(sha256="media"), meta={})
     value.repo = SimpleNamespace(
         get=lambda _: session,
         paths=lambda _: SimpleNamespace(root=tmp_path),

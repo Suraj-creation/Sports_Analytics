@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass, field
+from itertools import pairwise
 from pathlib import Path
 
 import cv2
@@ -253,6 +254,8 @@ class TrackNetV3:
             return []
         if masks is not None and len(masks) != len(frames_bgr):
             raise ValueError("one shuttle mask is required per frame")
+        if shots is not None and len(shots) != len(frames_bgr):
+            raise ValueError("one camera-shot ID is required per frame")
         L = self.seq_len
         step = L if step is None else max(1, min(step, L))
         shots = shots or [0] * len(frames_bgr)
@@ -260,18 +263,22 @@ class TrackNetV3:
         sx, sy = w / WIDTH, h / HEIGHT
         small = self._prep(frames_bgr, shots)
         n = len(small)
-        starts = list(range(0, max(1, n - L + 1), step))
-        if starts[-1] + L < n:
-            starts.append(n - L if n >= L else 0)
         acc = np.zeros((n, HEIGHT, WIDTH), np.float32)
         cnt = np.zeros(n, np.float32)
         windows, spans = [], []
-        for s0 in starts:
-            idx = [min(s0 + j, n - 1) for j in range(L)]
-            bg = self.bg.get(shots[s0], small[s0])
-            stack = np.concatenate([bg[None], np.stack([small[i] for i in idx])], axis=0)
-            windows.append(np.moveaxis(stack, -1, 1).reshape(self.in_dim, HEIGHT, WIDTH))
-            spans.append(idx)
+        # A temporal network must never see frames from different camera shots
+        # in one input. Pad only within each shot, including very short tails.
+        boundaries = [0, *[i for i in range(1, n) if shots[i] != shots[i - 1]], n]
+        for lo, hi in pairwise(boundaries):
+            starts = list(range(lo, max(lo + 1, hi - L + 1), step))
+            if starts[-1] + L < hi:
+                starts.append(max(lo, hi - L))
+            for s0 in starts:
+                idx = [min(s0 + j, hi - 1) for j in range(L)]
+                bg = self.bg.get(shots[s0], small[s0])
+                stack = np.concatenate([bg[None], np.stack([small[i] for i in idx])], axis=0)
+                windows.append(np.moveaxis(stack, -1, 1).reshape(self.in_dim, HEIGHT, WIDTH))
+                spans.append(idx)
         for b in range(0, len(windows), self.batch):
             x = np.stack(windows[b : b + self.batch]).astype(np.float32) / 255.0
             hms = self._forward(x)  # (B, L, H, W)

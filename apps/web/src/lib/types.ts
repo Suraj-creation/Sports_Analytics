@@ -110,10 +110,22 @@ export interface StatusMsg {
   detail: string | null;
   n_frames: number;
   frontier_frame: number;
+  analysed_frames?: number;
+  analysis_revision?: number;
   playhead: number;
   rate_x?: number;
   lead_ms?: number;
   degraded?: { stage: string; reason: string }[];
+  capabilities?: Record<
+    string,
+    {
+      status: string;
+      requested_model: string | null;
+      active_model: string | null;
+      required: boolean;
+      reason: string | null;
+    }
+  >;
 }
 
 export interface PlayerStats {
@@ -227,12 +239,25 @@ export interface AskAnswer {
 export interface IndividualAnalyticsData {
   available: boolean;
   match_format: "singles" | "doubles" | null;
-  participants: Record<string, {
-    name: string | null; team_id: string | null; total_shots: number;
-    shot_distribution: Record<string, number>; event_ids: string[];
-    events: Array<{ event_id: string; frame: number; stroke: string; track_id: number; review_id: string; rally_id: string }>;
-    rally_ids: string[];
-  }>;
+  participants: Record<
+    string,
+    {
+      name: string | null;
+      team_id: string | null;
+      total_shots: number;
+      shot_distribution: Record<string, number>;
+      event_ids: string[];
+      events: Array<{
+        event_id: string;
+        frame: number;
+        stroke: string;
+        track_id: number;
+        review_id: string;
+        rally_id: string;
+      }>;
+      rally_ids: string[];
+    }
+  >;
   teams: Record<string, { score_slot: "P1" | "P2" | null; attributed_shots: number }>;
   accounting: { total_shots: number; attributed_shots: number; unattributed_shots: number };
   unattributed_event_ids: string[];
@@ -245,26 +270,65 @@ export interface EstimatedIndividualAnalyticsData {
   match_format: "singles" | "doubles" | null;
   official: EstimatedShotScope;
   all_linked: EstimatedShotScope;
-  episode_profiles: {official: AnonymousEpisodeScope; all_linked: AnonymousEpisodeScope};
+  episode_profiles: { official: AnonymousEpisodeScope; all_linked: AnonymousEpisodeScope };
   unlinked_stroke_events: number;
   policy: Record<string, unknown>;
 }
 export interface EstimatedShotScope {
-  participants: Record<string, {name: string | null; team_id: string | null; estimated_shots: number; shot_distribution: Record<string, number>; events?: unknown[]}>;
-  accounting: {total_linked_shots: number; estimated_shots: number; unresolved_shots: number; verified_shots?: number};
+  participants: Record<
+    string,
+    {
+      name: string | null;
+      team_id: string | null;
+      estimated_shots: number;
+      shot_distribution: Record<string, number>;
+      events?: unknown[];
+    }
+  >;
+  accounting: {
+    total_linked_shots: number;
+    estimated_shots: number;
+    unresolved_shots: number;
+    verified_shots?: number;
+  };
   unresolved_event_ids: string[];
   legacy_unlinked_shots: number;
 }
 
 export interface AnonymousEpisodeScope {
-  episodes: Array<{observation_id: string; participant_id: string; track_id: number; candidate_shots: number; shot_distribution: Record<string, number>; detector_run_counts: {ran: number; not_run: number; unknown: number}; events?: unknown[]; status: string}>;
-  accounting: {total_linked_shots: number; episode_candidate_shots: number; unresolved_shots: number};
+  episodes: Array<{
+    observation_id: string;
+    participant_id: string;
+    track_id: number;
+    candidate_shots: number;
+    shot_distribution: Record<string, number>;
+    detector_run_counts: { ran: number; not_run: number; unknown: number };
+    events?: unknown[];
+    status: string;
+  }>;
+  accounting: { total_linked_shots: number; episode_candidate_shots: number; unresolved_shots: number };
   unresolved_event_ids: string[];
 }
 
 export interface EpisodeMovementData {
-  available: boolean; reason: string | null; scope: string;
-  window: {from: number; to: number; fps: number};
-  episodes: Array<{observation_id: string; participant_id: string; track_id: number; status: string; distance_m: number | null; valid_frames: number; detector_observed_frames: number; carried_frames: number; unknown_source_frames: number; coverage_fraction: number; observed_seconds: number; segments: number; positions_m: number[][]}>;
+  available: boolean;
+  reason: string | null;
+  scope: string;
+  window: { from: number; to: number; fps: number };
+  episodes: Array<{
+    observation_id: string;
+    participant_id: string;
+    track_id: number;
+    status: string;
+    distance_m: number | null;
+    valid_frames: number;
+    detector_observed_frames: number;
+    carried_frames: number;
+    unknown_source_frames: number;
+    coverage_fraction: number;
+    observed_seconds: number;
+    segments: number;
+    positions_m: number[][];
+  }>;
   warning: string;
 }

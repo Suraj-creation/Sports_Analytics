@@ -7,8 +7,8 @@ end: 10 consecutive invisible frames or ≥7 of the last 10 visible frames slowe
 
 Two upgrades over the legacy detector:
 
-* **contact-driven start** — a detected contact while IDLE starts a rally at that contact (the
-  serve), which is more precise than shuttle motion alone;
+* **contact-driven start** — a detected contact while IDLE starts an exchange at that contact;
+  the separate classifier checks service evidence rather than assuming it is a serve;
 * **replay/cut suppression** — while ``replay`` is true the FSM is frozen and any open rally is
   ended at the last in-play frame (a broadcast cut ends the live view of the rally).
 
@@ -57,7 +57,7 @@ class RallyParams:
 class RallySegment:
     start: int
     end: int
-    serve_frame: int | None
+    serve_frame: int | None  # legacy name: first contact anchor, not verified service
     reason: str  # why it ended: gap | stationary | cut | flush
 
     @property
@@ -88,9 +88,10 @@ class RallyFSM:
     _invisible: int = 0
     _recent: deque[tuple[bool, float]] = field(default_factory=lambda: deque(maxlen=10))
     _last_in_play_frame: int | None = None
+    _last_contact_frame: int | None = None
 
     def on_contact(self, frame: int) -> RallyUpdate:
-        """A detected hit: start (serve) or keep the rally alive."""
+        """A detected hit: start or keep an exchange alive, subject to merge time."""
         upd = RallyUpdate()
         if self.state is RallyState.IDLE:
             self._open(frame, upd)
@@ -98,9 +99,14 @@ class RallyFSM:
         elif self.state is RallyState.ENDING:
             self.state, self.tentative_end = RallyState.IN_PLAY, None
         elif self.state is RallyState.CLOSED and self.closed is not None:
-            self._reopen(upd)
+            if frame - self.closed.end <= self.params.merge_frames:
+                self._reopen(upd)
+            else:
+                self._finalize(upd)
+                self._open(frame, upd)
         if self.serve is None and self.state is RallyState.IN_PLAY:
             self.serve = frame
+        self._last_contact_frame = frame
         return upd
 
     def step(self, frame: int, visible: bool, speed: float, replay: bool = False) -> RallyUpdate:
@@ -175,10 +181,16 @@ class RallyFSM:
 
     def _open(self, start: int, upd: RallyUpdate) -> None:
         self.state, self.start, self.serve, self.tentative_end = RallyState.IN_PLAY, start, None, None
+        self._last_contact_frame = None
+        self._last_in_play_frame = start
         upd.started = start
 
     def _begin_end(self, tentative: int, reason: str) -> None:
-        self.state, self.tentative_end, self.end_reason = RallyState.ENDING, max(tentative, self.start or 0), reason
+        self.state, self.tentative_end, self.end_reason = (
+            RallyState.ENDING,
+            max(tentative, self.start or 0, self._last_contact_frame or 0),
+            reason,
+        )
 
     def _close(self, end: int, reason: str, upd: RallyUpdate) -> None:
         assert self.start is not None
@@ -193,6 +205,7 @@ class RallyFSM:
     def _finalize(self, upd: RallyUpdate) -> None:
         seg = self.closed
         self.closed, self.state, self.start, self.serve = None, RallyState.IDLE, None, None
+        self._last_contact_frame = None
         if seg is None:
             return
         if seg.length < self.params.min_frames:

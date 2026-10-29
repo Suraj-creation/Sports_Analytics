@@ -4,11 +4,9 @@ Loop: the model calls read-only tools over the event store, then answers.  The a
 
 * every statement about *this match* carries a citation ``[[ev:<event_id>]]`` to an event that a
   tool returned in this conversation; background facts cite ``[[kb:<doc#n>]]``;
-* every number stated must appear in some tool result of the conversation (the real hallucination
-  guard); references ("rally 50", "game 3", "the 50th") and numbers taken from the question are
-  not claims, and negative / abstaining sentences need no citation;
-* one repair round is attempted, after which unsupported sentences are marked rather than shown as
-  fact.
+* every number stated must appear in a cited tool result; references ("rally 50", "game 3",
+  "the 50th") are not quantities. This is a consistency check, not semantic verification;
+* one repair round is attempted, after which an unsupported answer is withheld.
 
 Small local models (8B) are supported defensively (validation DEF-04/05): tool calls written as
 JSON text are executed instead of being shown as the answer, identical repeated calls are answered
@@ -33,7 +31,7 @@ from bai_engine.obs import get_logger
 log = get_logger(__name__)
 
 SYSTEM = """You are the analyst inside a badminton match-analysis app. You answer questions about ONE match \
-using only the tools provided. Tools read a verified event log produced by computer vision: rallies, strokes, \
+using only the tools provided. Tools read observations and estimates produced by computer vision: rallies, strokes, \
 points, scores, highlights, player statistics, and the match phase.
 
 Rules:
@@ -49,6 +47,8 @@ running, say that the numbers cover only the observed part of the match.
 Never present background knowledge as something that happened in this match.
 - If the data does not answer the question, say so plainly and say what would be needed. That is a good answer.
 - Labels with band "probable" or "uncertain" are model estimates: say "probably" or "the model suggests".
+- A finalized event is not human verification. Contact is estimated unless explicitly human reviewed; \
+never call it a confirmed racket impact. Respect evidence_kind and capability limitations from the tools.
 - Call tools through the tool interface only — never write a tool call as text in your answer.
 - Refer to players by name. Keep answers short: lead with the answer, then the evidence. Use times like 12:34.
 - Do not invent numbers, speeds, angles or player intentions."""
@@ -63,6 +63,11 @@ REF = re.compile(
 NEG = re.compile(
     r"(?i)\b(?:no|not|none|never|cannot|can't|unable|unavailable|insufficient|unknown|isn't|aren't|wasn't|"
     r"weren't|doesn't|don't|didn't|without|n't)\b"
+)
+ABSTENTION = re.compile(
+    r"(?i)(?:\b(?:unable to answer|cannot (?:answer|determine|verify)|can't (?:answer|determine|verify)|"
+    r"couldn't (?:answer|produce)|insufficient (?:data|evidence)|data (?:does not|doesn't) (?:contain|show|answer)|"
+    r"(?:data|evidence|information) (?:is|are) (?:unavailable|missing)|not enough (?:data|evidence))\b)"
 )
 
 
@@ -89,8 +94,25 @@ def _norm_num(n: str) -> str:
 
 def _known_numbers(texts: list[str]) -> set[str]:
     """Numbers present in tool output, plus their usual renderings (percent, rounding)."""
+
+    def values(value: Any):  # type: ignore[no-untyped-def]
+        if isinstance(value, dict):
+            for key, child in value.items():
+                if key in {"id", "ref", "evidence_ids"} or key.endswith(("_id", "_ids", "_sha256")):
+                    continue
+                yield from values(child)
+        elif isinstance(value, list):
+            for child in value:
+                yield from values(child)
+        elif isinstance(value, (int, float, str)) and not isinstance(value, bool):
+            yield str(value)
+
     out: set[str] = set()
     for t in texts:
+        try:
+            t = " ".join(values(json.loads(t)))
+        except (ValueError, TypeError):
+            continue
         for n in NUM.findall(t):
             out.add(_norm_num(n))
             if ":" in n:
@@ -103,8 +125,19 @@ def _known_numbers(texts: list[str]) -> set[str]:
 
 
 def _claimed_numbers(sentence: str, question: str) -> list[str]:
-    q = {_norm_num(n) for n in NUM.findall(REF.sub(" ", question))} | {_norm_num(n) for n in NUM.findall(question)}
-    return [n for n in (_norm_num(x) for x in NUM.findall(REF.sub(" ", sentence))) if n not in q]
+    # A quantity supplied in the question is not evidence for repeating it as a fact.
+    return [_norm_num(x) for x in NUM.findall(REF.sub(" ", sentence))]
+
+
+def _cited_outputs(ctx: ToolContext, refs: set[str]) -> list[str]:
+    def contains(value: Any) -> bool:
+        if isinstance(value, dict):
+            return any(contains(child) for child in value.values())
+        if isinstance(value, list):
+            return any(contains(child) for child in value)
+        return isinstance(value, str) and value in refs
+
+    return [output for output in ctx.outputs if contains(json.loads(output))]
 
 
 def validate(text: str, ctx: ToolContext, question: str = "") -> list[str]:
@@ -120,13 +153,18 @@ def validate(text: str, ctx: ToolContext, question: str = "") -> list[str]:
         if re.fullmatch(r"\s*[-*]?\s*\d+[.)]\s*", plain):
             continue  # list marker
         nums = _claimed_numbers(plain, question)
-        if not nums:
-            continue
+        citations = CITE.findall(s)
         unsupported = [n for n in nums if n not in known]
         if unsupported:
             issues.append(f"number not in any tool result ({', '.join(unsupported)}): {plain.strip()[:80]}")
-        elif not CITE.search(s) and not NEG.search(plain):
-            issues.append(f"uncited number in: {plain.strip()[:80]}")
+        elif citations and nums:
+            scoped = _known_numbers(_cited_outputs(ctx, {ref for _, ref in citations}))
+            missing = [n for n in nums if n not in scoped]
+            if missing:
+                issues.append(f"number not in cited tool result ({', '.join(missing)}): {plain.strip()[:80]}")
+        elif not citations and plain.strip() and not ABSTENTION.search(plain):
+            kind = "number" if nums else "claim"
+            issues.append(f"uncited {kind} in: {plain.strip()[:80]}")
     return issues
 
 
@@ -249,7 +287,7 @@ def ask(
         if retry and not text_tool_calls(retry):
             text = retry
         issues = validate(text, ctx, question) if text else ["no answer was produced"]
-    if not text:
+    if issues or not text:
         text = "I couldn't produce an answer grounded in this match's data."
     cits = [{"kind": k, "ref": r} for k, r in dict.fromkeys(CITE.findall(text))]
     return Answer(
@@ -285,9 +323,12 @@ def deterministic_answer(question: str, ctx: ToolContext) -> Answer:
         cats = ", ".join(c.replace("_", " ") for c in h["categories"]) or "notable rally"
         parts.append(f"Highlight at {h['time']}: {cats} [[ev:{h['rally_id']}]].")
     if ov.get("unofficial_rallies"):
-        parts.append(f"{ov['unofficial_rallies']} warm-up or replayed exchanges were not counted.")
+        parts.append(
+            f"{ov['unofficial_rallies']} exchanges were not established as official play and were not counted."
+        )
     if not ov.get("official_rallies"):
         parts.append("No official rallies have been observed yet.")
+    parts.append("Computer-vision events are estimates unless human reviewed.")
     text = " ".join(parts) + " (The AI assistant is unavailable, so this is an automatic summary.)"
     return Answer(
         text=text,

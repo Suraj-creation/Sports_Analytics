@@ -21,10 +21,16 @@ export function evidenceRallies(events: EventLog): EvidenceRally[] {
     const logged = strokes.filter(
       (s) => s.frame_start >= event.frame_start && s.frame_start <= event.frame_end,
     );
-    const shots = logged.length
-      ? logged
-      : Array.isArray(event.payload.shots)
+    const hasReferences =
+      Array.isArray(event.payload.shots) &&
+      event.payload.shots.some((s: Record<string, unknown>) => typeof s.event_id === "string");
+    const shots =
+      hasReferences || (!logged.length && Array.isArray(event.payload.shots))
         ? event.payload.shots.flatMap((s: Record<string, unknown>) => {
+            if (typeof s.event_id === "string") {
+              const current = events.resolve(s.event_id);
+              return current?.type === "stroke" ? [current] : [];
+            }
             if (typeof s.frame !== "number") return [];
             return [
               {
@@ -42,7 +48,8 @@ export function evidenceRallies(events: EventLog): EvidenceRally[] {
               } as BaiEvent,
             ];
           })
-        : [];
+        : logged;
+    const uniqueShots = [...new Map(shots.map((s: BaiEvent) => [s.event_id, s])).values()] as BaiEvent[];
     return {
       id: event.event_id,
       no: Number(event.payload.rally_no ?? 0),
@@ -51,8 +58,12 @@ export function evidenceRallies(events: EventLog): EvidenceRally[] {
       official: event.payload.official !== false,
       winner: event.payload.winner === "P1" || event.payload.winner === "P2" ? event.payload.winner : null,
       outcome: String(event.payload.outcome ?? "unknown"),
-      shots,
-      shotCount: typeof event.payload.n_shots === "number" ? event.payload.n_shots : shots.length || null,
+      shots: uniqueShots,
+      shotCount: hasReferences
+        ? uniqueShots.length
+        : typeof event.payload.n_shots === "number"
+          ? event.payload.n_shots
+          : uniqueShots.length || null,
       event,
     };
   });

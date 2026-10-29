@@ -1,4 +1,4 @@
-"""Opt-in ReID caches are diagnostic output, never a replacement for matcher state."""
+"""All badminton caches are diagnostic output, never a replacement for matcher state."""
 
 from types import SimpleNamespace
 
@@ -39,11 +39,14 @@ def test_requested_doubles_identity_requires_fresh_ordered_perception_even_when_
 
 
 @pytest.mark.parametrize("match_format,model", [("singles", "osnet_ain_x0_25"), ("doubles", None), ("doubles", "none")])
-def test_default_and_disabled_identity_modes_keep_cache_roundtrips(match_format, model):
+def test_default_and_disabled_identity_modes_require_chronology_and_explicit_diagnostic_decode(match_format, model):
     value = session(match_format, model, "disabled")
-    assert value.requires_sequential_perception is False
+    assert value.requires_sequential_perception is True
     frame = FramePerception(0, None, 0, calibration_state=CalibrationState.VALID, detector_observed=True)
-    assert value.decode_perception(value.encode_perception(ChunkPerception(0, 0, [frame]))).start == 0
+    encoded = value.encode_perception(ChunkPerception(0, 0, [frame]))
+    with pytest.raises(StaleCacheError, match="sequential"):
+        value.decode_perception(encoded)
+    assert value.decode_perception(encoded, diagnostic=True).start == 0
 
 
 def test_cache_reuse_is_rejected_when_a_cold_birth_collides_with_another_cached_person():
@@ -68,3 +71,60 @@ def test_cache_reuse_is_rejected_when_a_cold_birth_collides_with_another_cached_
     payload = value.encode_perception(ChunkPerception(128, 128, [frame]))
     with pytest.raises(StaleCacheError, match="sequential"):
         value.decode_perception(payload)
+
+
+@pytest.mark.parametrize("change", ["cadence", "threshold", "loaded_model", "frame_size", "fps"])
+def test_diagnostic_cache_rejects_changed_inference_contract(tmp_path, change):
+    from test_plugin_discipline import make_session
+
+    value = make_session(tmp_path, "singles")
+    value.perception.profile = value.perception.profile.model_copy(deep=True)
+    frame = FramePerception(0, None, 0, calibration_state=CalibrationState.VALID, detector_observed=True)
+    encoded = value.encode_perception(ChunkPerception(0, 0, [frame]))
+    assert value.decode_perception(encoded, diagnostic=True).start == 0
+    if change == "cadence":
+        value.perception.profile.detector_rates.idle += 1
+    elif change == "threshold":
+        value.perception.profile.shuttle.params["threshold"] = 0.7
+    elif change == "loaded_model":
+        value.perception.models["pose"] = "different-pose@2"
+    elif change == "frame_size":
+        value.perception.frame_size = (640, 360)
+    else:
+        value.perception.fps = 25
+    with pytest.raises(StaleCacheError, match="stale"):
+        value.decode_perception(encoded, diagnostic=True)
+
+
+def test_capabilities_distinguish_loaded_models_heuristics_and_unimplemented_research_stages(tmp_path):
+    from test_plugin_discipline import make_session
+
+    from bai_engine.config import load_profile
+
+    value = make_session(tmp_path, "singles")
+    value.perception.profile = load_profile("gpu-high")
+    value.perception.models = {"shuttle": "tracknetv3@3.0", "pose": "rtmpose_x_halpe26@1.0"}
+    capabilities = value.capabilities()
+    assert capabilities["shuttle"]["status"] == "loaded"
+    assert capabilities["pose"]["status"] == "loaded"
+    assert capabilities["player_detector"]["status"] == "unavailable"
+    assert capabilities["stroke"]["status"] == "heuristic"
+    assert capabilities["stroke"]["active_model"] == "stroke_rules_v0"
+    assert capabilities["stroke"]["requested_model"] == "bst_cg_ap_shuttleset"
+    assert capabilities["stroke_shadow"]["status"] == "shadow_only"
+    assert capabilities["stroke_shadow"]["active_model"] is None
+    assert capabilities["stroke_shadow"]["required"] is False
+    for stage in ("racket", "shuttle_live", "shuttle_second_opinion", "shuttle_refinement"):
+        assert capabilities[stage]["status"] == "unsupported"
+        assert capabilities[stage]["required"] is False
+        assert capabilities[stage]["active_model"] is None
+
+
+def test_doubles_capability_does_not_advertise_singles_bst_execution(tmp_path):
+    from test_plugin_discipline import make_session
+
+    value = make_session(tmp_path, "doubles")
+    capability = value.capabilities()["stroke_shadow"]
+    assert capability["status"] == "unsupported"
+    assert capability["active_model"] is None
+    assert "exactly two players" in capability["reason"]
