@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-labelledby="rally-title">
+  <title id="rally-title">Rally concept — Parallel traces</title>
+  <desc>Internal grayscale identity exploration. Not the selected production mark.</desc>
+  <g id="symbol" fill="#000000">
+    <path id="trace-1" d="M30 192 L118 39.58 H154 L66 192 Z"/>
+    <path id="trace-2" d="M102 216 L190 63.58 H226 L138 216 Z"/>
+  </g>
+</svg>

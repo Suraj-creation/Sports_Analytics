@@ -1,0 +1,17 @@
+{
+  "name": "rally-client-website",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Independent static introduction to Rally video intelligence.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "node scripts/serve.mjs",
+    "preview": "node scripts/serve.mjs --dir dist",
+    "check": "node scripts/check.mjs",
+    "build": "node scripts/check.mjs && node scripts/build.mjs",
+    "test": "node --test"
+  }
+}

@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0d211c">
+  <meta name="description" content="Rally turns match footage into a game you can explore. Discover rallies, movement, patterns and answers you can trace to the evidence.">
+  <title>Rally — Beyond the score.</title>
+  <link rel="icon" type="image/svg+xml" href="./assets/brand/rally-favicon.svg">
+  <link rel="preload" href="./assets/fonts/archivo-latin-variable.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="./src/styles.css">
+  <script type="module" src="./src/main.js"></script>
+</head>
+<body id="top">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="opening dark-surface">
+    <header class="site-header wrap">
+      <a class="brand" href="#top" aria-label="Rally home"><img src="./assets/brand/rally-lockup-on-dark.svg" alt="Rally" width="132" height="51"></a>
+      <nav class="desktop-nav" aria-label="Main navigation"><a href="#experience">The experience</a><a href="#analytics">The intelligence</a><a href="#platform">The bigger picture</a></nav>
+      <a class="button button-lime header-cta" href="#conversation">Let’s talk <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19 19 5M5 5h14v14"/></svg></a>
+      <details class="mobile-nav"><summary>Menu <span></span></summary><nav aria-label="Mobile navigation"><a href="#experience">The experience</a><a href="#analytics">The intelligence</a><a href="#platform">The bigger picture</a><a href="#conversation">Let’s talk</a></nav></details>
+    </header>
+  </div>
+  <main id="main">
+    <section class="hero-shell dark-surface" aria-labelledby="hero-title">
+      <div class="hero wrap">
+        <div class="hero-copy">
+          
+          <h1 id="hero-title">Beyond<br> the score.</h1>
+          <p class="hero-lead">There’s a whole game inside your footage. Relive the rally, explore the movement and follow the evidence to a clearer understanding.</p>
+          <a class="button button-lime" href="#experience">Explore the evidence <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19 19 5M5 5h14v14"/></svg></a>
+          <p class="hero-purpose">Video intelligence, starting with badminton.</p>
+        </div>
+        <figure class="hero-visual">
+          <div class="pose-stage hero-stage" data-scene="net">
+            <img src="./assets/net-recovery.webp" alt="A player stretches low toward the net, seen from beside the court." width="1536" height="1024" fetchpriority="high">
+            <svg class="pose-svg" viewBox="0 0 1536 1024" aria-hidden="true"></svg>
+            <div class="hero-analysis"><span class="analysis-kicker">Movement, made visible</span><strong id="hero-landmark-count">17</strong><span>visible landmarks<br> 2D pose estimate</span></div>
+            <button class="pose-toggle" id="hero-pose-toggle" aria-pressed="true" disabled><span class="layer-icon"></span><span>Pose layer on</span></button>
+          </div>
+          <figcaption>Generated sports scene. Pose estimated locally from the image.</figcaption>
+        </figure>
+      </div>
+      <div class="hero-close wrap"><p>A moment becomes<br> something you can understand.</p><div class="story-chain"><span>Footage</span><span>Events</span><span>Evidence</span><strong>Understanding</strong></div><a href="#experience" aria-label="Scroll to the evidence explorer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18m-7-7 7 7 7-7"/></svg></a></div>
+    </section>
+
+    <section class="human-story section wrap" aria-labelledby="human-title">
+      <figure><img src="./assets/after-the-game.webp" alt="Two amateur players sit courtside, smiling as they review a moment on a phone." width="1200" height="900" loading="lazy"><figcaption>The match ends. The conversation keeps going.</figcaption></figure>
+      <div class="human-copy"><h2 id="human-title">Some moments<br> stay with you.</h2><p class="lead">The recovery you didn’t think you’d reach. The exchange nobody wanted to end. The tiny detail you notice only when you watch again.</p><p>Rally is being built to bring those moments closer. For players who are curious, coaches looking for context, and everyone who wants to get more from the game.</p>
+        <div class="intent-controls segmented" aria-label="Explore what matters to you"><button data-intent="relive" aria-pressed="true" disabled>Relive it</button><button data-intent="discover" aria-pressed="false" disabled>Discover it</button><button data-intent="improve" aria-pressed="false" disabled>Build on it</button></div>
+        <p id="intent-description" class="intent-description" aria-live="polite">Find the exchange worth watching again, with the surrounding play still in view.</p>
+      </div>
+    </section>
+
+    <section id="experience" class="experience section dark-surface" aria-labelledby="experience-title"><div class="wrap">
+      <div class="section-heading"><div><h2 id="experience-title">Look at the<br> whole movement.</h2></div><p class="lead">One scene. Different ways to see it.<br> Turn the layers on, follow the movement, and see where an observation begins.</p></div>
+      <div class="evidence-workspace" data-ui>
+        <div class="workspace-bar"><span><img src="./assets/brand/rally-symbol-lime.svg" width="20" height="20" alt=""> Evidence explorer</span><span class="sample-label">Illustrative experience</span></div>
+        <div class="workspace-grid">
+          <div class="source-workspace">
+            <div class="scene-controls" aria-label="Choose a scene"><button data-scene-select="overhead" aria-pressed="true" disabled>01 / Overhead preparation</button><button data-scene-select="net" aria-pressed="false" disabled>02 / Net recovery</button></div>
+            <div class="pose-stage explorer-stage" data-scene="overhead">
+              <img id="explorer-image" src="./assets/contact.webp" alt="A badminton player prepares an overhead shot." width="1672" height="941" loading="lazy">
+              <svg class="pose-svg" viewBox="0 0 1672 941" aria-hidden="true"></svg>
+              <svg id="movement-layer" class="movement-svg" viewBox="0 0 1672 941" aria-hidden="true" hidden><path d="M1310 850Q1170 840 1120 780T1200 730"/><circle cx="1200" cy="730" r="12"/></svg>
+              <div id="event-layer" class="event-annotation" hidden><span>Candidate contact window</span><small>Requires temporal footage and review</small></div>
+              <span id="landmark-readout" class="landmark-readout">2D pose estimate</span>
+            </div>
+            <div class="layer-controls" aria-label="Choose an evidence layer"><button data-evidence-layer="source" aria-pressed="false" disabled>Source</button><button data-evidence-layer="pose" aria-pressed="true" disabled>Pose estimate</button><button data-evidence-layer="movement" aria-pressed="false" disabled>Movement</button><button data-evidence-layer="events" aria-pressed="false" disabled>Events</button></div>
+            <p id="layer-explanation" class="layer-explanation">Estimated landmarks locate joints in this image. They do not measure physical speed or technique quality.</p>
+          </div>
+          <aside class="observation-panel"><span id="observation-status" class="data-state">Estimated observation</span><h3 id="observation-heading">A position.<br> With context.</h3><p id="observation-body">Look beyond the contact. An estimated shoulder, hip or ankle position is a starting point for review.</p>
+            <dl class="observation-facts"><div><dt>Scene</dt><dd id="observation-source">Overhead preparation</dd></div><div><dt>Record type</dt><dd>Separate visual study</dd></div><div><dt>Coordinates</dt><dd>2D image space</dd></div></dl>
+            <div class="court-preview"><svg viewBox="0 0 180 330" role="img" aria-label="Illustrative movement on a badminton court, not measured positions"><g class="court-lines"><path d="M24 15h132v290H24zM34 15v290M146 15v290M24 160h132M24 117h132M24 203h132M24 31h132M24 289h132M90 15v102M90 203v102"/></g><path class="court-trail" d="M125 266Q139 232 108 224T87 250"/><circle class="court-point" cx="87" cy="250" r="5"/></svg><span>Qualitative movement study<br> Illustrative court positions</span></div>
+            <button id="inspect-source" class="text-link" disabled>Return to the source <span aria-hidden="true">↗</span></button>
+          </aside>
+        </div>
+        <div class="workspace-note"><p>Pose: estimated from generated images. Movement and event layers: illustrative concepts.</p><button data-toggle-notes="pose-notes" aria-expanded="false" disabled>How to read this</button></div>
+        <div id="pose-notes" class="inline-notes" hidden>The pose layer uses a local YOLO11n-pose model with 17 possible body landmarks. Points below 0.35 confidence are omitted. Single-image estimates are uncertain and do not validate a stroke or a biomechanical claim. The synthetic rally record below is a separate demonstration; these still images are not its match footage.</div>
+      </div>
+      <noscript><p>The scenes and sample summaries remain visible. Enable JavaScript to switch layers and explore the record.</p></noscript>
+    </div></section>
+
+    <section id="analytics" class="analytics section wrap" aria-labelledby="analytics-title">
+      <div class="section-heading"><div><h2 id="analytics-title">The game,<br> made legible.</h2></div><p class="lead">Start with a question. Explore a pattern.<br> Every number should tell you what it counts, where it came from, and what it leaves out.</p></div>
+      <div class="catalogue" data-ui>
+        <div class="catalogue-bar"><span>Analytics catalogue</span><span class="sample-label">Synthetic six-rally sample</span></div>
+        <div class="catalogue-tabs" aria-label="Choose an analytics view"><button data-catalogue="rallies" aria-pressed="true" disabled>Rallies</button><button data-catalogue="shots" aria-pressed="false" disabled>Shot mix</button><button data-catalogue="movement" aria-pressed="false" disabled>Movement</button><button data-catalogue="patterns" aria-pressed="false" disabled>Patterns</button><button data-catalogue="highlights" aria-pressed="false" disabled>Highlights</button><button data-catalogue="progress" aria-pressed="false" disabled>Progress</button></div>
+        <div class="catalogue-content"><div class="catalogue-main">
+          <div class="catalogue-title"><div><span id="catalogue-state" class="data-state">Calculated from sample events</span><h3 id="catalogue-question">Which exchanges kept going?</h3></div><button id="metric-definition-toggle" aria-controls="metric-definition" class="definition-button" aria-expanded="false" disabled>Definition <span aria-hidden="true">+</span></button></div>
+          <div id="catalogue-chart" class="catalogue-chart"><p>6 rallies · 54 candidate strokes · 70 seconds of active play.</p></div>
+          <p id="catalogue-caption" class="chart-caption">Select a rally to inspect its record. Two warm-up exchanges are excluded.</p>
+          <details class="data-table-disclosure"><summary>View the sample data</summary><div id="sample-table"><p>The six official rallies contain 6, 10, 4, 14, 8 and 12 candidate strokes.</p></div></details>
+        </div><aside class="catalogue-summary"><p class="eyebrow">One coherent record</p><button data-definition="activePlay" disabled><span>Active play</span><strong id="summary-active">70<span>s</span></strong><small>Sum of official rally durations</small></button><button data-definition="meanShots" disabled><span>Mean rally length</span><strong id="summary-mean">9</strong><small>Candidate strokes per rally</small></button><button data-definition="classificationCoverage" disabled><span>Classified observations</span><strong id="summary-classified">46<span>/54</span></strong><small>8 observations remain unknown</small></button><p class="summary-note">Coverage is not accuracy.<br> Unknowns stay in the record.</p></aside></div>
+        <section id="rally-record" class="rally-record" aria-labelledby="record-title" hidden></section><div id="metric-definition" class="metric-definition" aria-live="polite" hidden></div>
+      </div>
+    </section>
+
+    <section id="investigation" class="investigation section" aria-labelledby="investigation-title"><div class="wrap investigation-layout">
+      <div class="investigation-copy"><h2 id="investigation-title">An answer.<br> A way back.</h2><p class="lead">“Show me the long rallies” should lead somewhere you can inspect.</p><p>The product’s assistant is designed around bounded tools: retrieve the record, calculate from it, then check the answer against its sources. If the evidence cannot support a claim, the answer should say so.</p><details class="tool-inventory"><summary>Inside the investigation</summary><p>The existing read-only tool set: match overview, rally list, rally detail, player stats, stroke search, highlights, momentum, and rules or background.</p><p>Pose, trajectory, cross-session comparison and reanalysis tools are future extensions. This local example runs defined calculations, without an AI service.</p></details></div>
+      <div class="investigation-console" data-ui><div class="console-bar"><span><span class="live-dot"></span> Ask the evidence</span><span class="sample-label">Guided local example</span></div>
+        <form id="investigation-form"><label for="investigation-question">Your question about the sample</label><div class="question-entry"><input id="investigation-question" name="question" value="Which rallies had at least 10 shots?" maxlength="240" required><button type="submit" aria-label="Investigate the question" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button></div></form>
+        <div class="question-examples" aria-label="Try a question"><button data-ask-example="Which rallies had at least 10 shots?" disabled>Long rallies</button><button data-ask-example="What was the total active play?" disabled>Active play</button><button data-ask-example="What was the smash speed?" disabled>Smash speed</button></div>
+        <ol id="investigation-steps" class="investigation-steps"><li>Read the sample match overview.</li><li>Filter official rally records.</li><li>Check the answer against the retrieved evidence.</li></ol>
+        <div id="investigation-answer" class="investigation-answer" aria-live="polite"><span class="answer-kind">Supported by the sample record</span><p>Rallies 2, 4 and 6 contain at least 10 candidate strokes.</p><div id="investigation-citations"></div></div>
+        <p class="console-note">A transparent demonstration on synthetic data. No upload, account or external AI call.</p>
+      </div>
+    </div></section>
+
+    <section id="platform" class="platform section dark-surface" aria-labelledby="platform-title"><div class="wrap">
+      <div class="section-heading"><div><h2 id="platform-title">Badminton is<br> the beginning.</h2></div><p class="lead">The bigger idea is video you can reason with. A foundation that connects what is seen, what happened, and what the evidence can explain.</p></div>
+      <div class="platform-film"><div class="film-frame"><video id="tracking-film" autoplay loop muted playsinline preload="auto" poster="./assets/tracking-poster.webp" aria-describedby="film-caption"><source src="./assets/tracking-reference.mp4" type="video/mp4"><p>Your browser cannot play this reference video.</p></video></div>
+        <div class="film-context"><div><h3>From the play<br> to a visible record.</h3></div><div><p id="film-caption" class="film-caption">This supplied basketball clip shows tracking annotations already present in the video. It illustrates the wider vision; it is not a demonstration of a shipped Rally basketball capability.</p><div class="film-chapters" aria-label="Seek within the reference film"><button data-film-time="0" disabled><span>00:00</span> Source view</button><button data-film-time="5" disabled><span>00:05</span> Tracking view</button><button data-film-time="11" disabled><span>00:11</span> Follow the play</button></div><p id="film-status" class="film-status" role="status">17-second supplied reference · Plays on a loop, silently.</p></div></div>
+      </div>
+      <div class="foundation-flow" aria-label="The video intelligence foundation"><span>Video</span><span>Observations</span><span>Events</span><span>Analytics</span><span>Evidence</span><strong>Understanding</strong></div>
+      <div class="domain-controls" aria-label="Explore the platform direction"><button data-domain="badminton" aria-pressed="true" disabled><span>01 / First application</span>Badminton</button><button data-domain="sports" aria-pressed="false" disabled><span>02 / Future domain packs</span>More ways to play</button><button data-domain="workflows" aria-pressed="false" disabled><span>03 / Architectural direction</span>Beyond sport</button></div>
+      <p id="domain-description" class="domain-description" aria-live="polite">Badminton provides the first concrete language: courts, exchanges, candidate strokes, rally boundaries and match context.<span>Each observation still needs suitable footage, explicit scope and reviewable evidence.</span></p>
+    </div></section>
+
+    <section class="principles section wrap" aria-labelledby="principles-title"><div><h2 id="principles-title">Trust is something<br> you can inspect.</h2></div><div class="principle-list"><article><span>01</span><div><h3>Numbers with definitions.</h3><p>A rally count needs a boundary. A percentage needs a denominator. A highlight needs a reason to be selected.</p></div></article><article><span>02</span><div><h3>Uncertainty in the open.</h3><p>Candidate events, missing observations and unknown strokes belong in the record. Confidence is a cue for review, never a promise of correctness.</p></div></article><article><span>03</span><div><h3>The source stays close.</h3><p>An answer should take you back to the relevant exchange, frame or observation, so you can see the context for yourself.</p></div></article></div></section>
+
+    <section class="questions section wrap" aria-labelledby="questions-title"><div><h2 id="questions-title">Worth asking.</h2></div><div class="faq-list">
+      <details><summary>What can Rally help me explore?</summary><p>The initial badminton work connects rally records, candidate strokes, active-play summaries, shot distributions, highlights and grounded questions. This website makes that direction tangible with a synthetic record and separate visual studies.</p></details>
+      <details><summary>Will any recording work?</summary><p>Camera stability, court visibility, occlusion, resolution and suitable calibration all matter. A fixed view that keeps play visible is a useful starting point. Suitability should be assessed before trusting the analysis.</p></details>
+      <details><summary>What about doubles?</summary><p>Reliable four-player identity, frequent occlusions and partner interactions need additional validation. This site does not promise production-ready doubles analysis.</p></details>
+      <details><summary>Can it measure speed or judge technique?</summary><p>The single-image pose demonstration estimates 2D landmarks. It does not establish shuttle speed, physical distance, injury risk or biomechanical quality. Those claims require appropriate measurement methods and validation.</p></details>
+      <details><summary>Is this live? Does it support other sports?</summary><p>Live analysis and additional sports are directions for future work. Badminton is the first application. Every new domain needs its own event definitions, tools and evaluation.</p></details>
+      <details><summary>Where does the demonstration data come from?</summary><p>The six rallies are a hand-authored fixture shared by every calculation on this page. Generated images, estimated pose, illustrative movement paths and the supplied basketball reference are labelled separately. They are not a measured match or an accuracy benchmark.</p></details>
+    </div></section>
+
+    <section id="conversation" class="conversation section"><div class="wrap conversation-layout"><div><h2>Bring your<br> next question.</h2><p class="lead">A match you want to understand.<br> A coaching question. A different kind of footage.</p><p>Tell us what you would like to see more clearly. Prepare a short brief to copy or download for a conversation with the team.</p><p class="local-note">This form works on your device. Nothing is uploaded or sent.</p></div>
+      <div class="brief-builder"><h3>Start with your game.</h3><form id="brief-form"><div class="form-pair"><div><label for="brief-role">I’m exploring as a</label><select id="brief-role" name="role"><option value="player">Player</option><option value="coach">Coach</option><option value="venue">Venue or academy</option><option value="partner">Potential partner</option></select></div><div><label for="brief-source">My footage is</label><select id="brief-source" name="source"><option value="fixed">Fixed camera</option><option value="phone">Phone recording</option><option value="broadcast">Broadcast footage</option><option value="unknown">Still figuring that out</option></select></div></div><label for="brief-goal">What would you like to understand?</label><textarea id="brief-goal" name="goal" rows="4" minlength="10" maxlength="1200" placeholder="For example, I’d like to find our longest exchanges and review how we recover after them." required></textarea><p id="brief-error" role="alert" hidden></p><button id="prepare-brief" class="button button-forest" type="submit" disabled>Prepare my brief <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19 19 5M5 5h14v14"/></svg></button></form>
+      <div id="brief-result" hidden><p class="brief-success">Your starting point, ready to share.</p><label for="brief-output" class="sr-only">Your prepared brief</label><textarea id="brief-output" readonly rows="8"></textarea><div class="brief-actions"><button id="copy-brief" class="button button-forest">Copy brief</button><button id="download-brief" class="button button-outline">Download</button><a id="email-brief" class="text-link" hidden>Open email draft</a></div><button id="edit-brief" class="text-link">Edit my answers</button><p id="brief-feedback" role="status"></p></div><noscript><p>Enable JavaScript to prepare a local brief.</p></noscript></div>
+    </div></section>
+  </main>
+  <footer class="site-footer dark-surface"><div class="wrap"><div class="footer-top"><p>There’s more to your game.</p><nav aria-label="Footer navigation"><a href="#experience">Experience</a><a href="#analytics">Intelligence</a><a href="#conversation">Let’s talk</a><a href="#top">Back to top ↑</a></nav></div><p class="footer-wordmark" aria-label="Rally">rally</p><div class="footer-notes"><details><summary>About the demonstrations</summary><p>Working brand. Product under development. Calculated examples use synthetic records. Generated scenes and supplied reference footage are identified where shown. No performance or model accuracy result is implied.</p></details><details><summary>Your data on this website</summary><p>No account, analytics tracker, upload or external AI request. Briefs are assembled locally. Copying or downloading a brief does not send it to the team.</p></details></div><div class="footer-bottom"><span>© <span id="current-year">2026</span> Rally. A working identity.</span><span>Video. Evidence. Understanding.</span></div></div></footer>
+</body>
+</html>
+
+
+
