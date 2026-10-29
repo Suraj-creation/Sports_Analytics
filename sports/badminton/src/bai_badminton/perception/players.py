@@ -5,7 +5,7 @@
   court polygon are discarded (umpires, line judges, coaches, crowd).
 * **Tracking** — ByteTrack (Roboflow ``trackers``, Apache-2.0).  The detector runs every
   ``stride`` frames; in between, the last observed boxes are carried forward without a new detection.
-* **Pose** — RTMPose (Apache-2.0) top-down on full-resolution crops of the (at most two) players.
+* **Pose** — RTMPose (Apache-2.0) top-down on full-resolution crops of court-player candidates.
 * **Appearance** — an HSV torso signature per box for identity re-linking after cuts.
 
 ONNX Runtime sessions are created by the platform (``ort_providers``) so TensorRT / CUDA / CPU
@@ -105,7 +105,9 @@ class PlayerDetector:
     def _rfdetr(self, img: NDArray[np.uint8]) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
         # rtmlib's "human" mode drops scores, which ByteTrack needs — decode the raw DETR outputs:
         # boxes (1, Q, 4) normalised cxcywh, logits (1, Q, C) with background at index 0.
-        pre, ori = self.tool.preprocess(img)
+        # RF-DETR's exported backbone expects RGB. rtmlib only normalises and
+        # transposes its input; decoded frames and court crops here are BGR.
+        pre, ori = self.tool.preprocess(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
         outs = self.tool.inference(pre)
         boxes, logits = (outs[0], outs[1]) if outs[0].shape[-1] == 4 else (outs[1], outs[0])
         prob = 1.0 / (1.0 + np.exp(-logits[0].astype(np.float64)))
@@ -147,19 +149,21 @@ class PoseEstimator:
     def __call__(self, img: NDArray[np.uint8], boxes: list[NDArray[np.float64]]) -> list[NDArray[np.float64]]:
         if not boxes:
             return []
-        kps, scores = self.tool(img, bboxes=[b.tolist() for b in boxes])
+        # The checkpoint's MMDeploy pipeline specifies Normalize(to_rgb=True).
+        # rtmlib performs the affine crop and normalisation, but no colour swap.
+        kps, scores = self.tool(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), bboxes=[b.tolist() for b in boxes])
         return [np.concatenate([kps[i], scores[i][:, None]], axis=1).astype(np.float64) for i in range(len(boxes))]
 
 
 class PlayerTracker:
-    """ByteTrack over detector outputs; predicts between detection frames."""
+    """ByteTrack over detector outputs using elapsed video time between detections."""
 
     def __init__(self, fps: float) -> None:
         from trackers import ByteTrackTracker
 
         self._tracker = ByteTrackTracker(
             frame_rate=fps,
-            lost_track_buffer=int(fps),
+            lost_track_buffer=30,  # expressed in 30-FPS frames: one second at any source rate
             track_activation_threshold=0.4,
             minimum_consecutive_frames=1,
             high_conf_det_threshold=0.5,
@@ -170,7 +174,7 @@ class PlayerTracker:
         self.__init__(self.fps)  # type: ignore[misc]
 
     def update(
-        self, boxes: NDArray[np.float64], scores: NDArray[np.float64]
+        self, boxes: NDArray[np.float64], scores: NDArray[np.float64], frame_idx: int
     ) -> list[tuple[int, NDArray[np.float64], float]]:
         import supervision as sv
 
@@ -179,7 +183,9 @@ class PlayerTracker:
             confidence=scores.astype(np.float32),
             class_id=np.zeros(len(boxes), int),
         )
-        tracked = self._tracker.update(det)
+        # Detector cadence changes with rally state. Timestamp mode gives the
+        # motion model and lost-track expiry elapsed video time, not call count.
+        tracked = self._tracker.update(det, timestamp=frame_idx / self.fps)
         out = []
         for i in range(len(tracked)):
             tid = int(tracked.tracker_id[i]) if tracked.tracker_id is not None else -1
@@ -216,6 +222,8 @@ class PlayerPerception:
         self.roi: CourtROI | None = None
         self._last: list[PersonObs] = []
         self._admitted: dict[int, int] = {}
+        self._court_tracks: dict[int, tuple[int, NDArray[np.float64]]] = {}
+        self._last_detection_frame: int | None = None
         self.fps = fps
 
     @property
@@ -229,6 +237,7 @@ class PlayerPerception:
             else "disabled",
             "model": self._reid_fingerprint,
             "policy": self._associator.policy_fingerprint if self._associator else "bytetrack_v1",
+            "court_membership": "observed_box_continuity_v1",
         }
 
     def set_roi(self, roi: CourtROI | None) -> None:
@@ -238,6 +247,8 @@ class PlayerPerception:
         self.tracker.reset()
         self._last = []
         self._admitted.clear()
+        self._court_tracks.clear()
+        self._last_detection_frame = None
         if self._associator is not None:
             self._associator.reset()
 
@@ -250,7 +261,7 @@ class PlayerPerception:
         if self.detector is None or det_stride == 0:
             return []
         if frame_idx % det_stride != 0:
-            return self._carry(frame_idx, img, pose_stride)
+            return self._carry(frame_idx, img, pose_stride, det_stride)
         h, w = img.shape[:2]
         x0, y0 = 0, 0
         view = img
@@ -259,15 +270,36 @@ class PlayerPerception:
             view = img[y0:y1, x0:x1]
         boxes, scores = self.detector(view)
         self.last_detector_observed = True
+        self._last_detection_frame = frame_idx
         if len(boxes):
             boxes = boxes + np.array([x0, y0, x0, y0], dtype=np.float64)
+        self._court_tracks = {
+            tid: (last, box) for tid, (last, box) in self._court_tracks.items() if frame_idx - last <= self.fps
+        }
+        continuing: set[int] = set()
         if self.roi is not None and len(boxes):
             keep = np.array([self.roi.contains_feet(b) for b in boxes], bool)
+            # Bbox bottoms are ground-plane feet only while grounded. A known
+            # athlete can jump above a baseline or run beyond a sideline. Keep
+            # a uniquely overlapping current detection of that existing track;
+            # do not admit unrelated spectators by expanding the court mask.
+            history = list(self._court_tracks.items())
+            if history:
+                overlap = _box_iou(boxes, np.asarray([value[1][1] for value in history])) >= 0.3
+                for i in range(len(boxes)):
+                    matches = np.flatnonzero(overlap[i])
+                    if len(matches) == 1 and overlap[:, matches[0]].sum() == 1:
+                        continuing.add(history[int(matches[0])][0])
+                        keep[i] = True
             boxes, scores = boxes[keep], scores[keep]
-        tracks = self.tracker.update(boxes, scores)
+        tracks = self.tracker.update(boxes, scores, frame_idx)
         self._admitted = {tid: last for tid, last in self._admitted.items() if frame_idx - last <= 2 * self.fps}
         if self.roi is not None:
-            tracks = [t for t in tracks if self.roi.contains_feet(t[1], allow_runoff=t[0] in self._admitted)]
+            tracks = [
+                t
+                for t in tracks
+                if self.roi.contains_feet(t[1], allow_runoff=t[0] in self._admitted) or t[0] in continuing
+            ]
         # A doubles overflow is ambiguous: dropping a lower-ranked track could
         # discard a player. Withhold all participant evidence for this frame
         # and its carried frames rather than treating the survivors as certain.
@@ -280,6 +312,9 @@ class PlayerPerception:
         tracks.sort(key=lambda t: -t[2] * (t[1][3] - t[1][1]))
         tracks = tracks[: self.max_players + 2]
         observed = _unique_detection_matches(tracks, boxes)
+        for (tid, box, _), matched in zip(tracks, observed, strict=True):
+            if matched:
+                self._court_tracks[tid] = (frame_idx, box.copy())
         canonical = [tid for tid, _, _ in tracks]
         reasons = ["bytetrack_v1"] * len(tracks)
         if self._associator is not None:
@@ -319,7 +354,11 @@ class PlayerPerception:
         self._last = persons
         return persons
 
-    def _carry(self, frame_idx: int, img: NDArray[np.uint8], pose_stride: int) -> list[PersonObs]:
+    def _carry(self, frame_idx: int, img: NDArray[np.uint8], pose_stride: int, det_stride: int) -> list[PersonObs]:
+        if self._last_detection_frame is None or frame_idx - self._last_detection_frame > det_stride:
+            # Scene gating can skip process() for a long interval. Returning to
+            # the main camera between detector ticks must not revive old boxes.
+            return []
         persons = [
             PersonObs(
                 track_id=p.track_id,
@@ -330,7 +369,7 @@ class PlayerPerception:
                 identity_method=p.identity_method,
             )
             for p in self._last
-            if self.roi is None or self.roi.contains_feet(p.bbox)
+            if self.roi is None or self.roi.contains_feet(p.bbox) or p.raw_track_id in self._court_tracks
         ]
         if self._associator is not None:
             canonical = self._associator.update(
@@ -365,10 +404,14 @@ def _unique_detection_matches(tracks: list[tuple[int, NDArray, float]], boxes: N
         return [False] * len(tracks)
     a = np.asarray([box for _, box, _ in tracks], dtype=np.float64)
     b = np.asarray(boxes, dtype=np.float64).reshape(-1, 4)
+    iou = _box_iou(a, b)
+    valid = np.isfinite(iou) & (iou >= 0.5)
+    return [bool(valid[i].sum() == 1 and valid[:, int(valid[i].argmax())].sum() == 1) for i in range(len(tracks))]
+
+
+def _box_iou(a: NDArray, b: NDArray) -> NDArray[np.float64]:
     intersection = np.prod(
         np.maximum(0, np.minimum(a[:, None, 2:], b[None, :, 2:]) - np.maximum(a[:, None, :2], b[None, :, :2])), axis=2
     )
     union = np.prod(a[:, 2:] - a[:, :2], axis=1)[:, None] + np.prod(b[:, 2:] - b[:, :2], axis=1)[None, :] - intersection
-    iou = np.divide(intersection, union, out=np.zeros_like(intersection), where=union > 0)
-    valid = np.isfinite(iou) & (iou >= 0.5)
-    return [bool(valid[i].sum() == 1 and valid[:, int(valid[i].argmax())].sum() == 1) for i in range(len(tracks))]
+    return np.divide(intersection, union, out=np.zeros_like(intersection), where=union > 0)

@@ -1,4 +1,5 @@
 """Doubles retains extra court candidates without pretending they are players."""
+
 from types import SimpleNamespace
 
 import numpy as np
@@ -17,7 +18,7 @@ def _tracks(count):
 
 def _perception(count, max_players):
     p = PlayerPerception(lambda image: (np.empty((0, 4)), np.empty(0)), None, fps=30, max_players=max_players)
-    p.tracker = SimpleNamespace(update=lambda boxes, scores: _tracks(count))
+    p.tracker = SimpleNamespace(update=lambda boxes, scores, frame_idx: _tracks(count))
     return p
 
 
@@ -57,27 +58,31 @@ def test_session_format_reaches_perception(tmp_path, match_format, expected):
 
 def test_legacy_doubles_cache_is_stale_after_capacity_policy_change(tmp_path):
     session = make_session(tmp_path, "doubles")
-    frame = FramePerception(frame_idx=0, shuttle_xy=None, shuttle_conf=0,
-        calibration_state=CalibrationState.VALID, detector_observed=True)
+    frame = FramePerception(
+        frame_idx=0, shuttle_xy=None, shuttle_conf=0, calibration_state=CalibrationState.VALID, detector_observed=True
+    )
     payload = session.encode_perception(ChunkPerception(start=0, end=0, frames=[frame]))
     import msgpack
+
     data = msgpack.unpackb(payload, raw=False)
     assert data["ci"]["player_candidate_limit"] == 6
     del data["ci"]["player_candidate_limit"]
     with pytest.raises(StaleCacheError):
-        session.decode_perception(msgpack.packb(data, use_bin_type=True))
+        session.decode_perception(msgpack.packb(data, use_bin_type=True), diagnostic=True)
 
 
 def test_legacy_singles_cache_policy_is_still_readable(tmp_path):
     session = make_session(tmp_path, "singles")
-    frame = FramePerception(frame_idx=0, shuttle_xy=None, shuttle_conf=0,
-        calibration_state=CalibrationState.VALID, detector_observed=True)
+    frame = FramePerception(
+        frame_idx=0, shuttle_xy=None, shuttle_conf=0, calibration_state=CalibrationState.VALID, detector_observed=True
+    )
     chunk = ChunkPerception(start=0, end=0, frames=[frame])
     payload = session.encode_perception(chunk)
     import msgpack
+
     data = msgpack.unpackb(payload, raw=False)
     assert "player_candidate_limit" not in data["ci"]
-    assert session.decode_perception(payload).frames[0].detector_observed is True
+    assert session.decode_perception(payload, diagnostic=True).frames[0].detector_observed is True
 
 
 def test_pipeline_reports_capacity_degradation_once_and_withholds_detector_coverage():
@@ -94,8 +99,13 @@ def test_pipeline_reports_capacity_degradation_once_and_withholds_detector_cover
     p._ref_poly = None
     p.camera = SimpleNamespace(_st=None)
     p.cuts = SimpleNamespace(update=lambda frame: False, shot_id=0)
-    p.players = SimpleNamespace(on_cut=lambda: None, set_roi=lambda roi: None,
-        process=lambda *args: [], last_capacity_limited=True, last_detector_observed=False)
+    p.players = SimpleNamespace(
+        on_cut=lambda: None,
+        set_roi=lambda roi: None,
+        process=lambda *args: [],
+        last_capacity_limited=True,
+        last_detector_observed=False,
+    )
     p._rate = lambda *args: None
     p._read_scoreboard = lambda *args: []
     p.shuttle = None
@@ -105,9 +115,14 @@ def test_pipeline_reports_capacity_degradation_once_and_withholds_detector_cover
     p.calibration_lifecycle = CalibrationLifecycle()
     p._calibration_last_frame = None
     polygon = np.array([[0.0, 0.0], [10.0, 0.0], [10.0, 10.0], [0.0, 10.0]])
-    p._scene = lambda chunk, cuts: _Scene(["main"] * len(chunk.frames), [0] * len(chunk.frames),
-        [0.9] * len(chunk.frames), [np.eye(3)] * len(chunk.frames), [polygon] * len(chunk.frames),
-        [False] * len(chunk.frames))
+    p._scene = lambda chunk, cuts: _Scene(
+        ["main"] * len(chunk.frames),
+        [0] * len(chunk.frames),
+        [0.9] * len(chunk.frames),
+        [np.eye(3)] * len(chunk.frames),
+        [polygon] * len(chunk.frames),
+        [False] * len(chunk.frames),
+    )
     frame = np.zeros((20, 20, 3), dtype=np.uint8)
     result = p.process(DecodedChunk(start=0, frames=[frame, frame, frame]), False)
     assert all(f.detector_observed is False and not f.persons for f in result.frames)

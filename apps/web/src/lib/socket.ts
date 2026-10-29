@@ -19,13 +19,14 @@ export class SessionSocket {
     private readonly onMessage: (m: ServerMsg) => void,
     private readonly lastSeq: () => number,
     private readonly onState: (s: "connecting" | "open" | "closed") => void = () => {},
+    private readonly revision: () => number = () => 0,
   ) {
     this.connect();
   }
 
   private url(): string {
     const proto = location.protocol === "https:" ? "wss" : "ws";
-    return `${proto}://${location.host}/ws/sessions/${this.sessionId}?last_seq=${this.lastSeq()}`;
+    return `${proto}://${location.host}/ws/sessions/${this.sessionId}?last_seq=${this.lastSeq()}&analysis_revision=${this.revision()}`;
   }
 
   private connect(): void {
@@ -38,6 +39,7 @@ export class SessionSocket {
       this.onState("open");
     };
     ws.onmessage = (ev) => {
+      if (this.closed || this.ws !== ws) return;
       try {
         const msg = ev.data instanceof ArrayBuffer ? decode(new Uint8Array(ev.data)) : JSON.parse(ev.data);
         if (msg && typeof msg === "object") {

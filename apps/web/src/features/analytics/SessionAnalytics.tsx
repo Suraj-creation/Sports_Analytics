@@ -132,7 +132,7 @@ function Overview({
   return (
     <>
       <div className="analysis-metrics">
-        <AnalysisStat value={a.rallies} label="Counted rallies" note="Warm-up exchanges excluded" />
+        <AnalysisStat value={a.rallies} label="Counted rallies" note="Only exchanges established as official play" />
         <AnalysisStat
           value={a.longest_rally_shots || (a.rallies ? 0 : null)}
           label="Shots in the longest rally"

@@ -88,6 +88,7 @@ ignore_missing_imports = true
 exclude = ["legacy/", "third_party/", "apps/web/", "research/"]
 
 [tool.pytest.ini_options]
+pythonpath = ["."]
 testpaths = ["engine/tests", "sports/badminton/tests", "agents/tests", "apps/api/tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"

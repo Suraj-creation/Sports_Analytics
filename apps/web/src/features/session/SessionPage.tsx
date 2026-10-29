@@ -12,16 +12,16 @@ import { Timeline } from "@/features/timeline/Timeline";
 import { api } from "@/lib/api";
 import { fps as fpsOf, STATUS_LABEL, shortName } from "@/lib/format";
 import { frameClock } from "@/lib/frameClock";
-import type { PlayerId, Session } from "@/lib/types";
+import type { PlayerId, Session, StatusMsg } from "@/lib/types";
 import { usePlayback } from "@/stores/playback";
 import { useSession } from "@/stores/session";
-import { LiveFeed } from "./LiveFeed";
-import { PlayerSelector } from "./PlayerSelector";
 import { EpisodeMovement } from "./EpisodeMovement";
 import { EstimatedIndividualAnalytics } from "./EstimatedIndividualAnalytics";
 import { IndividualAnalytics } from "./IndividualAnalytics";
+import { LiveFeed } from "./LiveFeed";
 import { ParticipantReview } from "./ParticipantReview";
 import { ParticipantRoster } from "./ParticipantRoster";
+import { PlayerSelector } from "./PlayerSelector";
 import { ReanalysisFeedback } from "./ReanalysisFeedback";
 import { ExportTab } from "./tabs/ExportTab";
 import { VisualObservations } from "./VisualObservations";
@@ -82,6 +82,12 @@ function SessionWorkspace({ session, search }: { session: Session; search: Analy
   const [shortcuts, setShortcuts] = useState(false);
   const connection = useSession((s) => s.connection);
   const status = useSession((s) => s.status);
+  const analyticsVersion = useSession((s) => s.analyticsVersion);
+  const queryClient = useQueryClient();
+  const degraded = (status?.degraded ?? session.meta.degraded ?? []) as NonNullable<StatusMsg["degraded"]>;
+  const capabilities = (status?.capabilities ?? session.meta.capabilities ?? {}) as NonNullable<
+    StatusMsg["capabilities"]
+  >;
   const video = usePlayback((s) => s.video);
   const frame = usePlayback((s) => s.frame);
   const applied = useRef<number | null>(null);
@@ -95,6 +101,12 @@ function SessionWorkspace({ session, search }: { session: Session; search: Analy
       : (availablePlayers[0]?.player_id ?? "P1");
   const tab = TABS.some(([id]) => id === search.tab) ? search.tab : "overview";
   const reanalyse = useMutation({ mutationFn: () => api.control(session.session_id, "reanalyse") });
+  useEffect(() => {
+    if (!analyticsVersion) return;
+    void queryClient.invalidateQueries({
+      predicate: (query) => query.queryKey.includes(session.session_id) && query.queryKey[0] !== "session",
+    });
+  }, [analyticsVersion, queryClient, session.session_id]);
   const patch = (change: Partial<AnalysisSearch>) =>
     void navigate({
       to: ".",
@@ -239,6 +251,19 @@ function SessionWorkspace({ session, search }: { session: Session; search: Analy
           are partial.{status?.rate_x ? ` Processing at ${status.rate_x.toFixed(1)}× real time.` : ""}
         </p>
       )}
+      {degraded.length > 0 && (
+        <div role="status" className="analysis-notice mt-5">
+          <p className="font-semibold">Analysis has component limitations</p>
+          <ul className="mt-2 list-disc pl-5">
+            {degraded.map((item) => (
+              <li key={`${item.stage}:${item.reason}`}>
+                {item.stage}: {item.reason}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2">Processed frames do not establish that every analytics component succeeded.</p>
+        </div>
+      )}
       {showQuality && (
         <section className="analysis-panel mt-5">
           <h2>What this recording can tell us</h2>
@@ -257,9 +282,24 @@ function SessionWorkspace({ session, search }: { session: Session; search: Analy
             </div>
             <div>
               <dt className="text-line-2">Identity capability</dt>
-              <dd>Two court-side identities</dd>
+              <dd>Visual tracks with separately reviewed participant identities</dd>
             </div>
           </dl>
+          {Object.keys(capabilities).length > 0 && (
+            <dl className="mt-4 space-y-2 text-sm">
+              {Object.entries(capabilities).map(([stage, capability]) => (
+                <div key={stage}>
+                  <dt className="font-medium">
+                    {stage} · {capability.status}
+                  </dt>
+                  <dd className="text-line-2">
+                    {capability.active_model ?? capability.requested_model ?? "No active model"}
+                    {capability.reason ? ` · ${capability.reason}` : ""}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          )}
           <p className="analysis-panel-hint mt-4">
             Frame processing is not rally coverage or labelled detection accuracy. Shot labels are heuristic;
             placement uses receiver positions; measured distance can contain tracking jitter. Four-player

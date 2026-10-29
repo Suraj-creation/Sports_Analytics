@@ -148,7 +148,7 @@ def test_scene_survives_the_perception_cache(tmp_path: Path, keyframes: list[np.
     s, _ = make_session(tmp_path)
     s.seed(keyframes)
     p = s.perceive(chunk(80, 120))
-    q = s.decode_perception(s.encode_perception(p))
+    q = s.decode_perception(s.encode_perception(p), diagnostic=True)
     assert [(f.view, f.head, f.court_q) for f in q.frames] == [(f.view, f.head, f.court_q) for f in p.frames]
     assert all((a.cam is None) == (b.cam is None) for a, b in zip(p.frames, q.frames, strict=True))
 
@@ -211,4 +211,4 @@ def test_a_chunk_cached_against_another_calibration_is_stale(tmp_path: Path, key
     old = s.encode_perception(s.perceive(chunk(0, 20)))
     s.handle({"cmd": "calibrate", "points": _clicks(1.5), "frame": 20})
     with pytest.raises(StaleCacheError):
-        s.decode_perception(old)
+        s.decode_perception(old, diagnostic=True)

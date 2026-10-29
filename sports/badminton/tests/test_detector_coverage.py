@@ -39,8 +39,8 @@ def test_detector_coverage_roundtrip_and_missing_metadata_is_stale():
         frame_idx=0, shuttle_xy=None, shuttle_conf=0, calibration_state=CalibrationState.VALID, detector_observed=True
     )
     encoded = session.encode_perception(ChunkPerception(start=0, end=0, frames=[f]))
-    assert session.decode_perception(encoded).frames[0].detector_observed is True
+    assert session.decode_perception(encoded, diagnostic=True).frames[0].detector_observed is True
     decoded = msgpack.unpackb(encoded, raw=False)
     del decoded["frames"][0]["do"]
     with pytest.raises(StaleCacheError):
-        session.decode_perception(msgpack.packb(decoded, use_bin_type=True))
+        session.decode_perception(msgpack.packb(decoded, use_bin_type=True), diagnostic=True)

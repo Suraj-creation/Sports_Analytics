@@ -55,6 +55,7 @@ export function VideoStage({ session }: { session: Session }) {
 
   const reviewBox = usePlayback((s) => s.reviewBox);
   const layers = usePlayback((s) => s.layers);
+  const frame = usePlayback((s) => s.frame);
   const waitForAnalysis = usePlayback((s) => s.waitForAnalysis);
   const bindVideo = usePlayback((s) => s.bindVideo);
   const setPlaying = usePlayback((s) => s.setPlaying);
@@ -169,6 +170,7 @@ export function VideoStage({ session }: { session: Session }) {
       layers: off,
       colors: PLAYER_HEX,
       names: { P1: shortName(session, "P1"), P2: shortName(session, "P2") },
+      fps,
       reviewBox: reviewBox?.sessionId === session.session_id ? reviewBox : null,
     };
     frameClock.poke();
@@ -373,6 +375,15 @@ export function VideoStage({ session }: { session: Session }) {
             Warming up the models…
           </div>
         )}
+        {!noTracksYet && status === "analysing" && frame > frontier && hls === "ready" && !gated && (
+          <div
+            role="status"
+            className="absolute bottom-3 left-3 right-3 rounded-lg bg-mat-deep/90 px-3 py-2 text-xs text-line-2"
+          >
+            This frame is waiting for analysis. Player tracks and shot estimates will appear as processing
+            reaches it.
+          </div>
+        )}
       </div>
 
       <Controls
@@ -473,7 +484,17 @@ function Controls(props: {
                 Show on video · press <span className="text-line-2">.</span> to hide all
               </p>
               {(Object.keys(LAYER_LABEL) as (keyof Layers)[]).map((k) => (
-                <Toggle key={k} label={LAYER_LABEL[k]} checked={layers[k]} onChange={() => toggleLayer(k)} />
+                <Toggle
+                  key={k}
+                  label={LAYER_LABEL[k]}
+                  hint={
+                    k === "pose"
+                      ? "Dashed skeletons briefly hold the previous observed pose between samples."
+                      : undefined
+                  }
+                  checked={layers[k]}
+                  onChange={() => toggleLayer(k)}
+                />
               ))}
               <div className="my-1 border-t border-seam" />
               <Toggle

@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { analysisQueryKey } from "@/lib/analysisQuery";
 import { EventLog } from "@/lib/events";
 import type { Analytics, PlayerStats } from "@/lib/types";
 import { useSession } from "@/stores/session";
@@ -32,8 +33,11 @@ function renderMovement(distance: number | null, observed = 0) {
     },
   };
   const qc = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false } } });
-  qc.setQueryData(["analytics", SESSION.session_id], { rallies: 0, players: { P1: stats } } as Analytics);
-  qc.setQueryData(["movement-evidence", SESSION.session_id, "P1"], { total: 10 });
+  qc.setQueryData(analysisQueryKey("analytics", SESSION.session_id, 0), {
+    rallies: 0,
+    players: { P1: stats },
+  } as Analytics);
+  qc.setQueryData(analysisQueryKey("movement-evidence", SESSION.session_id, 0, "P1"), { total: 10 });
   useSession.setState({ events: new EventLog(), eventsVersion: 0, calibration: null });
   render(
     <QueryClientProvider client={qc}>

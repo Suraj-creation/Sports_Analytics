@@ -277,18 +277,48 @@ def test_reviewed_match_intervals_are_validated_and_dispatched(
 def test_renaming_a_player_preserves_other_participants_and_metadata(client: TestClient) -> None:
     from bai_engine.schema import PlayerInfo
 
-    session = client.app.state.repo.save(Session(
-        title="Doubles", source=Source(kind=SourceKind.UPLOAD, uri="none"),
-        players=[PlayerInfo(player_id="P1", name="A", color="red"),
-                 PlayerInfo(player_id="P2", name="B", color="blue"),
-                 PlayerInfo(player_id="P3", name="C", color="green"),
-                 PlayerInfo(player_id="P4", name="D", color="yellow")],
-    ))
+    session = client.app.state.repo.save(
+        Session(
+            title="Doubles",
+            source=Source(kind=SourceKind.UPLOAD, uri="none"),
+            players=[
+                PlayerInfo(player_id="P1", name="A", color="red"),
+                PlayerInfo(player_id="P2", name="B", color="blue"),
+                PlayerInfo(player_id="P3", name="C", color="green"),
+                PlayerInfo(player_id="P4", name="D", color="yellow"),
+            ],
+        )
+    )
     result = client.patch(f"/api/sessions/{session.session_id}", json={"player1": "  Alice  "})
     assert result.status_code == 200
     players = result.json()["players"]
     assert [(p["player_id"], p["name"], p["color"]) for p in players] == [
-        ("P1", "Alice", "red"), ("P2", "B", "blue"),
-        ("P3", "C", "green"), ("P4", "D", "yellow"),
+        ("P1", "Alice", "red"),
+        ("P2", "B", "blue"),
+        ("P3", "C", "green"),
+        ("P4", "D", "yellow"),
     ]
     assert client.get(f"/api/sessions/{session.session_id}").json()["players"] == players
+
+
+def test_ask_withholds_answer_if_analysis_changes_during_model_call(settings: Settings, monkeypatch) -> None:
+    from bai_api.app import create_app
+    from bai_api.routes import agents
+
+    sid = _seed_match(settings)
+    with TestClient(create_app(settings, start_engine=False)) as client:
+
+        class ResetProvider(_FakeProvider):
+            def complete(self, *args, **kwargs):
+                result = super().complete(*args, **kwargs)
+                if self.turn == 2:
+                    client.app.state.repo.reset_analysis(sid)
+                return result
+
+        monkeypatch.setattr(agents, "_provider", ResetProvider)
+        response = client.post(f"/api/sessions/{sid}/ask", json={"question": "Who won?"})
+        assert response.status_code == 200
+        answer = response.json()
+        assert not answer["grounded"] and not answer["citations"]
+        assert "analysis changed" in answer["text"].lower()
+        assert "won 5" not in answer["text"]

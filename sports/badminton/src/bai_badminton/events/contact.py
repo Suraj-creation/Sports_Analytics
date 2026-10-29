@@ -1,6 +1,6 @@
-"""Racket–shuttle contact (hit) detection — deterministic multi-cue fusion (``contact_fusion_v0``).
+"""Estimated racket–shuttle hits — deterministic multi-cue fusion (``contact_fusion_v1``).
 
-No pretrained badminton hit detector exists (Report §5.5).  This baseline fuses four cues and
+No trained racket-contact adapter is active in this runtime. This baseline fuses four cues and
 records every component score as evidence so the fusion can be calibrated (and later replaced
 by the trained causal model T1) without changing the event contract:
 
@@ -10,8 +10,8 @@ by the trained causal model T1) without changing the event contract:
   normalised by that player's body height;
 * **swing** — wrist speed peak of that player around the frame.
 
-Post-processing: temporal non-maximum suppression and the singles alternation constraint
-(consecutive contacts must be by different players).
+Post-processing uses bounded temporal local maxima. Scores are uncalibrated
+heuristic support, not probabilities of physical racket contact.
 """
 
 from __future__ import annotations
@@ -26,9 +26,9 @@ from numpy.typing import NDArray
 from bai_badminton.observations import PlayerSeries, WindowObs
 from bai_badminton.perception.keypoints import KP
 
-CONTACT_MODEL = "contact_fusion_v0"
+CONTACT_MODEL = "contact_fusion_v1"
 
-# fusion weights (logistic); calibrated on FineBadminton hit frames in research/train/contact
+# Hand-set logistic fusion weights; no fitted calibration is supplied in this repository.
 W_BIAS = -4.2
 W_REDIRECT = 3.2
 W_IMPULSE = 1.4
@@ -92,7 +92,11 @@ def _player_point(s: PlayerSeries, i: int) -> list[NDArray[np.float64]]:
 
 
 def _wrist_speed(
-    s: PlayerSeries, i: int, win: int = 3, *, frame0: int = 0,
+    s: PlayerSeries,
+    i: int,
+    win: int = 3,
+    *,
+    frame0: int = 0,
     pose_stride: NDArray[np.int64] | None = None,
 ) -> float | None:
     """Observed wrist motion in body heights/frame, respecting pose scheduling.
@@ -231,17 +235,34 @@ def detect_contacts(
     stop: int | None = None,
     enforce_alternation: bool = True,
 ) -> list[ContactCandidate]:
-    """Detect contacts in window indices ``[start, stop)``; scoring may look ±3 frames around."""
+    """Return local score peaks in ``[start, stop)`` using observations outside it.
+
+    Peak selection needs ``round(nms_s * fps) + 4`` frames of context on either
+    side. Restricting the candidates to the output range before suppression
+    emitted the same turn twice at processing-chunk boundaries. A bounded
+    local maximum (earliest frame wins ties) has identical selection for every
+    output partition with the same contextual observations. Unlike greedy NMS,
+    its decision cannot depend on an arbitrarily long chain of distant peaks.
+
+    Optional singles alternation is a causal heuristic over returned peaks;
+    streaming callers must maintain that state across calls themselves.
+    """
     stop = w.n if stop is None else stop
-    cands = [c for i in range(start, stop) if not w.replay[i] and (c := score_frame(w, i)) is not None and c.p >= p_min]
-    # temporal NMS
     nms = max(1, int(round(nms_s * w.fps)))
-    cands.sort(key=lambda c: -c.p)
-    kept: list[ContactCandidate] = []
-    for c in cands:
-        if all(abs(c.frame - k.frame) > nms for k in kept):
-            kept.append(c)
-    kept.sort(key=lambda c: c.frame)
+    cands = [
+        c
+        for i in range(max(0, start - nms), min(w.n, stop + nms))
+        if not w.replay[i] and (c := score_frame(w, i)) is not None and c.p >= p_min
+    ]
+    kept = [
+        c
+        for c in cands
+        if start <= c.frame - w.frame0 < stop
+        and not any(
+            abs(c.frame - other.frame) <= nms and (other.p > c.p or (other.p == c.p and other.frame < c.frame))
+            for other in cands
+        )
+    ]
     if not enforce_alternation:
         return kept
     # singles alternation: the same player cannot hit twice in a row (within a short time)
@@ -249,8 +270,6 @@ def detect_contacts(
     out: list[ContactCandidate] = []
     for c in kept:
         if out and c.player_id is not None and c.player_id == out[-1].player_id and c.frame - out[-1].frame < gap:
-            if c.p > out[-1].p:
-                out[-1] = c
             continue
         out.append(c)
     return out

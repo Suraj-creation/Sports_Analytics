@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/lib/api";
 import type { ServerMsg } from "@/lib/socket";
-import { SESSION } from "@/test/fixtures";
+import { ev, SESSION } from "@/test/fixtures";
 
 const sockets: { onMessage: (m: ServerMsg) => void }[] = [];
 vi.mock("@/lib/socket", () => ({
@@ -21,6 +21,54 @@ afterEach(() => {
 });
 
 describe("session store", () => {
+  it("clears replaced analysis data and ignores late packets from the previous generation", () => {
+    useSession.getState().open("s1");
+    const send = sockets[0]!.onMessage;
+    send({ type: "hello", session: SESSION, analysis_revision: 0 });
+    send({ type: "events", analysis_revision: 0, events: [ev("stroke", 10, { seq: 99 })] });
+    send({
+      type: "tracks",
+      analysis_revision: 0,
+      window: { v: 1, from: 0, to: 20, shuttle: { f: [10], x: [2], y: [3], c: [0.9] }, players: {} },
+    });
+    send({
+      type: "status",
+      status: "analysing",
+      detail: null,
+      frontier_frame: 0,
+      analysed_frames: 0,
+      analysis_revision: 1,
+      degraded: [{ stage: "pose", reason: "unavailable" }],
+    });
+    expect(useSession.getState().events.size).toBe(0);
+    expect(useSession.getState().events.lastSeq).toBe(0);
+    expect(useSession.getState().tracks.shuttle.size).toBe(0);
+    send({ type: "events", analysis_revision: 0, events: [ev("stroke", 11)] });
+    expect(useSession.getState().events.size).toBe(0);
+    send({ type: "events", analysis_revision: 1, events: [ev("stroke", 12, { seq: 1 })] });
+    expect(useSession.getState().events.lastSeq).toBe(1);
+    send({
+      type: "status",
+      status: "analysed",
+      frontier_frame: 119,
+      analysed_frames: 120,
+      analysis_revision: 1,
+    });
+    expect(useSession.getState().session?.analysed_frames).toBe(120);
+    expect(useSession.getState().session?.meta.degraded).toEqual([{ stage: "pose", reason: "unavailable" }]);
+  });
+
+  it("ignores callbacks from closed or previously opened sessions", () => {
+    useSession.getState().open("s1");
+    const old = sockets[0]!.onMessage;
+    useSession.getState().open("s2");
+    old({ type: "hello", session: SESSION });
+    expect(useSession.getState().session).toBeNull();
+    const current = sockets[1]!.onMessage;
+    useSession.getState().close();
+    current({ type: "hello", session: { ...SESSION, session_id: "s2" } });
+    expect(useSession.getState().session).toBeNull();
+  });
   it("fetches media details once the probe has run (hello arrived before them)", async () => {
     const full = { ...SESSION, status: "ready_to_play" as const };
     const get = vi.spyOn(api, "session").mockResolvedValue(full);

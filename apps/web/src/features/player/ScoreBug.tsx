@@ -12,18 +12,22 @@ export function ScoreBug({ session }: { session: Session }) {
   const events = useSession((s) => s.events);
   const eventsVersion = useSession((s) => s.eventsVersion);
   const status = useSession((s) => s.session?.status);
+  const frontier = useSession((s) => s.session?.frontier_frame ?? 0);
   // biome-ignore lint/correctness/useExhaustiveDependencies: eventsVersion signals mutation of the log
-  const { state, known } = useMemo(() => stateAt(events, frame), [events, eventsVersion, frame]);
+  const { state, known: hasState } = useMemo(() => stateAt(events, frame), [events, eventsVersion, frame]);
+  const known = hasState && (status !== "analysing" || frame <= frontier);
 
-  const flag = state.winner
-    ? `${shortName(session, state.winner)} wins the match`
-    : state.match_point
-      ? "Match point"
-      : state.game_point
-        ? "Game point"
-        : state.deuce
-          ? "Deuce"
-          : null;
+  const flag = !known
+    ? null
+    : state.winner
+      ? `${shortName(session, state.winner)} wins the match`
+      : state.match_point
+        ? "Match point"
+        : state.game_point
+          ? "Game point"
+          : state.deuce
+            ? "Deuce"
+            : null;
 
   return (
     <div className="pointer-events-none absolute top-3 left-3 select-none" data-testid="score-bug">
@@ -42,7 +46,11 @@ export function ScoreBug({ session }: { session: Session }) {
       </div>
       <div className="mt-1 flex items-center gap-1.5 text-[11px]">
         <span className="rounded bg-mat-deep/80 px-1.5 py-0.5 text-line-2">
-          {known ? `Game ${state.game_no}` : status === "analysing" ? "Score pending" : "Score unavailable"}
+          {known
+            ? `Game ${state.game_no} · estimated score`
+            : status === "analysing"
+              ? "Score pending"
+              : "Score unavailable"}
         </span>
         {flag && <span className="rounded bg-line px-1.5 py-0.5 font-semibold text-mat-deep">{flag}</span>}
         {!known && status === "analysing" && (

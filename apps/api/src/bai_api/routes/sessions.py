@@ -210,7 +210,12 @@ def _control(session: Session, b: Any, action: str) -> dict[str, str]:
 
 @router.post("/{session_id}/start", status_code=202)
 def start(session: SessionDep, b: BusDep) -> dict[str, str]:
-    """(Re)start analysis — resumes from the perception cache, never redoes GPU work."""
+    """Start or resume a session runner.
+
+    A completed analysis can reattach without inference. Interrupted stateful
+    perception may need to process frames again because cached observations do
+    not restore a live tracker's private temporal state.
+    """
     return _control(session, b, "start")
 
 
@@ -221,7 +226,12 @@ def stop(session: SessionDep, b: BusDep) -> dict[str, str]:
 
 @router.post("/{session_id}/reanalyse", status_code=202)
 def reanalyse(session: SessionDep, b: BusDep) -> dict[str, str]:
-    """Rebuild all events from cached perception (after calibration changes or rule upgrades)."""
+    """Rebuild session semantics after calibration or pipeline changes.
+
+    Stateless plugins can reuse compatible perception caches. Stateful plugins
+    run sequential inference when replaying cached observations cannot restore
+    temporal state safely.
+    """
     return _control(session, b, "reanalyse")
 
 
@@ -249,34 +259,39 @@ def events(
     live: bool = True,
     since_seq: Annotated[int | None, Query(ge=0)] = None,
 ) -> dict[str, Any]:
-    store = r.events(session.session_id)
-    if since_seq is not None:
-        evs = store.since(since_seq)
-    else:
-        evs = store.query(
-            types=types.split(",") if types else None,
-            frame_from=frame_from,
-            frame_to=frame_to,
-            player_id=player,
-            live_only=live,
-        )
-    return {"last_seq": store.last_seq(), "events": [e.model_dump(mode="json") for e in evs]}
+    with r.analysis_snapshot(session.session_id) as (session, store, _):
+        if since_seq is not None:
+            evs = store.since(since_seq)
+        else:
+            evs = store.query(
+                types=types.split(",") if types else None,
+                frame_from=frame_from,
+                frame_to=frame_to,
+                player_id=player,
+                live_only=live,
+            )
+        return {
+            "last_seq": store.last_seq(),
+            "analysis_revision": session.meta.get("analysis_revision", 0),
+            "events": [e.model_dump(mode="json") for e in evs],
+        }
 
 
 @router.get("/{session_id}/state")
 def state(session: SessionDep, r: Repo, frame: Annotated[int | None, Query(ge=0)] = None) -> dict[str, Any]:
-    store = r.events(session.session_id)
-    snap = store.state_at(frame if frame is not None else 10**12)
-    return {
-        "frame": snap.frame_idx if snap else None,
-        "state": snap.state if snap else None,
-        "states": [
-            {"frame": s.frame_idx, "score": s.state.get("score"), "game_no": s.state.get("game_no")}
-            for s in store.states()
-        ]
-        if frame is None
-        else None,
-    }
+    with r.analysis_snapshot(session.session_id) as (session, store, _):
+        snap = store.state_at(frame if frame is not None else 10**12)
+        return {
+            "analysis_revision": session.meta.get("analysis_revision", 0),
+            "frame": snap.frame_idx if snap else None,
+            "state": snap.state if snap else None,
+            "states": [
+                {"frame": s.frame_idx, "score": s.state.get("score"), "game_no": s.state.get("game_no")}
+                for s in store.states()
+            ]
+            if frame is None
+            else None,
+        }
 
 
 @router.get("/{session_id}/tracks")
@@ -286,12 +301,17 @@ def tracks(
     frame_from: Annotated[int, Query(alias="from", ge=0)],
     frame_to: Annotated[int, Query(alias="to", ge=0)],
 ) -> Response:
+    if frame_to < frame_from:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "to must be at or after from")
     if frame_to - frame_from > 30 * 60 * 60:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "window too large (max 1 h of frames)")
-    table = r.tracks(session.session_id).read(
-        [TrackObject.SHUTTLE, TrackObject.PLAYER, TrackObject.CAMERA], frame_from, frame_to
-    )
-    return Response(encode_tracks(table_to_samples(table), frame_from, frame_to), media_type="application/msgpack")
+    with r.analysis_snapshot(session.session_id) as (session, _, track_store):
+        table = track_store.read([TrackObject.SHUTTLE, TrackObject.PLAYER, TrackObject.CAMERA], frame_from, frame_to)
+        return Response(
+            encode_tracks(table_to_samples(table), frame_from, frame_to),
+            media_type="application/msgpack",
+            headers={"X-Analysis-Revision": str(session.meta.get("analysis_revision", 0))},
+        )
 
 
 # ---------------------------------------------------------------------- calibration
