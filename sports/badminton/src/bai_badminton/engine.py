@@ -241,7 +241,7 @@ class BadmintonMatchEngine:
         self.timeline = Timeline.from_rate(cfg.fps, 10**9)
         self.ont = get_ontology()
         self.stroke_clf: StrokeClassifier = stroke_classifier or RuleStrokeClassifier()
-        self.identity = IdentityResolver(frame_height=float(cfg.frame_height))
+        self.identity = IdentityResolver(frame_height=float(cfg.frame_height), rebind_gap_frames=round(2 * cfg.fps))
         self.participants: ParticipantTracker | None = None
         self._participant_births: dict[str, str] = {}
         self._participant_shot_id: int | None = None
@@ -700,7 +700,7 @@ class BadmintonMatchEngine:
                 ]
             )
         assigned = (
-            self.identity.assign(persons, {k: v.value for k, v in self.state.ends.items()})
+            self.identity.assign(persons, {k: v.value for k, v in self.state.ends.items()}, fp.frame_idx)
             if geometry_valid
             and not fp.replay
             and not self._multi_person_identity_ambiguous
