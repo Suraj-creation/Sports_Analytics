@@ -13,9 +13,13 @@ Parsing is pure (:func:`parse_scoreboard`) so it is tested without the OCR model
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from importlib.metadata import version
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -81,12 +85,60 @@ class ScoreboardReader:
     _misses: int = 0
     _last: int = field(default=-(10**9))
     calls: int = 0
+    runtime: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def model_ref(self) -> str:
+        """Actual package and weights, not the historical rapidocr_v4 alias."""
+        if not self.runtime:
+            return "rapidocr@unknown"
+        weights = {stage: info["sha256"] for stage, info in self.runtime["stages"].items()}
+        fingerprint = hashlib.sha256(json.dumps(weights, sort_keys=True).encode()).hexdigest()[:12]
+        return f"rapidocr@{self.runtime['package_version']}+{fingerprint}"
 
     @classmethod
-    def load(cls, every: int) -> ScoreboardReader:
+    def load(cls, every: int, *, backend: str = "onnx-cpu") -> ScoreboardReader:
         from rapidocr import RapidOCR
 
-        return cls(RapidOCR(), every)
+        if backend not in ("onnx-cpu", "onnx-cuda"):
+            raise ValueError(f"unsupported RapidOCR backend: {backend}")
+        # Keep package-selected weights, thresholds and image preprocessing intact.
+        ocr = RapidOCR(params={"EngineConfig.onnxruntime.use_cuda": backend == "onnx-cuda"})
+        runtime: dict[str, Any] = {"package_version": version("rapidocr"), "requested_backend": backend, "stages": {}}
+        for stage, section in (("det", "Det"), ("cls", "Cls"), ("rec", "Rec")):
+            # RapidOCR 3.10 loads lazily. Initialize before claiming a loaded
+            # model, checking actual providers rather than assuming the flag won.
+            loader = getattr(ocr, f"_load_{stage}_model", None)
+            if loader is not None:
+                loader()
+            component = getattr(ocr, f"text_{stage}", None)
+            engine = getattr(component, "session", None)
+            session = getattr(engine, "session", None)
+            if session is None or not hasattr(session, "get_providers"):
+                raise RuntimeError(f"RapidOCR {stage} ONNX session unavailable for provider verification")
+            # ONNX Runtime retains the loaded artifact path on its Python session.
+            # Refuse unknown artifacts instead of claiming a configured filename.
+            model_path = getattr(session, "_model_path", None)
+            if not model_path:
+                raise RuntimeError(f"RapidOCR {stage} artifact path unavailable")
+            path = Path(model_path)
+            with path.open("rb") as stream:
+                digest = hashlib.file_digest(stream, "sha256").hexdigest()
+            config = getattr(ocr.cfg, section)
+            configured_version = getattr(config, "ocr_version", "unknown")
+            ocr_version = getattr(configured_version, "value", str(configured_version))
+            runtime["stages"][stage] = {
+                "model_file": path.name,
+                "sha256": digest,
+                "configured_ocr_version": ocr_version,
+                "providers": session.get_providers(),
+                "provider_options": session.get_provider_options(),
+            }
+        expected = "CUDAExecutionProvider" if backend == "onnx-cuda" else "CPUExecutionProvider"
+        runtime["backend_fallback"] = any(
+            not info["providers"] or info["providers"][0] != expected for info in runtime["stages"].values()
+        )
+        return cls(ocr, every, runtime=runtime)
 
     def maybe_read(self, frame_idx: int, img: NDArray[np.uint8]) -> ScoreReading | None:
         if frame_idx - self._last < self.every:

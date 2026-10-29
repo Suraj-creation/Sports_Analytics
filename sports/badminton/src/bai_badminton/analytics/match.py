@@ -108,6 +108,7 @@ class Highlight:
     categories: list[str]
     reasons: dict[str, float]  # decomposition of the score ("why ranked")
     player: str | None
+    evidence_ids: list[str] = field(default_factory=list)
 
     def to_public(self) -> dict[str, Any]:
         return {
@@ -119,6 +120,9 @@ class Highlight:
             "categories": self.categories,
             "reasons": {k: round(v, 2) for k, v in self.reasons.items()},
             "player": self.player,
+            "evidence_ids": list(self.evidence_ids),
+            "evidence_status": "estimated_events",
+            "score_semantics": "ranking_score_not_probability",
         }
 
 
@@ -280,7 +284,7 @@ class MatchAnalytics:
         reasons["length"] = min(3.0, r.n_shots / 6.0)
         if r.n_shots >= max(12, longest) and r.n_shots == longest:
             cats.append("longest_rally")
-        stroke_set = {s.get("stroke") for s in r.shots}
+        stroke_set = {s.get("stroke") for s in r.shots} - {None, "unknown"}
         reasons["variety"] = min(1.5, 0.3 * len(stroke_set))
         last = r.shots[-1] if r.shots else {}
         if last.get("stroke") == "smash" and last.get("player_id") == r.winner:
@@ -320,7 +324,17 @@ class MatchAnalytics:
             reasons["comeback"] = 1.5
             cats.append("comeback")
         score = min(10.0, sum(reasons.values()))
-        return Highlight(r.rally_id, r.rally_no, r.start, r.end, score, cats, reasons, r.winner)
+        return Highlight(
+            r.rally_id,
+            r.rally_no,
+            r.start,
+            r.end,
+            score,
+            cats,
+            reasons,
+            r.winner,
+            list(dict.fromkeys([r.rally_id, *(s["event_id"] for s in r.shots if s.get("event_id"))])),
+        )
 
     def _is_comeback_point(self, r: RallyRecord) -> bool:
         """The winner levels or takes the lead in a game after trailing by ≥ 5."""

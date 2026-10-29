@@ -122,10 +122,12 @@ models:
     task: stroke
     version: "1.0"
     format: torch
-    source: {gdrive_folder: "1D4172WZDJWPvpJdpaHDhy_cA-s8F-zR5", file: "bst_CG_AP_JnB_bone_between_2_hits_with_max_limits_seq_100_merged_2.pt"}
-    sha256: pin-on-first-fetch
+    source: {url: "https://drive.usercontent.google.com/download?id=1snqpEEww-GG6xFUBzkuctYAPHcBP360B&export=download&confirm=t", file: "bst_CG_AP_JnB_bone_between_2_hits_with_max_limits_seq_100_merged_2.pt"}
+    size: 7514133
+    sha256: 997f43e52b20cb47517132c71d3e147d7d717a2d9651cfbe7651a5003bd66809
     license: MIT (Va6lue/BST-Badminton-Stroke-type-Transformer)
-    status: candidate  # stroke_rules_v0 is used until installed (E7 decides fine-tuning)
+    input: {seq_len: 100, pose_dim: 72, players: 2, classes: 25}
+    status: candidate  # optional singles shadow adapter; rules remain default pending labelled evaluation
 
   rapidocr_v4:
     task: ocr
@@ -133,6 +135,7 @@ models:
     format: package
     source: {package: "rapidocr"}
     license: Apache-2.0 (RapidOCR / PP-OCR models)
+    note: Legacy profile alias for package-selected weights, not a PP-OCRv4 pin. Runtime records package version, actual weight hashes and providers.
 
   contact_fusion_v0:
     task: contact

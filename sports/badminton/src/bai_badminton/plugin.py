@@ -27,12 +27,12 @@ from bai_engine.obs import get_logger
 from bai_engine.runtime.registry import ModelRegistry
 from bai_engine.schema import Event, EventStatus, Provenance, Session, TrackObject, TrackSample
 from bai_engine.sport import EmitFn
-from bai_engine.store import EventStore
+from bai_engine.store import EventStore, TrackStore
 
 log = get_logger(__name__)
 AUTO_CALIBRATION_MIN_SCORE = 0.6
 REF_FILE = "camera_ref.png"  # the frame the calibration was made on (lossless: its id is a content hash)
-CODEC_VERSION = 9  # v9 binds canonical identity policy and raw/person-detection provenance
+CODEC_VERSION = 10  # RGB model inputs, timestamped tracking and shot-isolated shuttle windows
 MAX_ADJUST = 0.03  # a human calibration the court lines move by more than this (× frame width) is kept as is
 
 
@@ -71,6 +71,8 @@ class BadmintonSession:
         assert session.media is not None, "session media must be known before analysis starts"
         self.session = session
         self.store = store
+        self._analytics_token: tuple[Any, ...] | None = None
+        self._analytics_fold: Any = None
         m = session.media
         fps = float(m.fps)
         names = {p.player_id: p.name for p in session.players}
@@ -476,28 +478,143 @@ class BadmintonSession:
         return self.engine.public_state()
 
     def analytics(self) -> dict[str, Any]:
-        a = self.engine.analytics.to_public()
-        a["highlights"] = [h.to_public() for h in self.engine.analytics.highlights(k=12)]
+        """Publish the same canonical event/track fold used by HTTP and reports.
+
+        The runner persists its drained samples before publishing state. The
+        engine's coordinate-only live buffers omit the time, track and camera
+        evidence required for movement, so they cannot produce that view.
+        Ledger identity and atomic track-file revisions invalidate the cache,
+        including corrections and reanalysis that restarts sequence numbers.
+        """
+        from bai_badminton.analytics.rebuild import build
+
+        stat = self.store.path.stat()
+        tracks_root = self.store.path.parent / "tracks"
+        revisions = []
+        for kind in ("player", "camera"):
+            directory = tracks_root / kind
+            revision = directory.stat() if directory.exists() else None
+            revisions.append((kind, revision.st_ino, revision.st_mtime_ns) if revision else (kind, None, None))
+        media = self.session.media
+        token = (
+            self.store.last_seq(),
+            stat.st_ino,
+            stat.st_mtime_ns,
+            tuple(revisions),
+            media.fps_num if media else None,
+            media.fps_den if media else None,
+        )
+        if getattr(self, "_analytics_token", None) != token or getattr(self, "_analytics_fold", None) is None:
+            tracks = TrackStore(tracks_root) if tracks_root.exists() else None
+            self._analytics_fold = build(self.store, tracks, float(media.fps) if media else 30.0)
+            self._analytics_token = token
+        a = self._analytics_fold.to_public()
+        a["highlights"] = [h.to_public() for h in self._analytics_fold.highlights(k=12)]
         return a
 
     def degraded(self) -> list[dict[str, str]]:
         return [{"stage": d.stage, "reason": d.reason} for d in self.perception.degraded]
 
+    def capabilities(self) -> dict[str, dict[str, Any]]:
+        """Report actual execution, separately from optional research configuration."""
+        from bai_badminton.events.contact import CONTACT_MODEL
+
+        profile = self.perception.profile
+        loaded = self.perception.models
+        out: dict[str, dict[str, Any]] = {}
+        for stage, attr, required in (
+            ("shuttle", "shuttle", True),
+            ("player_detector", "player_detector", True),
+            ("pose", "pose", True),
+            ("player_identity", "player_reid", False),
+            ("ocr", "ocr", False),
+        ):
+            choice = getattr(profile, attr, None)
+            requested = choice.model if choice is not None else None
+            active = loaded.get("player_reid" if stage == "player_identity" else stage)
+            status = "loaded" if active else "disabled" if requested in (None, "none") else "unavailable"
+            reason = next((d.reason for d in self.perception.degraded if d.stage == stage), "")
+            if reason and active:
+                status = "unavailable"
+            if stage == "player_identity" and self.perception.match_format != "doubles" and not active:
+                status, reason = "disabled", "Neural identity association is currently available for doubles only."
+            out[stage] = {
+                "status": status,
+                "requested_model": requested,
+                "active_model": active,
+                "required": required,
+                "reason": reason,
+            }
+        scoreboard = getattr(self.perception, "scoreboard", None)
+        if scoreboard is not None and getattr(scoreboard, "runtime", None):
+            runtime = scoreboard.runtime
+            out["ocr"]["runtime"] = runtime
+            stages = runtime.get("stages", {})
+            detail = "; ".join(
+                f"{stage}: {info['model_file']} via {', '.join(info['providers'])}" for stage, info in stages.items()
+            )
+            out["ocr"]["reason"] = f"RapidOCR {runtime['package_version']}; {detail}"
+            if runtime.get("backend_fallback"):
+                out["ocr"]["status"] = "fallback"
+                out["ocr"]["reason"] += f". Requested {runtime['requested_backend']} was not available for every stage."
+        out["stroke"] = {
+            "status": "heuristic",
+            "requested_model": profile.stroke.model,
+            "active_model": self.engine.stroke_clf.name,
+            "required": True,
+            "reason": (
+                "Rule-based estimates with unknown outcomes; "
+                "trained BST is available only for explicit singles shadow evaluation."
+            ),
+        }
+        out["stroke_shadow"] = {
+            "status": "shadow_only" if self.perception.match_format == "singles" else "unsupported",
+            "requested_model": "bst_cg_ap_shuttleset",
+            "active_model": None,
+            "required": False,
+            "reason": (
+                "BST-CG-AP can be run explicitly on a completed singles session with verified weights. "
+                "It does not publish live shot labels; development evaluation did not improve the repaired default."
+                if self.perception.match_format == "singles"
+                else "The pretrained BST-CG-AP checkpoint supports exactly two players; doubles are unsupported."
+            ),
+        }
+        out["contact"] = {
+            "status": "heuristic",
+            "requested_model": profile.contact.model if profile.contact else None,
+            "active_model": CONTACT_MODEL,
+            "required": True,
+            "reason": "Temporal motion, proximity and pose estimate potential hits; racket contact is not confirmed.",
+        }
+        for stage in ("racket", "shuttle_live", "shuttle_second_opinion"):
+            choice = getattr(profile, stage, None)
+            requested = choice.model if choice is not None else None
+            out[stage] = {
+                "status": "disabled" if requested in (None, "none") else "unsupported",
+                "requested_model": requested,
+                "active_model": None,
+                "required": False,
+                "reason": "Optional research stage has no runtime adapter; it is not executed.",
+            }
+        if profile.shuttle.params.get("inpaint"):
+            out["shuttle_refinement"] = {
+                "status": "unsupported",
+                "requested_model": "inpaintnet",
+                "active_model": None,
+                "required": False,
+                "reason": "InpaintNet is not integrated; temporal gap filling is explicitly inferred.",
+            }
+        return out
+
     @property
     def requires_sequential_perception(self) -> bool:
-        """Requested ReID uses private history that cached chunks cannot restore.
+        """All modes retain tracker, cut, background and camera history.
 
-        Preserve this scheduling contract if model loading or inference degrades:
-        mixing fresh canonical births with old cached IDs can join different people.
-        Galleries are deliberately never persisted in perception caches.
+        Observation caches are diagnostics, not snapshots of that private state.
+        A seek preview through this instance, or a mix of cached and fresh chunks,
+        would corrupt chronology even when neural identity is disabled.
         """
-        profile = getattr(self.perception, "profile", None)
-        choice = getattr(profile, "player_reid", None)
-        return (
-            getattr(self.perception, "match_format", "singles") == "doubles"
-            and choice is not None
-            and choice.model != "none"
-        )
+        return True
 
     # ------------------------------------------------------------------ cache codec
     def _isolation_id(self) -> dict[str, Any]:
@@ -505,7 +622,15 @@ class BadmintonSession:
             "court": lines_ref_id(self.calibration.H) if self.calibration is not None else None,
             "mode": self.perception.mode,
             "fixed_camera": self._fixed_camera,
+            "match_format": getattr(self.perception, "match_format", "singles"),
         }
+        profile = getattr(self.perception, "profile", None)
+        if isinstance(profile, Profile):
+            policy["profile"] = profile.model_dump(mode="json")
+        policy["loaded_models"] = getattr(self.perception, "models", {})
+        size = getattr(self.perception, "frame_size", None)
+        policy["frame_size"] = list(size) if size else None
+        policy["fps"] = getattr(self.perception, "fps", None)
         # Older doubles caches silently capped candidate tracks at four; do not
         # reuse them with the expanded policy. Existing singles caches remain valid.
         if getattr(self.perception, "match_format", "singles") == "doubles":
@@ -564,9 +689,14 @@ class BadmintonSession:
         assert isinstance(out, bytes)
         return out
 
-    def decode_perception(self, data: bytes) -> ChunkPerception:
-        if self.requires_sequential_perception:
-            raise StaleCacheError("player identity requires sequential fresh perception; cache is diagnostic only")
+    def decode_perception(self, data: bytes, *, diagnostic: bool = False) -> ChunkPerception:
+        """Decode validated observations only for an explicit diagnostic replay.
+
+        Decoding cannot restore private perception state, so the runtime must
+        recompute in chronological order rather than use this as a cache read.
+        """
+        if not diagnostic:
+            raise StaleCacheError("badminton requires sequential fresh perception; cache is diagnostic only")
         d = msgpack.unpackb(data, raw=False)
         ref_id = self.perception.ref_id
         if d.get("v", 1) != CODEC_VERSION or d.get("cr") != ref_id or d.get("ci") != self._isolation_id():

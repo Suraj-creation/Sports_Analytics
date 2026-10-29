@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { ErrorNote, Spinner } from "@/components/ui";
 import { playEventEvidence } from "@/features/player/clip";
+import { useAnalysisQueryKey } from "@/lib/analysisQuery";
 import { req } from "@/lib/api";
 import { clock } from "@/lib/format";
 import type { BaiEvent, Session } from "@/lib/types";
@@ -37,7 +38,7 @@ export function VisualObservations({ session }: { session: Session }) {
   const [open, setOpen] = useState(false);
   const [limit, setLimit] = useState(PAGE_SIZE);
   const observations = useQuery({
-    queryKey: ["visual-track-observations", session.session_id],
+    queryKey: useAnalysisQueryKey("visual-track-observations", session),
     queryFn: ({ signal }) =>
       req<{ last_seq: number; events: BaiEvent[] }>(
         `/api/sessions/${encodeURIComponent(session.session_id)}/events?${new URLSearchParams({ types: EVENT_TYPES })}`,

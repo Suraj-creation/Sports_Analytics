@@ -64,3 +64,36 @@ def test_initial_multiple_people_on_one_side_remain_unresolved() -> None:
     result = resolver.assign([person(1, "near"), person(3, "near", 0.99)], ENDS)
     assert result == {}
     assert resolver.unresolved_tracks == {1: "near", 3: "near"}
+
+
+def moved(track_id: int, side: str, dx: float) -> PersonObs:
+    p = person(track_id, side)
+    p.bbox = p.bbox + np.array([dx, 0.0, dx, 0.0])
+    return p
+
+
+def test_replacement_track_inherits_participant_on_unique_spatial_overlap() -> None:
+    resolver = IdentityResolver(frame_height=720, rebind_gap_frames=60)
+    resolver.assign([person(1, "near"), person(2, "far")], ENDS, 0)
+    result = resolver.assign([person(3, "near"), person(2, "far")], ENDS, 8)
+    assert result["P1"].track_id == 3 and result["P1"].identity_method == "spatial_rebind_v1"
+    assert resolver.rebound_tracks == {3: 1} and resolver.unresolved_tracks == {}
+    # The estimate persists, and the dead track cannot reclaim the participant.
+    assert resolver.assign([person(3, "near"), person(2, "far")], ENDS, 9)["P1"].identity_method == "spatial_rebind_v1"
+
+
+def test_replacement_without_spatial_evidence_or_beyond_gap_stays_unresolved() -> None:
+    far_away = IdentityResolver(frame_height=720, rebind_gap_frames=60)
+    far_away.assign([person(1, "near"), person(2, "far")], ENDS, 0)
+    assert "P1" not in far_away.assign([moved(3, "near", 400.0), person(2, "far")], ENDS, 8)
+    late = IdentityResolver(frame_height=720, rebind_gap_frames=60)
+    late.assign([person(1, "near"), person(2, "far")], ENDS, 0)
+    assert "P1" not in late.assign([person(3, "near"), person(2, "far")], ENDS, 61)
+    assert late.unresolved_tracks == {3: "near"}
+
+
+def test_two_overlapping_candidates_are_not_guessed_between() -> None:
+    resolver = IdentityResolver(frame_height=720, rebind_gap_frames=60)
+    resolver.assign([person(1, "near"), person(2, "far")], ENDS, 0)
+    result = resolver.assign([person(3, "near"), moved(4, "near", 5.0), person(2, "far")], ENDS, 8)
+    assert "P1" not in result and resolver.rebound_tracks == {}

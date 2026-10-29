@@ -217,11 +217,17 @@ class BadmintonPerception:
             return None
 
     def _load_ocr(self, c: ModelChoice | None, reg: ModelRegistry, fps: float) -> ScoreboardReader | None:
-        if c is None or c.model == "none":
+        if c is None or c.model == "none" or c.backend == "none":
             return None
         try:
-            r = ScoreboardReader.load(every=max(1, int(round(self.profile.ocr_every_s * fps))))
-            self.models["ocr"] = reg.get(c.model).ref
+            spec = reg.get(c.model)
+            if spec.format != "package" or spec.source.get("package") != "rapidocr":
+                raise ModelError(f"{c.model} is not a RapidOCR package alias")
+            r = ScoreboardReader.load(every=max(1, int(round(self.profile.ocr_every_s * fps))), backend=c.backend)
+            self.models["ocr"] = r.model_ref
+            if r.runtime.get("backend_fallback"):
+                providers = {stage: info["providers"] for stage, info in r.runtime["stages"].items()}
+                self._degrade("ocr_backend", f"Requested {c.backend}; actual OCR providers: {providers}")
             return r
         except (ModelError, OSError, ValueError, ImportError, RuntimeError) as e:
             self._degrade("ocr", f"{c.model}: {e}")

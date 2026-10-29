@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "session_id": "DoublesProbe20261029",
+  "media_sha256": "fb51eae2db75f554c0521e726dd6c8bc8e81f514ff531733dffc9ecd44d7018b",
+  "fps_num": 25, "fps_den": 1, "width": 1280, "height": 720,
+  "window_frames": [0, 375], "timebase": "analysis_proxy_frames",
+  "sampled_frames": [0,125,250,350],
+  "status": "draft", "split": "diagnostic",
+  "review": {"blind_to_predictions": true, "human_verified": false, "reviewer": "AI visual review before inference"},
+  "scope": "Four visible on-court players only, excluding officials and crowd. Approximate visible-body boxes, not racket extent. No cross-frame identity labels or keypoint accuracy claims.",
+  "frames": [
+    {"frame_idx":0,"exhaustive":true,"persons":[
+      {"bbox":[580,250,631,360],"person_id":null},
+      {"bbox":[683,249,759,368],"person_id":null},
+      {"bbox":[512,413,609,538],"person_id":null},
+      {"bbox":[554,459,641,599],"person_id":null}]},
+    {"frame_idx":125,"exhaustive":true,"persons":[
+      {"bbox":[626,239,672,343],"person_id":null},
+      {"bbox":[692,207,753,309],"person_id":null},
+      {"bbox":[522,452,637,579],"person_id":null},
+      {"bbox":[734,436,832,590],"person_id":null}]},
+    {"frame_idx":250,"exhaustive":true,"persons":[
+      {"bbox":[459,238,569,327],"person_id":null},
+      {"bbox":[608,262,684,382],"person_id":null},
+      {"bbox":[443,435,509,576],"person_id":null},
+      {"bbox":[629,414,692,542],"person_id":null}]},
+    {"frame_idx":350,"exhaustive":true,"persons":[
+      {"bbox":[526,213,565,333],"person_id":null},
+      {"bbox":[662,215,712,332],"person_id":null},
+      {"bbox":[556,386,631,491],"person_id":null},
+      {"bbox":[583,458,643,613],"person_id":null}]}
+  ]
+}

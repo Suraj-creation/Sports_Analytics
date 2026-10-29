@@ -29,6 +29,7 @@ export interface OverlayCtx {
   layers: Layers;
   colors: Record<PlayerId, string>;
   names: Record<PlayerId, string>;
+  fps?: number;
   reviewBox?: { frame: number; trackId: number; bbox: [number, number, number, number] } | null;
 }
 
@@ -72,14 +73,22 @@ export function drawOverlay(o: OverlayCtx, frame: number): void {
   }
   if (layers.labels && view) drawSceneChip(g, view.view, px, video.videoHeight || 720);
 
-  if (layers.players) {
-    for (const pid of ["P1", "P2"] as PlayerId[]) {
-      const p = tracks.player(pid, frame);
-      if (!p) continue;
-      const color = o.colors[pid];
-      drawBrackets(g, p.bbox, color, px);
-      if (layers.pose && p.kps) drawSkeleton(g, p.kps, color, px);
-      if (layers.labels) drawLabel(g, p.bbox, o.names[pid], color, px);
+  if (layers.players || layers.pose) {
+    for (const p of tracks.playersAt(frame)) {
+      const color = p.playerId ? o.colors[p.playerId] : "#e8c46b";
+      const carried = p.detectorMatched === false;
+      g.globalAlpha = carried ? 0.65 : 1;
+      if (carried) g.setLineDash([4 * px, 3 * px]);
+      if (layers.players) drawBrackets(g, p.bbox, color, px);
+      g.setLineDash([]);
+      g.globalAlpha = 1;
+      const pose = layers.pose
+        ? tracks.displayPose(p, frame, Math.min(5, Math.floor((o.fps ?? 30) * 0.2)))
+        : null;
+      if (pose) drawSkeleton(g, pose.keypoints, color, px, pose.ageFrames > 0);
+      const name = p.playerId ? o.names[p.playerId] : `Track ${p.track} · identity unassigned`;
+      const qualification = `${carried ? " · tracked estimate" : ""}${pose?.ageFrames ? " · pose estimate" : ""}`;
+      if (layers.labels) drawLabel(g, p.bbox, `${name}${qualification}`, color, px);
     }
   }
 
@@ -90,7 +99,7 @@ export function drawOverlay(o: OverlayCtx, frame: number): void {
   if (layers.shuttle) drawShuttle(g, tracks, frame, px);
 
   // contact flash: a ring at the contact point for ~6 frames after a hit
-  for (const c of o.events.window(frame - 6, frame, ["contact"])) {
+  for (const c of layers.shuttle ? o.events.window(frame - 6, frame, ["contact"]) : []) {
     const xy = c.payload.shuttle_xy as [number, number] | null;
     if (!xy) continue;
     const age = frame - c.frame_start;
@@ -109,7 +118,7 @@ export function drawOverlay(o: OverlayCtx, frame: number): void {
 const SCENE_LABEL: Record<"main" | "alt" | "none", string> = {
   main: "Main camera · analysed",
   alt: "Other camera · not analysed",
-  none: "No court in view",
+  none: "No usable court view",
 };
 
 /** Which camera this frame comes from, so a gap in the overlays reads as "not this view", not as a failure. */
@@ -176,9 +185,16 @@ function drawBrackets(
   g.stroke();
 }
 
-function drawSkeleton(g: CanvasRenderingContext2D, k: Float32Array, color: string, px: number) {
+function drawSkeleton(
+  g: CanvasRenderingContext2D,
+  k: Float32Array,
+  color: string,
+  px: number,
+  estimated = false,
+) {
   g.strokeStyle = color;
-  g.globalAlpha = 0.85;
+  g.globalAlpha = estimated ? 0.55 : 0.85;
+  if (estimated) g.setLineDash([3 * px, 2 * px]);
   g.lineWidth = 1.75 * px;
   g.lineCap = "round";
   g.beginPath();
@@ -188,6 +204,7 @@ function drawSkeleton(g: CanvasRenderingContext2D, k: Float32Array, color: strin
     g.lineTo(k[b * 3] as number, k[b * 3 + 1] as number);
   }
   g.stroke();
+  g.setLineDash([]);
   g.globalAlpha = 1;
 }
 
@@ -220,8 +237,10 @@ function drawShuttle(g: CanvasRenderingContext2D, tracks: TrackBuffer, frame: nu
     const a = trail[i - 1];
     const b = trail[i];
     if (!a || !b || b.f - a.f > 2) continue;
+    if (tracks.view(a.f)?.camera !== tracks.view(b.f)?.camera) continue;
     const t = i / trail.length;
-    g.strokeStyle = `rgba(255,255,255,${0.12 + 0.75 * t})`;
+    const confidence = Math.max(0.15, Math.min(1, Math.min(a.p.c, b.p.c)));
+    g.strokeStyle = `rgba(255,255,255,${(0.12 + 0.75 * t) * confidence})`;
     g.lineWidth = (1 + 4 * t) * px;
     g.lineCap = "round";
     g.beginPath();
@@ -238,6 +257,15 @@ function drawShuttle(g: CanvasRenderingContext2D, tracks: TrackBuffer, frame: nu
     g.arc(head.p.x, head.p.y, 4.5 * px, 0, Math.PI * 2);
     g.fill();
     g.shadowBlur = 0;
+    if (head.p.c < 0.5) {
+      g.strokeStyle = "#e8c46b";
+      g.lineWidth = 1.5 * px;
+      g.setLineDash([3 * px, 3 * px]);
+      g.beginPath();
+      g.arc(head.p.x, head.p.y, 9 * px, 0, Math.PI * 2);
+      g.stroke();
+      g.setLineDash([]);
+    }
   }
 }
 

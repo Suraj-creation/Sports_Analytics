@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import sqlite3
 import threading
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -188,14 +190,31 @@ class SessionRepository:
             if es:
                 es.close()
             self._track_stores.pop(session_id, None)
-        p = self.paths(session_id)
-        for f in (p.events_db, Path(f"{p.events_db}-wal"), Path(f"{p.events_db}-shm")):
-            f.unlink(missing_ok=True)
-        shutil.rmtree(p.tracks, ignore_errors=True)
-        self.update(session_id, frontier_frame=0, analysed_frames=0)
+            # Keep replacement handles, deletion and generation publication atomic.
+            # Otherwise a reader can open a new SQLite file just before it is unlinked.
+            p = self.paths(session_id)
+            for f in (p.events_db, Path(f"{p.events_db}-wal"), Path(f"{p.events_db}-shm")):
+                f.unlink(missing_ok=True)
+            shutil.rmtree(p.tracks, ignore_errors=True)
+            session = self.get(session_id)
+            assert session is not None
+            meta = dict(session.meta)
+            meta["analysis_revision"] = int(meta.get("analysis_revision", 0)) + 1
+            meta.pop("degraded", None)
+            meta.pop("capabilities", None)
+            self.update(session_id, frontier_frame=0, analysed_frames=0, meta=meta)
         return backup
 
     # ------------------------------------------------------------------ stores
+    @contextmanager
+    def analysis_snapshot(self, session_id: str) -> Iterator[tuple[Session, EventStore, TrackStore]]:
+        """Hold a consistent generation for synchronous reads; never await in this context."""
+        with self._lock:
+            session = self.get(session_id)
+            if session is None:
+                raise KeyError(session_id)
+            yield session, self.events(session_id), self.tracks(session_id)
+
     def events(self, session_id: str) -> EventStore:
         with self._lock:
             if session_id not in self._event_stores:

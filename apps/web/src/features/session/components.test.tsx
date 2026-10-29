@@ -60,6 +60,17 @@ describe("ScoreBug", () => {
     render(<ScoreBug session={SESSION} />);
     expect(screen.getByText("Game point")).toBeInTheDocument();
   });
+
+  it("does not carry an earlier score into a frame not yet analysed", () => {
+    loadEvents([point(300, "P1", state(19, 18), state(20, 18, { game_point: "P1" }))]);
+    useSession.setState({ session: { ...SESSION, status: "analysing", frontier_frame: 350 } });
+    act(() => usePlayback.setState({ frame: 900 }));
+    render(<ScoreBug session={SESSION} />);
+    expect(screen.getByTestId("score-bug")).toHaveTextContent("Score pending");
+    expect(screen.queryByText("Game point")).not.toBeInTheDocument();
+    act(() => usePlayback.setState({ frame: 320 }));
+    expect(screen.getByTestId("score-bug")).toHaveTextContent("estimated score");
+  });
 });
 
 describe("LiveFeed", () => {

@@ -101,11 +101,9 @@ def test_get_rally_by_number_and_unknown_number(ctx: ToolContext) -> None:
 def test_validator_accepts_abstentions_and_references(ctx: ToolContext) -> None:
     run_tool(ctx, "get_rally", {"rally_no": 50})
     q = "Who won the 50th rally of this match?"
-    text = (
-        "I am unable to answer your question. The data does not contain the 50th rally. "
-        "Game 3 was not played in this clip."
-    )
+    text = "I am unable to answer your question. The data does not contain the 50th rally."
     assert validate(text, ctx, q) == []
+    assert validate("Game 3 was not played in this clip.", ctx, q)  # absence is a match claim too
 
 
 def test_validator_flags_hallucinated_and_uncited_numbers(ctx: ToolContext) -> None:
@@ -157,6 +155,42 @@ def test_unrepairable_answer_is_marked_ungrounded(ctx: ToolContext) -> None:
     p = Scripted([LLMTurn("Axelsen hit 17 smashes at 400 km/h.", [], "stop")])
     a = answer("How many smashes?", ctx, p)
     assert not a.grounded and any("not in any tool result" in i for i in a.issues)
+    assert "400" not in a.text and "17 smashes" not in a.text
+    assert not a.citations
+
+
+def test_qualitative_match_claims_require_evidence(ctx: ToolContext) -> None:
+    assert validate("Axelsen dominated the net exchanges.", ctx) == [
+        "uncited claim in: Axelsen dominated the net exchanges."
+    ]
+    assert validate("Axelsen never missed a return.", ctx)
+
+
+def test_question_quantities_are_not_evidence(ctx: ToolContext) -> None:
+    assert validate("Axelsen hit 412 km/h.", ctx, "Did Axelsen hit 412 km/h?")
+
+
+def test_numbers_must_come_from_the_cited_tool_result(ctx: ToolContext) -> None:
+    ctx.seen_ids.update({"event-a", "event-b"})
+    ctx.outputs.extend(
+        [
+            json.dumps({"event_id": "event-a", "duration": 9}),
+            json.dumps({"event_id": "event-b", "duration": 27}),
+        ]
+    )
+    assert validate("The rally lasted 27 seconds [[ev:event-b]].", ctx) == []
+    assert any(
+        "not in cited tool result" in issue for issue in validate("The rally lasted 27 seconds [[ev:event-a]].", ctx)
+    )
+
+
+def test_event_id_digits_do_not_authorize_a_quantity(ctx: ToolContext) -> None:
+    ctx.seen_ids.add("event-412-id")
+    ctx.outputs.append(json.dumps({"event_id": "event-412-id", "count": 3}))
+    assert any(
+        "not in any tool result" in issue
+        for issue in validate("The top smash reached 412 km/h [[ev:event-412-id]].", ctx)
+    )
 
 
 def test_text_tool_call_parser_handles_noise() -> None:

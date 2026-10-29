@@ -1,6 +1,8 @@
 """Real FFmpeg integration: probe → proxy/HLS → segment decode must preserve frame identity."""
 
 import shutil
+import subprocess
+from dataclasses import replace
 from fractions import Fraction
 from pathlib import Path
 
@@ -98,3 +100,83 @@ def test_hls_segments_have_exact_frame_ranges(proxied: tuple[MediaPaths, object,
     assert mp.proxy.exists()
     assert _encoded_value(dec.decode_frame(137)) == 137 % 64
     assert _encoded_value(dec.keyframe(2)) == 120 % 64
+
+
+def test_decode_rejects_missing_and_negative_frames(proxied: tuple[MediaPaths, object, int]) -> None:
+    mp, plan, n = proxied
+    dec = SegmentDecoder(mp, plan.frames_per_segment)
+    with pytest.raises(ValueError, match="non-negative"):
+        dec.decode_frame(-1)
+    with pytest.raises(ValueError, match="non-negative"):
+        dec.decode_segment(-1)
+    with pytest.raises(IndexError, match="beyond"):
+        dec.decode_frame(n)
+    # A corrupt/mismatched segment size must not silently discard frames.
+    with pytest.raises(ValueError, match="expected at most"):
+        SegmentDecoder(mp, 20).decode_segment(0)
+
+
+@pytest.mark.parametrize("rotation", [0, 90, 180, 270])
+def test_rotated_proxy_and_warm_start_share_orientation_and_target_frame(tmp_path: Path, rotation: int) -> None:
+    from bai_engine.bus import LocalBus
+    from bai_engine.config import Settings
+    from bai_engine.media.proxy import build_sprite
+    from bai_engine.runtime.registry import ModelRegistry
+    from bai_engine.runtime.runner import SessionRunner
+    from bai_engine.schema import MediaInfo, Session, Source, SourceKind
+    from bai_engine.store import SessionRepository
+
+    src, rotated = tmp_path / "raw.mp4", tmp_path / "rotated.mp4"
+    _make_source(src, 30)
+    tools = Tools.resolve()
+    subprocess.run(
+        [
+            tools.ffmpeg,
+            "-v",
+            "error",
+            "-display_rotation",
+            str(rotation),
+            "-i",
+            str(src),
+            "-c",
+            "copy",
+            str(rotated),
+        ],
+        check=True,
+        capture_output=True,
+    )
+    p = probe(rotated, tools)
+    assert p.rotation == rotation
+    assert replace(p, r_frame_rate=Fraction(0)).variable_frame_rate
+    plan = plan_proxy(p, tools, prefer_gpu=False)
+    width, height = p.display_size
+    assert plan.height == height
+    mp = MediaPaths(tmp_path / "media")
+    mp.root.mkdir()
+    transcode(str(rotated), mp, plan, tools, p.duration_s).run()
+    dec = SegmentDecoder(mp, plan.frames_per_segment)
+    middle = dec.decode_frame(15)
+    assert middle.shape[:2] == (height, width)
+    repo = SessionRepository(tmp_path / "data")
+    try:
+        session = repo.save(
+            Session(
+                title="Orientation",
+                source=Source(kind=SourceKind.UPLOAD, uri=str(rotated)),
+                media=MediaInfo(fps_num=30, fps_den=1, width=width, height=height, n_frames=30, duration_us=1_000_000),
+                meta={"source_rotation": p.rotation},
+            )
+        )
+        settings = Settings(data_dir=repo.data_dir, _env_file=None)
+        runner = SessionRunner(session.session_id, repo, LocalBus(), settings, ModelRegistry(settings.models_dir))
+        samples = runner._sample_keyframes(n=1)
+        assert len(samples) == 1
+        # Frame 15 is not a keyframe. Seeking without decoding forward would use frame zero.
+        assert _encoded_value(np.rot90(samples[0], -(rotation // 90))) == 15
+        # A second lossy encode changes a few block-edge pixels. Mean error
+        # checks orientation/alignment without demanding identical codecs.
+        assert np.abs(samples[0].astype(float) - middle.astype(float)).mean() < 1
+    finally:
+        repo.close()
+    sprite = build_sprite(mp.proxy, mp, tools, p.duration_s, every_s=0.5, tile=2)
+    assert sprite["thumb_h"] == round(192 * height / width / 2) * 2

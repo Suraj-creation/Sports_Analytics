@@ -114,6 +114,14 @@ class SessionRunner(threading.Thread):
         if status is not None:
             self.repo.set_status(self.session_id, status, detail)
         s = self.session
+        meta = dict(s.meta)
+        if self.sport is not None:
+            meta["degraded"] = self.sport.degraded()
+            capabilities = getattr(self.sport, "capabilities", None)
+            if callable(capabilities):
+                meta["capabilities"] = capabilities()
+            if meta != s.meta:
+                self.repo.update(self.session_id, meta=meta)
         n = s.media.n_frames if s.media else 0
         msg = {
             "type": "status",
@@ -121,18 +129,29 @@ class SessionRunner(threading.Thread):
             "detail": s.status_detail,
             "n_frames": n,
             "frontier_frame": s.frontier_frame,
+            "analysed_frames": s.analysed_frames,
+            "analysis_revision": int(meta.get("analysis_revision", 0)),
+            "degraded": meta.get("degraded", []),
+            "capabilities": meta.get("capabilities", {}),
             "playhead": self.shared.playhead,
             **extra,
         }
-        if self.sport is not None:
-            msg["degraded"] = self.sport.degraded()
         self.bus.publish(topic(self.session_id, "status"), msg)
+
+    @property
+    def analysis_revision(self) -> int:
+        return int(self.session.meta.get("analysis_revision", 0))
 
     def _emit_events(self, events: list[Event]) -> None:
         for e in events:
             EVENTS_TOTAL.labels(type=e.type, status=e.status.value).inc()
         self.bus.publish(
-            topic(self.session_id, "events"), {"type": "events", "events": [e.model_dump(mode="json") for e in events]}
+            topic(self.session_id, "events"),
+            {
+                "type": "events",
+                "analysis_revision": self.analysis_revision,
+                "events": [e.model_dump(mode="json") for e in events],
+            },
         )
 
     def command(self, cmd: dict[str, Any]) -> None:
@@ -192,7 +211,8 @@ class SessionRunner(threading.Thread):
         plan = plan_proxy(pr, self.tools, max_height=self.settings.proxy_height, prefer_gpu=True)
         self.plan = plan
         n_est = int(pr.duration_s * float(plan.fps))
-        width = round(pr.width * plan.height / pr.height / 2) * 2
+        display_width, display_height = pr.display_size
+        width = round(display_width * plan.height / display_height / 2) * 2
         media = MediaInfo(
             fps_num=plan.fps.numerator,
             fps_den=plan.fps.denominator,
@@ -210,7 +230,12 @@ class SessionRunner(threading.Thread):
         self.repo.update(
             self.session_id,
             media=media,
-            meta={**s.meta, "frames_per_segment": plan.frames_per_segment, "encoder": plan.encoder},
+            meta={
+                **s.meta,
+                "frames_per_segment": plan.frames_per_segment,
+                "encoder": plan.encoder,
+                "source_rotation": pr.rotation,
+            },
         )
         if hls_status(mp).ended:
             return
@@ -256,17 +281,25 @@ class SessionRunner(threading.Thread):
         assert s.media is not None
         out: list[np.ndarray] = []
         try:
+            rotation = s.meta.get("source_rotation")
+            if rotation is None:
+                rotation = probe(Path(s.source.uri), self.tools, self.settings.ffprobe_timeout_s).rotation
             with av.open(s.source.uri) as c:
                 st = c.streams.video[0]
                 dur = (st.duration * st.time_base) if st.duration else Fraction(s.media.duration_us, 1_000_000)
                 for i in range(n):
                     t = float(dur) * (i + 0.5) / n
-                    c.seek(int(t / st.time_base), stream=st, any_frame=False)
+                    target = (st.start_time or 0) + int(t / st.time_base)
+                    c.seek(target, stream=st, any_frame=False)
                     for fr in c.decode(st):
+                        if fr.pts is not None and fr.pts < target:
+                            continue
                         img = fr.to_ndarray(format="bgr24")
+                        if rotation in (90, 180, 270):
+                            img = np.ascontiguousarray(np.rot90(img, int(rotation) // 90))
                         out.append(cv2.resize(img, (s.media.width, s.media.height), interpolation=cv2.INTER_AREA))
                         break
-        except (av.FFmpegError, OSError) as e:
+        except (av.FFmpegError, OSError, MediaError) as e:
             log.warning("keyframes.failed", error=str(e))
         return out
 
@@ -310,7 +343,13 @@ class SessionRunner(threading.Thread):
                     ts.write_chunk(obj, start, end, samples_to_table(part))
         self.bus.publish(
             topic(self.session_id, "tracks"),
-            {"type": "tracks", "from": start, "to": end, "bin": encode_tracks(samples, start, end)},
+            {
+                "type": "tracks",
+                "analysis_revision": self.analysis_revision,
+                "from": start,
+                "to": end,
+                "bin": encode_tracks(samples, start, end),
+            },
         )
 
     def _drain_commands(self) -> None:
@@ -330,7 +369,12 @@ class SessionRunner(threading.Thread):
                 self.bus.publish(reply_to, {"type": "reply", "cmd": cmd.get("cmd"), "result": result})
             self.bus.publish(
                 topic(self.session_id, "state"),
-                {"type": "state", "state": self.sport.public_state(), "analytics": self.sport.analytics()},
+                {
+                    "type": "state",
+                    "analysis_revision": self.analysis_revision,
+                    "state": self.sport.public_state(),
+                    "analytics": self.sport.analytics(),
+                },
             )
 
     def run(self) -> None:
@@ -404,7 +448,12 @@ class SessionRunner(threading.Thread):
             self._apply_carried()
             self.bus.publish(
                 topic(self.session_id, "state"),
-                {"type": "state", "state": self.sport.public_state(), "analytics": self.sport.analytics()},
+                {
+                    "type": "state",
+                    "analysis_revision": self.analysis_revision,
+                    "state": self.sport.public_state(),
+                    "analytics": self.sport.analytics(),
+                },
             )
             if self._transcode_error:
                 self._status(SessionStatus.FAILED, f"Video processing failed: {self._transcode_error}")
@@ -436,7 +485,12 @@ class SessionRunner(threading.Thread):
         log.info("session.attached", session=self.session_id, rallies=n)
         self.bus.publish(
             topic(self.session_id, "state"),
-            {"type": "state", "state": self.sport.public_state(), "analytics": self.sport.analytics()},
+            {
+                "type": "state",
+                "analysis_revision": self.analysis_revision,
+                "state": self.sport.public_state(),
+                "analytics": self.sport.analytics(),
+            },
         )
         self._status(SessionStatus.ANALYSED, "Analysis complete")
 
@@ -482,7 +536,12 @@ class SessionRunner(threading.Thread):
         if self._rate_frames % 4 == 0:
             self.bus.publish(
                 topic(self.session_id, "state"),
-                {"type": "state", "state": self.sport.public_state(), "analytics": self.sport.analytics()},
+                {
+                    "type": "state",
+                    "analysis_revision": self.analysis_revision,
+                    "state": self.sport.public_state(),
+                    "analytics": self.sport.analytics(),
+                },
             )
 
 
@@ -533,7 +592,6 @@ class EngineService:
             try:
                 self.dispatch(cmd)
             except Exception:
-                log.exception("engine.command_failed", cmd=cmd.get("cmd"))
                 if cmd.get("cmd") == "reanalyse":
                     # Keep successful prior results available when a backup or
                     # writer-stop guard rejects an asynchronously accepted command.
@@ -551,8 +609,14 @@ class EngineService:
                                     "detail": detail,
                                     "n_frames": session.media.n_frames if session.media else 0,
                                     "frontier_frame": session.frontier_frame,
+                                    "analysed_frames": session.analysed_frames,
+                                    "analysis_revision": int(session.meta.get("analysis_revision", 0)),
+                                    "degraded": session.meta.get("degraded", []),
+                                    "capabilities": session.meta.get("capabilities", {}),
                                 },
                             )
+                # Formatting/log I/O must not delay rejection feedback to the UI.
+                log.exception("engine.command_failed", cmd=cmd.get("cmd"))
 
     def dispatch(self, cmd: dict[str, Any]) -> None:
         sid = cmd.get("session_id")
@@ -610,7 +674,8 @@ class EngineService:
     def _prepare_start(self, sid: str) -> bool:
         """Decide how a (re)started runner begins. Returns True to re-attach to a finished
         analysis. An interrupted analysis can't resume mid-log, so it restarts from a clean log
-        (cheap: perception is cached) keeping the human inputs."""
+        while keeping human inputs. Stateless plugins can reuse compatible perception caches;
+        sequential plugins may need fresh inference because caches cannot restore matcher state."""
         s = self.repo.get(sid)
         if s is None or self.repo.events(sid).last_seq() == 0:
             return False
@@ -650,6 +715,9 @@ class EngineService:
             carried[carry_key(data)] = data
         backup = self.repo.reset_analysis(sid)
         log.info("analysis.backed_up", session=sid, backup=str(backup))
+        meta["analysis_revision"] = int(self.repo.get(sid).meta.get("analysis_revision", 0))
+        meta.pop("degraded", None)
+        meta.pop("capabilities", None)
         if manual_cal:
             c = manual_cal[-1]
             self.repo.events(sid).append(Event.model_validate(c.model_dump(exclude={"event_id", "seq", "supersedes"})))
