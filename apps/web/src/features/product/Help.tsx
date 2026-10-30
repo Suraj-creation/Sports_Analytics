@@ -1,4 +1,4 @@
-import { Card, Page } from "./ui";
+import { Page } from "./ui";
 
 const topics = [
   [
@@ -32,15 +32,13 @@ const topics = [
 ];
 export function HelpPage() {
   return (
-    <Page
-      title="Understanding your analytics"
-      lead="What each metric measures, and where it gets less certain."
-    >
-      <div className="rally-stack">
+    <Page title="Help and evidence" lead="What each metric measures, and where it gets less certain.">
+      <div className="rally-help-list">
         {topics.map(([title, body]) => (
-          <Card key={title} title={title}>
-            <p className="rally-muted">{body}</p>
-          </Card>
+          <section key={title} className="rally-help-topic">
+            <h2>{title}</h2>
+            <p>{body}</p>
+          </section>
         ))}
       </div>
     </Page>

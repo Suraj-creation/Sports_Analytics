@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import {
   Activity,
+  ChevronRight,
   Clapperboard,
   HelpCircle,
   House,
@@ -28,18 +29,26 @@ const NAV = [
   { to: "/people", label: "People", icon: Users },
 ] as const;
 
-export function Logo() {
+export function Logo({ compact = false, className = "" }: { compact?: boolean; className?: string }) {
+  const light = compact ? "rally-symbol-forest.svg" : "rally-lockup-on-light.svg";
+  const dark = compact ? "rally-symbol-lime.svg" : "rally-lockup-on-dark.svg";
   return (
-    <svg viewBox="0 0 32 32" className="size-8" aria-hidden>
-      <rect width="32" height="32" rx="9" fill="var(--c-primary)" />
-      <path
-        d="M9 9 16 23 23 9M12 9l4 14 4-14M9 9q7-3 14 0"
-        fill="none"
-        stroke="var(--c-on-primary)"
-        strokeWidth="1.5"
+    <span className={`rally-logo ${compact ? "rally-logo-compact" : ""} ${className}`}>
+      <img
+        src={`/brand/${light}`}
+        className="rally-logo-light"
+        alt="Rally"
+        width={compact ? 30 : 114}
+        height={compact ? 30 : 44}
       />
-      <circle cx="16" cy="24" r="2" fill="var(--c-on-primary)" />
-    </svg>
+      <img
+        src={`/brand/${dark}`}
+        className="rally-logo-dark"
+        alt="Rally"
+        width={compact ? 30 : 114}
+        height={compact ? 30 : 44}
+      />
+    </span>
   );
 }
 
@@ -52,6 +61,7 @@ function NavItem({ to, label, icon: Icon }: { to: string; label: string; icon: t
       to={to}
       aria-current={active ? "page" : undefined}
       title={label}
+      aria-label={label}
       className={`rally-nav-item ${active ? "is-active" : ""}`}
     >
       <Icon className="size-5 shrink-0" aria-hidden />
@@ -63,9 +73,40 @@ function NavItem({ to, label, icon: Icon }: { to: string; label: string; icon: t
 export function AppShell() {
   const me = useQuery({ queryKey: ["me"], queryFn: api.me, staleTime: 60_000 });
   const [theme, setTheme] = useState(() => readDisplay().theme);
+  const [systemDark, setSystemDark] = useState(
+    () => window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false,
+  );
   const [logoutError, setLogoutError] = useState("");
   const path = useRouterState({ select: (s) => s.location.pathname });
   const main = useRef<HTMLElement>(null);
+  const darkTheme = theme === "dark" || (theme === "system" && systemDark);
+  const pageLabel = path.includes("/calibrate")
+    ? "Court calibration"
+    : path.startsWith("/matches/") || path.startsWith("/sessions/")
+      ? "Match review"
+      : path === "/library"
+        ? "Add a recording"
+        : path === "/system"
+          ? "System"
+          : path === "/settings"
+            ? "Settings"
+            : path === "/help"
+              ? "Help"
+              : (NAV.find((item) => item.to === path)?.label ?? "Workspace");
+  useEffect(() => {
+    const media = window.matchMedia?.("(prefers-color-scheme: dark)");
+    const onSystemChange = () => setSystemDark(media?.matches ?? false);
+    media?.addEventListener("change", onSystemChange);
+    const observer = new MutationObserver(() => {
+      const value = document.documentElement.dataset.theme;
+      setTheme(value === "dark" || value === "light" ? value : "system");
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => {
+      media?.removeEventListener("change", onSystemChange);
+      observer.disconnect();
+    };
+  }, []);
 
   useEffect(() => {
     if (me.data) setCsrf(me.data.csrf);
@@ -86,7 +127,7 @@ export function AppShell() {
     );
   if (me.isError)
     return (
-      <div className="grid h-full place-items-center p-6 text-center">
+      <div className="rally-offline">
         <div>
           <h1 className="text-xl font-semibold">We couldn't reach the server</h1>
           <p className="mt-2 text-line-2">Check your connection, then try again.</p>
@@ -104,10 +145,11 @@ export function AppShell() {
         Skip to content
       </a>
       <aside className="rally-sidebar">
-        <Link to="/" className="rally-brand">
-          <Logo />
-          <span>Rally</span>
+        <Link to="/" className="rally-brand" aria-label="Rally home">
+          <Logo className="rally-logo-lockup" />
+          <Logo compact className="rally-logo-symbol" />
         </Link>
+        <p className="rally-sidebar-context">Badminton analytics</p>
         <nav aria-label="Main">
           {NAV.map((item) => (
             <NavItem key={item.to} {...item} />
@@ -122,7 +164,7 @@ export function AppShell() {
             onClick={() => {
               const next = {
                 ...readDisplay(),
-                theme: theme === "dark" ? ("light" as const) : ("dark" as const),
+                theme: darkTheme ? ("light" as const) : ("dark" as const),
               };
               applyDisplay(next);
               setTheme(next.theme);
@@ -132,33 +174,42 @@ export function AppShell() {
                 /* blocked storage */
               }
             }}
-            aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
+            aria-label={`Switch to ${darkTheme ? "light" : "dark"} theme`}
           >
-            {theme === "light" ? <Moon className="size-5" /> : <Sun className="size-5" />}
-            <span>{theme === "light" ? "Arena night" : "Court daylight"}</span>
+            {!darkTheme ? <Moon className="size-5" /> : <Sun className="size-5" />}
+            <span>{darkTheme ? "Light appearance" : "Dark appearance"}</span>
           </button>
           <NavItem to="/settings" label="Settings" icon={Settings} />
         </div>
       </aside>
       <div className="rally-app-main">
         <header className="rally-header">
-          <Link to="/" className="rally-mobile-brand">
+          <Link to="/" className="rally-mobile-brand" aria-label="Rally home">
             <Logo />
-            <span>Rally</span>
           </Link>
-          <div className="ml-auto flex items-center gap-2">
-            <Link to="/library" className="rally-header-link">
+          <div className="rally-breadcrumb">
+            <span>Analytics</span>
+            <ChevronRight size={14} aria-hidden />
+            <strong>{pageLabel}</strong>
+          </div>
+          <div className="rally-header-actions">
+            <Link to="/library" className="rally-header-link rally-header-add">
               <Upload className="size-4" aria-hidden />
               <span>Add recording</span>
             </Link>
-            <Link to="/help" className="rally-header-link">
+            <Link to="/help" className="rally-header-link rally-header-help" aria-label="Help">
               <HelpCircle className="size-4" aria-hidden />
               <span>Help</span>
+            </Link>
+            <Link to="/settings" className="rally-header-link rally-mobile-settings" aria-label="Settings">
+              <Settings className="size-4" aria-hidden />
+              <span>Settings</span>
             </Link>
             {me.data.auth_required && (
               <button
                 type="button"
                 className="rally-header-link"
+                aria-label="Sign out"
                 onClick={async () => {
                   try {
                     await api.logout();
@@ -179,7 +230,7 @@ export function AppShell() {
             {logoutError}
           </p>
         )}
-        <main id="content" ref={main} className="min-w-0 flex-1">
+        <main id="content" ref={main} className="rally-main-sheet">
           <Outlet />
         </main>
       </div>

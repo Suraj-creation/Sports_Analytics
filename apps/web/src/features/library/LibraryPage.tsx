@@ -5,6 +5,7 @@ import { clsx } from "clsx";
 import { CircleAlert, Trash2, Upload, Youtube } from "lucide-react";
 import { useRef, useState } from "react";
 import { Button, Empty, ErrorNote, Field, inputClass, Meter, Spinner } from "@/components/ui";
+import { Page } from "@/features/product/ui";
 import { api, uploadVideo } from "@/lib/api";
 import { playerName, STATUS_LABEL } from "@/lib/format";
 import type { Session } from "@/lib/types";
@@ -24,39 +25,44 @@ export function LibraryPage() {
   const system = useQuery({ queryKey: ["system"], queryFn: api.system, staleTime: 60_000 });
 
   return (
-    <div className="mx-auto max-w-7xl space-y-10 px-4 py-8 sm:px-6">
-      <section className="grid items-start gap-4 lg:grid-cols-[1.4fr_1fr]">
-        <UploadCard maxMb={system.data?.limits?.max_upload_mb} />
-        <YouTubeCard enabled={Boolean(system.data?.youtube_ingest)} loading={system.isPending} />
-      </section>
+    <Page
+      title="Recordings"
+      lead="Add a video or reopen saved work. Opening a recording does not start a new analysis."
+    >
+      <div className="rally-stack">
+        <section className="rally-library-methods" aria-label="Add a recording">
+          <UploadCard maxMb={system.data?.limits?.max_upload_mb} />
+          <YouTubeCard enabled={Boolean(system.data?.youtube_ingest)} loading={system.isPending} />
+        </section>
 
-      <section className="space-y-4">
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-lg font-semibold">Matches</h2>
-          {sessions.data && (
-            <span className="text-sm text-line-3">{sessions.data.length} in your library</span>
+        <section className="space-y-4">
+          <div className="flex items-baseline justify-between">
+            <h2 className="rally-section-title mb-0">Saved recordings</h2>
+            {sessions.data && (
+              <span className="text-sm text-line-3">{sessions.data.length} in your library</span>
+            )}
+          </div>
+          {sessions.isPending && (
+            <div className="grid h-40 place-items-center" role="status" aria-label="Loading recordings">
+              <Spinner />
+            </div>
           )}
-        </div>
-        {sessions.isPending && (
-          <div className="grid h-40 place-items-center">
-            <Spinner />
-          </div>
-        )}
-        <ErrorNote error={sessions.error} />
-        {sessions.data?.length === 0 && (
-          <div className="panel">
-            <Empty title="No matches yet">
-              Upload a match video or import one from YouTube to start analysing.
-            </Empty>
-          </div>
-        )}
-        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {sessions.data?.map((s) => (
-            <SessionCard key={s.session_id} s={s} />
-          ))}
-        </ul>
-      </section>
-    </div>
+          <ErrorNote error={sessions.error} />
+          {sessions.data?.length === 0 && (
+            <div className="panel">
+              <Empty title="No matches yet">
+                Upload a match video or import one from YouTube to start analysing.
+              </Empty>
+            </div>
+          )}
+          <ul className="rally-library-list">
+            {sessions.data?.map((s) => (
+              <SessionCard key={s.session_id} s={s} />
+            ))}
+          </ul>
+        </section>
+      </div>
+    </Page>
   );
 }
 
@@ -113,12 +119,18 @@ function UploadCard({ maxMb }: { maxMb?: number }) {
 
   const uploading = progress !== null;
   return (
-    <div className="panel space-y-5 p-5">
+    <form
+      className="panel space-y-5"
+      aria-labelledby="upload-video-heading"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void start();
+      }}
+    >
       <div>
-        <h1 className="text-xl font-semibold tracking-tight">Analyse a match</h1>
+        <h2 id="upload-video-heading">Upload a video</h2>
         <p className="mt-1 text-sm text-line-2">
-          The video starts playing as soon as it's prepared; shots, rallies and the score fill in while you
-          watch.
+          Add a file from your device. Playback becomes available when the server prepares the video.
         </p>
       </div>
       <button
@@ -135,10 +147,7 @@ function UploadCard({ maxMb }: { maxMb?: number }) {
           pick(e.dataTransfer.files[0]);
         }}
         disabled={uploading}
-        className={clsx(
-          "flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-4 py-8 transition-colors",
-          drag ? "border-signal bg-signal/5" : "border-seam bg-mat-deep/50 hover:border-line-3",
-        )}
+        className={clsx("rally-upload-zone", drag && "is-dragging")}
       >
         <Upload className="size-6 text-line-2" aria-hidden />
         {file ? (
@@ -159,19 +168,21 @@ function UploadCard({ maxMb }: { maxMb?: number }) {
       <input
         ref={inputRef}
         type="file"
+        aria-label="Video file"
         accept={ACCEPT}
         className="sr-only"
         tabIndex={-1}
         onChange={(e) => pick(e.target.files?.[0])}
       />
       <MatchFormatField value={format} onChange={setFormat} />
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="rally-upload-fields">
         <Field label="Title">
           <input
             className={inputClass}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             maxLength={120}
+            placeholder="Name this recording"
           />
         </Field>
         <Field label={format === "doubles" ? "Team 1 label" : "Player 1"} hint="Starts on the near side">
@@ -182,8 +193,8 @@ function UploadCard({ maxMb }: { maxMb?: number }) {
         </Field>
       </div>
       <ErrorNote error={error} />
-      <div className="flex items-center gap-3">
-        <Button variant="primary" onClick={start} disabled={!file || uploading}>
+      <div className="rally-upload-progress">
+        <Button variant="primary" type="submit" disabled={!file || uploading}>
           Analyse video
         </Button>
         {uploading && (
@@ -202,7 +213,7 @@ function UploadCard({ maxMb }: { maxMb?: number }) {
           </>
         )}
       </div>
-    </div>
+    </form>
   );
 }
 
@@ -216,7 +227,13 @@ function YouTubeCard({ enabled, loading }: { enabled: boolean; loading: boolean 
   const [ack, setAck] = useState(false);
   const create = useMutation({
     mutationFn: () =>
-      api.youtube({ url, player1: p1 || undefined, player2: p2 || undefined, match_format: format || undefined, acknowledge_rights: ack }),
+      api.youtube({
+        url,
+        player1: p1 || undefined,
+        player2: p2 || undefined,
+        match_format: format || undefined,
+        acknowledge_rights: ack,
+      }),
     onSuccess: async (s) => {
       await qc.invalidateQueries({ queryKey: ["sessions"] });
       navigate({ to: "/sessions/$sessionId", params: { sessionId: s.session_id } });
@@ -225,7 +242,8 @@ function YouTubeCard({ enabled, loading }: { enabled: boolean; loading: boolean 
 
   return (
     <form
-      className="panel flex flex-col gap-4 p-5"
+      className="panel flex flex-col gap-4"
+      aria-labelledby="youtube-import-heading"
       onSubmit={(e) => {
         e.preventDefault();
         create.mutate();
@@ -233,16 +251,18 @@ function YouTubeCard({ enabled, loading }: { enabled: boolean; loading: boolean 
     >
       <div className="flex items-center gap-2">
         <Youtube className="size-5 text-line-2" aria-hidden />
-        <h2 className="font-semibold">Import from YouTube</h2>
+        <h2 id="youtube-import-heading" className="mb-0!">
+          Import from YouTube
+        </h2>
       </div>
       {!enabled && !loading ? (
         <p className="flex gap-2 text-sm text-line-2">
           <CircleAlert className="mt-0.5 size-4 shrink-0 text-caution" aria-hidden />
-          YouTube import is turned off on this server. Set BAI_YOUTUBE_INGEST=true in .env and restart to use
-          it.
+          YouTube import is unavailable on this server. Upload a video file from your device instead.
         </p>
       ) : (
         <>
+          <p className="text-sm text-line-2">Paste a link to a recording you have permission to download.</p>
           <Field label="Video link">
             <input
               className={inputClass}
@@ -252,6 +272,7 @@ function YouTubeCard({ enabled, loading }: { enabled: boolean; loading: boolean 
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               maxLength={300}
+              required
             />
           </Field>
           <MatchFormatField value={format} onChange={setFormat} />
@@ -287,7 +308,12 @@ function YouTubeCard({ enabled, loading }: { enabled: boolean; loading: boolean 
           </label>
           <ErrorNote error={create.error} />
           <div className="mt-auto">
-            <Button type="submit" variant="secondary" busy={create.isPending} disabled={!url || !ack}>
+            <Button
+              type="submit"
+              variant="secondary"
+              busy={create.isPending}
+              disabled={!url || !ack || loading}
+            >
               Import and analyse
             </Button>
           </div>
@@ -316,7 +342,7 @@ function SessionCard({ s }: { s: Session }) {
   const players = s.players.length ? `${playerName(s, "P1")} vs ${playerName(s, "P2")}` : null;
 
   return (
-    <li className="panel group relative flex flex-col transition-colors hover:border-line-3">
+    <li className="panel rally-library-card group relative flex flex-col transition-colors hover:border-line-3">
       <Thumb
         sessionId={s.session_id}
         durationS={durationS}
@@ -333,7 +359,7 @@ function SessionCard({ s }: { s: Session }) {
         {players && <p className="text-sm text-line-2">{players}</p>}
         <div className="mt-auto flex items-center gap-2 pt-1 text-xs">
           <span className={clsx("inline-flex items-center gap-1.5 font-medium", statusTone(s.status))}>
-            {busy && <span className="size-1.5 animate-pulse rounded-full bg-signal" aria-hidden />}
+            {busy && <span className="size-1.5 rounded-full bg-signal" aria-hidden />}
             {STATUS_LABEL[s.status] ?? s.status}
             {s.status === "analysing" && n > 0 && ` ${Math.round(analysed * 100)}%`}
           </span>
@@ -349,11 +375,7 @@ function SessionCard({ s }: { s: Session }) {
       </div>
       <Dialog.Root>
         <Dialog.Trigger asChild>
-          <button
-            type="button"
-            aria-label={`Delete ${s.title}`}
-            className="absolute top-2 right-2 z-10 grid size-8 place-items-center rounded-lg bg-mat-deep/80 text-line-2 opacity-0 transition-opacity hover:text-alert focus-visible:opacity-100 group-hover:opacity-100"
-          >
+          <button type="button" aria-label={`Delete ${s.title}`} className="rally-library-card-delete">
             <Trash2 className="size-4" aria-hidden />
           </button>
         </Dialog.Trigger>
@@ -381,10 +403,27 @@ function SessionCard({ s }: { s: Session }) {
   );
 }
 
-function MatchFormatField({ value, onChange }: {value: "" | "singles" | "doubles"; onChange: (value: "" | "singles" | "doubles") => void}) {
-  return <Field label="Match format" hint="Unspecified uses singles geometry. Doubles uses wider court boundaries; doubles service and scoring still require review.">
-    <select className={inputClass} value={value} onChange={(event) => onChange(event.target.value as "" | "singles" | "doubles")}>
-      <option value="">Not specified</option><option value="singles">Singles</option><option value="doubles">Doubles</option>
-    </select>
-  </Field>;
+function MatchFormatField({
+  value,
+  onChange,
+}: {
+  value: "" | "singles" | "doubles";
+  onChange: (value: "" | "singles" | "doubles") => void;
+}) {
+  return (
+    <Field
+      label="Match format"
+      hint="Unspecified uses singles geometry. Doubles uses wider court boundaries; doubles service and scoring still require review."
+    >
+      <select
+        className={inputClass}
+        value={value}
+        onChange={(event) => onChange(event.target.value as "" | "singles" | "doubles")}
+      >
+        <option value="">Not specified</option>
+        <option value="singles">Singles</option>
+        <option value="doubles">Doubles</option>
+      </select>
+    </Field>
+  );
 }

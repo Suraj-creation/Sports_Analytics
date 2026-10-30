@@ -1,24 +1,40 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, Play } from "lucide-react";
 import { type ReactNode, useEffect, useRef } from "react";
+import { Thumb } from "@/features/library/Thumb";
 import type { Highlight } from "@/lib/types";
 import { useOverview } from "./api";
 import { dateLabel, processingPercent, strokeLabel } from "./model";
 import type { MatchSummary, Overview } from "./types";
 import "./product.css";
 
-export function Page({ title, lead, children }: { title: string; lead?: string; children: ReactNode }) {
+export function Page({
+  title,
+  lead,
+  actions,
+  children,
+  className = "",
+}: {
+  title: string;
+  lead?: string;
+  actions?: ReactNode;
+  children: ReactNode;
+  className?: string;
+}) {
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     heading.current?.focus({ preventScroll: true });
   }, []);
   return (
-    <div className="rally-page">
+    <div className={`rally-page ${className}`}>
       <header className="rally-page-heading">
-        <h1 ref={heading} tabIndex={-1}>
-          {title}
-        </h1>
-        {lead && <p>{lead}</p>}
+        <div>
+          <h1 ref={heading} tabIndex={-1}>
+            {title}
+          </h1>
+          {lead && <p>{lead}</p>}
+        </div>
+        {actions && <div className="rally-page-actions">{actions}</div>}
       </header>
       {children}
     </div>
@@ -53,41 +69,48 @@ export function Stat({
 }) {
   return (
     <div className={`rally-stat ${value == null ? "rally-missing" : ""}`}>
+      <p className="rally-stat-label">{label}</p>
       <p className="rally-figure">
         {typeof value === "number"
           ? value.toLocaleString(undefined, { maximumFractionDigits: 1 })
           : (value ?? "—")}{" "}
         {value != null && unit && <small>{unit}</small>}
       </p>
-      <p className="rally-stat-label">{label}</p>
       {detail && <p className="rally-caption">{detail}</p>}
     </div>
   );
 }
 export function Empty({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <Card title={title}>
-      <p className="rally-muted">{children}</p>
+    <Card title={title} className="rally-empty">
+      <div className="rally-muted">{children}</div>
     </Card>
   );
 }
 export function Catalogue({
   title,
   lead,
+  actions,
   children,
 }: {
   title: string;
   lead?: string;
+  actions?: ReactNode;
   children: (data: Overview) => ReactNode;
 }) {
   const query = useOverview();
   return (
-    <Page title={title} lead={lead}>
+    <Page title={title} lead={lead} actions={actions}>
       {query.isPending ? (
-        <div className="rally-card" role="status">
-          Loading your matches…
+        <div className="rally-card rally-loading" role="status" aria-live="polite">
+          <p>Loading your recordings…</p>
+          <div className="rally-loading-lines" aria-hidden>
+            <span />
+            <span />
+            <span />
+          </div>
         </div>
-      ) : query.isError ? (
+      ) : query.isError && !query.data ? (
         <div className="rally-card" role="alert">
           <h2>We couldn’t load your analytics</h2>
           <p>{query.error.message}</p>
@@ -148,7 +171,7 @@ export function Status({ match }: { match: MatchSummary }) {
     failed: "Processing failed",
   };
   return (
-    <span className="rally-status">
+    <span className="rally-status" data-status={session.status}>
       {labels[session.status] ?? session.status}
       {session.status === "analysing" && progress != null ? ` ${progress}%` : ""}
     </span>
@@ -159,50 +182,74 @@ export function MatchCard({ match, hero = false }: { match: MatchSummary; hero?:
   const lastScore = analytics?.score_timeline.at(-1)?.score;
   return (
     <Card className={hero ? "rally-match-hero" : "rally-match-card"}>
-      <div className="product-card-heading">
-        <div>
-          <p className="rally-eyebrow">
-            {dateLabel(session.created_at)} · <Status match={match} />
-          </p>
-          <h2>
-            <MatchLink id={session.session_id}>{session.title}</MatchLink>
-          </h2>
-          <p className="rally-muted">
-            {session.players.map((p) => p.name || p.player_id).join(" vs ")}
-            {lastScore ? ` · ${lastScore.P1}–${lastScore.P2}` : ""}
-          </p>
-        </div>
-        <MatchLink id={session.session_id} className={hero ? "rally-action" : "rally-text-action"}>
-          Open the match <ArrowRight size={16} aria-hidden />
+      {hero && (
+        <MatchLink id={session.session_id} className="rally-match-preview">
+          <Thumb
+            sessionId={session.session_id}
+            durationS={(session.media?.duration_us ?? 0) / 1e6}
+            ready={!["created", "ingesting"].includes(session.status)}
+          />
+          <span>
+            <Play size={16} aria-hidden /> Open recording
+          </span>
         </MatchLink>
-      </div>
-      {analytics ? (
-        <div className="rally-stats">
-          <MatchLink id={session.session_id} tab="rallies">
-            <Stat value={analytics.rallies} label="Counted rallies" />
-          </MatchLink>
-          <MatchLink id={session.session_id} tab="rallies">
-            <Stat
-              value={analytics.rallies ? analytics.longest_rally_shots : null}
-              unit="shots"
-              label="Longest rally"
-            />
-          </MatchLink>
-          <MatchLink id={session.session_id} tab="rallies">
-            <Stat value={analytics.avg_rally_shots} unit="shots" label="Average rally" />
-          </MatchLink>
-          <MatchLink id={session.session_id} tab="moments">
-            <Stat value={match.highlights.length} label="Moments to watch" detail="Up to 10 ranked moments" />
+      )}
+      <div className="rally-match-content">
+        <div className="product-card-heading">
+          <div>
+            <h2>
+              <MatchLink id={session.session_id}>{session.title}</MatchLink>
+            </h2>
+            <p className="rally-muted rally-match-players">
+              {session.players.map((p) => p.name || p.player_id).join(" vs ") || "Players not named"}
+              {lastScore ? ` · ${lastScore.P1}–${lastScore.P2}` : ""}
+            </p>
+            <div className="rally-match-meta">
+              <span>{dateLabel(session.created_at)}</span>
+              <Status match={match} />
+              {match.availability.partial && <span>Partial analysis</span>}
+            </div>
+          </div>
+          <MatchLink id={session.session_id} className="rally-text-action">
+            Review match <ArrowRight size={16} aria-hidden />
           </MatchLink>
         </div>
-      ) : (
-        <p className="rally-muted">
-          {match.availability.reason ||
-            session.status_detail ||
-            "Analytics will appear when processing is complete."}
-        </p>
+        {analytics ? (
+          <div className="rally-stats">
+            <MatchLink id={session.session_id} tab="rallies">
+              <Stat value={analytics.rallies} label="Counted rallies" />
+            </MatchLink>
+            <MatchLink id={session.session_id} tab="rallies">
+              <Stat
+                value={analytics.rallies ? analytics.longest_rally_shots : null}
+                unit="shots"
+                label="Longest rally"
+              />
+            </MatchLink>
+            <MatchLink id={session.session_id} tab="rallies">
+              <Stat value={analytics.avg_rally_shots} unit="shots" label="Average rally" />
+            </MatchLink>
+            <MatchLink id={session.session_id} tab="moments">
+              <Stat
+                value={match.highlights.length}
+                label="Moments to watch"
+                detail="Up to 10 ranked moments"
+              />
+            </MatchLink>
+          </div>
+        ) : (
+          <p className="rally-muted">
+            {match.availability.reason ||
+              session.status_detail ||
+              "Analytics will appear when processing is complete."}
+          </p>
+        )}
+      </div>
+      {hero && match.highlights[0] && (
+        <div className="rally-match-highlight">
+          <MomentRow match={match} highlight={match.highlights[0]} />
+        </div>
       )}
-      {hero && match.highlights[0] && <MomentRow match={match} highlight={match.highlights[0]} />}
     </Card>
   );
 }

@@ -53,10 +53,7 @@ export function StrokeToast({ session }: { session: Session }) {
 function Toast({ children }: { children: React.ReactNode }) {
   return (
     <div className="pointer-events-none absolute inset-x-0 top-3 flex justify-center">
-      <div
-        className="flex animate-[toast-in_180ms_var(--ease-snap)] items-center gap-2 rounded-full border border-white/10 bg-mat-deep/88 px-3 py-1.5 text-sm shadow-lg shadow-black/30 backdrop-blur-sm"
-        role="status"
-      >
+      <div className="video-event-toast flex items-center gap-2 px-3 py-1.5 text-sm" role="status">
         {children}
       </div>
     </div>

@@ -1,267 +1,430 @@
 .rally-page {
-  max-width: 1160px;
-  margin: 0 auto;
-  padding: 32px 28px 88px;
-  color: var(--c-ink, #14211d);
+  width: 100%;
+  max-width: 1440px;
+  margin-inline: auto;
+  padding: 28px 32px 64px;
+  color: var(--c-ink);
+  font-size: 15px;
+  line-height: 1.5;
 }
 .rally-page-heading {
-  margin-bottom: 28px;
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+.rally-page-heading > div:first-child {
+  min-width: 0;
 }
 .rally-page-heading h1 {
-  font-size: clamp(24px, 3vw, 32px);
-  font-weight: 700;
-  letter-spacing: -0.035em;
-  line-height: 1.2;
+  font-size: 26px;
+  font-weight: 650;
+  letter-spacing: -0.025em;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.rally-page-heading h1:focus {
+  outline: none;
 }
 .rally-page-heading p {
   margin-top: 8px;
-  color: var(--c-muted, #47544f);
+  max-width: 72ch;
+  color: var(--c-muted);
+}
+.rally-page-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex-shrink: 0;
 }
 .rally-stack {
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 24px;
 }
 .rally-card {
-  padding: 24px;
-  border: 1px solid var(--c-edge, #d6cfbf);
-  border-radius: 14px;
-  background: var(--c-surface, #fff);
   min-width: 0;
+  padding: 24px;
+  border: 1px solid var(--c-edge);
+  border-radius: 12px;
+  background: var(--c-surface);
 }
 .rally-card h2,
 .rally-section-title {
-  font-size: 19px;
-  line-height: 1.35;
-  font-weight: 650;
-  margin-bottom: 12px;
-  letter-spacing: -0.02em;
-}
-.rally-card p + p {
-  margin-top: 10px;
-}
-.rally-card h2 a:hover {
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-.product-card-heading {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 18px;
-}
-.product-card-heading > div {
-  min-width: 0;
+  margin-bottom: 16px;
+  font-size: 18px;
+  line-height: 1.4;
+  font-weight: 600;
+  letter-spacing: -0.015em;
   overflow-wrap: anywhere;
 }
-.rally-eyebrow {
-  color: var(--c-faint, #5e6b66);
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-bottom: 8px;
-}
-.rally-status {
-  display: inline-flex;
-  border: 1px solid var(--c-edge, #d6cfbf);
-  border-radius: 20px;
-  padding: 4px 9px;
-  font-size: 12px;
-  text-transform: none;
-  letter-spacing: 0;
-}
-.rally-action,
-.rally-text-action {
-  display: inline-flex;
+.rally-section-heading {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 44px;
-  font-weight: 550;
-  font-size: 14px;
-  border-radius: 10px;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 12px;
 }
-.rally-action {
-  padding: 10px 16px;
-  background: var(--c-primary, #0b6e6e);
-  color: var(--c-on-primary, white);
+.rally-section-heading h2 {
+  margin-bottom: 0;
 }
-.rally-text-action {
-  color: var(--c-primary, #0b6e6e);
+.rally-inline-link,
+.rally-card h2 a:hover {
+  color: var(--c-primary);
+  text-decoration: underline;
   text-underline-offset: 4px;
 }
-.rally-text-action:hover {
-  text-decoration: underline;
-}
 .rally-muted {
-  color: var(--c-muted, #47544f);
-  line-height: 1.6;
+  color: var(--c-muted);
   font-size: 14px;
+  line-height: 1.6;
 }
 .rally-caption {
   display: block;
+  color: var(--c-faint);
   font-size: 12px;
   line-height: 1.55;
-  color: var(--c-faint, #5e6b66);
+}
+.rally-status {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  border-radius: 4px;
+  padding: 3px 8px;
+  background: var(--c-surface-raised);
+  color: var(--c-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  font-weight: 500;
+}
+.rally-status[data-status="failed"] {
+  color: var(--c-error);
+}
+.rally-status[data-status="analysing"],
+.rally-status[data-status="ingesting"] {
+  color: var(--c-primary);
+}
+.rally-summary {
+  padding: 20px 24px 16px;
+  border: 1px solid var(--c-edge);
+  border-radius: 12px;
+  background: var(--c-surface);
 }
 .rally-stats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   margin: 20px 0;
 }
-.rally-stat {
+.rally-summary .rally-stats {
+  margin: 0 0 16px;
+}
+.rally-stats > * {
   min-width: 0;
-  padding: 16px;
-  border: 1px solid var(--c-edge, #d6cfbf);
-  border-radius: 10px;
+}
+.rally-stats > * + * {
+  border-inline-start: 1px solid var(--c-edge);
+}
+.rally-stat {
+  padding: 0 20px;
+  min-width: 0;
+}
+.rally-stat-label {
+  color: var(--c-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  margin-bottom: 6px;
 }
 .rally-figure {
-  font-size: 34px;
-  font-weight: 700;
-  letter-spacing: -0.04em;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
   font-variant-numeric: tabular-nums;
-  line-height: 1.15;
+  line-height: 1.2;
 }
 .rally-figure small {
+  color: var(--c-muted);
   font-size: 12px;
   font-weight: 400;
   letter-spacing: 0;
-  color: var(--c-muted, #47544f);
 }
-.rally-stat-label {
-  font-size: 13px;
-  font-weight: 600;
-  margin-top: 8px;
+.rally-stat .rally-caption {
+  margin-top: 6px;
 }
-.rally-missing {
-  background: repeating-linear-gradient(135deg, transparent, transparent 8px, #7e786910 8px, #7e786910 9px);
+.rally-missing .rally-figure {
+  color: var(--c-faint);
 }
 .rally-grid {
   display: grid;
-  gap: 20px;
+  gap: 16px;
 }
 .rally-grid-two {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 .rally-home-columns {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
-  gap: 22px;
+  grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr);
+  gap: 24px;
   align-items: start;
 }
 .rally-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
   font-size: 14px;
 }
 .rally-list li {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--c-edge, #d6cfbf);
+  align-items: center;
   flex-wrap: wrap;
+  gap: 8px 16px;
+  min-height: 48px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--c-edge);
+  overflow-wrap: anywhere;
 }
 .rally-list li:last-child {
-  border: 0;
+  border-bottom: 0;
 }
 .rally-list :where(li > a) {
   display: flex;
-  flex-wrap: wrap;
   justify-content: space-between;
-  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
   width: 100%;
 }
-.rally-list :where(li span) {
-  color: var(--c-muted, #47544f);
+.rally-list :where(li > span:not(.rally-status), li > a > span:not(.rally-status):last-child) {
+  color: var(--c-muted);
+}
+.rally-list :where(strong) {
+  font-weight: 550;
+  color: var(--c-ink);
+  font-variant-numeric: tabular-nums;
+}
+.rally-recording-list li {
+  min-height: 72px;
+}
+.rally-recording-list :where(li > a > span:first-child) {
+  flex: 1;
+  min-width: 140px;
+}
+.rally-recording-list .rally-caption {
+  margin-top: 4px;
+}
+.rally-list :where(li > a:hover strong, li > a:hover > span:first-child) {
+  color: var(--c-primary);
+}
+.product-card-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.product-card-heading > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.product-card-heading h2 {
+  margin-bottom: 4px;
+}
+.product-card-heading > .rally-text-action {
+  flex-shrink: 0;
+}
+.rally-match-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 12px;
+  color: var(--c-faint);
+  font-size: 12px;
+}
+.rally-match-card .rally-stats {
+  margin: 20px 0 0;
+}
+.rally-match-card .rally-figure {
+  font-size: 20px;
+}
+.rally-match-hero {
+  display: grid;
+  grid-template-columns: minmax(200px, 0.65fr) minmax(0, 1.35fr);
+  gap: 20px 24px;
+}
+.rally-match-preview {
+  min-width: 0;
+  align-self: start;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--c-surface-raised);
+}
+.rally-match-preview > div {
+  border-radius: 0;
+}
+.rally-match-preview > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  font-size: 12px;
+  font-weight: 550;
+}
+.rally-match-content {
+  min-width: 0;
+}
+.rally-match-hero .rally-stats {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 0;
+}
+.rally-match-hero .rally-stat {
+  padding-inline: 12px;
+}
+.rally-match-hero .rally-figure {
+  font-size: 22px;
+}
+.rally-match-highlight {
+  grid-column: 1 / -1;
+  padding-top: 16px;
+  border-top: 1px solid var(--c-edge);
 }
 .rally-moment {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 14px 16px;
-  border: 1px solid var(--c-edge, #d6cfbf);
-  border-radius: 10px;
-  background: var(--c-surface-raised, #ede8dc);
-  margin-top: 14px;
+  gap: 12px;
+  min-height: 64px;
+  border-radius: 8px;
 }
 .rally-moment > span:nth-child(2) {
   flex: 1;
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 .rally-moment strong {
   display: block;
+  margin-bottom: 4px;
   font-size: 14px;
+  font-weight: 550;
 }
 .rally-play {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  color: var(--c-on-primary, white);
-  background: var(--c-primary, #0b6e6e);
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--c-edge);
+  border-radius: 8px;
+  color: var(--c-primary);
+  background: var(--c-surface-raised);
   flex-shrink: 0;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease;
+}
+.rally-moment:hover .rally-play {
+  border-color: var(--c-edge-strong);
+}
+.rally-moment-card {
+  padding-block: 16px;
+}
+.rally-moment-card details {
+  margin-inline-start: 52px;
+}
+.rally-moment-card details .rally-list {
+  max-width: 520px;
+  margin-bottom: 12px;
 }
 .rally-processing {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  border: 1px solid var(--c-edge, #d6cfbf);
-  border-radius: 14px;
-  background: var(--c-surface, white);
-  padding: 14px 18px;
+  gap: 16px;
+  border: 1px solid var(--c-edge);
+  border-radius: 12px;
+  background: var(--c-surface);
+  padding: 16px 20px;
+}
+.rally-processing > span:first-child {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.rally-processing strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 550;
+  margin-bottom: 4px;
 }
 .rally-filters {
   display: flex;
   flex-wrap: wrap;
   align-items: end;
   gap: 16px;
+  padding: 16px 20px;
+  border: 1px solid var(--c-edge);
+  border-radius: 12px;
+  background: var(--c-surface);
 }
 .rally-filters label,
 .rally-person-select {
   display: flex;
   flex-direction: column;
-  gap: 7px;
-  font-size: 13px;
-  font-weight: 550;
+  gap: 8px;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 500;
+}
+.rally-filters label {
+  flex: 1;
+  min-width: 160px;
 }
 .rally-filters input,
 .rally-filters select,
 .rally-person-select select {
-  min-height: 44px;
-  padding: 10px 12px;
-  border: 1px solid var(--c-edge, #d6cfbf);
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--c-edge-strong);
   border-radius: 8px;
-  background: var(--c-surface, white);
-  color: var(--c-ink, #14211d);
-  min-width: 180px;
+  background: var(--c-field, var(--c-surface));
+  color: var(--c-field-ink, var(--c-ink));
+  min-width: 0;
+  width: 100%;
   max-width: 100%;
+  font-weight: 400;
+  font-size: 14px;
+}
+.rally-filters input::placeholder {
+  color: var(--c-field-placeholder, var(--c-faint));
+  opacity: 1;
 }
 .rally-tabbar {
   display: flex;
-  gap: 6px;
+  gap: 20px;
   overflow-x: auto;
-  border-bottom: 1px solid var(--c-edge, #d6cfbf);
+  border-bottom: 1px solid var(--c-edge);
 }
 .rally-tabbar button {
-  min-height: 48px;
+  min-height: 44px;
   white-space: nowrap;
-  padding: 10px 16px;
+  padding: 8px 0 12px;
   border-bottom: 2px solid transparent;
-  color: var(--c-muted, #47544f);
+  color: var(--c-muted);
+  font-size: 14px;
+  transition:
+    color 160ms ease,
+    border-color 160ms ease;
+}
+.rally-tabbar button:hover {
+  color: var(--c-ink);
 }
 .rally-tabbar button[aria-selected="true"] {
-  color: var(--c-ink, #14211d);
-  border-color: var(--c-primary, #0b6e6e);
+  color: var(--c-ink);
+  border-color: var(--c-primary);
   font-weight: 600;
 }
 .rally-person-select {
   max-width: 320px;
+  width: 100%;
 }
 .rally-table-wrap {
   overflow-x: auto;
@@ -273,22 +436,37 @@
 }
 .rally-table-wrap th,
 .rally-table-wrap td {
-  text-align: left;
-  padding: 12px;
-  border-bottom: 1px solid var(--c-edge, #d6cfbf);
+  padding: 12px 8px;
+  border-bottom: 1px solid var(--c-edge);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-align: right;
+}
+.rally-table-wrap th:first-child,
+.rally-table-wrap td:first-child {
+  text-align: left;
+  padding-inline-start: 0;
+}
+.rally-table-wrap th {
+  color: var(--c-faint);
+  font-size: 12px;
+  font-weight: 500;
+}
+.rally-table-wrap tr:last-child td {
+  border-bottom: 0;
 }
 .rally-table-wrap caption {
   text-align: left;
-  color: var(--c-muted, #47544f);
-  padding: 16px 0;
+  color: var(--c-muted);
+  font-size: 12px;
+  padding: 16px 0 8px;
 }
 .rally-bars {
-  height: 215px;
+  height: 220px;
   display: flex;
   align-items: end;
-  gap: 12px;
-  padding: 20px 4px;
+  gap: 16px;
+  padding: 20px 4px 8px;
   overflow-x: auto;
 }
 .rally-bars a {
@@ -296,98 +474,482 @@
   flex-direction: column;
   justify-content: end;
   align-items: center;
-  min-width: 64px;
+  min-width: 72px;
+  height: 100%;
   flex: 1;
   gap: 8px;
+  font-variant-numeric: tabular-nums;
 }
 .rally-bars span {
   display: block;
-  width: 70%;
+  width: min(70%, 48px);
   min-height: 2px;
-  max-height: 160px;
-  background: var(--c-you, #0b7466);
-  border-radius: 4px 4px 0 0;
+  max-height: 144px;
+  background: var(--c-you);
+  border-radius: 3px 3px 0 0;
 }
 .rally-bars small {
-  font-size: 10px;
+  font-size: 12px;
   white-space: nowrap;
+  color: var(--c-faint);
+}
+.rally-bars strong {
+  font-size: 12px;
+  font-weight: 500;
+}
+.rally-moment:hover strong {
+  color: var(--c-primary);
 }
 .rally-checkbox {
   min-height: 44px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   font-size: 14px;
-  margin-top: 12px;
 }
-.rally-page details {
-  margin-top: 14px;
+.rally-checkbox input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--c-primary);
+  flex-shrink: 0;
 }
 .rally-page summary {
   cursor: pointer;
-  min-height: 44px;
-  padding: 12px 0;
-  font-size: 13px;
-  font-weight: 550;
+  min-height: 40px;
+  padding: 10px 0;
+  color: var(--c-muted);
+  font-size: 12px;
+  font-weight: 500;
 }
-.rally-page :focus-visible {
-  outline: 2px solid var(--c-evidence, #1d4ed8);
-  outline-offset: 3px;
+.rally-page summary:hover {
+  color: var(--c-ink);
 }
-:root[data-reduced-motion="true"] *,
-:root[data-reduced-motion="true"] *::before,
-:root[data-reduced-motion="true"] *::after {
-  animation-duration: 0.01ms;
-  transition-duration: 0.01ms;
-  scroll-behavior: auto;
+.rally-empty {
+  padding: 32px;
 }
-.rally-match-card {
-  padding: 16px;
+.rally-empty .rally-muted {
+  max-width: 70ch;
 }
-.rally-match-card .rally-stats {
-  margin: 16px 0 0;
+.rally-empty .rally-action {
+  margin-top: 16px;
 }
-.rally-match-card .rally-stat {
-  background: var(--c-surface-raised, #ede8dc);
+.rally-loading {
+  min-height: 220px;
+  color: var(--c-muted);
+  font-size: 14px;
+}
+.rally-loading-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 24px;
+}
+.rally-loading-lines span {
+  height: 20px;
+  width: 80%;
+  border-radius: 4px;
+  background: var(--c-surface-raised);
+}
+.rally-loading-lines span:nth-child(2) {
+  width: 60%;
+}
+.rally-loading-lines span:nth-child(3) {
+  width: 70%;
+}
+.rally-settings {
+  background: var(--c-surface);
+  border: 1px solid var(--c-edge);
+  border-radius: 12px;
+  padding: 0 24px;
+}
+.rally-setting-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 0.8fr) minmax(0, 1.8fr);
+  gap: 32px;
+  padding: 24px 0;
+  border-bottom: 1px solid var(--c-edge);
+}
+.rally-setting-row:last-child {
   border: 0;
-  padding: 12px;
-  height: 100%;
 }
-.rally-match-card .rally-figure {
-  font-size: 26px;
-  font-variation-settings: "wdth" 62;
-  font-weight: 800;
+.rally-setting-row h2 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
 }
-.rally-match-card .rally-stat-label {
+.rally-setting-content {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  gap: 12px;
+  min-width: 0;
+}
+.rally-setting-content .rally-muted {
+  max-width: 70ch;
+}
+.rally-setting-content [role="status"]:empty {
+  display: none;
+}
+.rally-help-list {
+  border: 1px solid var(--c-edge);
+  border-radius: 12px;
+  padding: 0 24px;
+  background: var(--c-surface);
+}
+.rally-help-topic {
+  padding: 24px 0;
+  display: grid;
+  grid-template-columns: minmax(160px, 0.8fr) minmax(0, 1.8fr);
+  gap: 32px;
+  border-bottom: 1px solid var(--c-edge);
+}
+.rally-help-topic:last-child {
+  border-bottom: 0;
+}
+.rally-help-topic h2 {
+  font-size: 18px;
+  font-weight: 600;
+}
+.rally-help-topic p {
+  max-width: 72ch;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--c-muted);
+}
+.rally-notice {
+  padding: 16px 20px;
+  border-radius: 8px;
+  background: var(--c-surface-raised);
+  color: var(--c-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.rally-person-card .product-card-heading .rally-caption {
   margin-top: 4px;
-  font-weight: 400;
+}
+.rally-person-card .rally-stats {
+  margin-bottom: 16px;
+}
+.rally-records-grid .rally-stat {
+  border: 0;
+  padding: 16px 0;
+}
+.rally-stats > :first-child .rally-stat,
+.rally-stats > .rally-stat:first-child {
+  padding-inline-start: 0;
+}
+.rally-stats > :last-child .rally-stat,
+.rally-stats > .rally-stat:last-child {
+  padding-inline-end: 0;
+}
+.rally-records-grid a {
+  border-bottom: 1px solid var(--c-edge);
+}
+.rally-library-methods {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.rally-library-methods h2 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.rally-library-methods .panel {
+  padding: 24px;
+}
+.rally-upload-zone {
+  display: flex;
+  width: 100%;
+  min-height: 144px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px dashed var(--c-edge-strong);
+  border-radius: 8px;
+  padding: 24px 16px;
+  background: var(--c-surface-raised);
+  overflow-wrap: anywhere;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease;
+}
+.rally-upload-zone:hover,
+.rally-upload-zone.is-dragging {
+  border-color: var(--c-primary);
+}
+.rally-upload-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.rally-upload-fields > :first-child {
+  grid-column: 1 / -1;
+}
+.rally-upload-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.rally-library-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+}
+.rally-library-card {
+  overflow: hidden;
+}
+.rally-library-card > div:first-child {
+  border-radius: 0;
+}
+.rally-library-card-delete {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--c-edge);
+  border-radius: 8px;
+  background: var(--c-surface);
+  color: var(--c-muted);
+  transition:
+    color 160ms ease,
+    border-color 160ms ease;
+}
+.rally-library-card-delete:hover {
+  color: var(--c-error);
+  border-color: var(--c-error);
+}
+.rally-library-card a {
+  overflow-wrap: anywhere;
+}
+.rally-login {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 32px 20px;
+  background: var(--c-canvas);
+}
+.rally-login-form {
+  width: 100%;
+  max-width: 420px;
+  padding: 32px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-edge);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.rally-login-brand {
+  margin-bottom: 8px;
+}
+.rally-login h1 {
+  font-size: 26px;
+  font-weight: 650;
+  letter-spacing: -0.025em;
+  margin-bottom: 8px;
+}
+.rally-login p {
+  font-size: 14px;
+  color: var(--c-muted);
+  line-height: 1.6;
+}
+.rally-system-gpu + .rally-system-gpu {
+  padding-top: 20px;
+  margin-top: 20px;
+  border-top: 1px solid var(--c-edge);
+}
+.rally-system dl > div {
+  min-width: 0;
+}
+.rally-system dd {
+  overflow-wrap: anywhere;
+}
+.rally-system section > h2 {
+  font-size: 18px;
+  font-weight: 600;
+}
+@media (max-width: 1100px) {
+  .rally-grid-two:has(.rally-person-card) {
+    grid-template-columns: 1fr;
+  }
+  .rally-page {
+    padding-inline: 24px;
+  }
+  .rally-home-columns {
+    grid-template-columns: minmax(0, 1.3fr) minmax(260px, 1fr);
+  }
+  .rally-match-hero {
+    grid-template-columns: minmax(180px, 0.65fr) minmax(0, 1.35fr);
+  }
+  .rally-match-hero .product-card-heading {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .rally-match-hero .rally-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px 0;
+  }
+  .rally-match-hero .rally-stats > :nth-child(3) {
+    border-inline-start: 0;
+  }
+  .rally-match-hero .rally-stats > :nth-child(3) .rally-stat {
+    padding-inline-start: 0;
+  }
 }
 @media (max-width: 900px) {
-  .rally-home-columns {
+  .rally-home-columns,
+  .rally-library-methods {
     grid-template-columns: 1fr;
+  }
+  .rally-library-methods {
+    gap: 16px;
+  }
+  .rally-setting-row,
+  .rally-help-topic {
+    grid-template-columns: minmax(140px, 0.7fr) minmax(0, 1.5fr);
+    gap: 24px;
   }
 }
 @media (max-width: 600px) {
   .rally-page {
-    padding: 24px 16px 100px;
+    padding: 24px 16px 104px;
   }
-  .rally-card {
-    padding: 16px;
+  .rally-page-heading {
+    flex-direction: column;
+    gap: 16px;
+  }
+  .rally-page-heading h1 {
+    font-size: 24px;
+  }
+  .rally-page-heading p {
+    font-size: 14px;
+  }
+  .rally-stack {
+    gap: 20px;
+  }
+  .rally-card,
+  .rally-library-methods .panel {
+    padding: 20px 16px;
+  }
+  .rally-summary {
+    padding: 20px 16px 16px;
   }
   .rally-grid-two {
     grid-template-columns: 1fr;
   }
-  .rally-stats {
+  .rally-stats,
+  .rally-match-hero .rally-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
+    gap: 16px 0;
   }
-  .rally-stat {
-    padding: 12px;
+  .rally-stats > :nth-child(odd) {
+    border-inline-start: 0;
   }
-  .rally-filters label {
-    width: 100%;
+  .rally-stat,
+  .rally-match-hero .rally-stat {
+    padding-inline: 16px;
+  }
+  .rally-stats > :nth-child(odd) .rally-stat,
+  .rally-stats > .rally-stat:nth-child(odd) {
+    padding-inline-start: 0;
+  }
+  .rally-stats > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+    padding-top: 16px;
+    border-top: 1px solid var(--c-edge);
   }
   .rally-figure {
-    font-size: 30px;
+    font-size: 24px;
+  }
+  .rally-match-hero {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  .rally-match-preview {
+    display: none;
+  }
+  .product-card-heading {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .rally-match-card .product-card-heading > .rally-text-action {
+    margin-left: 0;
+  }
+  .rally-match-card .rally-stats {
+    margin-top: 16px;
+  }
+  .rally-filters {
+    padding: 16px;
+    gap: 12px;
+  }
+  .rally-filters label {
+    flex-basis: calc(50% - 6px);
+    min-width: 120px;
+  }
+  .rally-filters label:has(input[type="search"]) {
+    flex-basis: 100%;
+  }
+  .rally-filters input,
+  .rally-filters select,
+  .rally-person-select select {
+    min-height: 44px;
+  }
+  .rally-moment-card details {
+    margin-inline-start: 0;
+  }
+  .rally-processing {
+    gap: 12px;
+    padding: 16px;
+    flex-wrap: wrap;
+  }
+  .rally-processing > svg {
+    display: none;
+  }
+  .rally-processing .rally-caption {
+    max-width: 30ch;
+  }
+  .rally-setting-row,
+  .rally-help-topic {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding-block: 20px;
+  }
+  .rally-settings,
+  .rally-help-list {
+    padding-inline: 16px;
+  }
+  .rally-setting-row h2 {
+    margin-bottom: 0;
+  }
+  .rally-list li > a {
+    align-items: start;
+  }
+  .rally-recording-list .rally-status {
+    margin-top: 2px;
+  }
+  .rally-upload-fields {
+    gap: 12px;
+  }
+  .rally-library-list {
+    grid-template-columns: 1fr;
+  }
+  .rally-login-form {
+    padding: 24px;
+  }
+}
+
+@media (pointer: coarse) {
+  .rally-filters input,
+  .rally-filters select,
+  .rally-person-select select {
+    min-height: 44px;
   }
 }

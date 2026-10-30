@@ -19,14 +19,13 @@ export function Button({
       type="button"
       {...rest}
       disabled={disabled || busy}
+      aria-busy={busy || undefined}
       className={clsx(
-        "inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors duration-150",
-        "disabled:cursor-not-allowed disabled:opacity-50",
-        size === "sm" ? "h-8 px-3 text-[13px]" : "h-10 px-4 text-sm",
-        variant === "primary" && "bg-line text-mat-deep hover:bg-white",
-        variant === "secondary" && "border border-seam bg-stand-raised text-line hover:border-line-3",
-        variant === "ghost" && "text-line-2 hover:bg-stand-raised hover:text-line",
-        variant === "danger" && "border border-alert/40 text-alert hover:bg-alert/10",
+        "ui-button",
+        size === "sm" && "ui-button-small",
+        variant === "primary" && "ui-button-primary",
+        variant === "ghost" && "ui-button-ghost",
+        variant === "danger" && "ui-button-danger",
         className,
       )}
     >
@@ -50,12 +49,7 @@ export function IconButton({
       title={label}
       aria-pressed={active}
       {...rest}
-      className={clsx(
-        "inline-flex size-9 items-center justify-center rounded-lg transition-colors duration-150",
-        active ? "bg-line/12 text-line" : "text-line-2 hover:bg-stand-raised hover:text-line",
-        "disabled:opacity-40",
-        className,
-      )}
+      className={clsx("ui-icon-button", className)}
     >
       {children}
     </button>
@@ -121,34 +115,28 @@ export function ErrorNote({ error }: { error: unknown }) {
   if (!error) return null;
   const msg = error instanceof Error ? error.message : String(error);
   return (
-    <p role="alert" className="rounded-lg border border-alert/40 bg-alert/10 px-3 py-2 text-sm text-line">
+    <p role="alert" className="ui-error">
       {msg}
     </p>
   );
 }
 
 export function Kbd({ children }: { children: ReactNode }) {
-  return (
-    <kbd className="inline-flex h-5 min-w-5 items-center justify-center rounded border border-seam bg-mat-deep px-1 text-[11px] text-line-2">
-      {children}
-    </kbd>
-  );
+  return <kbd className="ui-kbd">{children}</kbd>;
 }
 
 export function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
     // biome-ignore lint/a11y/noLabelWithoutControl: the control is passed as children
-    <label className="flex flex-col gap-1.5 text-sm">
-      <span className="font-medium text-line">{label}</span>
+    <label className="ui-field">
+      <span className="ui-field-label">{label}</span>
       {children}
-      {hint && <span className="text-xs text-line-3">{hint}</span>}
+      {hint && <span className="ui-field-hint">{hint}</span>}
     </label>
   );
 }
 
-export const inputClass =
-  "h-10 rounded-lg border border-seam bg-mat-deep px-3 text-sm text-line placeholder:text-line-3 " +
-  "focus:border-line-3 focus:outline-none";
+export const inputClass = "ui-input";
 
 export function Meter({
   value,

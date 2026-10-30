@@ -57,3 +57,7 @@ mlruns/
 .DS_Store
 *.log
 env
+
+# Local design review captures can contain private recordings.
+.impeccable/review/
+.taste-skill/

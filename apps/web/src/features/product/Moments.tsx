@@ -7,10 +7,7 @@ export function MomentsPage() {
   const [sessionId, setSessionId] = useState("all");
   const [personId, setPersonId] = useState("all");
   return (
-    <Catalogue
-      title="Moments worth another look"
-      lead="Real rallies, with a direct link back to the recording."
-    >
+    <Catalogue title="Moments" lead="Selected rallies, linked to their source frames.">
       {(data) => {
         const moments = data.matches.flatMap((match) =>
           match.highlights.map((highlight) => ({ match, highlight })),
@@ -69,7 +66,7 @@ export function MomentsPage() {
               explicit session names and recorded moment attribution.
             </p>
             {shown.map(({ match, highlight }) => (
-              <Card key={`${match.session.session_id}-${highlight.rally_id}`}>
+              <Card key={`${match.session.session_id}-${highlight.rally_id}`} className="rally-moment-card">
                 <MomentRow match={match} highlight={highlight} />
                 <details>
                   <summary>Why this moment?</summary>

@@ -31,10 +31,10 @@ function useWidth<T extends HTMLElement>() {
 /** Whole-match overview (rallies, games, analysis frontier) above a 60-second shot lane. */
 export function Timeline({ session }: { session: Session }) {
   return (
-    <div className="space-y-4 rounded-lg border border-seam bg-stand p-3">
+    <section className="video-timeline" aria-label="Recording timeline">
       <Overview session={session} />
       <Detail session={session} />
-    </div>
+    </section>
   );
 }
 
@@ -132,7 +132,9 @@ function Overview({ session }: { session: Session }) {
     <div ref={ref} className="relative">
       <div className="mb-1 flex items-center justify-between gap-3 text-xs">
         <p className="font-medium text-line-2">Full match</p>
-        <p className="tabular text-line-2">{clock(uiFrame, session.media)} / {clock(n - 1, session.media)}</p>
+        <p className="tabular text-line-2">
+          {clock(uiFrame, session.media)} / {clock(n - 1, session.media)}
+        </p>
       </div>
       <div
         className="min-h-11 cursor-pointer touch-none select-none"
@@ -213,7 +215,10 @@ function Overview({ session }: { session: Session }) {
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-[11px] text-line-3">
-        <p>{data.rallies.length} rally {data.rallies.length === 1 ? "candidate" : "candidates"} · select a moment to seek</p>
+        <p>
+          {data.rallies.length} rally {data.rallies.length === 1 ? "candidate" : "candidates"} · select a
+          moment to seek
+        </p>
         <p>{Math.round((analysedTo / n) * 100)}% of source frames processed</p>
       </div>
       {hover != null && (
@@ -260,16 +265,23 @@ function Detail({ session }: { session: Session }) {
   // biome-ignore lint/correctness/useExhaustiveDependencies: eventsVersion signals mutation of the log
   const shots = useMemo(() => events.ofType("stroke"), [events, eventsVersion]);
   const unassigned = shots.some((shot) => shot.actors.player_id !== "P1" && shot.actors.player_id !== "P2");
-  const classified = shots.filter((shot) => typeof shot.payload.stroke === "string" &&
-    !["unknown", "unclassified", ""].includes(shot.payload.stroke)).length;
+  const classified = shots.filter(
+    (shot) =>
+      typeof shot.payload.stroke === "string" &&
+      !["unknown", "unclassified", ""].includes(shot.payload.stroke),
+  ).length;
   const H = unassigned ? 96 : 72;
   const pending = status !== "analysed" && frontier < n - 1;
-  const shotSummary = shots.length === 0
-    ? status === "analysed" ? "No shot events were detected in this recording."
-      : status === "failed" ? "No shot events are available from this partial analysis."
-      : "Shot events appear as analysis progresses."
-    : classified === 0 ? `${shots.length} shot ${shots.length === 1 ? "event" : "events"} · classification unavailable`
-      : `${classified} of ${shots.length} shot events classified`;
+  const shotSummary =
+    shots.length === 0
+      ? status === "analysed"
+        ? "No shot events were detected in this recording."
+        : status === "failed"
+          ? "No shot events are available from this partial analysis."
+          : "Shot events appear as analysis progresses."
+      : classified === 0
+        ? `${shots.length} shot ${shots.length === 1 ? "event" : "events"} · classification unavailable`
+        : `${classified} of ${shots.length} shot events classified`;
   const name1 = shortName(session, "P1");
   const name2 = shortName(session, "P2");
   const [tip, setTip] = useState<{ x: number; text: string } | null>(null);
@@ -326,8 +338,8 @@ function Detail({ session }: { session: Session }) {
       // shots
       for (const e of shots) {
         if (e.frame_end < a || e.frame_start > a + span) continue;
-        const pid: Lane = e.actors.player_id === "P1" || e.actors.player_id === "P2"
-          ? e.actors.player_id : "unassigned";
+        const pid: Lane =
+          e.actors.player_id === "P1" || e.actors.player_id === "P2" ? e.actors.player_id : "unassigned";
         const px = X(e.frame_start);
         if (px < LABEL_W) continue;
         const y = lane[pid];
@@ -367,7 +379,9 @@ function Detail({ session }: { session: Session }) {
   return (
     <div ref={ref} className="relative border-t border-seam pt-3">
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-xs">
-        <p className="font-medium text-line-2">Shot activity <span className="font-normal text-line-3">· 60-second view</span></p>
+        <p className="font-medium text-line-2">
+          Shot activity <span className="font-normal text-line-3">· 60-second view</span>
+        </p>
         <p className="text-line-2">{shotSummary}</p>
       </div>
       <canvas
@@ -413,20 +427,33 @@ function Detail({ session }: { session: Session }) {
         </div>
       )}
       <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 pl-[84px] text-[11px] text-line-3">
-        {shots.length > 0 && <span className="flex items-center gap-1.5">
-          <span className="inline-block h-2.5 w-0.5 bg-line-2" aria-hidden /> Shot event
-        </span>}
-        {classified > 0 && <span className="flex items-center gap-1.5">
-          <span className="inline-block h-3 w-1 bg-line-2" aria-hidden /> Smash
-        </span>}
-        {classified > 0 && <span className="flex items-center gap-1.5">
-          <span className="inline-block size-2 rotate-45 bg-line-2" aria-hidden /> Jump smash
-        </span>}
-        {pending && <span className="flex items-center gap-1.5">
-          <span className="inline-block h-2 w-3 rounded-sm bg-mat-deep ring-1 ring-seam" aria-hidden /> Source frames awaiting analysis
-        </span>}
+        {shots.length > 0 && (
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block h-2.5 w-0.5 bg-line-2" aria-hidden /> Shot event
+          </span>
+        )}
+        {classified > 0 && (
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block h-3 w-1 bg-line-2" aria-hidden /> Smash
+          </span>
+        )}
+        {classified > 0 && (
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block size-2 rotate-45 bg-line-2" aria-hidden /> Jump smash
+          </span>
+        )}
+        {pending && (
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block h-2 w-3 rounded-sm bg-mat-deep ring-1 ring-seam" aria-hidden />{" "}
+            Source frames awaiting analysis
+          </span>
+        )}
       </div>
-      {unassigned && <p className="mt-2 text-[11px] text-line-3">Shots without a supported player association appear in the unassigned lane.</p>}
+      {unassigned && (
+        <p className="mt-2 text-[11px] text-line-3">
+          Shots without a supported player association appear in the unassigned lane.
+        </p>
+      )}
     </div>
   );
 }

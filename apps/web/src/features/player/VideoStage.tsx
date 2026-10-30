@@ -10,7 +10,7 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { IconButton, Spinner } from "@/components/ui";
 import { clock, fps as fpsOf, PLAYER_HEX, shortName } from "@/lib/format";
 import { frameClock, timeToFrame } from "@/lib/frameClock";
@@ -36,7 +36,15 @@ const LAYER_LABEL: Record<keyof Layers, string> = {
   scoreBug: "Score",
 };
 
-export function VideoStage({ session }: { session: Session }) {
+export function VideoStage({
+  session,
+  controlsVisible = true,
+  suspended = false,
+}: {
+  session: Session;
+  controlsVisible?: boolean;
+  suspended?: boolean;
+}) {
   const [video, setVideo] = useState<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -65,12 +73,21 @@ export function VideoStage({ session }: { session: Session }) {
   const clip = usePlayback((s) => s.clip);
   const clearClip = usePlayback((s) => s.clearClip);
   const [clipLoop, setClipLoop] = useState(false);
+  const pendingAutoplay = useRef(false);
+
+  useEffect(() => {
+    if (!suspended) return;
+    // Collapsing is an explicit pause, so a later frontier update must not resume playback.
+    setGated(false);
+    pendingAutoplay.current = false;
+    if (video && !video.paused) video.pause();
+  }, [suspended, video]);
 
   useEffect(() => {
     const cue = (selection: EvidenceSelection) => {
       const { start, end } = selection;
       const range = normalizeClip(start, end, fps, nFrames);
-      if (!range || !video || video.readyState < 1) return;
+      if (suspended || !range || !video || video.readyState < 1) return;
       usePlayback.getState().selectEvidence(selection, range);
       setClipLoop(false);
       setGated(false);
@@ -78,11 +95,13 @@ export function VideoStage({ session }: { session: Session }) {
       video.currentTime = (Math.min(nFrames - 1, Math.floor(start)) + 0.5) / fps;
       usePlayback.getState().setFrame(Math.floor(start));
       useSession.getState().socket?.seek(Math.floor(start));
-      void video.play().catch(() => {});
+      if (pendingAutoplay.current) void video.play().catch(() => {});
+      pendingAutoplay.current = false;
     };
     const onClip = (event: Event) => {
       const selection = (event as CustomEvent<EvidenceSelection>).detail;
       usePlayback.setState({ selection, clip: null });
+      pendingAutoplay.current = true;
       cue(selection);
     };
     const pending = () => {
@@ -96,7 +115,7 @@ export function VideoStage({ session }: { session: Session }) {
       video?.removeEventListener("loadedmetadata", pending);
       window.removeEventListener("bai:play-clip", onClip);
     };
-  }, [fps, nFrames, video]);
+  }, [fps, nFrames, video, suspended]);
 
   useEffect(() => {
     if (!video || !clip) return;
@@ -214,24 +233,24 @@ export function VideoStage({ session }: { session: Session }) {
         lastReq = now;
       }
       // hold playback at the frontier so labels appear at their real moment
-      if (usePlayback.getState().waitForAnalysis && analysing && !video.paused) {
+      if (!suspended && usePlayback.getState().waitForAnalysis && analysing && !video.paused) {
         if (f > front - SEMANTIC_LEAD_S * fps) {
           video.pause();
           setGated(true);
         }
       }
     });
-  }, [video, fps, nFrames, setFrame]);
+  }, [video, fps, nFrames, setFrame, suspended]);
 
   useEffect(() => {
-    if (!gated || !video) return;
+    if (!gated || !video || suspended) return;
     const ready =
       status !== "analysing" || frontier - SEMANTIC_LEAD_S * fps >= frameClock.frame + RESUME_MARGIN_S * fps;
     if (ready || !waitForAnalysis) {
       setGated(false);
       void video.play().catch(() => {});
     }
-  }, [gated, frontier, status, fps, video, waitForAnalysis]);
+  }, [gated, frontier, status, fps, video, waitForAnalysis, suspended]);
 
   // ---- (re)connect → ask for the window around the playhead
   useEffect(() => {
@@ -241,7 +260,14 @@ export function VideoStage({ session }: { session: Session }) {
   useEffect(() => {
     if (!video) return;
     const onSeeking = () => useSession.getState().socket?.seek(timeToFrame(video.currentTime, fps));
-    const onPlay = () => setPlaying(true);
+    const onPlay = () => {
+      if (suspended) {
+        video.pause();
+        setPlaying(false);
+        return;
+      }
+      setPlaying(true);
+    };
     const onPause = () => {
       setPlaying(false);
       // the last presented frame may have been throttled away from the UI copy
@@ -256,7 +282,7 @@ export function VideoStage({ session }: { session: Session }) {
       video.removeEventListener("play", onPlay);
       video.removeEventListener("pause", onPause);
     };
-  }, [video, fps, setPlaying, setFrame]);
+  }, [video, fps, setPlaying, setFrame, suspended]);
 
   useEffect(() => {
     if (video) video.playbackRate = rate;
@@ -271,7 +297,7 @@ export function VideoStage({ session }: { session: Session }) {
 
   const playing = usePlayback((s) => s.playing);
   const togglePlay = () => {
-    if (!video) return;
+    if (!video || suspended) return;
     if (video.paused) {
       setGated(false);
       void video.play().catch(() => {});
@@ -284,7 +310,7 @@ export function VideoStage({ session }: { session: Session }) {
   const noTracksYet = status === "analysing" && frontier < 1;
 
   return (
-    <div className="flex min-w-0 flex-col overflow-hidden rounded-[var(--radius-card)] border border-seam bg-mat-deep">
+    <div className="video-stage-shell">
       <div
         ref={stageRef}
         className="video-picture relative w-full bg-black"
@@ -297,12 +323,13 @@ export function VideoStage({ session }: { session: Session }) {
           playsInline
           muted={muted}
           preload="metadata"
+          aria-label={`Source recording: ${session.title}`}
           onClick={togglePlay}
           onDoubleClick={() => void stageRef.current?.requestFullscreen?.()}
         />
         <canvas ref={canvasRef} className="pointer-events-none absolute inset-0 size-full" aria-hidden />
-        {clip && (
-          <div className="absolute bottom-3 left-3 right-3 z-20 flex flex-wrap items-center gap-2 rounded-lg border border-white/20 bg-black/85 px-3 py-2 text-xs text-white">
+        {clip && controlsVisible && (
+          <div className="video-clip-controls absolute bottom-3 left-3 right-3 z-20 flex flex-wrap items-center gap-2 px-3 py-2 text-xs">
             <span className="mr-auto">{clip.label} · bounded clip</span>
             <button
               type="button"
@@ -360,31 +387,33 @@ export function VideoStage({ session }: { session: Session }) {
         )}
         {gated && (
           <div className="absolute inset-x-0 bottom-4 flex justify-center">
-            <div className="flex items-center gap-2 rounded-full border border-seam bg-mat-deep/90 px-4 py-2 text-sm backdrop-blur">
-              <span className="size-2 animate-pulse rounded-full bg-signal" aria-hidden />
+            <div className="video-status-note flex items-center gap-2 px-4 py-2 text-sm" role="status">
+              <span className="size-2 rounded-full bg-signal" aria-hidden />
               Analysis is catching up — playback resumes on its own
             </div>
           </div>
         )}
         {noTracksYet && hls === "ready" && !gated && (
-          <div className="absolute top-3 right-3 rounded-full bg-mat-deep/85 px-3 py-1 text-xs text-line-2">
+          <div className="video-status-note absolute top-3 right-3 px-3 py-1 text-xs text-line-2">
             Warming up the models…
           </div>
         )}
       </div>
 
-      <Controls
-        playing={playing}
-        onToggle={togglePlay}
-        fps={fps}
-        session={session}
-        muted={muted}
-        onMute={() => setMuted((m) => !m)}
-        rate={rate}
-        onRate={setRate}
-        onFullscreen={() => void stageRef.current?.requestFullscreen?.()}
-        hasAudio={Boolean(session.media?.has_audio)}
-      />
+      {controlsVisible && (
+        <Controls
+          playing={playing}
+          onToggle={togglePlay}
+          fps={fps}
+          session={session}
+          muted={muted}
+          onMute={() => setMuted((m) => !m)}
+          rate={rate}
+          onRate={setRate}
+          onFullscreen={() => void stageRef.current?.requestFullscreen?.()}
+          hasAudio={Boolean(session.media?.has_audio)}
+        />
+      )}
     </div>
   );
 }
@@ -401,6 +430,7 @@ function Controls(props: {
   onFullscreen: () => void;
   hasAudio: boolean;
 }) {
+  const rateId = useId();
   const frame = usePlayback((s) => s.frame);
   const seekFrame = usePlayback((s) => s.seekFrame);
   const video = usePlayback((s) => s.video);
@@ -415,33 +445,33 @@ function Controls(props: {
   };
 
   return (
-    <div className="video-controls flex min-h-12 shrink-0 flex-wrap items-center gap-1 border-t border-seam px-2 py-1">
-      <IconButton label={props.playing ? "Pause (Space)" : "Play (Space)"} onClick={props.onToggle}>
-        {props.playing ? <Pause className="size-5" /> : <Play className="size-5" />}
-      </IconButton>
-      <IconButton label="Previous frame (←)" onClick={() => step(-1)}>
-        <ChevronLeft className="size-5" />
-      </IconButton>
-      <IconButton label="Next frame (→)" onClick={() => step(1)}>
-        <ChevronRight className="size-5" />
-      </IconButton>
-      <span className="tabular ml-2 text-sm">
-        {clock(frame, props.session.media, true)}
-        <span className="text-line-3"> / {clock(n, props.session.media)}</span>
-      </span>
-      <span className="tabular ml-2 hidden text-xs text-line-3 md:inline">
-        frame {frame.toLocaleString()}
-      </span>
+    <fieldset className="video-controls" aria-label="Playback controls">
+      <div className="video-controls-primary">
+        <IconButton label={props.playing ? "Pause (Space)" : "Play (Space)"} onClick={props.onToggle}>
+          {props.playing ? <Pause className="size-5" /> : <Play className="size-5" />}
+        </IconButton>
+        <IconButton label="Previous frame (←)" onClick={() => step(-1)}>
+          <ChevronLeft className="size-5" />
+        </IconButton>
+        <IconButton label="Next frame (→)" onClick={() => step(1)}>
+          <ChevronRight className="size-5" />
+        </IconButton>
+        <span className="video-controls-clock tabular">
+          {clock(frame, props.session.media, true)}
+          <span className="text-line-3"> / {clock(n, props.session.media)}</span>
+        </span>
+        <span className="video-controls-frame tabular">frame {frame.toLocaleString()}</span>
+      </div>
 
-      <div className="ml-auto flex items-center gap-1">
-        <label className="sr-only" htmlFor="rate">
+      <div className="video-controls-secondary">
+        <label className="sr-only" htmlFor={rateId}>
           Playback speed
         </label>
         <select
-          id="rate"
+          id={rateId}
           value={props.rate}
           onChange={(e) => props.onRate(Number(e.target.value))}
-          className="tabular h-8 rounded-lg border border-seam bg-stand px-2 text-sm text-line"
+          className="video-rate tabular"
         >
           {[0.25, 0.5, 1, 1.5, 2].map((r) => (
             <option key={r} value={r}>
@@ -465,7 +495,8 @@ function Controls(props: {
               side="top"
               align="end"
               sideOffset={8}
-              className="panel z-50 w-64 space-y-1 p-2 shadow-xl shadow-black/40"
+              className="video-theme video-layer-menu panel z-50 w-64 space-y-1 p-2"
+              data-theme="dark"
             >
               <p className="px-2 pt-1 pb-2 text-xs text-line-3">
                 Show on video · press <span className="text-line-2">.</span> to hide all
@@ -487,7 +518,7 @@ function Controls(props: {
           <Maximize className="size-5" />
         </IconButton>
       </div>
-    </div>
+    </fieldset>
   );
 }
 

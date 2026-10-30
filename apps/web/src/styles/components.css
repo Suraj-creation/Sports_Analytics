@@ -1,0 +1,192 @@
+.ui-button,
+.ui-icon-button,
+.rally-action,
+.rally-text-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 550;
+  line-height: 1.25;
+  text-decoration: none;
+  transition:
+    background-color var(--duration-fast),
+    border-color var(--duration-fast),
+    color var(--duration-fast);
+}
+.ui-button,
+.rally-action {
+  padding: 9px 14px;
+  border: 1px solid var(--c-edge-strong);
+  background: var(--c-surface);
+  color: var(--c-ink);
+}
+.ui-button:hover:not(:disabled),
+.rally-action:hover:not(:disabled) {
+  background: var(--c-surface-raised);
+  border-color: var(--c-primary);
+}
+.ui-button-primary,
+.rally-action-primary {
+  background: var(--c-primary);
+  border-color: var(--c-primary);
+  color: var(--c-on-primary);
+}
+.ui-button-primary:hover:not(:disabled),
+.rally-action-primary:hover:not(:disabled) {
+  background: var(--c-primary-hover);
+  border-color: var(--c-primary-hover);
+}
+.ui-button-ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--c-muted);
+}
+.ui-button-danger {
+  border-color: color-mix(in srgb, var(--c-error) 45%, var(--c-edge));
+  color: var(--c-error);
+}
+.ui-button-small {
+  min-height: 34px;
+  padding: 6px 11px;
+  font-size: 13px;
+}
+.ui-button:disabled,
+.rally-action:disabled {
+  background: var(--c-field-disabled);
+  color: var(--c-muted);
+  border-color: var(--c-edge);
+  opacity: 1;
+}
+.rally-text-action {
+  color: var(--c-primary);
+  padding: 4px 0;
+  min-height: 36px;
+  text-underline-offset: 4px;
+}
+.rally-text-action:hover {
+  text-decoration: underline;
+}
+.ui-icon-button {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  color: var(--c-muted);
+  background: transparent;
+  border: 1px solid transparent;
+}
+.ui-icon-button:hover:not(:disabled),
+.ui-icon-button[aria-pressed="true"] {
+  color: var(--c-ink);
+  background: var(--c-surface-raised);
+}
+.ui-icon-button:disabled {
+  color: var(--c-faint);
+  opacity: 0.65;
+}
+.ui-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+  font-size: 14px;
+}
+.ui-field-label {
+  color: var(--c-ink);
+  font-weight: 550;
+}
+.ui-field-hint {
+  color: var(--c-faint);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.ui-input {
+  width: 100%;
+  height: 42px;
+  padding: 10px 12px;
+  color: var(--c-field-ink);
+  -webkit-text-fill-color: var(--c-field-ink);
+  background: var(--c-field);
+  border: 1px solid var(--c-edge-strong);
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.ui-input:focus-visible {
+  border-color: var(--c-primary);
+  outline: 2px solid color-mix(in srgb, var(--c-primary) 25%, transparent);
+  outline-offset: 1px;
+}
+.ui-input::placeholder {
+  color: var(--c-field-placeholder);
+  opacity: 1;
+}
+.ui-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 21px;
+  height: 21px;
+  padding: 0 5px;
+  border: 1px solid var(--c-edge);
+  border-radius: 4px;
+  background: var(--c-surface-raised);
+  color: var(--c-muted);
+  font-size: 12px;
+}
+.ui-error {
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--c-error) 35%, var(--c-edge));
+  border-radius: 8px;
+  color: var(--c-error);
+  background: var(--c-surface);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.panel {
+  background: var(--c-surface);
+  border: 1px solid var(--c-edge);
+  border-radius: 12px;
+}
+.numerals {
+  font-variation-settings: "wdth" 75;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.condensed {
+  font-variation-settings: "wdth" 85;
+}
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+.measure {
+  max-width: 70ch;
+}
+.band-confirmed {
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+}
+.band-probable {
+  border: 1px solid color-mix(in srgb, currentColor 45%, transparent);
+}
+.band-uncertain,
+.band-unknown {
+  border: 1px dashed color-mix(in srgb, currentColor 45%, transparent);
+}
+.quiet-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-edge-strong) transparent;
+}
+@media (max-width: 640px), (pointer: coarse) {
+  .ui-button,
+  .ui-icon-button,
+  .ui-input,
+  .rally-action,
+  .rally-text-action {
+    min-height: 44px;
+  }
+}

@@ -1,0 +1,335 @@
+@import "tailwindcss";
+@import "@fontsource-variable/archivo/wdth.css";
+
+/* Production owns its tokens. The historical prototype remains independent. */
+:root,
+:root[data-theme="light"] {
+  color-scheme: light;
+  --c-canvas: #eef3ef;
+  --c-frame: #e9f0ea;
+  --c-surface: #ffffff;
+  --c-surface-raised: #f5f8f5;
+  --c-edge: #d6e1d9;
+  --c-edge-strong: #9cb3a3;
+  --c-ink: #172d25;
+  --c-muted: #53685e;
+  --c-faint: #596f62;
+  --c-primary: #245c40;
+  --c-primary-hover: #1b4932;
+  --c-primary-soft: #e1ece3;
+  --c-on-primary: #ffffff;
+  --c-field: #ffffff;
+  --c-field-ink: #172d25;
+  --c-field-placeholder: #596f62;
+  --c-field-disabled: #edf2ee;
+  --c-well: #0c1913;
+  --c-you: #216b50;
+  --c-partner: #89652e;
+  --c-other: #596c61;
+  --c-evidence: #286448;
+  --c-strength: #246343;
+  --c-opportunity: #855b17;
+  --c-uncertain: #5d7065;
+  --c-corrected: #395e82;
+  --c-error: #a82e35;
+  --c-live: #276747;
+  --c-shuttle: #ffffff;
+  --c-court-floor: #e6eee7;
+  --c-court-line: #38654c;
+  --c-p1: #2875b8;
+  --c-p2: #aa5624;
+  --shadow-pop: 0 12px 32px rgb(20 42 30 / 0.12);
+}
+
+:root[data-theme="dark"],
+.video-theme,
+.match-video[data-theme="dark"] {
+  color-scheme: dark;
+  --c-canvas: #101a15;
+  --c-frame: #101a15;
+  --c-surface: #17251e;
+  --c-surface-raised: #203328;
+  --c-edge: #344c3e;
+  --c-edge-strong: #658370;
+  --c-ink: #edf3ee;
+  --c-muted: #b7c9bc;
+  --c-faint: #9ab2a2;
+  --c-primary: #d0e7a5;
+  --c-primary-hover: #e1efc5;
+  --c-primary-soft: #2b4433;
+  --c-on-primary: #173323;
+  --c-field: #1b2c22;
+  --c-field-ink: #edf3ee;
+  --c-field-placeholder: #a6bbad;
+  --c-field-disabled: #203127;
+  --c-well: #0c1913;
+  --c-you: #b8db9f;
+  --c-partner: #dfc08b;
+  --c-other: #adbbaf;
+  --c-evidence: #bddba7;
+  --c-strength: #abd39c;
+  --c-opportunity: #e0bf86;
+  --c-uncertain: #adbdaf;
+  --c-corrected: #a1bfdc;
+  --c-error: #f49b9c;
+  --c-live: #b8db9f;
+  --c-shuttle: #ffffff;
+  --c-court-floor: #1a3627;
+  --c-court-line: #b2cfb9;
+  --c-p1: #77b8ef;
+  --c-p2: #e9af79;
+  --shadow-pop: 0 12px 32px rgb(0 0 0 / 0.3);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --c-canvas: #101a15;
+    --c-frame: #101a15;
+    --c-surface: #17251e;
+    --c-surface-raised: #203328;
+    --c-edge: #344c3e;
+    --c-edge-strong: #658370;
+    --c-ink: #edf3ee;
+    --c-muted: #b7c9bc;
+    --c-faint: #9ab2a2;
+    --c-primary: #d0e7a5;
+    --c-primary-hover: #e1efc5;
+    --c-primary-soft: #2b4433;
+    --c-on-primary: #173323;
+    --c-field: #1b2c22;
+    --c-field-ink: #edf3ee;
+    --c-field-placeholder: #a6bbad;
+    --c-field-disabled: #203127;
+    --c-you: #b8db9f;
+    --c-partner: #dfc08b;
+    --c-other: #adbbaf;
+    --c-evidence: #bddba7;
+    --c-strength: #abd39c;
+    --c-opportunity: #e0bf86;
+    --c-uncertain: #adbdaf;
+    --c-corrected: #a1bfdc;
+    --c-error: #f49b9c;
+    --c-live: #b8db9f;
+    --c-court-floor: #1a3627;
+    --c-court-line: #b2cfb9;
+    --c-p1: #77b8ef;
+    --c-p2: #e9af79;
+    --shadow-pop: 0 12px 32px rgb(0 0 0 / 0.3);
+  }
+}
+
+/* Legacy paint APIs and production controls resolve through the same roles. */
+:root,
+.video-theme,
+.match-video[data-theme="dark"] {
+  --color-mat: var(--c-canvas);
+  --c-stage: var(--c-field);
+  --color-mat-deep: var(--c-stage);
+  --color-stand: var(--c-surface);
+  --color-stand-raised: var(--c-surface-raised);
+  --color-seam: var(--c-edge);
+  --color-line: var(--c-ink);
+  --color-line-2: var(--c-muted);
+  --color-line-3: var(--c-faint);
+  --color-p1: var(--c-p1);
+  --color-p2: var(--c-p2);
+  --color-shuttle: var(--c-shuttle);
+  --color-signal: var(--c-primary);
+  --color-alert: var(--c-error);
+  --color-caution: var(--c-opportunity);
+}
+.video-theme,
+.match-video[data-theme="dark"] {
+  --c-stage: var(--c-well);
+  --color-mat-deep: var(--c-stage);
+}
+
+@theme inline {
+  --color-canvas: var(--c-canvas);
+  --color-surface: var(--c-surface);
+  --color-surface-raised: var(--c-surface-raised);
+  --color-field: var(--c-field);
+  --color-field-ink: var(--c-field-ink);
+  --color-ink: var(--c-ink);
+  --color-muted: var(--c-muted);
+  --color-faint: var(--c-faint);
+  --color-edge: var(--c-edge);
+  --color-primary: var(--c-primary);
+  --color-on-primary: var(--c-on-primary);
+  --color-mat: var(--c-canvas);
+  --color-mat-deep: var(--c-stage);
+  --color-stand: var(--c-surface);
+  --color-stand-raised: var(--c-surface-raised);
+  --color-seam: var(--c-edge);
+  --color-line: var(--c-ink);
+  --color-line-2: var(--c-muted);
+  --color-line-3: var(--c-faint);
+  --color-p1: var(--c-p1);
+  --color-p2: var(--c-p2);
+  --color-shuttle: var(--c-shuttle);
+  --color-signal: var(--c-primary);
+  --color-alert: var(--c-error);
+  --color-caution: var(--c-opportunity);
+}
+@theme {
+  --font-sans: "Archivo Variable", "Archivo", ui-sans-serif, system-ui, sans-serif;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 0.9375rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.625rem;
+  --text-3xl: 1.875rem;
+  --radius-card: 12px;
+  --radius-control: 8px;
+  --radius-sheet: 16px;
+  --radius-chip: 999px;
+  --ease-snap: cubic-bezier(0.16, 1, 0.3, 1);
+}
+:root {
+  --duration-fast: 160ms;
+  --duration-base: 220ms;
+  --d-pad: 16px;
+  --d-gap: 16px;
+  --d-row: 44px;
+  --d-body: 0.9375rem;
+}
+[data-depth="quick"] {
+  --d-pad: 24px;
+  --d-gap: 24px;
+  --d-row: 52px;
+}
+[data-depth="advanced"] {
+  --d-pad: 12px;
+  --d-gap: 12px;
+  --d-row: 36px;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+  html {
+    background: var(--c-canvas);
+    scroll-padding-top: 24px;
+  }
+  body {
+    margin: 0;
+    background: var(--c-canvas);
+    color: var(--c-ink);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.5;
+    font-variation-settings: "wdth" 100;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    -webkit-tap-highlight-color: transparent;
+  }
+  button:not(:disabled),
+  summary,
+  select {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+  [hidden] {
+    /* biome-ignore lint/complexity/noImportantStyles: native hidden must override component display */
+    display: none !important;
+  }
+  :focus-visible {
+    outline: 2px solid var(--c-primary);
+    outline-offset: 3px;
+  }
+  h1:focus {
+    outline: none;
+  }
+  ::selection {
+    color: var(--c-ink);
+    background: var(--c-primary-soft);
+  }
+  input,
+  textarea {
+    caret-color: var(--c-field-ink);
+  }
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  select,
+  textarea {
+    min-width: 0;
+    max-width: 100%;
+    color: var(--c-field-ink);
+    -webkit-text-fill-color: var(--c-field-ink);
+    background-color: var(--c-field);
+    border: 1px solid var(--c-edge-strong);
+    border-radius: 8px;
+    accent-color: var(--c-primary);
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--c-field-placeholder);
+    opacity: 1;
+  }
+  input:disabled,
+  textarea:disabled,
+  select:disabled {
+    color: var(--c-muted);
+    -webkit-text-fill-color: var(--c-muted);
+    background-color: var(--c-field-disabled);
+    opacity: 1;
+  }
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--c-field-ink);
+    caret-color: var(--c-field-ink);
+    box-shadow: 0 0 0 1000px var(--c-field) inset;
+  }
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="range"] {
+    accent-color: var(--c-primary);
+  }
+  progress {
+    accent-color: var(--c-primary);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-base: 0ms;
+  }
+  *,
+  *::before,
+  *::after {
+    /* biome-ignore lint/complexity/noImportantStyles: user reduced-motion preferences override component motion */
+    scroll-behavior: auto !important;
+    /* biome-ignore lint/complexity/noImportantStyles: user reduced-motion preferences override component motion */
+    animation-duration: 0.01ms !important;
+    /* biome-ignore lint/complexity/noImportantStyles: user reduced-motion preferences override component motion */
+    transition-duration: 0.01ms !important;
+  }
+}
+:root[data-reduced-motion="true"] *,
+:root[data-reduced-motion="true"] *::before,
+:root[data-reduced-motion="true"] *::after {
+  /* biome-ignore lint/complexity/noImportantStyles: user reduced-motion preferences override component motion */
+  animation-duration: 0.01ms !important;
+  /* biome-ignore lint/complexity/noImportantStyles: user reduced-motion preferences override component motion */
+  transition-duration: 0.01ms !important;
+}

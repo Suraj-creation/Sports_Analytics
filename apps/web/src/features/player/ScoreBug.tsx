@@ -60,7 +60,7 @@ export function ScoreBug({ session }: { session: Session }) {
 
   return (
     <div className="pointer-events-none absolute top-3 left-3 select-none" data-testid="score-bug">
-      <div className="overflow-hidden rounded-lg border border-white/10 bg-mat-deep/88 shadow-lg shadow-black/30 backdrop-blur-sm">
+      <div className="video-score-panel overflow-hidden rounded-lg">
         {broadcast
           ? broadcast.map((row, index) => (
               <Row
