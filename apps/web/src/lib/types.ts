@@ -245,7 +245,6 @@ export interface EstimatedIndividualAnalyticsData {
   match_format: "singles" | "doubles" | null;
   official: EstimatedShotScope;
   all_linked: EstimatedShotScope;
-  episode_profiles: {official: AnonymousEpisodeScope; all_linked: AnonymousEpisodeScope};
   unlinked_stroke_events: number;
   policy: Record<string, unknown>;
 }
@@ -254,17 +253,4 @@ export interface EstimatedShotScope {
   accounting: {total_linked_shots: number; estimated_shots: number; unresolved_shots: number; verified_shots?: number};
   unresolved_event_ids: string[];
   legacy_unlinked_shots: number;
-}
-
-export interface AnonymousEpisodeScope {
-  episodes: Array<{observation_id: string; participant_id: string; track_id: number; candidate_shots: number; shot_distribution: Record<string, number>; detector_run_counts: {ran: number; not_run: number; unknown: number}; events?: unknown[]; status: string}>;
-  accounting: {total_linked_shots: number; episode_candidate_shots: number; unresolved_shots: number};
-  unresolved_event_ids: string[];
-}
-
-export interface EpisodeMovementData {
-  available: boolean; reason: string | null; scope: string;
-  window: {from: number; to: number; fps: number};
-  episodes: Array<{observation_id: string; participant_id: string; track_id: number; status: string; distance_m: number | null; valid_frames: number; detector_observed_frames: number; carried_frames: number; unknown_source_frames: number; coverage_fraction: number; observed_seconds: number; segments: number; positions_m: number[][]}>;
-  warning: string;
 }

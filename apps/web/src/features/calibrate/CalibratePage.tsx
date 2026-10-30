@@ -50,7 +50,7 @@ export function CalibratePage() {
   const [cursor, setCursor] = useState<{ x: number; y: number; px: number; py: number } | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const loupeRef = useRef<HTMLCanvasElement>(null);
-  const seeded = useRef(false);
+  const seeded = useRef<string | null>(null);
 
   const W = prop.data?.width ?? session.data?.media?.width ?? 1280;
   const H = prop.data?.height ?? session.data?.media?.height ?? 720;
@@ -63,25 +63,29 @@ export function CalibratePage() {
     video.currentTime = (prop.data.frame + 0.5) / fps;
   }, [video, hls, prop.data, fps]);
 
-  // seed (once): the court detected from this frame's lines; else the existing calibration — which only holds
-  // on its own frame when the camera moves — else the mat-outline proposal
+  // Restore saved geometry only on a frame where that homography applies.
+  // A fresh automatic proposal remains available through Use detected.
   useEffect(() => {
-    if (seeded.current || !prop.data) return;
-    seeded.current = true;
-    const cur = prop.data.current?.H;
-    if (prop.data.proposal?.method === "court_lines_v1") {
-      setPoints(prop.data.proposal.points);
-    } else if (cur) {
+    if (!prop.data) return;
+    const seedKey = `${sessionId}:${prop.data.frame}`;
+    if (seeded.current === seedKey) return;
+    seeded.current = seedKey;
+    const current = prop.data.current;
+    const applies = current?.H && current.validity !== "invalid" &&
+      (current.mode === "static" || (current.ref_frame == null && current.cam_ref == null) ||
+        current.ref_frame === prop.data.frame);
+    if (applies) {
       const pts: Record<string, P> = {};
-      for (const o of ORDER.slice(0, 6)) {
+      for (const o of ORDER) {
         const c = prop.data.reference_points[o.id];
-        if (c) pts[o.id] = project(cur, c);
+        if (c) pts[o.id] = project(current.H, c);
       }
       setPoints(pts);
-    } else if (prop.data.proposal) {
-      setPoints(prop.data.proposal.points);
+    } else {
+      setPoints(prop.data.proposal?.points ?? {});
     }
-  }, [prop.data]);
+    setHistory([]);
+  }, [prop.data, sessionId]);
 
   const fit = useMemo(() => {
     const ids = Object.keys(points).filter((k) => ref[k]);

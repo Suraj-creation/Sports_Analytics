@@ -32,12 +32,26 @@ class ScoreReconciler:
     row_map: dict[int, str] | None = None  # bug row index → player id
     _votes: dict[tuple[int, str], int] = field(default_factory=dict)
 
-    def add(self, r: ScoreReading) -> None:
+    def add(self, r: ScoreReading) -> ScoreReading | None:
+        """Return a corroborated broadcast observation, independent of player mapping.
+
+        Names and points must agree in two distinct, ordered observations. This
+        supports displaying the source board without assigning its rows to P1/P2.
+        """
         if r.conf < 0.5:
             return
+        previous = self.readings[-1] if self.readings else None
+        if previous is not None and r.frame_idx <= previous.frame_idx:
+            return None
         self.readings.append(r)
         if self.row_map is None:
             self._try_names(r)
+        if previous is not None and all(
+            _norm(name) == _norm(old_name) and points == old_points
+            for (name, points), (old_name, old_points) in zip(r.rows, previous.rows, strict=True)
+        ):
+            return r
+        return None
 
     def _try_names(self, r: ScoreReading) -> None:
         names = {pid: _norm(n) for pid, n in self.player_names.items() if n}

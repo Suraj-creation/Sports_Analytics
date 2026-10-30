@@ -24,7 +24,6 @@ export interface EvidenceClip extends EvidenceSelection {
 interface PlaybackStore {
   /** Current presented frame, updated ~10×/s for React panels (the canvas uses the exact frame). */
   frame: number;
-  reviewBox: { sessionId: string; frame: number; trackId: number; bbox: [number, number, number, number] } | null;
   playing: boolean;
   duration: number;
   layers: Layers;
@@ -56,7 +55,6 @@ function loadLayers(): Layers {
 
 export const usePlayback = create<PlaybackStore>((set, get) => ({
   frame: 0,
-  reviewBox: null,
   playing: false,
   duration: 0,
   layers: loadLayers(),
@@ -66,7 +64,7 @@ export const usePlayback = create<PlaybackStore>((set, get) => ({
   clip: null,
   selectEvidence: (selection, range) => set({ selection, clip: { ...selection, ...range } }),
   clearClip: () => set({ clip: null }),
-  resetMedia: () => set({ frame: 0, reviewBox: null, playing: false, duration: 0, selection: null, clip: null }),
+  resetMedia: () => set({ frame: 0, playing: false, duration: 0, selection: null, clip: null }),
   setFrame: (frame) => set({ frame }),
   setPlaying: (playing) => set({ playing }),
   setDuration: (duration) => set({ duration }),

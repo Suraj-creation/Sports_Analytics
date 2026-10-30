@@ -28,6 +28,7 @@ from dataclasses import dataclass, field
 from fractions import Fraction
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import av
 import cv2
@@ -101,6 +102,7 @@ class SessionRunner(threading.Thread):
         self._rate_t0 = time.perf_counter()
         self._rate_frames = 0
         self.main_k = 0
+        self._reused_session_id: str | None = None
 
     # ================================================================== helpers
     @property
@@ -117,6 +119,7 @@ class SessionRunner(threading.Thread):
         n = s.media.n_frames if s.media else 0
         msg = {
             "type": "status",
+            "generation": str(s.meta.get("analysis_generation") or ""),
             "status": s.status.value,
             "detail": s.status_detail,
             "n_frames": n,
@@ -132,7 +135,9 @@ class SessionRunner(threading.Thread):
         for e in events:
             EVENTS_TOTAL.labels(type=e.type, status=e.status.value).inc()
         self.bus.publish(
-            topic(self.session_id, "events"), {"type": "events", "events": [e.model_dump(mode="json") for e in events]}
+            topic(self.session_id, "events"),
+            {"type": "events", "events": [e.model_dump(mode="json") for e in events],
+             "generation": str(self.session.meta.get("analysis_generation") or "")}
         )
 
     def command(self, cmd: dict[str, Any]) -> None:
@@ -182,6 +187,12 @@ class SessionRunner(threading.Thread):
                 title=s.title if s.title != "YouTube video" else (stored.original_name or s.title),
             )
             s = self.session
+            previous = self.repo.reuse_downloaded_source(s)
+            if previous is not None:
+                self._reused_session_id = previous.session_id
+                self._status()
+                log.info("session.reused_source", session=self.session_id, saved_session=previous.session_id)
+                return
             src = stored.path
             mp = self.repo.media_paths(stored.sha256)
         else:
@@ -336,6 +347,8 @@ class SessionRunner(threading.Thread):
     def run(self) -> None:
         try:
             self._ensure_media()
+            if self._reused_session_id is not None:
+                return
             if self.shared.stop.is_set():
                 return
             if self.attach:
@@ -501,6 +514,9 @@ class EngineService:
         self._thread = threading.Thread(target=self._loop, name="engine-commands", daemon=True)
 
     def start(self) -> None:
+        interrupted = self.repo.mark_interrupted()
+        if interrupted:
+            log.info("engine.interrupted_sessions", count=interrupted)
         self._thread.start()
         log.info("engine.started", profile=self.settings.profile)
 
@@ -586,7 +602,7 @@ class EngineService:
                 attach = False
                 if name == "reanalyse":
                     self._reset_semantics(sid)
-                    self.repo.set_status(sid, SessionStatus.ANALYSING, "Reanalysis starting from cached perception")
+                    self.repo.set_status(sid, SessionStatus.ANALYSING, "Reanalysis requested; saved results backed up")
                     self._reanalysing.add(sid)
                 else:
                     attach = self._prepare_start(sid)
@@ -602,20 +618,24 @@ class EngineService:
         if runner is None or not runner.is_alive():
             if name == "playhead":
                 return
-            # commands for a finished session restart it (cached perception makes this cheap)
+            # Commands re-attach to completed results; only an explicit retry rebuilds interrupted work.
             self.dispatch({"cmd": "start", "session_id": sid})
             runner = self.runners[sid]
         runner.command(cmd)
 
     def _prepare_start(self, sid: str) -> bool:
         """Decide how a (re)started runner begins. Returns True to re-attach to a finished
-        analysis. An interrupted analysis can't resume mid-log, so it restarts from a clean log
-        (cheap: perception is cached) keeping the human inputs."""
+        analysis. An explicit retry of interrupted work restarts from a clean log,
+        retaining human inputs. Stateful plugins must repeat sequential perception."""
         s = self.repo.get(sid)
-        if s is None or self.repo.events(sid).last_seq() == 0:
+        if s is None:
             return False
+        # Empty detections are a valid completed result. Completion must not depend
+        # on whether the model happened to emit an event.
         if s.status is SessionStatus.ANALYSED:
             return True
+        if self.repo.events(sid).last_seq() == 0 and s.analysed_frames == 0:
+            return False
         self._reset_semantics(sid)
         return False
 
@@ -657,4 +677,11 @@ class EngineService:
             meta[CARRY_KEY] = list(carried.values())
         else:
             meta.pop(CARRY_KEY, None)
+        meta["analysis_generation"] = uuid4().hex
         self.repo.update(sid, meta=meta)
+        self.bus.publish(
+            topic(sid, "status"),
+            {"type": "analysis_reset", "session_id": sid,
+             "generation": meta["analysis_generation"],
+             "calibration": manual_cal[-1].payload if manual_cal else None},
+        )

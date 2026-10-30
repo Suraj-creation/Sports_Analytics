@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { usePlayback } from "./playback";
 import { api } from "@/lib/api";
 import { EventLog } from "@/lib/events";
 import { type ServerMsg, SessionSocket } from "@/lib/socket";
@@ -69,13 +70,73 @@ export const useSession = create<SessionStore>((set, get) => ({
           mediaFetch = null;
         });
     };
+    let generation: string | undefined;
+    let socket: SessionSocket | null = null;
+    const generationOf = (value: unknown) => typeof value === "string" && value ? value : undefined;
+    const resetAnalysis = (next: string | undefined, calibration: Calibration | null = null) => {
+      generation = next;
+      events.clear();
+      tracks.clear();
+      usePlayback.setState({ selection: null, clip: null });
+      set((s) => ({
+        eventsVersion: events.version,
+        tracksVersion: tracks.version,
+        analyticsVersion: s.analyticsVersion + 1,
+        state: null,
+        calibration,
+        status: null,
+        lastEvents: [],
+        session: s.session ? {
+          ...s.session,
+          status: "analysing",
+          status_detail: "Reanalysis starting",
+          frontier_frame: 0,
+          analysed_frames: 0,
+          meta: { ...s.session.meta, analysis_generation: next },
+        } : null,
+      }));
+    };
+    // Reconnect only reads the new log from zero; it never starts analysis.
+    const connect = () => {
+      socket?.close();
+      socket = new SessionSocket(id, onMessage, () => events.lastSeq,
+        (c) => set({ connection: c }), () => generation);
+      set({ socket });
+    };
     const onMessage = (m: ServerMsg) => {
+      const incomingGeneration = generationOf(m.generation);
+      if (m.type !== "hello" && m.type !== "analysis_reset" &&
+          incomingGeneration !== undefined && incomingGeneration !== generation) {
+        resetAnalysis(incomingGeneration);
+        connect();
+        return;
+      }
       switch (m.type) {
-        case "hello":
+        case "hello": {
+          const next = generationOf(m.session.meta?.analysis_generation);
+          const changed = next !== generation;
+          const rolledBack = typeof m.last_seq === "number" && m.last_seq < events.lastSeq;
+          if (changed || rolledBack) resetAnalysis(next);
+          generation = next;
           set({ session: m.session, state: m.state ?? null, calibration: m.calibration ?? null });
+          // Older servers do not clamp an obsolete resume cursor.
+          if (rolledBack && !changed) connect();
+          break;
+        }
+        case "analysis_reset":
+          if (incomingGeneration !== generation || (incomingGeneration === undefined && events.lastSeq > 0))
+            resetAnalysis(incomingGeneration, m.calibration ?? null);
           break;
         case "events": {
           const evs = m.events as BaiEvent[];
+          // Legacy live streams have no generation marker, but a fresh sequence
+          // one with a new ID cannot belong to the log already on screen.
+          if (generation === undefined && !m.backlog && events.lastSeq > 0 &&
+              evs.some((event) => event.seq === 1 && !events.get(event.event_id))) {
+            resetAnalysis(generation);
+            connect();
+            return;
+          }
           events.apply(evs);
           const cal = evs.filter((e) => e.type === "calibration").pop();
           const point = evs.filter((e) => e.type === "point").pop();
@@ -115,13 +176,7 @@ export const useSession = create<SessionStore>((set, get) => ({
           break;
       }
     };
-    const socket = new SessionSocket(
-      id,
-      onMessage,
-      () => events.lastSeq,
-      (c) => set({ connection: c }),
-    );
-    set({ socket });
+    connect();
   },
 
   close: () => {

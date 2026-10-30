@@ -369,7 +369,26 @@ class BadmintonMatchEngine:
 
     def on_ocr(self, reading: ScoreReading) -> None:
         self._ocr_seen = True
-        self.ocr.add(reading)
+        stable = self.ocr.add(reading)
+        if stable is not None:
+            self._emit([
+                self._event(
+                    "broadcast_score",
+                    stable.frame_idx,
+                    stable.frame_idx,
+                    payload={
+                        "rows": [{"name": name, "points": points} for name, points in stable.rows],
+                        "player_mapping": dict(self.ocr.row_map) if self.ocr.row_map is not None else None,
+                        "source": "broadcast_ocr",
+                        "confirmation": "two_distinct_observations",
+                    },
+                    confidence=min(stable.conf, self.ocr.readings[-2].conf),
+                    evidence=(Evidence(kind=EvidenceKind.SCORE_OCR,
+                                       frames=(self.ocr.readings[-2].frame_idx, stable.frame_idx)),),
+                    model="scoreboard_observation_v1",
+                    status=EventStatus.CONFIRMED,
+                )
+            ])
 
     def ingest(self, chunk: ChunkPerception) -> None:
         if chunk.start != self._last_frame + 1:

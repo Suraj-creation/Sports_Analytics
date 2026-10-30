@@ -31,7 +31,7 @@ function useWidth<T extends HTMLElement>() {
 /** Whole-match overview (rallies, games, analysis frontier) above a 60-second shot lane. */
 export function Timeline({ session }: { session: Session }) {
   return (
-    <div className="panel space-y-2 p-3">
+    <div className="space-y-4 rounded-lg border border-seam bg-stand p-3">
       <Overview session={session} />
       <Detail session={session} />
     </div>
@@ -126,10 +126,14 @@ function Overview({ session }: { session: Session }) {
   };
   const hoverRally =
     hover != null ? data.rallies.find((r) => hover >= r.start && hover <= r.stop) : undefined;
-  const analysedTo = status === "analysed" ? n : frontier;
+  const analysedTo = status === "analysed" ? n : Math.min(n, Math.max(0, frontier + 1));
 
   return (
     <div ref={ref} className="relative">
+      <div className="mb-1 flex items-center justify-between gap-3 text-xs">
+        <p className="font-medium text-line-2">Full match</p>
+        <p className="tabular text-line-2">{clock(uiFrame, session.media)} / {clock(n - 1, session.media)}</p>
+      </div>
       <div
         className="min-h-11 cursor-pointer touch-none select-none"
         role="slider"
@@ -208,6 +212,10 @@ function Overview({ session }: { session: Session }) {
         </svg>
       </div>
 
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-[11px] text-line-3">
+        <p>{data.rallies.length} rally {data.rallies.length === 1 ? "candidate" : "candidates"} · select a moment to seek</p>
+        <p>{Math.round((analysedTo / n) * 100)}% of source frames processed</p>
+      </div>
       {hover != null && (
         <div
           className="pointer-events-none absolute bottom-full z-20 mb-2 -translate-x-1/2 overflow-hidden rounded-lg border border-seam bg-stand shadow-xl shadow-black/40"
@@ -241,13 +249,27 @@ function Detail({ session }: { session: Session }) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const canvas = useRef<HTMLCanvasElement>(null);
   const events = useSession((s) => s.events);
+  const eventsVersion = useSession((s) => s.eventsVersion);
   const frontier = useSession((s) => s.session?.frontier_frame ?? 0);
   const status = useSession((s) => s.session?.status ?? session.status);
   const seekFrame = usePlayback((s) => s.seekFrame);
   const fps = fpsOf(session.media);
   const n = session.media?.n_frames ?? 0;
   const span = Math.round(DETAIL_S * fps);
-  const H = 72;
+  // eventsVersion signals appended or corrected events in the mutable log.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: eventsVersion signals mutation of the log
+  const shots = useMemo(() => events.ofType("stroke"), [events, eventsVersion]);
+  const unassigned = shots.some((shot) => shot.actors.player_id !== "P1" && shot.actors.player_id !== "P2");
+  const classified = shots.filter((shot) => typeof shot.payload.stroke === "string" &&
+    !["unknown", "unclassified", ""].includes(shot.payload.stroke)).length;
+  const H = unassigned ? 96 : 72;
+  const pending = status !== "analysed" && frontier < n - 1;
+  const shotSummary = shots.length === 0
+    ? status === "analysed" ? "No shot events were detected in this recording."
+      : status === "failed" ? "No shot events are available from this partial analysis."
+      : "Shot events appear as analysis progresses."
+    : classified === 0 ? `${shots.length} shot ${shots.length === 1 ? "event" : "events"} · classification unavailable`
+      : `${classified} of ${shots.length} shot events classified`;
   const name1 = shortName(session, "P1");
   const name2 = shortName(session, "P2");
   const [tip, setTip] = useState<{ x: number; text: string } | null>(null);
@@ -256,7 +278,10 @@ function Detail({ session }: { session: Session }) {
     const c = canvas.current;
     if (!c) return;
     const plotW = width - LABEL_W;
-    const lane: Record<PlayerId, number> = { P1: 22, P2: 46 };
+    type Lane = PlayerId | "unassigned";
+    const lane: Record<Lane, number> = { P1: 22, P2: 46, unassigned: 70 };
+    const lanes: Lane[] = unassigned ? ["P1", "P2", "unassigned"] : ["P1", "P2"];
+    const colors: Record<Lane, string> = { ...PLAYER_HEX, unassigned: "#a9bab2" };
     return frameClock.subscribe((f) => {
       const g = prepareCanvas(c, width, H);
       if (!g) return;
@@ -264,9 +289,9 @@ function Detail({ session }: { session: Session }) {
       const X = (fr: number) => LABEL_W + ((fr - a) / span) * plotW;
       g.font = '500 11px "Archivo Variable", system-ui, sans-serif';
       // lane labels
-      const names: Record<PlayerId, string> = { P1: name1, P2: name2 };
-      for (const pid of ["P1", "P2"] as PlayerId[]) {
-        g.fillStyle = PLAYER_HEX[pid];
+      const names: Record<Lane, string> = { P1: name1, P2: name2, unassigned: "Unassigned" };
+      for (const pid of lanes) {
+        g.fillStyle = colors[pid];
         g.fillRect(0, lane[pid] - 5, 3, 10);
         g.fillStyle = "#a9bab2";
         g.fillText(names[pid].slice(0, 11), 8, lane[pid] + 4);
@@ -281,31 +306,32 @@ function Detail({ session }: { session: Session }) {
       const step = Math.round(5 * fps);
       for (let t = Math.ceil(a / step) * step; t < Math.min(a + span, n); t += step) {
         const px = X(t);
-        g.fillRect(px, 56, 1, 4);
-        if ((t / step) % 2 === 0) g.fillText(clock(t, session.media), Math.max(LABEL_W, px - 10), 70);
+        g.fillRect(px, H - 16, 1, 4);
+        if ((t / step) % 2 === 0) g.fillText(clock(t, session.media), Math.max(LABEL_W, px - 10), H - 2);
       }
       // not-yet-analysed region
-      const analysedTo = status === "analysed" ? n : frontier;
-      if (analysedTo < a + span) {
+      const analysedTo = status === "analysed" ? n : Math.min(n, Math.max(0, frontier + 1));
+      if (analysedTo < Math.min(a + span, n)) {
         const px = Math.max(LABEL_W, X(analysedTo));
         g.fillStyle = "rgba(12,38,32,0.7)";
-        g.fillRect(px, 8, width - px, 48);
+        g.fillRect(px, 8, width - px, H - 24);
       }
       // rallies as faint spans
       for (const r of events.window(a, a + span, ["rally_end"])) {
         const x0 = Math.max(LABEL_W, X(r.frame_start));
         const x1 = X(r.frame_end);
         g.fillStyle = "rgba(232,239,234,0.05)";
-        g.fillRect(x0, 10, Math.max(1, x1 - x0), 44);
+        g.fillRect(x0, 10, Math.max(1, x1 - x0), H - 28);
       }
       // shots
-      for (const e of events.window(a, a + span, ["stroke"])) {
-        const pid = e.actors.player_id as PlayerId | null;
-        if (!pid) continue;
+      for (const e of shots) {
+        if (e.frame_end < a || e.frame_start > a + span) continue;
+        const pid: Lane = e.actors.player_id === "P1" || e.actors.player_id === "P2"
+          ? e.actors.player_id : "unassigned";
         const px = X(e.frame_start);
         if (px < LABEL_W) continue;
         const y = lane[pid];
-        g.fillStyle = PLAYER_HEX[pid];
+        g.fillStyle = colors[pid];
         g.globalAlpha = e.band === "confirmed" ? 1 : e.band === "probable" ? 0.75 : 0.45;
         if (isJumpSmash(e)) {
           g.beginPath();
@@ -324,9 +350,9 @@ function Detail({ session }: { session: Session }) {
       }
       // playhead
       g.fillStyle = "#ffffff";
-      g.fillRect(X(f) - 1, 4, 2, 52);
+      g.fillRect(X(f) - 1, 4, 2, H - 20);
     });
-  }, [width, events, frontier, status, fps, span, n, session.media, name1, name2]);
+  }, [width, events, shots, frontier, status, fps, span, n, session.media, name1, name2, H, unassigned]);
 
   const frameAtX = (clientX: number, el: Element) => {
     const r = el.getBoundingClientRect();
@@ -339,12 +365,16 @@ function Detail({ session }: { session: Session }) {
   };
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="relative border-t border-seam pt-3">
+      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-xs">
+        <p className="font-medium text-line-2">Shot activity <span className="font-normal text-line-3">· 60-second view</span></p>
+        <p className="text-line-2">{shotSummary}</p>
+      </div>
       <canvas
         ref={canvas}
         style={{ width, height: H }}
         className="block cursor-pointer"
-        aria-label="Shots in the last minute, one lane per player"
+        aria-label="Shot activity near the playhead"
         role="img"
         onClick={(e) => {
           const f = frameAtX(e.clientX, e.currentTarget);
@@ -383,20 +413,20 @@ function Detail({ session }: { session: Session }) {
         </div>
       )}
       <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 pl-[84px] text-[11px] text-line-3">
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-2.5 w-0.5 bg-line-2" aria-hidden /> shot
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-3 w-1 bg-line-2" aria-hidden /> smash
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block size-2 rotate-45 bg-line-2" aria-hidden /> jump smash
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-2 w-3 rounded-sm bg-mat-deep ring-1 ring-seam" aria-hidden /> not
-          analysed yet
-        </span>
+        {shots.length > 0 && <span className="flex items-center gap-1.5">
+          <span className="inline-block h-2.5 w-0.5 bg-line-2" aria-hidden /> Shot event
+        </span>}
+        {classified > 0 && <span className="flex items-center gap-1.5">
+          <span className="inline-block h-3 w-1 bg-line-2" aria-hidden /> Smash
+        </span>}
+        {classified > 0 && <span className="flex items-center gap-1.5">
+          <span className="inline-block size-2 rotate-45 bg-line-2" aria-hidden /> Jump smash
+        </span>}
+        {pending && <span className="flex items-center gap-1.5">
+          <span className="inline-block h-2 w-3 rounded-sm bg-mat-deep ring-1 ring-seam" aria-hidden /> Source frames awaiting analysis
+        </span>}
       </div>
+      {unassigned && <p className="mt-2 text-[11px] text-line-3">Shots without a supported player association appear in the unassigned lane.</p>}
     </div>
   );
 }

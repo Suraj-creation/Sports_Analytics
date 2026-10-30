@@ -62,6 +62,7 @@ def create_upload(
     b: BusDep,
     s: SettingsDep,
     _: User,
+    response: Response,
     file: Annotated[UploadFile, File()],
     title: Annotated[str | None, Form()] = None,
     player1: Annotated[str | None, Form()] = None,
@@ -75,7 +76,7 @@ def create_upload(
     except SourceError as e:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e)) from e
     name = (title or file.filename or "Untitled match").strip()[:120]
-    session = r.save(
+    session, reused = r.save_or_reuse(
         Session(
             title=name,
             source=Source(
@@ -86,7 +87,10 @@ def create_upload(
             profile=prof,
         )
     )
-    b.send_command({"cmd": "start", "session_id": session.session_id})
+    if reused:
+        response.status_code = status.HTTP_200_OK
+    else:
+        b.send_command({"cmd": "start", "session_id": session.session_id})
     return public_session(session)
 
 
@@ -101,7 +105,7 @@ class YouTubeRequest(BaseModel):
 
 
 @router.post("/youtube", status_code=201)
-def create_youtube(body: YouTubeRequest, r: Repo, b: BusDep, s: SettingsDep, _: User) -> Session:
+def create_youtube(body: YouTubeRequest, r: Repo, b: BusDep, s: SettingsDep, _: User, response: Response) -> Session:
     if not s.youtube_ingest:
         raise HTTPException(
             status.HTTP_403_FORBIDDEN, "YouTube import is turned off on this server (BAI_YOUTUBE_INGEST)"
@@ -114,16 +118,20 @@ def create_youtube(body: YouTubeRequest, r: Repo, b: BusDep, s: SettingsDep, _: 
         vid = parse_youtube_url(body.url)
     except SourceError as e:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e)) from e
-    session = r.save(
+    session, reused = r.save_or_reuse(
         Session(
             title=body.title or "YouTube video",
             source=Source(kind=SourceKind.YOUTUBE, uri=f"https://www.youtube.com/watch?v={vid}"),
             players=_players(body.player1, body.player2),
             roster=_initial_roster(body.match_format),
             profile=_check_profile(body.profile or s.profile, s),
+            meta={"youtube_video_id": vid},
         )
     )
-    b.send_command({"cmd": "start", "session_id": session.session_id})
+    if reused:
+        response.status_code = status.HTTP_200_OK
+    else:
+        b.send_command({"cmd": "start", "session_id": session.session_id})
     return public_session(session)
 
 
@@ -210,7 +218,7 @@ def _control(session: Session, b: Any, action: str) -> dict[str, str]:
 
 @router.post("/{session_id}/start", status_code=202)
 def start(session: SessionDep, b: BusDep) -> dict[str, str]:
-    """(Re)start analysis — resumes from the perception cache, never redoes GPU work."""
+    """Open saved results, or explicitly restart an interrupted analysis."""
     return _control(session, b, "start")
 
 
@@ -221,7 +229,7 @@ def stop(session: SessionDep, b: BusDep) -> dict[str, str]:
 
 @router.post("/{session_id}/reanalyse", status_code=202)
 def reanalyse(session: SessionDep, b: BusDep) -> dict[str, str]:
-    """Rebuild all events from cached perception (after calibration changes or rule upgrades)."""
+    """Explicitly rebuild analysis, preserving a backup and human inputs first."""
     return _control(session, b, "reanalyse")
 
 

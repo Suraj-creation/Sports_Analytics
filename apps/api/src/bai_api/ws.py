@@ -61,7 +61,6 @@ async def session_ws(ws: WebSocket, session_id: str) -> None:
         return
     await ws.accept()
     WS_CLIENTS.inc()
-    store = repo.events(session_id)
     fps = float(session.media.fps) if session.media else 30.0
     send_lock = asyncio.Lock()
 
@@ -73,21 +72,36 @@ async def session_ws(ws: WebSocket, session_id: str) -> None:
         last_seq = int(ws.query_params.get("last_seq", "0") or 0)
     except ValueError:
         last_seq = 0
-    snap = store.state_at(10**12)
-    cal = store.query(types=["calibration"])
+    # Reset closes/replaces the event store. Capture one coherent generation
+    # without holding the repository lock across a network await.
+    with repo._lock:
+        session = repo.get(session_id) or session
+        store = repo.events(session_id)
+        generation = str(session.meta.get("analysis_generation") or "")
+        current_seq = store.last_seq()
+        requested_generation = ws.query_params.get("generation", "")
+        if requested_generation != generation or last_seq > current_seq:
+            last_seq = 0
+        snap = store.state_at(10**12)
+        cal = store.query(types=["calibration"])
+        backlog = store.since(last_seq, limit=MAX_BACKLOG)
     await send(
         {
             "type": "hello",
             "session": public_session(session).model_dump(mode="json"),
             "state": snap.state if snap else None,
             "calibration": cal[-1].payload if cal else None,
-            "last_seq": store.last_seq(),
+            "last_seq": current_seq,
         }
     )
-    backlog = store.since(last_seq, limit=MAX_BACKLOG)
     for i in range(0, len(backlog), 500):
         await send(
-            {"type": "events", "events": [e.model_dump(mode="json") for e in backlog[i : i + 500]], "backlog": True}
+            {
+                "type": "events",
+                "events": [e.model_dump(mode="json") for e in backlog[i : i + 500]],
+                "backlog": True,
+                "generation": generation,
+            }
         )
 
     async def forward(name: str) -> None:
@@ -100,7 +114,8 @@ async def session_ws(ws: WebSocket, session_id: str) -> None:
         table = repo.tracks(session_id).read([TrackObject.SHUTTLE, TrackObject.PLAYER, TrackObject.CAMERA], a, b)
         if table.num_rows:
             await send({"type": "tracks", "from": a, "to": b, "bin": encode_tracks(table_to_samples(table), a, b)})
-        snap = store.state_at(center)
+        with repo._lock:
+            snap = repo.events(session_id).state_at(center)
         await send({"type": "state_at", "frame": center, "state": snap.state if snap else None})
 
     tasks = [asyncio.create_task(forward(t)) for t in TOPICS]

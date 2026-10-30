@@ -1,0 +1,105 @@
+{
+  "session_id": "01M616D5NP6VVEGD5RT5VDM497",
+  "status": "analysed",
+  "analysed_frames": 38417,
+  "total_frames": 38417,
+  "before_frames": 16080,
+  "before": {
+    "event_types": {
+      "calibration": 1,
+      "activity_interval": 219,
+      "scene": 44,
+      "participant_observation": 114,
+      "identity_ambiguity": 13,
+      "rally_start": 10,
+      "rally_end": 8,
+      "stroke": 40,
+      "contact": 41
+    },
+    "stroke_types": {
+      "short_serve": 5,
+      "unknown": 26,
+      "drop": 4,
+      "long_serve": 3,
+      "clear": 1,
+      "smash": 1
+    },
+    "classified_strokes": 14
+  },
+  "after": {
+    "event_types": {
+      "calibration": 1,
+      "activity_interval": 947,
+      "scene": 125,
+      "participant_observation": 612,
+      "rally_start": 32,
+      "rally_end": 30,
+      "identity_ambiguity": 36,
+      "stroke": 133,
+      "contact": 133
+    },
+    "stroke_types": {
+      "unknown": 91,
+      "short_serve": 14,
+      "drop": 1,
+      "push": 6,
+      "long_serve": 10,
+      "drive": 4,
+      "lift": 3,
+      "net_shot": 2,
+      "rush": 1,
+      "smash": 1
+    },
+    "classified_strokes": 42
+  },
+  "calibration": {
+    "source": "auto",
+    "method": "court_lines_v1",
+    "quality": {
+      "precision": 0.8802,
+      "support": 3.916,
+      "lines": [
+        5,
+        6
+      ],
+      "area": 0.3225,
+      "rms_px": 0.973
+    }
+  },
+  "backup": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/data/backups/01M616D5NP6VVEGD5RT5VDM497/20261030T072521.159940Z-01M65V5TW8GGQQQY0JYM7S89NZ",
+  "event_seq": 3244,
+  "updated_at": "2026-10-30T08:02:38.598254+00:00",
+  "limits": "Counts and geometric coverage are not labelled detection/classification accuracy; uncertain labels and winners are withheld.",
+  "restart_reopen_verified": {
+    "unchanged_event_sequence": 3244,
+    "unchanged_completion_timestamp": true,
+    "models_reloaded": false,
+    "public_health_http": 200
+  },
+  "tests": {
+    "api_engine_agents": 178,
+    "badminton": 578,
+    "frontend": 88
+  },
+  "recovered_section": {
+    "frame_interval": [
+      4135,
+      7682
+    ],
+    "new_frames": 3548,
+    "new_views": {
+      "main": 2955,
+      "alt": 393,
+      "none": 200
+    },
+    "new_raw_shuttle_observations": 1532,
+    "old_camera_heads": {
+      "-1": 66,
+      "4": 141,
+      "1": 3106,
+      "2": 235
+    },
+    "old_visible_shuttle_track_rows": 0,
+    "note": "Coverage and observed rows, not labelled accuracy"
+  }
+}

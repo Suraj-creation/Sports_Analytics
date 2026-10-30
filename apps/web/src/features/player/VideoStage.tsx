@@ -53,7 +53,6 @@ export function VideoStage({ session }: { session: Session }) {
   const frontier = useSession((s) => s.session?.frontier_frame ?? 0);
   const status = useSession((s) => s.session?.status ?? session.status);
 
-  const reviewBox = usePlayback((s) => s.reviewBox);
   const layers = usePlayback((s) => s.layers);
   const waitForAnalysis = usePlayback((s) => s.waitForAnalysis);
   const bindVideo = usePlayback((s) => s.bindVideo);
@@ -169,10 +168,9 @@ export function VideoStage({ session }: { session: Session }) {
       layers: off,
       colors: PLAYER_HEX,
       names: { P1: shortName(session, "P1"), P2: shortName(session, "P2") },
-      reviewBox: reviewBox?.sessionId === session.session_id ? reviewBox : null,
     };
     frameClock.poke();
-  }, [video, tracks, events, calibration, layers, hidden, session, tracksVersion, eventsVersion, reviewBox]);
+  }, [video, tracks, events, calibration, layers, hidden, session, tracksVersion, eventsVersion]);
 
   useEffect(
     () =>

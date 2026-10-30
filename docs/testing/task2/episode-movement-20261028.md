@@ -1,5 +1,7 @@
 # Anonymous episode movement estimates
 
+Historical validation record. The track movement feature and its API were removed on 2026-10-30; the behavior below describes the retired implementation.
+
 `GET /api/sessions/{session_id}/episode-movement?from=START&to=END` accepts an inclusive canonical frame window of at most 120 seconds. It returns separate temporary track-episode summaries, not named players. Missing observations, calibration, valid camera poses or usable continuous movement produce `available: false` / `distance_m: null` rather than a fabricated zero. A successfully sampled stationary episode may instead have distance zero.
 
 New doubles track samples retain court coordinates only when the episode birth, detector track and valid target-court projection agree. Existing samples lacking those coordinates or episode-birth provenance cannot support the metric; reanalysis must follow a verified session backup. The movement helper also requires one in-frame player box per track/frame, confidence at least 0.5, finite court points inside the bounded target court, and a unique visible main-camera matrix with quality at least 0.6 and condition number below 1e12. It stops an episode at reset, exit, reuse or relevant identity uncertainty. Samples are never joined across an observation ID, track ID, rejected frame or missing frame.

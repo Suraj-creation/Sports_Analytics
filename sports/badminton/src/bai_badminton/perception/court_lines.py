@@ -463,6 +463,43 @@ def downscale(frame: Frame, work_width: int) -> tuple[Frame, float]:
     return np.asarray(cv2.resize(frame, (work_width, round(h * s)), interpolation=interp), dtype=np.uint8), s
 
 
+def _surface_region(hsv: NDArray[np.uint8]) -> NDArray[np.uint8] | None:
+    """Large mat-coloured regions plus a small allowance for white paint.
+
+    Low-angle footage includes long white roof and wall beams. Brightness and
+    straightness alone cannot distinguish those from floor lines. When a large
+    coloured playing surface is visible, require line evidence near it. Use all
+    existing mat families; neutral courts without such a region retain their
+    previous line evidence rather than assuming a green floor.
+    """
+    from bai_badminton.perception.scene import MAT_BANDS
+
+    h, w = hsv.shape[:2]
+    coloured = np.zeros((h, w), np.uint8)
+    for band in MAT_BANDS:
+        coloured |= band.mask(hsv)
+    # Bridge thin painted lines and small player occlusions before measuring
+    # component area. A shirt or advertising glyph is not a playing surface.
+    k = _odd(0.02 * w)
+    coloured = cv2.morphologyEx(coloured, cv2.MORPH_CLOSE, np.ones((k, k), np.uint8))
+    _, labels, stats, _ = cv2.connectedComponentsWithStats(coloured, connectivity=8)
+    keep = (stats[:, cv2.CC_STAT_AREA] >= MIN_AREA * w * h).astype(np.uint8)
+    keep[0] = 0
+    surface = keep[labels]
+    if not surface.any():
+        return None
+    margin = _odd(0.012 * w)
+    return cv2.dilate(surface, np.ones((margin, margin), np.uint8))
+
+
+def _long_line_mask(pixels: NDArray[np.uint8], width: int) -> NDArray[np.uint8]:
+    _, labels, stats, _ = cv2.connectedComponentsWithStats(pixels, connectivity=8)
+    longest = np.maximum(stats[:, cv2.CC_STAT_WIDTH], stats[:, cv2.CC_STAT_HEIGHT])
+    keep = (longest >= 0.025 * width).astype(np.uint8) * 255
+    keep[0] = 0
+    return keep[labels]
+
+
 def line_features(frame: Frame, work_width: int = 960, *, scaled: tuple[Frame, float] | None = None) -> LineFeatures:
     """``scaled``: ``frame`` already downscaled (image, scale) — saves a second resize."""
     img, s = scaled if scaled is not None else downscale(frame, work_width)
@@ -472,12 +509,15 @@ def line_features(frame: Frame, work_width: int = 960, *, scaled: tuple[Frame, f
     k = _odd(0.016 * ww)
     tophat = cv2.morphologyEx(val, cv2.MORPH_TOPHAT, cv2.getStructuringElement(cv2.MORPH_RECT, (k, k)))
     m = ((tophat >= 22) & (sat <= 115) & (val >= 105)).astype(np.uint8)
-    # specks, letters and logo glyphs are short; court lines (even cut by a player) are long
-    _, lab, stats, _ = cv2.connectedComponentsWithStats(m, connectivity=8)
-    longest = np.maximum(stats[:, cv2.CC_STAT_WIDTH], stats[:, cv2.CC_STAT_HEIGHT])
-    keep = (longest >= 0.025 * ww).astype(np.uint8) * 255
-    keep[0] = 0
-    mask = keep[lab]
+    # Specks, letters and logo glyphs are short; court lines are long.
+    mask = _long_line_mask(m, ww)
+    surface = _surface_region(hsv)
+    if surface is not None:
+        supported = _long_line_mask(m & surface, ww)
+        # A coloured wall or advertising patch without painted-line support
+        # must not hide a neutral playing surface elsewhere in the image.
+        if supported.any():
+            mask = supported
     # centre ridge: local maxima of the distance to the line's border (a thick line counts once)
     inner = cv2.distanceTransform(mask, cv2.DIST_L2, 3)
     ridge = ((mask > 0) & (inner >= cv2.dilate(inner, np.ones((3, 3), np.uint8)) - 1e-3)).astype(np.uint8) * 255

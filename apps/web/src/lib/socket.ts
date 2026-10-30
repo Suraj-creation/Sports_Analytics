@@ -19,13 +19,17 @@ export class SessionSocket {
     private readonly onMessage: (m: ServerMsg) => void,
     private readonly lastSeq: () => number,
     private readonly onState: (s: "connecting" | "open" | "closed") => void = () => {},
+    private readonly generation: () => string | undefined = () => undefined,
   ) {
     this.connect();
   }
 
   private url(): string {
     const proto = location.protocol === "https:" ? "wss" : "ws";
-    return `${proto}://${location.host}/ws/sessions/${this.sessionId}?last_seq=${this.lastSeq()}`;
+    const query = new URLSearchParams({ last_seq: String(this.lastSeq()) });
+    const generation = this.generation();
+    if (generation) query.set("generation", generation);
+    return `${proto}://${location.host}/ws/sessions/${this.sessionId}?${query}`;
   }
 
   private connect(): void {
@@ -34,10 +38,12 @@ export class SessionSocket {
     const ws = new WebSocket(this.url());
     ws.binaryType = "arraybuffer";
     ws.onopen = () => {
+      if (this.closed || this.ws !== ws) return;
       this.retry = 0;
       this.onState("open");
     };
     ws.onmessage = (ev) => {
+      if (this.closed || this.ws !== ws) return;
       try {
         const msg = ev.data instanceof ArrayBuffer ? decode(new Uint8Array(ev.data)) : JSON.parse(ev.data);
         if (msg && typeof msg === "object") {
@@ -50,8 +56,8 @@ export class SessionSocket {
       }
     };
     ws.onclose = () => {
+      if (this.closed || this.ws !== ws) return;
       this.onState("closed");
-      if (this.closed) return;
       const delay = Math.min(10_000, 400 * 2 ** this.retry++);
       this.timer = setTimeout(() => this.connect(), delay);
     };

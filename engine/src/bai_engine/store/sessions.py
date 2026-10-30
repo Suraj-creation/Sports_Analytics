@@ -121,6 +121,92 @@ class SessionRepository:
         self.paths(session.session_id).root.mkdir(parents=True, exist_ok=True)
         return session
 
+    def find_reusable(self, session: Session) -> Session | None:
+        """Match durable source identity, never a filename or a guessed title."""
+        video_id = session.meta.get("youtube_video_id")
+        digest = session.source.sha256
+        if not digest and not video_id:
+            return None
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT body FROM sessions WHERE session_id != ? "
+                "AND json_extract(body, '$.meta.reused_session_id') IS NULL "
+                "AND json_extract(body, '$.profile') = ? "
+                "AND json_extract(body, '$.sport') = ? AND ("
+                "(? IS NOT NULL AND json_extract(body, '$.source.sha256') = ?) OR "
+                "(? IS NOT NULL AND (json_extract(body, '$.meta.youtube_video_id') = ? "
+                "OR json_extract(body, '$.source.uri') = ?))) "
+                "ORDER BY (status = 'analysed') DESC, "
+                "json_extract(body, '$.analysed_frames') DESC, created_at DESC",
+                (
+                    session.session_id,
+                    session.profile,
+                    session.sport,
+                    digest,
+                    digest,
+                    video_id,
+                    video_id,
+                    session.source.uri,
+                ),
+            ).fetchall()
+            for row in rows:
+                previous = Session.model_validate_json(row["body"])
+                if session.roster is not None and (
+                    previous.roster is None or previous.roster.match_format != session.roster.match_format
+                ):
+                    continue
+                return previous
+        return None
+
+    def save_or_reuse(self, session: Session) -> tuple[Session, bool]:
+        """Serialize same-process imports and preserve existing calibration/metadata."""
+        with self._lock:
+            previous = self.find_reusable(session)
+            return (previous, True) if previous else (self.save(session), False)
+
+    def reuse_downloaded_source(self, session: Session) -> Session | None:
+        """Recognize legacy imports whose original YouTube ID was not retained.
+
+        A single identification download may be needed. A matching media hash lets
+        the import redirect to saved results before transcoding or model inference.
+        Retain the recovered ID on the original so future imports skip downloading.
+        """
+        with self._lock:
+            previous = self.find_reusable(session)
+            if previous is None:
+                return None
+            video_id = session.meta.get("youtube_video_id")
+            if video_id and not previous.meta.get("youtube_video_id"):
+                previous = self.update(previous.session_id, meta={**previous.meta, "youtube_video_id": video_id})
+            self.update(
+                session.session_id,
+                source=session.source,
+                media=previous.media,
+                title=previous.title,
+                status=previous.status,
+                status_detail=previous.status_detail,
+                frontier_frame=previous.frontier_frame,
+                analysed_frames=previous.analysed_frames,
+                meta={**session.meta, "reused_session_id": previous.session_id},
+            )
+            return previous
+
+    def mark_interrupted(self) -> int:
+        """A fresh engine owns no prior workers; keep their results but correct stale status."""
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT body FROM sessions WHERE status IN ('created', 'ingesting', 'ready_to_play', 'analysing')"
+            ).fetchall()
+            for row in rows:
+                session = Session.model_validate_json(row["body"])
+                self.set_status(
+                    session.session_id,
+                    SessionStatus.FAILED,
+                    "Analysis interrupted by a server restart. Saved results and calibration were preserved. "
+                    "Use Retry analysis to finish processing.",
+                )
+            return len(rows)
+
     def get(self, session_id: str) -> Session | None:
         with self._lock:
             row = self._conn.execute("SELECT body FROM sessions WHERE session_id=?", (session_id,)).fetchone()
@@ -128,7 +214,11 @@ class SessionRepository:
 
     def list(self, limit: int = 200) -> list[Session]:
         with self._lock:
-            rows = self._conn.execute("SELECT body FROM sessions ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
+            rows = self._conn.execute(
+                "SELECT body FROM sessions WHERE json_extract(body, '$.meta.reused_session_id') IS NULL "
+                "ORDER BY created_at DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
         return [Session.model_validate_json(r["body"]) for r in rows]
 
     def update(self, session_id: str, **changes: object) -> Session:

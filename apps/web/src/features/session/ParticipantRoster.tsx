@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ErrorNote } from "@/components/ui";
 import { api } from "@/lib/api";
 import type { RosterParticipant, Session, SessionRoster } from "@/lib/types";
@@ -14,6 +14,8 @@ export function ParticipantRoster({ session }: { session: Session }) {
   const [saved, setSaved] = useState<SessionRoster | null>(session.roster ?? null);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<SessionRoster | null>(session.roster ?? null);
+  // Socket/query refreshes update saved data without replacing a form being edited.
+  useEffect(() => setSaved(session.roster ?? null), [session.roster]);
   const save = useMutation({
     mutationFn: (roster: SessionRoster) => api.updateRoster(session.session_id, roster),
     onSuccess: (updated) => {
@@ -36,7 +38,7 @@ export function ParticipantRoster({ session }: { session: Session }) {
     const count = value === "doubles" ? 4 : 2;
     const previous = draft?.participants ?? [];
     const participants = Array.from({ length: count }, (_, index) => previous[index] ?? blankParticipant());
-    setDraft({ match_format: value, teams: [{ team_id: "T1", score_slot: null }, { team_id: "T2", score_slot: null }], participants });
+    setDraft({ match_format: value, teams: draft?.teams ?? [{ team_id: "T1", score_slot: null }, { team_id: "T2", score_slot: null }], participants });
   };
   const changeParticipant = (index: number, change: Partial<RosterParticipant>) => {
     setDraft((current) => current ? {
@@ -60,7 +62,7 @@ export function ParticipantRoster({ session }: { session: Session }) {
         </ul>
       )}
       {!editing && (
-        <button className="rally-action mt-4" type="button" onClick={() => { setDraft(saved); setEditing(true); }}>
+        <button className="rally-action mt-4" type="button" onClick={() => { save.reset(); setDraft(saved); setEditing(true); }}>
           {saved ? "Edit participants" : "Set up participants"}
         </button>
       )}
@@ -71,7 +73,7 @@ export function ParticipantRoster({ session }: { session: Session }) {
         }}>
           <label className="block text-sm">
             Match format
-            <select className="mt-2 block min-h-11 w-full rounded-lg border border-seam bg-stand px-3" value={draft?.match_format ?? ""} disabled={Boolean(saved)} onChange={(event) => chooseFormat(event.target.value)}>
+            <select className="mt-2 block min-h-11 w-full rounded-lg border border-seam bg-stand px-3" value={draft?.match_format ?? ""} disabled={save.isPending} onChange={(event) => chooseFormat(event.target.value)}>
               <option value="">Choose a format</option>
               <option value="singles">Singles</option>
               <option value="doubles">Doubles</option>

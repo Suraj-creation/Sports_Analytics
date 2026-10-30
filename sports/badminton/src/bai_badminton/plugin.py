@@ -506,6 +506,8 @@ class BadmintonSession:
             "mode": self.perception.mode,
             "fixed_camera": self._fixed_camera,
         }
+        if self.perception.mode == "lines":
+            policy["court_line_surface"] = 1
         # Older doubles caches silently capped candidate tracks at four; do not
         # reuse them with the expanded policy. Existing singles caches remain valid.
         if getattr(self.perception, "match_format", "singles") == "doubles":

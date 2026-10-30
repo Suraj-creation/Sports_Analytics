@@ -17,10 +17,8 @@ import { usePlayback } from "@/stores/playback";
 import { useSession } from "@/stores/session";
 import { LiveFeed } from "./LiveFeed";
 import { PlayerSelector } from "./PlayerSelector";
-import { EpisodeMovement } from "./EpisodeMovement";
 import { EstimatedIndividualAnalytics } from "./EstimatedIndividualAnalytics";
 import { IndividualAnalytics } from "./IndividualAnalytics";
-import { ParticipantReview } from "./ParticipantReview";
 import { ParticipantRoster } from "./ParticipantRoster";
 import { ReanalysisFeedback } from "./ReanalysisFeedback";
 import { ExportTab } from "./tabs/ExportTab";
@@ -40,6 +38,7 @@ const TABS = [
 ] as const;
 
 export function SessionPage() {
+  const navigate = useNavigate();
   const params = useParams({ strict: false }) as { sessionId?: string; matchId?: string };
   const sessionId = params.matchId ?? params.sessionId ?? "";
   const search = useSearch({ strict: false }) as AnalysisSearch;
@@ -56,6 +55,21 @@ export function SessionPage() {
     return () => close();
   }, [sessionId, open, close]);
   const session = live?.session_id === sessionId ? live : q.data;
+  const reused = session?.meta.reused_session_id;
+  const reusedSessionId = typeof reused === "string" && reused.trim() !== sessionId ? reused.trim() : "";
+  useEffect(() => {
+    if (reusedSessionId) void navigate({
+      to: "/matches/$matchId",
+      params: { matchId: reusedSessionId },
+      search,
+      replace: true,
+    });
+  }, [reusedSessionId, navigate, search]);
+  if (reusedSessionId) return (
+    <div className="grid h-64 place-items-center" role="status">
+      <p className="flex items-center gap-3 text-sm text-line-2"><Spinner className="size-5" /> Opening saved analysis…</p>
+    </div>
+  );
   if (q.error && !session)
     return (
       <div className="match-workspace">
@@ -100,6 +114,7 @@ function SessionWorkspace({ session, search }: { session: Session; search: Analy
       to: ".",
       search: ((old: Record<string, unknown>) => ({ ...old, ...change })) as never,
       replace: true,
+      resetScroll: false,
     });
 
   useEffect(() => {
@@ -192,7 +207,7 @@ function SessionWorkspace({ session, search }: { session: Session; search: Analy
           <button type="button" className="rally-action" onClick={() => setEditing(true)}>
             Edit match details
           </button>
-          <button type="button" className="rally-action" onClick={() => setShowQuality((v) => !v)}>
+          <button type="button" className="rally-action" aria-expanded={showQuality} aria-controls="recording-quality" onClick={() => setShowQuality((v) => !v)}>
             Recording & quality
           </button>
           <button type="button" className="rally-action" onClick={() => setShowExports((v) => !v)}>
@@ -240,8 +255,8 @@ function SessionWorkspace({ session, search }: { session: Session; search: Analy
         </p>
       )}
       {showQuality && (
-        <section className="analysis-panel mt-5">
-          <h2>What this recording can tell us</h2>
+        <section id="recording-quality" className="analysis-panel mt-5" aria-labelledby="recording-quality-heading">
+          <h2 id="recording-quality-heading">What this recording can tell us</h2>
           <dl className="mt-4 grid grid-cols-2 gap-4 text-sm">
             <div>
               <dt className="text-line-2">Source frames</dt>
@@ -265,6 +280,24 @@ function SessionWorkspace({ session, search }: { session: Session; search: Analy
             placement uses receiver positions; measured distance can contain tracking jitter. Four-player
             doubles attribution requires additional identity evidence.
           </p>
+          {session.status === "analysed" && (
+            <div className="mt-5 border-t border-seam pt-4">
+              <h3 className="font-medium">Apply court or format changes</h3>
+              <p className="analysis-panel-hint mt-2">
+                This backs up saved results, then reprocesses the video with your current court calibration and match format.
+              </p>
+              <button
+                type="button"
+                className="rally-action mt-3"
+                disabled={reanalyse.isPending}
+                onClick={() => reanalyse.mutate()}
+              >
+                <RotateCcw className="size-4" aria-hidden />
+                {reanalyse.isPending ? "Requesting reanalysis…" : "Analyse again"}
+              </button>
+              <ErrorNote error={reanalyse.error} />
+            </div>
+          )}
         </section>
       )}
       {showExports && (
@@ -292,8 +325,6 @@ function SessionWorkspace({ session, search }: { session: Session; search: Analy
       <ParticipantRoster key={`roster-${session.session_id}`} session={session} />
       <IndividualAnalytics session={session} />
       <EstimatedIndividualAnalytics session={session} />
-      <EpisodeMovement session={session} />
-      <ParticipantReview key={`review-${session.session_id}`} session={session} />
       <details className="analysis-panel mt-5">
         <summary className="cursor-pointer text-sm font-medium">Live event feed</summary>
         <div className="mt-4 max-h-64 overflow-y-auto">
