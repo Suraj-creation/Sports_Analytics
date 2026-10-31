@@ -26,8 +26,8 @@
 - [x] Inspect scoring/OCR, corrections, reanalysis generation, persistence, live/API folds, highlights, exports, and frontend transport. Recover compatible fixes and add tests for newly demonstrated defects.
 - [x] Audit CUDA/provider selection and disabled models. Test requested versus actual backend status with controlled sessions; never claim CUDA execution locally.
 - [x] Run available existing unit/regression/synthetic integration tests, static parsing, focused lint, frontend tests/typecheck/build. Record unavailable dependencies and actual pass/fail/skip counts.
-- [ ] Review all changed paths and file sizes; verify protected user state byte-for-byte. Commit only reviewed recovery files, leave protected changes untouched, and delete only obsolete fully merged local branches without active worktrees.
-- [ ] Complete `docs/testing/pipeline-recovery-20261031.md` with architecture, contracts, defect register, commands/results, limitations, completion checklist, and ordered GPU/real-video validation plan.
+- [x] Review all changed paths and file sizes; verify protected user state byte-for-byte. Commit only reviewed recovery files, leave protected changes untouched, and delete only obsolete fully merged local branches without active worktrees.
+- [x] Complete `docs/testing/pipeline-recovery-20261031.md` with architecture, contracts, defect register, commands/results, limitations, completion checklist, and ordered GPU/real-video validation plan.
 
 ## Primary boundaries to inspect
 

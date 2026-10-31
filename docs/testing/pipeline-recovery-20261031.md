@@ -14,6 +14,16 @@ This recovery repairs executable contracts and integration on `main`. It does **
 
 Original local branches: `Design_prototype@c982510`, `client-website-immersive@4654ae3`, `codex/task2-persistent-identity@5d76ad6`, `main@510b703`, `master@4540a71`, `review/pipeline-reliability@c4b1b96`, `upgrading@55055e0`. The separate identity and review worktrees were preserved. Unmerged branches remain recoverable because they contain independent product/review work beyond the selectively recovered fixes.
 
+### Final Git state
+
+The tested recovery was committed on **`main`** as **`74a200af977146eba2d57c787784b5839800f983`** (`Recover and validate badminton pipeline contracts and state`): 99 files, 6,205 insertions and 576 deletions. A documentation-only completion commit records the branch cleanup and final checklist; its final HEAD is supplied with the delivery.
+
+After that integration, `git branch --merged main` and `git worktree list` were checked again. Only obsolete local **`master`** (`4540a71bbd95ec1ebb95a7fea7938982fbc84700`) and **`upgrading`** (`55055e022574c0cf2d2f41becb1736c939b1589e`) were deleted with non-forcing `git branch -d`. Their commits remain ancestors of main, with original refs also recorded in the backup inventory. No remote branch was changed.
+
+Preserved local branches are `Design_prototype`, `client-website-immersive`, `codex/task2-persistent-identity`, and `review/pipeline-reliability`, plus active `main`. The first two retain independent product work; the review branch retains historical probes/docs and implementation differences not safely merged wholesale. The already merged identity branch remains checked out in its existing worktree. The separate detached Kilo worktree was also untouched.
+
+The working tree is **intentionally not clean**: it retains exactly the original 17 design-document deletions, two modified web dependency files, and the original untracked design/client/legacy directories. Recovery source changes are committed, and the index is empty after the completion commit. The final protected binary diff matches the original backup, SHA-256 `01F68BF08339C85CDA7669097AAE175EC359849E8BC0809DC87E3FC36493D052`. Ignored user directories, including `Part2/` and any `apps/web/dist.old/`, were not cleaned, deleted or moved. Nothing was pushed.
+
 ## Actual execution path and inventory
 
 ```text
