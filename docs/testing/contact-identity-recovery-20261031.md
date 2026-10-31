@@ -111,6 +111,14 @@ The first broad run had 1,097 passes and three failures enforcing the former dis
 
 Independent read-only review found the multiple-racket, dormant-margin, corrected-review, official-motion and later-game service-control issues. All received targeted regressions and repairs; follow-up review found no remaining blocker in the changed source. Further parent inspection aligned same-frame/epoch/older-boundary overlay behavior with the ledger. Desktop workflow screenshots were inspected. The owned temporary browser server was stopped; production data and unrelated processes were untouched.
 
+## Delivery and repository state
+
+The tested implementation is committed on **`main`** as **`9e105e9ea6e483c0938960ce79bd299ece845ffd`**, `Connect racket evidence and four-player identity workflows` (63 files, 3,159 insertions, 134 deletions). A documentation-only completion commit records this delivery state; the final HEAD is supplied in the delivery message. No branch was created/deleted in this follow-up and nothing was pushed.
+
+The working tree intentionally retains the original 17 design-document deletions, changes to `apps/web/package.json` and `apps/web/pnpm-lock.yaml`, and original untracked design/client/legacy folders. Those paths were excluded from the recovery commit. The protected binary diff is still byte-identical to its backup: SHA-256 `01F68BF08339C85CDA7669097AAE175EC359849E8BC0809DC87E3FC36493D052`. `Part2/`, `SportsVideoAnalysis/`, `apps/web/dist.old/` and other unrelated folders were not cleaned, moved or deleted. The recovery index is empty after the completion commit.
+
+To use the restored workflow, record the four participants, their teams and team score slots before assigning reviewed identities. After completed analysis, open Visual track observations, watch the relevant evidence and link each person to a finite track interval. Confirm hitters independently. Individual player analytics and Your pair then expose only the corresponding reviewed evidence. Use the service setup frame and named opposing pair to initialize partner rotation; choose frame zero only for a known opening at 0–0. A changed analysis, changed score history or new game requires the appropriate new review/setup rather than reusing stale evidence.
+
 ## Remaining external validation
 
 1. Labelled representative video is still required to measure racket recall/false positives, contact timing/precision/recall, hitter attribution and player ID switches. In particular test blur, edge-on rackets, clutter, overlap, missed poses and low shuttle visibility. Physical collision truth cannot be established from synthetic ellipse overlap.

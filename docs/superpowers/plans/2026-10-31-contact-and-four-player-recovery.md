@@ -15,4 +15,4 @@
 - [x] Reconnect existing finite-interval identity ledger and scoped shot review for all four roster people. Test authorization/validation, simultaneous one-to-one mappings, revoked/superseded evidence, reanalysis revisions and coherent persistence reads. Expose the dedicated workflow in the current visual-observation panel.
 - [x] Inspect downstream doubles service state, exports, movement, runtime metadata and unsupported-stage contracts; fix demonstrated remaining defects with targeted regressions.
 - [x] Run focused red/green suites, then full offline backend/research, frontend, typecheck/build and meaningful browser coverage. Obtain independent review, address findings and document exact limits.
-- [ ] Verify original work byte-for-byte, commit only task files on main, and deliver report with implemented capabilities and remaining external validation.
+- [x] Verify original work byte-for-byte, commit only task files on main, and deliver report with implemented capabilities and remaining external validation.
