@@ -52,7 +52,7 @@ def extract_frames(directory: Path, calibrations: list[Event]) -> tuple[dict[int
         hashes[path.name] = hashlib.sha256(raw).hexdigest()
         chunk = msgpack.unpackb(raw, raw=False)
         versions[chunk["v"]] += 1
-        if chunk["v"] not in (9, 10, 11):
+        if chunk["v"] not in (9, 10, 11, 12):
             raise ValueError(f"unsupported diagnostic cache codec {chunk['v']}")
         for row in chunk["frames"]:
             index = row["f"]

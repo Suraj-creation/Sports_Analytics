@@ -185,7 +185,7 @@ test("real upload creates playable media with range delivery and exact frame nav
     await expect(page).toHaveURL(/who=P2/);
   }
   await expect(
-    page.getByText("This analysis currently resolves two court-side identities", { exact: false }),
+    page.getByText("No pair positions have sufficient reviewed evidence yet.", { exact: true }),
   ).toBeVisible();
   await page.reload();
   await expect(page.getByRole("button", { name: "Show Far numbers", exact: true })).toHaveAttribute(

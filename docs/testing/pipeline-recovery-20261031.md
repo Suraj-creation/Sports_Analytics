@@ -2,6 +2,8 @@
 
 This recovery repairs executable contracts and integration on `main`. It does **not** establish real-video player/shuttle recall, physical racket-contact accuracy, shot-family accuracy, automatic scoring accuracy, or actual CUDA execution. Synthetic observations, controlled model adapters, real ByteTrack, real SQLite/Parquet, FFmpeg, HTTP and browser tests have different evidential limits; they are distinguished below.
 
+The subsequent [racket and four-player recovery](contact-identity-recovery-20261031.md) connects local image-based racket evidence, reviewed four-person identity/movement, pair positions and explicit named doubles service order. Its report supersedes the corresponding disconnected-capability statements below; real-video/model/GPU accuracy remains unverified.
+
 ## Repository and recovery decisions
 
 - Original checkout: `C:/Users/Govin/Desktop/Badminton_analytics`, branch `main`, commit `510b703`. The local `origin/main` reference was identical; no fetch, SSH, remote job, push or remote branch deletion was performed.

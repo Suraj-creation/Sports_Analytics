@@ -16,9 +16,13 @@ def pipeline():
     return p
 
 
-def test_existing_profiles_keep_optional_reid_disabled():
+def test_gpu_doubles_profiles_request_pinned_local_reid_and_cpu_stays_optional():
     assert load_profile("cpu-dev").player_reid is None
-    assert load_profile("gpu-rtx4000").player_reid is None
+    for name in ("gpu-rtx4000", "gpu-high", "gpu-doubles-identity"):
+        choice = load_profile(name).player_reid
+        assert choice.model == "osnet_ain_x0_25"
+        assert choice.backend == "torch-cuda" and choice.precision == "fp32"
+        assert choice.params["retention_seconds"] == 8
 
 
 def test_descriptor_loading_is_local_and_device_explicit(monkeypatch):

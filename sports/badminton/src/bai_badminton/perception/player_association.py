@@ -57,10 +57,18 @@ class PersistentPlayerAssociator:
     increasing across reset, so birth IDs cannot collide with earlier output.
     """
 
-    def __init__(self, fps: float) -> None:
+    def __init__(self, fps: float, *, retention_seconds: float = RETENTION_SECONDS) -> None:
         if isinstance(fps, bool) or not isinstance(fps, (int, float)) or not isfinite(fps) or fps <= 0:
             raise ValueError("a finite positive frame rate is required")
         self.fps = float(fps)
+        if (
+            isinstance(retention_seconds, bool)
+            or not isinstance(retention_seconds, (int, float))
+            or not isfinite(retention_seconds)
+            or not 0 < retention_seconds <= 300
+        ):
+            raise ValueError("identity retention must be finite and within (0, 300] seconds")
+        self.retention_seconds = float(retention_seconds)
         self._tracks: dict[int, _Identity] = {}
         self._raw_links: dict[int, int] = {}
         self._last_frame = -1
@@ -68,7 +76,7 @@ class PersistentPlayerAssociator:
 
     @property
     def policy_fingerprint(self) -> str:
-        return POLICY_FINGERPRINT
+        return f"{POLICY_FINGERPRINT}:retention{self.retention_seconds:g}:dormant-neural-v1"
 
     def reset(self) -> None:
         self._tracks.clear()
@@ -139,7 +147,7 @@ class PersistentPlayerAssociator:
         if max(height, other_height) / min(height, other_height) > 2:
             return float("inf"), 0.5
         predicted = _feet(state.box)
-        if state.previous is not None:
+        if state.previous is not None and (frame_idx - state.frame) / self.fps <= RETENTION_SECONDS:
             old_frame, old_box = state.previous
             velocity = (predicted - _feet(old_box)) / (state.frame - old_frame)
             speed = float(np.linalg.norm(velocity))
@@ -168,7 +176,7 @@ class PersistentPlayerAssociator:
         self._tracks = {
             key: value
             for key, value in self._tracks.items()
-            if (frame_idx - value.frame) / self.fps <= RETENTION_SECONDS
+            if (frame_idx - value.frame) / self.fps <= self.retention_seconds
         }
         self._raw_links = {raw: key for raw, key in self._raw_links.items() if key in self._tracks}
         output = [-1] * len(tracks)
@@ -201,6 +209,18 @@ class PersistentPlayerAssociator:
                     continue
                 same_raw = self._raw_links.get(raw) == key
                 neural = feature is not None and bool(state.gallery)
+                dormant = (frame_idx - state.frame) / self.fps > RETENTION_SECONDS
+                if dormant and (not neural or similarities[col] < 0.9):
+                    # Preserve the hypothesis as a possible match while refusing
+                    # recycled raw IDs without distinctive neural evidence.
+                    plausible[row_idx, col] = True
+                    continue
+                if dormant:
+                    competitors = [value for j, value in enumerate(similarities) if j != col]
+                    unknown_gallery = any(not self._tracks[other].gallery for other in keys if other != key)
+                    if unknown_gallery or (competitors and similarities[col] - max(competitors) < ASSIGNMENT_MARGIN):
+                        plausible[row_idx, col] = True
+                        continue
                 if neural and similarities[col] < MIN_COSINE:
                     continue
                 if not neural and not same_raw:

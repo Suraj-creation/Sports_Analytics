@@ -185,6 +185,7 @@ def _stabilise(p: PersonObs, Ginv: Any) -> PersonObs:
         raw_track_id=p.raw_track_id,
         detector_matched=p.detector_matched,
         identity_method=p.identity_method,
+        racket=p.racket.transformed(Ginv) if p.racket is not None else None,
     )
 
 
@@ -289,7 +290,7 @@ class BadmintonMatchEngine:
         self._participant_visible_counts: list[int] = []
         self._participant_identity_unresolved: list[bool] = []
         self._players: dict[str, dict[str, list[Any]]] = {
-            pid: {"bbox": [], "kps": [], "court": [], "track_id": []} for pid in ("P1", "P2")
+            pid: {"bbox": [], "kps": [], "court": [], "track_id": [], "racket": []} for pid in ("P1", "P2")
         }
         self._proc: Track | None = None  # processed shuttle over the current window
         self._proc0 = 0
@@ -587,6 +588,7 @@ class BadmintonMatchEngine:
                     court_xy=person.court_xy,
                     detector_observed=fp.detector_observed,
                     detector_matched=person.detector_matched,
+                    racket=person.racket,
                 )
         participant_events = [
             self._event(
@@ -737,6 +739,7 @@ class BadmintonMatchEngine:
             buf["kps"].append(a.kps if a is not None and a.kps is not None else None)
             buf["court"].append(a.court_xy if a is not None else None)
             buf["track_id"].append(a.track_id if a is not None and a.track_id >= 0 else None)
+            buf["racket"].append(a.racket if a is not None else None)
         # identity-resolved track samples for the track store / live overlays (raw frame pixels)
         self._track_out.append(
             TrackSample(
@@ -750,6 +753,27 @@ class BadmintonMatchEngine:
             )
         )
         raw = {q.track_id: q for q in fp.persons}
+        if geometry_valid and not fp.replay:
+            for person in fp.persons:
+                racket = person.racket
+                if racket is None or person.track_id < 0 or person.detector_matched is not True:
+                    continue
+                radius = max(racket.axes) / 2
+                x, y = racket.center
+                self._track_out.append(
+                    TrackSample(
+                        frame_idx=fp.frame_idx,
+                        obj=TrackObject.RACKET,
+                        track_id=person.track_id,
+                        participant_observation_id=observation_by_track.get(person.track_id),
+                        detector_matched=True,
+                        x=x,
+                        y=y,
+                        bbox=(x - radius, y - radius, x + radius, y + radius),
+                        conf=racket.confidence,
+                        model=racket.method,
+                    )
+                )
         assigned_track_ids = {person.track_id for person in assigned.values()}
         if geometry_valid:
             # Missing/partial singles identity is independent of the number of
@@ -886,6 +910,8 @@ class BadmintonMatchEngine:
                 c = buf["court"][a + i]
                 if c is not None:
                     s.court_xy[i] = c
+                if "racket" in buf:
+                    s.racket[i] = buf["racket"][a + i]
             players[pid] = s
         return WindowObs(
             frame0=lo,
@@ -1061,6 +1087,8 @@ class BadmintonMatchEngine:
             "contact_method": CONTACT_MODEL,
             "confidence_semantics": "uncalibrated_heuristic_support",
             "racket_contact_observed": False,
+            "racket_overlap_observed": c.scores.get("racket_overlap", 0) >= 0.5,
+            "racket_evidence_method": "opencv_ellipse_shaft_v1" if c.scores.get("racket_observed", 0) else None,
         }
         # For an unresolved named hitter, retain separately-scored provisional
         # track-episode evidence without asserting a player or team identity.

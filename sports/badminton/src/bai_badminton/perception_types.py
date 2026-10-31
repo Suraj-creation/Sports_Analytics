@@ -10,6 +10,55 @@ from numpy.typing import NDArray
 from bai_badminton.perception.calibration_state import CalibrationState
 
 
+@dataclass(frozen=True)
+class RacketObservation:
+    """Observed image ellipse and shaft support; never a wrist-derived substitute."""
+
+    center: tuple[float, float]
+    axes: tuple[float, float]  # ellipse diameters in image pixels
+    angle: float
+    confidence: float  # uncalibrated geometric support
+    wrist: int
+    method: str = "opencv_ellipse_shaft_v1"
+
+    def __post_init__(self) -> None:
+        values = [*self.center, *self.axes, self.angle, self.confidence]
+        if (
+            len(self.center) != 2
+            or len(self.axes) != 2
+            or not np.isfinite(values).all()
+            or min(self.axes) <= 0
+            or not 0 <= self.confidence <= 1
+            or self.wrist not in (9, 10)
+            or self.method != "opencv_ellipse_shaft_v1"
+        ):
+            raise ValueError("invalid observed racket geometry")
+        object.__setattr__(self, "center", tuple(float(value) for value in self.center))
+        object.__setattr__(self, "axes", tuple(float(value) for value in self.axes))
+
+    def overlap(self, point: tuple[float, float]) -> float:
+        delta = np.asarray(point) - self.center
+        angle = np.deg2rad(self.angle)
+        rotation = np.array([[np.cos(angle), np.sin(angle)], [-np.sin(angle), np.cos(angle)]])
+        distance = float(np.linalg.norm((rotation @ delta) / (np.asarray(self.axes) / 2)))
+        return max(0.0, 1.0 - max(0.0, distance - 0.75) / 0.5)
+
+    def transformed(self, matrix: NDArray[np.float64]) -> RacketObservation | None:
+        import cv2
+
+        phase = np.linspace(0, 2 * np.pi, 32, endpoint=False)
+        local = np.column_stack((np.cos(phase), np.sin(phase))) * (np.asarray(self.axes) / 2)
+        angle = np.deg2rad(self.angle)
+        rotation = np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
+        points = local @ rotation.T + self.center
+        homogeneous = np.column_stack((points, np.ones(len(points)))) @ np.asarray(matrix).T
+        if not np.isfinite(homogeneous).all() or np.any(np.abs(homogeneous[:, 2]) < 1e-8):
+            return None
+        mapped = (homogeneous[:, :2] / homogeneous[:, 2, None]).astype(np.float32)
+        center, axes, orientation = cv2.fitEllipse(mapped)
+        return RacketObservation(tuple(center), tuple(axes), orientation, self.confidence, self.wrist)
+
+
 @dataclass
 class PersonObs:
     track_id: int
@@ -21,6 +70,7 @@ class PersonObs:
     raw_track_id: int | None = None  # ByteTrack ID before optional neural/motion association
     detector_matched: bool | None = None  # unique match to this frame's person detection
     identity_method: str | None = None  # uncalibrated association policy/reason, never a person name
+    racket: RacketObservation | None = None
 
 
 @dataclass

@@ -187,6 +187,12 @@ export function VideoStage({
       layers: off,
       colors: PLAYER_HEX,
       names: { P1: shortName(session, "P1"), P2: shortName(session, "P2") },
+      participantNames: Object.fromEntries(
+        (session.roster?.participants ?? []).map((person, index) => [
+          person.participant_id,
+          person.name || `Player ${index + 1}`,
+        ]),
+      ),
       fps,
     };
     frameClock.poke();

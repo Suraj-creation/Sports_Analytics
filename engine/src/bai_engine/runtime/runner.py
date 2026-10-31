@@ -346,7 +346,7 @@ class SessionRunner(threading.Thread):
             return
         if write:
             ts = self.repo.tracks(self.session_id)
-            for obj in (TrackObject.SHUTTLE, TrackObject.PLAYER, TrackObject.CAMERA):
+            for obj in (TrackObject.SHUTTLE, TrackObject.PLAYER, TrackObject.CAMERA, TrackObject.RACKET):
                 part = [x for x in samples if x.obj is obj and start <= x.frame_idx <= end]
                 if part:
                     ts.write_chunk(obj, start, end, samples_to_table(part))
@@ -382,7 +382,7 @@ class SessionRunner(threading.Thread):
                 {
                     "type": "state",
                     "analysis_revision": self.analysis_revision,
-                "generation": str(self.session.meta.get("analysis_generation") or ""),
+                    "generation": str(self.session.meta.get("analysis_generation") or ""),
                     "state": self.sport.public_state(),
                     "analytics": self.sport.analytics(),
                 },
@@ -464,7 +464,7 @@ class SessionRunner(threading.Thread):
                 {
                     "type": "state",
                     "analysis_revision": self.analysis_revision,
-                "generation": str(self.session.meta.get("analysis_generation") or ""),
+                    "generation": str(self.session.meta.get("analysis_generation") or ""),
                     "state": self.sport.public_state(),
                     "analytics": self.sport.analytics(),
                 },
@@ -554,7 +554,7 @@ class SessionRunner(threading.Thread):
                 {
                     "type": "state",
                     "analysis_revision": self.analysis_revision,
-                "generation": str(self.session.meta.get("analysis_generation") or ""),
+                    "generation": str(self.session.meta.get("analysis_generation") or ""),
                     "state": self.sport.public_state(),
                     "analytics": self.sport.analytics(),
                 },
@@ -752,8 +752,11 @@ class EngineService:
         self.repo.update(sid, meta=meta)
         self.bus.publish(
             topic(sid, "status"),
-            {"type": "analysis_reset", "session_id": sid,
-             "generation": meta["analysis_generation"],
-             "analysis_revision": meta["analysis_revision"],
-             "calibration": manual_cal[-1].payload if manual_cal else None},
+            {
+                "type": "analysis_reset",
+                "session_id": sid,
+                "generation": meta["analysis_generation"],
+                "analysis_revision": meta["analysis_revision"],
+                "calibration": manual_cal[-1].payload if manual_cal else None,
+            },
         )

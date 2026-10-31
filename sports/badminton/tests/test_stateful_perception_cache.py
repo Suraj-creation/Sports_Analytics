@@ -114,7 +114,8 @@ def test_capabilities_distinguish_loaded_models_heuristics_and_unimplemented_res
     assert capabilities["stroke_shadow"]["status"] == "shadow_only"
     assert capabilities["stroke_shadow"]["active_model"] is None
     assert capabilities["stroke_shadow"]["required"] is False
-    for stage in ("racket", "shuttle_live", "shuttle_second_opinion", "shuttle_refinement"):
+    assert capabilities["racket"]["status"] == "unavailable"  # configured builtin not loaded in this fixture
+    for stage in ("shuttle_live", "shuttle_second_opinion", "shuttle_refinement"):
         assert capabilities[stage]["status"] == "unsupported"
         assert capabilities[stage]["required"] is False
         assert capabilities[stage]["active_model"] is None

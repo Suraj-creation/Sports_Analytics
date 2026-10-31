@@ -28,6 +28,16 @@ export function IndividualAnalytics({ session }: { session: Session }) {
             <p className="mt-1 text-sm">
               {person.total_shots} reviewed player {person.total_shots === 1 ? "shot" : "shots"}
             </p>
+            {person.movement && (
+              <p className="mt-1 text-sm text-line-2">
+                {person.movement.distance_m === null
+                  ? "Movement unavailable"
+                  : `${person.movement.distance_m.toFixed(1)} m · reviewed path estimate`}
+                {person.movement.travel.latest?.heading_deg != null &&
+                  ` · travel ${person.movement.travel.latest.heading_deg}°`}
+                {` · ${person.movement.observed_frames} observed frames`}
+              </p>
+            )}
             {Object.keys(person.shot_distribution).length > 0 && (
               <p className="mt-1 text-xs text-line-2">
                 {Object.entries(person.shot_distribution)

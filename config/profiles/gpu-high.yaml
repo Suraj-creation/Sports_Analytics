@@ -26,6 +26,11 @@ player_detector:
   precision: fp16
   input_size: [576, 576]
   params: {score_threshold: 0.3, court_roi: true}
+player_reid:
+  model: osnet_ain_x0_25
+  backend: torch-cuda
+  precision: fp32
+  params: {retention_seconds: 8}
 pose:
   model: rtmpose_x_halpe26
   backend: onnx-cuda
@@ -33,15 +38,15 @@ pose:
   batch: 2
   input_size: [288, 384]
 racket:
-  model: racketvision_racketpose
-  backend: onnx-cuda
-  precision: fp16
+  model: racket_geometry_v1
+  backend: opencv-cpu
+  precision: fp32
 stroke:
   model: bst_cg_ap_shuttleset
   backend: torch-cuda
   params: {window: adaptive}
 contact:
-  model: contact_fusion_v0
+  model: contact_fusion_v2
   backend: none
 ocr:
   model: rapidocr_v4

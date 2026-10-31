@@ -108,6 +108,13 @@ models:
     input: {width: 288, height: 384}
     note: body7 384×288 variant; halpe26 heel/toe export to be added after E5
 
+  racket_geometry_v1:
+    task: racket_pose
+    version: "1"
+    format: builtin
+    license: project (OpenCV runtime)
+    note: Observed ellipse and shaft near a posed wrist; uncalibrated classical geometry, not a pretrained detector.
+
   racketvision_racketpose:
     task: racket_pose
     version: "1.0"
@@ -136,6 +143,13 @@ models:
     source: {package: "rapidocr"}
     license: Apache-2.0 (RapidOCR / PP-OCR models)
     note: Legacy profile alias for package-selected weights, not a PP-OCRv4 pin. Runtime records package version, actual weight hashes and providers.
+
+  contact_fusion_v2:
+    task: contact
+    version: "2"
+    format: builtin
+    license: project
+    note: Temporal motion and body/pose cues with optional observed racket geometry; uncalibrated estimates.
 
   contact_fusion_v0:
     task: contact

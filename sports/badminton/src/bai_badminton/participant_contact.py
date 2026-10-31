@@ -15,6 +15,7 @@ from numpy.typing import NDArray
 from bai_badminton.court import HALF_LEN, WIDTH_DOUBLES
 from bai_badminton.events.contact import ATTRIBUTION_POLICY, score_frame
 from bai_badminton.observations import PlayerSeries, WindowObs
+from bai_badminton.perception_types import RacketObservation
 
 
 @dataclass(frozen=True)
@@ -27,6 +28,7 @@ class ParticipantSnapshot:
     # Frame-level detector execution, not evidence that this person was matched.
     detector_observed: bool | None = None
     detector_matched: bool | None = None
+    racket: RacketObservation | None = None
 
 
 def has_target_court_provenance(snapshot: ParticipantSnapshot) -> bool:
@@ -76,6 +78,7 @@ def participant_window(
             if item is None or not usable(snapshot):
                 continue
             item.bbox[i] = snapshot.bbox
+            item.racket[i] = snapshot.racket if snapshot.detector_matched is True else None
             if snapshot.kps is not None:
                 item.kps[i] = snapshot.kps
             if snapshot.court_xy is not None:

@@ -175,6 +175,11 @@ def patch(session: SessionDep, body: SessionPatch, r: Repo) -> Session:
 @router.put("/{session_id}/roster")
 def update_roster(session: SessionDep, roster: ParticipantRoster, r: Repo) -> Session:
     """Record explicit participants and teams without asserting track identity."""
+    with r.analysis_snapshot(session.session_id) as (current, _, _):
+        return _update_roster_locked(current, roster, r)
+
+
+def _update_roster_locked(session: Session, roster: ParticipantRoster, r: Repo) -> Session:
     reviewed = r.events(session.session_id).query(types=["identity_review"])
     known = {person.participant_id: person.team_id for person in roster.participants}
     reviewed_ids = {event.actors.player_id for event in reviewed if event.actors.player_id is not None}
@@ -236,14 +241,23 @@ def reanalyse(session: SessionDep, b: BusDep) -> dict[str, str]:
 # ---------------------------------------------------------------------- events / state / tracks
 @router.get("/{session_id}/individual-analytics")
 def individual_analytics(session: SessionDep, r: Repo) -> dict[str, Any]:
-    if session.media is None or session.media.n_frames <= 0:
-        raise HTTPException(status.HTTP_409_CONFLICT, "Video timeline is not available")
-    return build_individual_analytics(
-        r.events(session.session_id),
-        session.roster,
-        max_frame=session.media.n_frames - 1,
-        fps=float(session.media.fps),
-    )
+    from bai_badminton.analytics.reviewed_motion import reviewed_motion
+
+    with r.analysis_snapshot(session.session_id) as (current, store, tracks):
+        if current.media is None or current.media.n_frames <= 0:
+            raise HTTPException(status.HTTP_409_CONFLICT, "Video timeline is not available")
+        result = build_individual_analytics(
+            store, current.roster, max_frame=current.media.n_frames - 1, fps=float(current.media.fps)
+        )
+        result["analysis_revision"] = int(current.meta.get("analysis_revision", 0))
+        if current.roster is not None:
+            motion = reviewed_motion(
+                store, tracks, current.roster, current.media.n_frames - 1, float(current.media.fps)
+            )
+            for person, value in result["participants"].items():
+                value["movement"] = motion["movement"][person]
+            result["pairs"] = motion["pairs"]
+        return result
 
 
 @router.get("/{session_id}/events")
@@ -304,7 +318,9 @@ def tracks(
     if frame_to - frame_from > 30 * 60 * 60:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "window too large (max 1 h of frames)")
     with r.analysis_snapshot(session.session_id) as (session, _, track_store):
-        table = track_store.read([TrackObject.SHUTTLE, TrackObject.PLAYER, TrackObject.CAMERA], frame_from, frame_to)
+        table = track_store.read(
+            [TrackObject.SHUTTLE, TrackObject.PLAYER, TrackObject.CAMERA, TrackObject.RACKET], frame_from, frame_to
+        )
         return Response(
             encode_tracks(table_to_samples(table), frame_from, frame_to),
             media_type="application/msgpack",

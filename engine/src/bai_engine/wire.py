@@ -39,6 +39,7 @@ def encode_tracks(samples: list[TrackSample], frame_from: int, frame_to: int) ->
     # Doubles and uncertain singles identities still have real boxes and poses.
     anonymous: dict[str, dict[str, list[Any]]] = {}
     cam: dict[str, list[Any]] = {"f": [], "g": [], "h": [], "q": []}
+    rackets: dict[str, list[Any]] = {key: [] for key in ("f", "t", "x", "y", "b", "c", "obs")}
     for s in samples:
         if s.obj is TrackObject.SHUTTLE:
             if s.visible and s.x is not None and s.y is not None:
@@ -46,6 +47,14 @@ def encode_tracks(samples: list[TrackSample], frame_from: int, frame_to: int) ->
                 shuttle["x"].append(_r(s.x))
                 shuttle["y"].append(_r(s.y))
                 shuttle["c"].append(_r(s.conf, 2))
+        elif s.obj is TrackObject.RACKET and s.visible and s.bbox is not None and s.x is not None and s.y is not None:
+            rackets["f"].append(s.frame_idx)
+            rackets["t"].append(s.track_id)
+            rackets["x"].append(_r(s.x))
+            rackets["y"].append(_r(s.y))
+            rackets["b"].extend(_r(value) for value in s.bbox)
+            rackets["c"].append(_r(s.conf, 3))
+            rackets["obs"].append(s.participant_observation_id)
         elif s.obj is TrackObject.CAMERA:
             cam["f"].append(s.frame_idx)
             cam["g"].extend(s.cam if s.cam is not None else (0.0,) * 9)
@@ -75,6 +84,7 @@ def encode_tracks(samples: list[TrackSample], frame_from: int, frame_to: int) ->
             p["cy"].append(_r(s.court_y, 2))
     payload: dict[str, Any] = {"v": VERSION, "from": frame_from, "to": frame_to, "shuttle": shuttle, "players": players}
     payload["anonymous"] = anonymous
+    payload["rackets"] = rackets
     if cam["f"]:
         payload["cam"] = cam
     out = msgpack.packb(payload, use_bin_type=True)

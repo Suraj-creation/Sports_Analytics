@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
@@ -19,7 +20,7 @@ from bai_badminton.perception.court_lines import METHOD as LINES_METHOD
 from bai_badminton.perception.court_lines import CourtFit, camera_pose, choose_main, detect_court, refine_court
 from bai_badminton.perception.isolation import is_fixed_camera
 from bai_badminton.perception.pipeline import BadmintonPerception, lines_ref_id
-from bai_badminton.perception_types import ChunkPerception, FramePerception, PersonObs, ScoreReading
+from bai_badminton.perception_types import ChunkPerception, FramePerception, PersonObs, RacketObservation, ScoreReading
 from bai_badminton.rules.bwf import MatchConfig
 from bai_engine.config import Profile, get_settings
 from bai_engine.decode import DecodedChunk
@@ -32,7 +33,7 @@ from bai_engine.store import EventStore, TrackStore
 log = get_logger(__name__)
 AUTO_CALIBRATION_MIN_SCORE = 0.6
 REF_FILE = "camera_ref.png"  # the frame the calibration was made on (lossless: its id is a content hash)
-CODEC_VERSION = 11  # validated model outputs, explicit runtime devices and precision
+CODEC_VERSION = 12  # observed equipment geometry and bounded neural retention policy
 MAX_ADJUST = 0.03  # a human calibration the court lines move by more than this (× frame width) is kept as is
 
 
@@ -528,6 +529,7 @@ class BadmintonSession:
             ("pose", "pose", True),
             ("player_identity", "player_reid", False),
             ("ocr", "ocr", False),
+            ("racket", "racket", False),
         ):
             choice = getattr(profile, attr, None)
             requested = choice.model if choice is not None else None
@@ -593,7 +595,14 @@ class BadmintonSession:
             "required": True,
             "reason": "Temporal motion, proximity and pose estimate potential hits; racket contact is not confirmed.",
         }
-        for stage in ("racket", "shuttle_live", "shuttle_second_opinion"):
+        if loaded.get("racket"):
+            out["racket"]["status"] = "geometric"
+            out["racket"]["reason"] = (
+                "Observed ellipse, shaft and wrist support; no trained racket model or calibrated accuracy."
+            )
+        elif out["racket"]["requested_model"] not in (None, "none", "racket_geometry_v1"):
+            out["racket"]["status"] = "unsupported"
+        for stage in ("shuttle_live", "shuttle_second_opinion"):
             choice = getattr(profile, stage, None)
             requested = choice.model if choice is not None else None
             out[stage] = {
@@ -678,6 +687,7 @@ class BadmintonSession:
                             "rt": q.raw_track_id,
                             "dm": q.detector_matched,
                             "im": q.identity_method,
+                            "rk": asdict(q.racket) if q.racket is not None else None,
                         }
                         for q in fp.persons
                     ],
@@ -767,6 +777,7 @@ class BadmintonSession:
                         raw_track_id=q["rt"],
                         detector_matched=q["dm"],
                         identity_method=q["im"],
+                        racket=RacketObservation(**q["rk"]) if q.get("rk") is not None else None,
                     )
                     for q in f["p"]
                 ],

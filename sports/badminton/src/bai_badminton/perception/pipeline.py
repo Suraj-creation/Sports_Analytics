@@ -118,6 +118,7 @@ class BadmintonPerception:
         pose = self._load_pose(profile.pose, registry, cache)
         reid = self._load_reid(profile.player_reid, registry) if match_format == "doubles" else None
         self.scoreboard = self._load_ocr(profile.ocr, registry, fps)
+        self.racket = self._load_racket(profile.racket)
         self.players = PlayerPerception(
             det,
             pose,
@@ -126,6 +127,9 @@ class BadmintonPerception:
             pose_stride=profile.pose_rates.in_play,
             max_players=4 if match_format == "doubles" else 2,
             reid=reid,
+            identity_retention_s=float(profile.player_reid.params.get("retention_seconds", 1.0))
+            if profile.player_reid is not None
+            else 1.0,
         )
 
     @property
@@ -137,6 +141,23 @@ class BadmintonPerception:
         }
 
     # ------------------------------------------------------------------ loading
+    def _load_racket(self, choice: ModelChoice | None):  # type: ignore[no-untyped-def]
+        if choice is None or choice.model == "none" or choice.backend == "none":
+            return None
+        if choice.model != "racket_geometry_v1" or choice.backend != "opencv-cpu":
+            self._degrade("racket", f"{choice.model}: no verified local adapter; select racket_geometry_v1 explicitly")
+            return None
+        from bai_badminton.perception.racket import RacketDetector
+
+        self.models["racket"] = "racket_geometry_v1@1"
+        self.runtimes["racket"] = {
+            "requested_backend": choice.backend,
+            "actual_backend": "opencv-cpu",
+            "backend_fallback": False,
+            "method": "opencv_ellipse_shaft_v1",
+        }
+        return RacketDetector()
+
     def _providers(self, choice: ModelChoice, cache: Path) -> list[Any]:
         return ort_providers(choice.backend, engine_cache=cache / choice.model, fp16=choice.precision == "fp16")
 
@@ -388,6 +409,11 @@ class BadmintonPerception:
                     h_now = Homography(H_now, 0.0, 4) if H_now is not None else None
                     self.players.set_roi(CourtROI(poly.astype(np.float32), homography=h_now))
                 persons = [] if replay[i] else self.players.process(fidx, img, (rates_det, rates_pose))
+                racket_detector = getattr(self, "racket", None)
+                if racket_detector is not None and persons and shuttle[i] is not None and not replay[i]:
+                    observed_rackets = racket_detector.detect(img, persons)
+                    for person in persons:
+                        person.racket = observed_rackets.get(person.track_id)
                 identity_error = getattr(self.players, "last_identity_error", None)
                 if identity_error is not None and not any(
                     d.stage == "player_identity" and d.reason == identity_error for d in self.degraded

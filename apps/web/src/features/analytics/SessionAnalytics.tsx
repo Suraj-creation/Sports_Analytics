@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { ErrorNote, Spinner } from "@/components/ui";
+import { PairAnalytics } from "@/features/session/PairAnalytics";
 import { AskTab } from "@/features/session/tabs/AskTab";
 import { HeatmapsTab } from "@/features/session/tabs/HeatmapsTab";
 import { HighlightsTab } from "@/features/session/tabs/HighlightsTab";
@@ -66,20 +67,7 @@ export function SessionAnalytics({
         </div>
       </AnalysisPanel>
     );
-  if (tab === "pair")
-    return (
-      <Unavailable title="Your pair, when four identities can be measured">
-        <p>
-          This analysis currently resolves two court-side identities, P1 and P2. It does not identify four
-          individual doubles players or retain partner relationships, so individual partner contributions and
-          front/rear responsibility cannot yet be calculated.
-        </p>
-        <p className="mt-3">
-          Real footage, rallies, side-based shots and court tracking remain available in the other views. A
-          side must not be presented as a named doubles player.
-        </p>
-      </Unavailable>
-    );
+  if (tab === "pair") return <PairAnalytics session={session} />;
   if (q.isPending)
     return (
       <div className="flex items-center gap-3 py-10 text-line-2">

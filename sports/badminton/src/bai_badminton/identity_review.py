@@ -21,6 +21,7 @@ TRACKER_IDENTITY_EVIDENCE_TYPES = frozenset(
         "participant_observation",
         "doubles_team_hypothesis",
         "stroke_participant_review",
+        "doubles_service_setup",
     }
 )
 
@@ -161,4 +162,63 @@ class IdentityReviewLedger:
             raise ValueError("unknown current identity review")
         return self.store.append(
             review.retract(Provenance(model="human", worker="review-ui"), "identity review revoked")
+        )
+
+    def confirm_stroke(self, stroke_event_id: str, identity_review_id: str) -> Event:
+        """Review only the hitter; preserve estimated contact and shot-family evidence."""
+        from bai_badminton.analytics.individual import machine_hypothesis_unchanged
+        from bai_badminton.analytics.rebuild import lineage_ids
+
+        stroke = next(
+            (event for event in self.store.query(types=["stroke"]) if event.event_id == stroke_event_id), None
+        )
+        identity = next((event for event in self.current() if event.event_id == identity_review_id), None)
+        if stroke is None or identity is None or not machine_hypothesis_unchanged(self.store, stroke):
+            raise ValueError("current machine stroke and current identity review required")
+        hypothesis = stroke.payload.get("participant_hypothesis")
+        if (
+            not isinstance(hypothesis, dict)
+            or not identity.frame_start <= stroke.frame_start <= identity.frame_end
+            or hypothesis.get("participant_id") != identity.payload.get("participant_id")
+            or hypothesis.get("observation_id") != identity.payload.get("observation_id")
+            or hypothesis.get("track_id") != identity.actors.track_id
+        ):
+            raise ValueError("stroke evidence does not match reviewed track interval")
+        payload = {
+            "scope": "participant_only",
+            "stroke_event_id": stroke.event_id,
+            "identity_review_id": identity.event_id,
+            "observation_id": identity.payload["observation_id"],
+            "participant_id": identity.payload["participant_id"],
+            "track_id": identity.actors.track_id,
+            "player_id": identity.actors.player_id,
+        }
+        ancestry = set(lineage_ids(self.store, stroke))
+        previous = [
+            event
+            for event in self.store.query(types=["stroke_participant_review"])
+            if event.payload.get("stroke_event_id") in ancestry
+        ]
+        if len(previous) == 1 and previous[0].payload == payload:
+            return previous[0]
+        # Retire conflicting scoped reviews explicitly; the canonical fold never
+        # chooses between two human assignments silently.
+        for event in previous:
+            self.store.append(event.retract(Provenance(model="human", worker="review-ui"), "hitter review replaced"))
+        return self.store.append(
+            Event(
+                session_id=self.store.session_id,
+                type="stroke_participant_review",
+                frame_start=stroke.frame_start,
+                frame_end=stroke.frame_start,
+                pts_us=stroke.pts_us,
+                actors=identity.actors,
+                payload=payload,
+                status=EventStatus.HUMAN_VERIFIED,
+                provenance=Provenance(model="human", worker="review-ui"),
+                evidence=(
+                    Evidence(kind=EvidenceKind.EVENT, event_id=identity.event_id),
+                    Evidence(kind=EvidenceKind.EVENT, event_id=stroke.event_id),
+                ),
+            )
         )

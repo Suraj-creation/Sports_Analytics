@@ -71,7 +71,7 @@ class ModelChoice(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     model: str  # registry name in models/manifest.yaml, or "none"
-    backend: Literal["tensorrt", "onnx-cuda", "onnx-cpu", "torch-cuda", "torch-cpu", "none"] = "onnx-cpu"
+    backend: Literal["tensorrt", "onnx-cuda", "onnx-cpu", "torch-cuda", "torch-cpu", "opencv-cpu", "none"] = "onnx-cpu"
     precision: Literal["fp32", "fp16", "int8"] = "fp32"
     batch: int = 1
     input_size: tuple[int, int] | None = None  # (width, height)

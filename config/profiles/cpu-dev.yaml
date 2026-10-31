@@ -1,5 +1,5 @@
 # Development laptop (no CUDA). Sub-real-time by design: playback is gated by the lead buffer.
-description: CPU development profile — ONNX Runtime, reduced rates, no racket model
+description: CPU development profile — ONNX Runtime, reduced rates, geometric racket evidence
 device: cpu
 analysis_height: 720
 chunk_frames: 64
@@ -24,12 +24,15 @@ pose:
   precision: fp32
   batch: 2
   input_size: [192, 256]
+racket:
+  model: racket_geometry_v1
+  backend: opencv-cpu
 stroke:
   model: bst_cg_ap_shuttleset
   backend: torch-cpu
   params: {window: fixed}
 contact:
-  model: contact_fusion_v0
+  model: contact_fusion_v2
   backend: none
 ocr:
   model: rapidocr_v4

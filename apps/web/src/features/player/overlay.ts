@@ -1,5 +1,6 @@
 import { COURT_LINES, mul3, NET, project } from "@/lib/court";
 import type { EventLog } from "@/lib/events";
+import { reviewedIdentity } from "@/lib/reviewedIdentity";
 import type { TrackBuffer } from "@/lib/tracks";
 import type { Calibration, PlayerId } from "@/lib/types";
 import type { Layers } from "@/stores/playback";
@@ -29,6 +30,7 @@ export interface OverlayCtx {
   layers: Layers;
   colors: Record<PlayerId, string>;
   names: Record<PlayerId, string>;
+  participantNames?: Record<string, string>;
   fps?: number;
 }
 
@@ -85,13 +87,30 @@ export function drawOverlay(o: OverlayCtx, frame: number): void {
         ? tracks.displayPose(p, frame, Math.min(5, Math.floor((o.fps ?? 30) * 0.2)))
         : null;
       if (pose) drawSkeleton(g, pose.keypoints, color, px, pose.ageFrames > 0);
-      const name = p.playerId ? o.names[p.playerId] : `Track ${p.track} · identity unassigned`;
+      const reviewed = reviewedIdentity(o.events, p, frame, o.participantNames ?? {});
+      const name = reviewed
+        ? `${reviewed.name} · reviewed interval`
+        : p.playerId
+          ? o.names[p.playerId]
+          : `Track ${p.track} · identity unassigned`;
       const qualification = `${carried ? " · tracked estimate" : ""}${pose?.ageFrames ? " · pose estimate" : ""}`;
       if (layers.labels) drawLabel(g, p.bbox, `${name}${qualification}`, color, px);
     }
   }
 
   if (layers.shuttle) drawShuttle(g, tracks, frame, px);
+  if (layers.players) {
+    for (const racket of tracks.racketsAt(frame)) {
+      g.strokeStyle = "#e8c46b";
+      g.lineWidth = 1.5 * px;
+      g.setLineDash([3 * px, 2 * px]);
+      g.beginPath();
+      g.arc(racket.x, racket.y, (racket.bbox[2] - racket.bbox[0]) / 2, 0, 2 * Math.PI);
+      g.stroke();
+      g.setLineDash([]);
+      if (layers.labels) drawLabel(g, racket.bbox, `Racket geometry · track ${racket.track}`, "#e8c46b", px);
+    }
+  }
 
   // contact flash: a ring at the contact point for ~6 frames after a hit
   for (const c of layers.shuttle ? o.events.window(frame - 6, frame, ["contact"]) : []) {
@@ -99,7 +118,8 @@ export function drawOverlay(o: OverlayCtx, frame: number): void {
     if (!xy) continue;
     const age = frame - c.frame_start;
     if (age < 0) continue;
-    const color = c.actors.player_id ? o.colors[c.actors.player_id] : "#ffffff";
+    const id = c.actors.player_id;
+    const color = id === "P1" || id === "P2" ? o.colors[id] : "#ffffff";
     g.strokeStyle = color;
     g.globalAlpha = Math.max(0, 1 - age / 7);
     g.lineWidth = 2.5 * px;

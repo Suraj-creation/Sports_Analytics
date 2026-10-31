@@ -14,13 +14,16 @@ export function clock(frame: number, m: MediaInfo | null | undefined, millis = f
   return millis ? `${base}.${String(Math.floor((t % 1) * 1000)).padStart(3, "0")}` : base;
 }
 
-export function playerName(s: Session | null | undefined, pid: PlayerId | null | undefined): string {
+export function playerName(s: Session | null | undefined, pid: string | null | undefined): string {
   if (!pid) return "—";
   const p = s?.players.find((x) => x.player_id === pid);
-  return p?.name || (pid === "P1" ? "Player 1" : "Player 2");
+  const participant = s?.roster?.participants.find((person) => person.participant_id === pid);
+  return (
+    p?.name || participant?.name || (pid === "P1" ? "Player 1" : pid === "P2" ? "Player 2" : "Unnamed player")
+  );
 }
 
-export function shortName(s: Session | null | undefined, pid: PlayerId | null | undefined): string {
+export function shortName(s: Session | null | undefined, pid: string | null | undefined): string {
   const n = playerName(s, pid);
   const parts = n.split(/\s+/);
   return parts.length > 1 ? (parts[parts.length - 1] as string) : n;

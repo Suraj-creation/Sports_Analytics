@@ -23,6 +23,15 @@ interface WireWindow {
   shuttle: { f: number[]; x: number[]; y: number[]; c: number[] };
   players: Record<string, WirePlayer>;
   anonymous?: Record<string, WirePlayer>;
+  rackets?: {
+    f: number[];
+    t: number[];
+    x: number[];
+    y: number[];
+    b: number[];
+    c: number[];
+    obs: (string | null)[];
+  };
   /** camera pose per frame: 3×3 row-major, reference px → frame px; all zeros = court not in view.
    *  `h`: physical camera (0 = main, analysed; -1 = no court); `q`: court-line fit precision */
   cam?: { f: number[]; g: number[]; h?: number[]; q?: (number | null)[] };
@@ -62,6 +71,15 @@ export interface DisplayPose {
   ageFrames: number;
 }
 
+export interface RacketFrame {
+  track: number;
+  x: number;
+  y: number;
+  bbox: [number, number, number, number];
+  confidence: number;
+  observationId: string | null;
+}
+
 function playerFrame(p: WirePlayer, i: number, playerId: PlayerId | null): PlayerFrame {
   const k = p.k.slice(i * 51, i * 51 + 51);
   const cx = p.cx[i];
@@ -89,6 +107,7 @@ export class TrackBuffer {
   readonly shuttle = new Map<number, ShuttlePoint>();
   readonly players: Record<PlayerId, Map<number, PlayerFrame>> = { P1: new Map(), P2: new Map() };
   readonly anonymous = new Map<string, Map<number, PlayerFrame>>();
+  private readonly rackets = new Map<number, RacketFrame[]>();
   /** per-frame camera pose (null: tracked, but the court is not in view); empty when the camera is untracked */
   private readonly cams = new Map<number, number[][] | null>();
   private readonly views = new Map<number, CameraView>();
@@ -102,8 +121,40 @@ export class TrackBuffer {
     // a window replaces whatever we had for its range (refinement revisions arrive this way)
     for (let f = win.from; f <= win.to; f++) {
       this.shuttle.delete(f);
+      this.rackets.delete(f);
     }
     const s = win.shuttle;
+    const r = win.rackets;
+    if (r) {
+      for (let i = 0; i < r.f.length; i++) {
+        const frame = r.f[i];
+        if (frame === undefined || frame < win.from || frame > win.to) continue;
+        const bbox = r.b.slice(i * 4, i * 4 + 4) as RacketFrame["bbox"];
+        const track = r.t[i],
+          x = r.x[i],
+          y = r.y[i],
+          confidence = r.c[i];
+        if (
+          bbox.length !== 4 ||
+          ![track, x, y, confidence, ...bbox].every(Number.isFinite) ||
+          track === undefined ||
+          x === undefined ||
+          y === undefined ||
+          confidence === undefined ||
+          track < 0 ||
+          !Number.isInteger(track) ||
+          !Number.isInteger(frame) ||
+          confidence < 0 ||
+          confidence > 1 ||
+          bbox[2] <= bbox[0] ||
+          bbox[3] <= bbox[1]
+        )
+          continue;
+        const items = this.rackets.get(frame) ?? [];
+        items.push({ track, x, y, bbox, confidence, observationId: r.obs[i] ?? null });
+        this.rackets.set(frame, items);
+      }
+    }
     for (let i = 0; i < s.f.length; i++) {
       const f = s.f[i] as number;
       this.shuttle.set(f, { x: s.x[i] as number, y: s.y[i] as number, c: s.c[i] as number });
@@ -205,6 +256,10 @@ export class TrackBuffer {
     });
   }
 
+  racketsAt(frame: number): readonly RacketFrame[] {
+    return this.rackets.get(frame) ?? [];
+  }
+
   /** Display-only pose hold between scheduled samples. Stored observations stay unchanged.
    * Requires a current body box and continuous evidence for the same episode;
    * never bridges a missing person, camera change, or unassigned episode.
@@ -272,6 +327,7 @@ export class TrackBuffer {
     this.players.P1.clear();
     this.players.P2.clear();
     this.anonymous.clear();
+    this.rackets.clear();
     this.cams.clear();
     this.views.clear();
     this.tracksCamera = false;

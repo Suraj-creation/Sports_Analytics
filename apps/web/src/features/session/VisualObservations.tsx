@@ -2,10 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { ErrorNote, Spinner } from "@/components/ui";
 import { playEventEvidence } from "@/features/player/clip";
-import { useAnalysisQueryKey } from "@/lib/analysisQuery";
+import { useAnalysisQueryKey, useAnalysisRevision } from "@/lib/analysisQuery";
 import { req } from "@/lib/api";
 import { clock } from "@/lib/format";
 import type { BaiEvent, Session } from "@/lib/types";
+import { IdentityReviewPanel } from "./IdentityReviewPanel";
 
 const EVENT_TYPES = "participant_observation,identity_ambiguity";
 const PAGE_SIZE = 50;
@@ -35,6 +36,7 @@ function epochOf(event: BaiEvent): string | null {
 }
 
 export function VisualObservations({ session }: { session: Session }) {
+  const revision = useAnalysisRevision(session);
   const [open, setOpen] = useState(false);
   const [limit, setLimit] = useState(PAGE_SIZE);
   const observations = useQuery({
@@ -130,6 +132,13 @@ export function VisualObservations({ session }: { session: Session }) {
                 Show more observations
               </button>
             </div>
+          )}
+          {session.roster && session.media && session.status === "analysed" && (
+            <IdentityReviewPanel
+              key={`${session.session_id}:${revision}`}
+              session={session}
+              observations={events}
+            />
           )}
         </div>
       )}

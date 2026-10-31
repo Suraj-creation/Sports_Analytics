@@ -264,6 +264,7 @@ class PlayerPerception:
         pose_stride: int = 1,
         max_players: int = 2,
         reid: Any | None = None,
+        identity_retention_s: float = 1.0,
     ) -> None:
         self.detector, self.pose = detector, pose
         self.last_detector_observed = False
@@ -273,7 +274,9 @@ class PlayerPerception:
         self.max_players = max_players
         self.reid = reid
         self._reid_fingerprint = getattr(reid, "fingerprint", None)
-        self._associator = PersistentPlayerAssociator(fps) if reid is not None else None
+        self._associator = (
+            PersistentPlayerAssociator(fps, retention_seconds=identity_retention_s) if reid is not None else None
+        )
         self.last_identity_error: str | None = None
         self.roi: CourtROI | None = None
         self._last: list[PersonObs] = []

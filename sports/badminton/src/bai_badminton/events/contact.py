@@ -1,6 +1,6 @@
-"""Estimated racket–shuttle hits — deterministic multi-cue fusion (``contact_fusion_v1``).
+"""Estimated racket–shuttle hits — deterministic multi-cue fusion (``contact_fusion_v2``).
 
-No trained racket-contact adapter is active in this runtime. This baseline fuses four cues and
+No trained racket-contact adapter is active in this runtime. This baseline fuses body/motion cues and
 records every component score as evidence so the fusion can be calibrated (and later replaced
 by the trained causal model T1) without changing the event contract:
 
@@ -9,6 +9,7 @@ by the trained causal model T1) without changing the event contract:
 * **proximity** — distance from the shuttle to the nearest wrist (or upper bbox) of a player,
   normalised by that player's body height;
 * **swing** — wrist speed peak of that player around the frame.
+* **racket overlap** — optional actual ellipse/shaft observation from the current image.
 
 Post-processing uses bounded temporal local maxima. Scores are uncalibrated
 heuristic support, not probabilities of physical racket contact.
@@ -26,7 +27,7 @@ from numpy.typing import NDArray
 from bai_badminton.observations import PlayerSeries, WindowObs
 from bai_badminton.perception.keypoints import KP
 
-CONTACT_MODEL = "contact_fusion_v1"
+CONTACT_MODEL = "contact_fusion_v2"
 
 # Hand-set logistic fusion weights; no fitted calibration is supplied in this repository.
 W_BIAS = -4.2
@@ -80,6 +81,8 @@ def _seg_velocity(
 def _player_point(s: PlayerSeries, i: int) -> list[NDArray[np.float64]]:
     """Candidate racket-hand points for player at frame i: wrists if posed, else upper box."""
     pts: list[NDArray[np.float64]] = []
+    if i < len(s.racket) and (racket := s.racket[i]) is not None:
+        return [np.asarray(racket.center)]
     k = s.kps[i]
     for kp in (KP.L_WRIST, KP.R_WRIST):
         if np.isfinite(k[kp]).all() and k[kp, 2] >= 0.3:
@@ -176,11 +179,23 @@ def score_frame(w: WindowObs, i: int, half: int = 3) -> ContactCandidate | None:
     # Python's stable sort preserves the prior best-candidate choice for exact ties,
     # keeping its swing cue for contact scoring while attribution abstains.
     ranked.sort(key=lambda item: item[1], reverse=True)
+    equipment = {
+        pid: player.racket[i].overlap((float(sx), float(sy)))
+        for pid, player in w.players.items()
+        if i < len(player.racket) and player.racket[i] is not None
+    }
+    # An observed racket overlap is more specific than a second person's wrist
+    # or body box. Multiple overlapping rackets still require attribution abstention.
+    overlapping_rackets = {pid for pid, overlap in equipment.items() if overlap >= 0.5}
+    if overlapping_rackets:
+        ranked = [row for row in ranked if row[0] in overlapping_rackets]
     best_pid, best_prox, best_h = ranked[0] if ranked else (None, 0.0, None)
     second_prox = ranked[1][1] if len(ranked) > 1 else 0.0
     gap = best_prox - second_prox
     relative_gap = gap / best_prox if best_prox > 0 else 0.0
-    if not ranked:
+    if len(overlapping_rackets) > 1:
+        attributed_pid, attribution_reason = None, "ambiguous_racket_overlap"
+    elif not ranked:
         attributed_pid, attribution_reason = None, "no_player_observation"
     elif best_prox < ATTRIBUTION_MIN_PROXIMITY:
         attributed_pid, attribution_reason = None, "insufficient_proximity"
@@ -193,12 +208,22 @@ def score_frame(w: WindowObs, i: int, half: int = 3) -> ContactCandidate | None:
     swing_players = [best_pid] if best_pid is not None and attribution_reason != "insufficient_proximity" else []
     if attribution_reason == "ambiguous_proximity":
         swing_players = [pid for pid, prox, _ in ranked if (best_prox - prox) / best_prox <= ATTRIBUTION_PROXIMITY_GAP]
+    elif attribution_reason == "ambiguous_racket_overlap":
+        swing_players = list(overlapping_rackets)
     wrist_speeds = [
         _wrist_speed(w.players[pid], i, frame0=w.frame0, pose_stride=w.pose_stride) for pid in swing_players
     ]
     observed_speeds = [speed for speed in wrist_speeds if speed is not None]
     s_swing = float(np.clip((max(observed_speeds) - 0.05) / 0.25, 0.0, 1.0)) if observed_speeds else 0.0
-    z = W_BIAS + W_REDIRECT * s_redirect + W_IMPULSE * s_impulse + W_PROX * best_prox + W_SWING * s_swing
+    racket_overlap = max((equipment.get(pid, 0.0) for pid in swing_players), default=0.0)
+    z = (
+        W_BIAS
+        + W_REDIRECT * s_redirect
+        + W_IMPULSE * s_impulse
+        + W_PROX * best_prox
+        + W_SWING * s_swing
+        + 1.4 * racket_overlap
+    )
     p = _sigmoid(z)
     return ContactCandidate(
         frame=w.frame0 + i,
@@ -215,6 +240,8 @@ def score_frame(w: WindowObs, i: int, half: int = 3) -> ContactCandidate | None:
             "proximity_minimum_threshold": ATTRIBUTION_MIN_PROXIMITY,
             "proximity_candidates": float(len(ranked)),
             "swing": s_swing,
+            "racket_observed": float(any(pid in equipment for pid in swing_players)),
+            "racket_overlap": racket_overlap,
             "angle_deg": angle,
             "speed_before": nb,
             "speed_after": na,

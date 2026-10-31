@@ -1,4 +1,4 @@
-"""Retired track movement and participant review API surfaces stay unavailable."""
+"""Legacy aliases stay retired; restored scoped review routes require current evidence."""
 
 from fastapi.testclient import TestClient
 
@@ -8,17 +8,17 @@ from bai_engine.schema import Event, EventStatus, Provenance, Session, Source, S
 REMOVED_PATHS = (
     "/api/sessions/{session_id}/episode-movement",
     "/api/sessions/{session_id}/participant-observations/{observation_id}/box",
-    "/api/sessions/{session_id}/identity-reviews",
-    "/api/sessions/{session_id}/identity-reviews/{review_id}",
-    "/api/sessions/{session_id}/stroke-participant-reviews",
     "/api/sessions/{session_id}/strokes/{stroke_id}/participant-review",
-    "/api/sessions/{session_id}/stroke-participant-reviews/{review_id}",
 )
 
 
 def test_retired_review_and_track_movement_are_not_registered(settings):
     app = create_app(settings, start_engine=False)
     assert set(REMOVED_PATHS).isdisjoint(app.openapi()["paths"])
+    paths = app.openapi()["paths"]
+    assert "/__test__/review-fixture/{session_id}" not in paths
+    assert {"get", "post"} <= paths["/api/sessions/{session_id}/identity-reviews"].keys()
+    assert "post" in paths["/api/sessions/{session_id}/stroke-participant-reviews"]
 
 
 def test_retired_endpoints_cannot_mutate_historical_reviews(settings):
@@ -43,18 +43,18 @@ def test_retired_endpoints_cannot_mutate_historical_reviews(settings):
         ]
         root = f"/api/sessions/{session.session_id}"
         requests = (
-            ("GET", "/episode-movement?from=0&to=10"),
-            ("GET", "/participant-observations/observation/box?frame=5"),
-            ("GET", "/identity-reviews"),
-            ("POST", "/identity-reviews"),
-            ("DELETE", f"/identity-reviews/{historical[0].event_id}"),
-            ("GET", "/stroke-participant-reviews"),
-            ("POST", "/strokes/stroke/participant-review"),
-            ("DELETE", f"/stroke-participant-reviews/{historical[1].event_id}"),
+            ("GET", "/episode-movement?from=0&to=10", {404, 405}),
+            ("GET", "/participant-observations/observation/box?frame=5", {404, 405}),
+            ("GET", "/identity-reviews", {409}),
+            ("POST", "/identity-reviews", {422}),
+            ("DELETE", f"/identity-reviews/{historical[0].event_id}", {422}),
+            ("GET", "/stroke-participant-reviews", {404, 405}),
+            ("POST", "/strokes/stroke/participant-review", {404, 405}),
+            ("DELETE", f"/stroke-participant-reviews/{historical[1].event_id}", {422}),
         )
-        for method, path in requests:
+        for method, path, expected in requests:
             response = client.request(method, root + path, json={} if method == "POST" else None)
-            assert response.status_code in (404, 405), (method, path, response.status_code)
+            assert response.status_code in expected, (method, path, response.status_code)
         response = client.get(root + "/events", params={"types": "identity_review,stroke_participant_review"})
         assert response.status_code == 200
         events = response.json()["events"]

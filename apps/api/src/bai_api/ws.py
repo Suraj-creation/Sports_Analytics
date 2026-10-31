@@ -77,9 +77,7 @@ async def session_ws(ws: WebSocket, session_id: str) -> None:
     requested_revision = query_int("analysis_revision", -1)
     requested_generation = ws.query_params.get("generation", "")
     cursor_matches = (
-        requested_revision == revision
-        if "analysis_revision" in ws.query_params
-        else requested_generation == generation
+        requested_revision == revision if "analysis_revision" in ws.query_params else requested_generation == generation
     )
     sent_seq = max(0, query_int("last_seq", 0)) if cursor_matches else 0
 
@@ -162,7 +160,9 @@ async def session_ws(ws: WebSocket, session_id: str) -> None:
                 b = min(b, current.frontier_frame)
                 payload = None
                 if current.analysed_frames > 0 and a <= b:
-                    table = tracks.read([TrackObject.SHUTTLE, TrackObject.PLAYER, TrackObject.CAMERA], a, b)
+                    table = tracks.read(
+                        [TrackObject.SHUTTLE, TrackObject.PLAYER, TrackObject.CAMERA, TrackObject.RACKET], a, b
+                    )
                     payload = encode_tracks(table_to_samples(table), a, b)
                 snap = store.state_at(center) if center is not None else None
         except KeyError:

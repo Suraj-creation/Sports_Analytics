@@ -14,6 +14,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from bai_badminton.perception.shuttle_post import Track
+from bai_badminton.perception_types import RacketObservation
 
 PLAYER_IDS = ("P1", "P2")
 
@@ -25,6 +26,7 @@ class PlayerSeries:
     bbox: NDArray[np.float64]  # (n, 4) x1,y1,x2,y2 — NaN rows when not observed
     kps: NDArray[np.float64]  # (n, 17, 3) — NaN when pose not run / not observed
     court_xy: NDArray[np.float64]  # (n, 2) feet position in court metres — NaN without calibration
+    racket: list[RacketObservation | None] = field(default_factory=list)
 
     @classmethod
     def empty(cls, n: int) -> PlayerSeries:
@@ -32,6 +34,7 @@ class PlayerSeries:
             bbox=np.full((n, 4), np.nan),
             kps=np.full((n, 17, 3), np.nan),
             court_xy=np.full((n, 2), np.nan),
+            racket=[None] * n,
         )
 
     @property

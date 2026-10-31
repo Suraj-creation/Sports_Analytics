@@ -75,7 +75,7 @@ export interface BaiEvent {
   frame_start: number;
   frame_end: number;
   pts_us: number;
-  actors: { player_id: PlayerId | null; track_id: number | null; opponent_id: PlayerId | null };
+  actors: { player_id: string | null; track_id: number | null; opponent_id: string | null };
   payload: Record<string, any>;
   confidence: number | null;
   band: Band;
@@ -254,6 +254,16 @@ export interface IndividualAnalyticsData {
       name: string | null;
       team_id: string | null;
       total_shots: number;
+      movement?: {
+        distance_m: number | null;
+        observed_frames: number;
+        expected_frames: number;
+        travel: {
+          status: string;
+          mean_speed_m_s: number | null;
+          latest: { heading_deg: number | null; frame_end: number } | null;
+        };
+      };
       shot_distribution: Record<string, number>;
       event_ids: string[];
       events: Array<{
@@ -272,6 +282,18 @@ export interface IndividualAnalyticsData {
   unattributed_event_ids: string[];
   legacy_unlinked_shots: number;
   counting_scope: string;
+  pairs?: Record<
+    string,
+    {
+      members: string[];
+      observed_frames: number;
+      front_back_frames: number;
+      side_by_side_frames: number;
+      front_seconds: Record<string, number>;
+      rear_seconds: Record<string, number>;
+      meaning: string;
+    }
+  >;
 }
 
 export interface EstimatedIndividualAnalyticsData {
