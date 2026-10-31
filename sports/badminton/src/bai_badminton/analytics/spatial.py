@@ -7,7 +7,7 @@ modes and do not establish physical accuracy.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from itertools import pairwise
 
 import numpy as np
@@ -27,12 +27,41 @@ def court_point_valid(x: float, y: float) -> bool:
 
 
 @dataclass
+class TravelSample:
+    """Travel in court axes: 0 degrees is +x; 90 is +y (toward the far end).
+
+    This is ground-plane direction of travel, never body orientation or facing.
+    """
+
+    frame_start: int
+    frame_end: int
+    track_id: int
+    vx_m_s: float
+    vy_m_s: float
+    speed_m_s: float
+    heading_deg: float | None
+
+    def to_public(self, fps: float) -> dict[str, int | float | None]:
+        return {
+            "frame_start": self.frame_start,
+            "frame_end": self.frame_end,
+            "pts_us": round(self.frame_end * 1_000_000 / fps),
+            "track_id": self.track_id,
+            "vx_m_s": round(self.vx_m_s, 3),
+            "vy_m_s": round(self.vy_m_s, 3),
+            "speed_m_s": round(self.speed_m_s, 3),
+            "heading_deg": round(self.heading_deg, 1) if self.heading_deg is not None else None,
+        }
+
+
+@dataclass
 class Movement:
     xy: np.ndarray
     weights: list[float]
     accepted_samples: int = 0
     observed_s: float = 0
     segments: int = 0
+    motion: list[TravelSample] = field(default_factory=list)
 
     @property
     def distance_m(self) -> float:
@@ -100,6 +129,20 @@ def movement(
             if displacement > MAX_SPEED_M_S * dt:
                 continue
             distance = displacement if displacement >= JITTER_M else 0.0
+            delta = smoothed[right] - smoothed[left] if distance else np.zeros(2)
+            vx, vy = (float(v) / dt for v in delta)
+            heading = float(np.degrees(np.arctan2(vy, vx)) % 360) if distance else None
+            out.motion.append(
+                TravelSample(
+                    frame_start=int(frames[indices[left]]),
+                    frame_end=int(frames[indices[right]]),
+                    track_id=int(track_ids[indices[right]]),
+                    vx_m_s=vx,
+                    vy_m_s=vy,
+                    speed_m_s=distance / dt,
+                    heading_deg=heading,
+                )
+            )
             destinations.append(smoothed[right])
             out.weights.append(distance)
             out.observed_s += dt

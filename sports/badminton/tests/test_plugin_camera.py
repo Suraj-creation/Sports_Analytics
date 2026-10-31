@@ -129,7 +129,7 @@ def test_the_pose_survives_the_perception_cache(tmp_path: Path, worlds) -> None:
     s, _ = make_session(tmp_path, worlds)
     calibrate(s)
     p = s.perceive(chunk(worlds, 0, 30))
-    q = s.decode_perception(s.encode_perception(p))
+    q = s.decode_perception(s.encode_perception(p), diagnostic=True)
     assert q.cam_ref == p.cam_ref
     assert all(np.allclose(a.cam, b.cam) for a, b in zip(p.frames, q.frames, strict=True))
     assert [f.cam_lost for f in q.frames] == [f.cam_lost for f in p.frames]
@@ -141,7 +141,7 @@ def test_a_chunk_cached_against_another_reference_is_stale(tmp_path: Path, world
     old = s.encode_perception(s.perceive(chunk(worlds, 0, 30)))
     calibrate(s, frame=40)  # recalibrated on a different frame: a new reference view
     with pytest.raises(StaleCacheError):
-        s.decode_perception(old)
+        s.decode_perception(old, diagnostic=True)
 
 
 def test_tracking_resumes_after_a_restart(tmp_path: Path, worlds) -> None:  # type: ignore[no-untyped-def]

@@ -40,7 +40,7 @@ from bai_badminton.perception_types import ChunkPerception, FramePerception, Sco
 from bai_engine.config import ModelChoice, Profile
 from bai_engine.decode import DecodedChunk
 from bai_engine.obs import INFERENCE_FPS, get_logger, timed
-from bai_engine.runtime.device import engine_cache_dir, ort_providers
+from bai_engine.runtime.device import engine_cache_dir, ort_providers, ort_runtime
 from bai_engine.runtime.registry import ModelError, ModelRegistry
 
 log = get_logger(__name__)
@@ -98,6 +98,7 @@ class BadmintonPerception:
         self.frame_size = frame_size
         self.degraded: list[Degradation] = []
         self.models: dict[str, str] = {}
+        self.runtimes: dict[str, dict[str, Any]] = {}
         self.cuts = CutDetector()
         self.presence: CourtPresence | None = None
         self.camera = CameraTracker()  # legacy: keeps a calibration on a panning camera by its background
@@ -140,7 +141,7 @@ class BadmintonPerception:
         return ort_providers(choice.backend, engine_cache=cache / choice.model, fp16=choice.precision == "fp16")
 
     def _load_shuttle(self, c: ModelChoice, reg: ModelRegistry, cache: Path):  # type: ignore[no-untyped-def]
-        if c.model == "none":
+        if c.model == "none" or c.backend == "none":
             return None
         try:
             from bai_badminton.perception.tracknet import TrackNetV3
@@ -152,7 +153,9 @@ class BadmintonPerception:
                 onnx_dir=cache / c.model,
                 providers=self._providers(c, cache),
                 batch=c.batch,
+                precision=c.precision,
             )
+            self._record_runtime("shuttle", m.runtime)
             self.models["shuttle"] = reg.get(c.model).ref
             return m
         except (ModelError, OSError, ValueError, ImportError, RuntimeError) as e:
@@ -160,7 +163,7 @@ class BadmintonPerception:
             return None
 
     def _load_detector(self, c: ModelChoice, reg: ModelRegistry, cache: Path) -> PlayerDetector | None:
-        if c.model == "none":
+        if c.model == "none" or c.backend == "none":
             return None
         try:
             spec = reg.get(c.model)
@@ -173,6 +176,7 @@ class BadmintonPerception:
                 score_thr=float(c.params.get("score_threshold", 0.35)),
                 kind=kind,
             )
+            self._record_runtime("player_detector", ort_runtime(c.backend, d.tool.session))
             self.models["player_detector"] = spec.ref
             return d
         except (ModelError, OSError, ValueError, ImportError, RuntimeError) as e:
@@ -180,12 +184,13 @@ class BadmintonPerception:
             return None
 
     def _load_pose(self, c: ModelChoice, reg: ModelRegistry, cache: Path) -> PoseEstimator | None:
-        if c.model == "none":
+        if c.model == "none" or c.backend == "none":
             return None
         try:
             spec = reg.get(c.model)
             size = c.input_size or (spec.input.get("width", 192), spec.input.get("height", 256))
             p = PoseEstimator(reg.path(c.model), (int(size[0]), int(size[1])), self._providers(c, cache))
+            self._record_runtime("pose", ort_runtime(c.backend, p.tool.session))
             self.models["pose"] = spec.ref
             return p
         except (ModelError, OSError, ValueError, ImportError, RuntimeError) as e:
@@ -193,7 +198,7 @@ class BadmintonPerception:
             return None
 
     def _load_reid(self, choice: ModelChoice | None, registry: ModelRegistry) -> Any | None:
-        if choice is None or choice.model == "none":
+        if choice is None or choice.model == "none" or choice.backend == "none":
             return None
         try:
             from bai_badminton.perception.offline_reid import OSNetAppearanceEmbedder
@@ -217,11 +222,17 @@ class BadmintonPerception:
             return None
 
     def _load_ocr(self, c: ModelChoice | None, reg: ModelRegistry, fps: float) -> ScoreboardReader | None:
-        if c is None or c.model == "none":
+        if c is None or c.model == "none" or c.backend == "none":
             return None
         try:
-            r = ScoreboardReader.load(every=max(1, int(round(self.profile.ocr_every_s * fps))))
-            self.models["ocr"] = reg.get(c.model).ref
+            spec = reg.get(c.model)
+            if spec.format != "package" or spec.source.get("package") != "rapidocr":
+                raise ModelError(f"{c.model} is not a RapidOCR package alias")
+            r = ScoreboardReader.load(every=max(1, int(round(self.profile.ocr_every_s * fps))), backend=c.backend)
+            self.models["ocr"] = r.model_ref
+            if r.runtime.get("backend_fallback"):
+                providers = {stage: info["providers"] for stage, info in r.runtime["stages"].items()}
+                self._degrade("ocr_backend", f"Requested {c.backend}; actual OCR providers: {providers}")
             return r
         except (ModelError, OSError, ValueError, ImportError, RuntimeError) as e:
             self._degrade("ocr", f"{c.model}: {e}")
@@ -230,6 +241,13 @@ class BadmintonPerception:
     def _degrade(self, stage: str, reason: str) -> None:
         log.warning("perception.degraded", stage=stage, reason=reason)
         self.degraded.append(Degradation(stage, reason))
+
+    def _record_runtime(self, stage: str, runtime: dict[str, Any]) -> None:
+        if not hasattr(self, "runtimes"):
+            self.runtimes = {}
+        self.runtimes[stage] = runtime
+        if runtime.get("backend_fallback"):
+            self._degrade(f"{stage}_backend", f"Requested {runtime['requested_backend']}; actual runtime: {runtime}")
 
     # ------------------------------------------------------------------ calibration
     @property

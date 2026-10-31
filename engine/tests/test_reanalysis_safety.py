@@ -66,6 +66,7 @@ def test_reset_saves_consistent_events_states_tracks_exports_and_metadata(tmp_pa
     assert (backup / "exports" / "report.pdf").read_bytes() == b"report-result"
     assert json.loads((backup / "session.json").read_text())["meta"]["match_start"] == 12
     assert repo.events(sid).last_seq() == 0
+    assert repo.get(sid).meta["analysis_revision"] == 1
     assert not paths.tracks.exists()
     assert (paths.exports / "report.pdf").exists()
     repo.close()
@@ -141,11 +142,13 @@ def test_conflicting_reanalysis_coalesces_until_completion(tmp_path: Path, monke
     assert len(started) == 1 and started[0].stops == 0
     assert repo.get(sid).status is SessionStatus.ANALYSING
     assert len(list((repo.data_dir / "backups" / sid).glob("*"))) == 1
+    assert repo.get(sid).meta["analysis_revision"] == 1
     # A new user request is allowed after the previous analysis completed.
     repo.set_status(sid, SessionStatus.ANALYSED)
     svc.dispatch({"cmd": "reanalyse", "session_id": sid})
     assert len(started) == 2 and started[0].stops == 1
     assert len(list((repo.data_dir / "backups" / sid).glob("*"))) == 2
+    assert repo.get(sid).meta["analysis_revision"] == 2
     repo.close()
 
 

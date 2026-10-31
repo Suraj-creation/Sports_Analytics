@@ -8,7 +8,7 @@ test("upload → play with synced clock → analysis completes → tabs and expo
   page.on("pageerror", (e) => errors.push(e.message));
 
   await page.goto("/library");
-  await expect(page.getByRole("heading", { name: "Analyse a match" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Recordings", exact: true })).toBeVisible();
 
   // upload
   await page.locator('input[type="file"]').setInputFiles(CLIP);

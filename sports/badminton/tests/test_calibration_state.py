@@ -49,14 +49,14 @@ def test_cache_roundtrip_and_missing_state_rejection():
         detector_observed=True,
     )
     encoded = session.encode_perception(ChunkPerception(start=0, end=0, frames=[fp]))
-    assert session.decode_perception(encoded).frames[0].calibration_state == CalibrationState.DEGRADED
+    assert session.decode_perception(encoded, diagnostic=True).frames[0].calibration_state == CalibrationState.DEGRADED
     data = msgpack.unpackb(encoded, raw=False)
     del data["frames"][0]["cs"]
     with pytest.raises(StaleCacheError):
-        session.decode_perception(msgpack.packb(data, use_bin_type=True))
+        session.decode_perception(msgpack.packb(data, use_bin_type=True), diagnostic=True)
     data["v"] = 6
     with pytest.raises(StaleCacheError):
-        session.decode_perception(msgpack.packb(data, use_bin_type=True))
+        session.decode_perception(msgpack.packb(data, use_bin_type=True), diagnostic=True)
 
 
 def test_perception_publishes_recovery_across_chunks(monkeypatch):

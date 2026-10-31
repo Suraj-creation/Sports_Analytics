@@ -130,7 +130,7 @@ def test_cache_binds_identity_policy_and_preserves_raw_provenance(tmp_path, monk
         0, None, 0, persons=[person], calibration_state=CalibrationState.VALID, detector_observed=True
     )
     payload = session.encode_perception(ChunkPerception(0, 0, [frame]))
-    result = session.decode_perception(payload).frames[0].persons[0]
+    result = session.decode_perception(payload, diagnostic=True).frames[0].persons[0]
     assert (result.track_id, result.raw_track_id, result.detector_matched, result.identity_method) == (
         1,
         9,
@@ -139,7 +139,7 @@ def test_cache_binds_identity_policy_and_preserves_raw_provenance(tmp_path, monk
     )
     session.perception.players.identity_policy["model"] = "checkpoint-b"
     with pytest.raises(StaleCacheError):
-        session.decode_perception(payload)
+        session.decode_perception(payload, diagnostic=True)
 
 
 def test_cache_cannot_disguise_missing_identity_metadata_as_current(tmp_path, monkeypatch):
@@ -160,4 +160,4 @@ def test_cache_cannot_disguise_missing_identity_metadata_as_current(tmp_path, mo
     data = msgpack.unpackb(session.encode_perception(ChunkPerception(0, 0, [frame])), raw=False)
     data["frames"][0]["p"][0].pop("rt", None)
     with pytest.raises(StaleCacheError):
-        session.decode_perception(msgpack.packb(data, use_bin_type=True))
+        session.decode_perception(msgpack.packb(data, use_bin_type=True), diagnostic=True)

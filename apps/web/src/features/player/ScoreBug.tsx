@@ -78,7 +78,7 @@ export function ScoreBug({ session }: { session: Session }) {
                 key={pid}
                 name={shortName(session, pid)}
                 pid={pid}
-                serving={known && state.server === pid}
+                serving={known && state.server_known !== false && state.server === pid}
                 games={state.games_won[pid] ?? 0}
                 points={state.score[pid] ?? 0}
                 pending={!known}

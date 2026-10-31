@@ -86,5 +86,8 @@ def test_open_socket_seek_reads_new_store_after_reanalysis(settings):
             )
             ws.send_json({"type": "seek", "frame": 2})
             response = msgpack.unpackb(ws.receive_bytes())
+            assert response["type"] == "hello" and response["reset"]
+            assert response["analysis_revision"] == 1
+            response = msgpack.unpackb(ws.receive_bytes())
             assert response["type"] == "state_at"
             assert response["state"] == {"marker": "new analysis"}

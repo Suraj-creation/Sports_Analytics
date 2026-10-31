@@ -48,6 +48,26 @@ def ort_providers(backend: str, engine_cache: Path | None = None, fp16: bool = T
     return providers
 
 
+def ort_runtime(backend: str, session: Any) -> dict[str, Any]:
+    """Describe the providers actually active after ORT initializes a model."""
+    expected = {
+        "onnx-cpu": "CPUExecutionProvider",
+        "onnx-cuda": "CUDAExecutionProvider",
+        "tensorrt": "TensorrtExecutionProvider",
+    }
+    if backend not in expected:
+        raise ValueError(f"unsupported ONNX backend {backend!r}")
+    providers = list(session.get_providers())
+    return {
+        "requested_backend": backend,
+        "providers": providers,
+        "actual_backend": next(
+            (key for key, provider in expected.items() if providers and providers[0] == provider), None
+        ),
+        "backend_fallback": not providers or providers[0] != expected[backend],
+    }
+
+
 def engine_cache_dir(models_dir: Path) -> Path:
     tag = "cpu"
     try:

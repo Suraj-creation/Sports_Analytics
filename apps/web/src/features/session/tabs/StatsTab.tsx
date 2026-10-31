@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Empty, ErrorNote, Spinner } from "@/components/ui";
 import { useMeasuredMovement } from "@/features/analytics/useInsights";
+import { useAnalysisQueryKey } from "@/lib/analysisQuery";
 import { api } from "@/lib/api";
 import { STROKE_LABEL, shortName } from "@/lib/format";
 import type { Analytics, PlayerId, PlayerStats, Session } from "@/lib/types";
@@ -14,9 +15,8 @@ export function useAnalytics(sessionId: string) {
     if (v > 0) void qc.invalidateQueries({ queryKey: ["analytics", sessionId] });
   }, [qc, sessionId, v]);
   return useQuery({
-    queryKey: ["analytics", sessionId],
+    queryKey: useAnalysisQueryKey("analytics", sessionId),
     queryFn: () => api.analytics(sessionId),
-    placeholderData: (prev) => prev,
   });
 }
 

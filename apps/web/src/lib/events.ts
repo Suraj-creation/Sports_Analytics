@@ -7,6 +7,7 @@ import type { BaiEvent } from "./types";
 export class EventLog {
   private live = new Map<string, BaiEvent>();
   private superseded = new Set<string>();
+  private replacements = new Map<string, string>();
   lastSeq = 0;
   version = 0;
   /** ids of events whose replacement arrived in the latest batch (for "corrected" animations) */
@@ -18,6 +19,7 @@ export class EventLog {
       if (e.seq != null) this.lastSeq = Math.max(this.lastSeq, e.seq);
       if (e.supersedes) {
         this.superseded.add(e.supersedes);
+        this.replacements.set(e.supersedes, e.event_id);
         if (this.live.delete(e.supersedes) && e.status !== "retracted")
           this.recentlyCorrected.add(e.event_id);
       }
@@ -28,6 +30,16 @@ export class EventLog {
   }
 
   get(id: string): BaiEvent | undefined {
+    return this.live.get(id);
+  }
+
+  /** Follow correction lineage; retracted and missing references remain absent. */
+  resolve(id: string): BaiEvent | undefined {
+    const seen = new Set<string>();
+    while (this.replacements.has(id) && !seen.has(id)) {
+      seen.add(id);
+      id = this.replacements.get(id) as string;
+    }
     return this.live.get(id);
   }
 
@@ -65,6 +77,8 @@ export class EventLog {
   clear(): void {
     this.live.clear();
     this.superseded.clear();
+    this.replacements.clear();
+    this.recentlyCorrected.clear();
     this.lastSeq = 0;
     this.version++;
   }

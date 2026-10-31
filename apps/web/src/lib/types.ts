@@ -93,6 +93,7 @@ export interface MatchState {
   games_won: Record<PlayerId, number>;
   completed_games: [number, number][];
   server: PlayerId;
+  server_known?: boolean;
   receiver: PlayerId;
   service_court: "left" | "right";
   ends: Record<PlayerId, "near" | "far">;
@@ -114,9 +115,29 @@ export interface StatusMsg {
   rate_x?: number;
   lead_ms?: number;
   degraded?: { stage: string; reason: string }[];
+  analysed_frames?: number;
+  analysis_revision?: number;
+  capabilities?: Record<string, { status: string; active_model?: string | null; reason?: string }>;
 }
 
 export interface PlayerStats {
+  travel?: {
+    status: "estimate" | "unavailable";
+    meaning: "direction_of_travel";
+    coordinate_system: "court_metres";
+    heading_convention: string;
+    mean_speed_m_s: number | null;
+    latest: {
+      frame_start: number;
+      frame_end: number;
+      pts_us: number;
+      track_id: number;
+      vx_m_s: number;
+      vy_m_s: number;
+      speed_m_s: number;
+      heading_deg: number | null;
+    } | null;
+  };
   points_won: number;
   points_lost: number;
   win_rate: number | null;
@@ -227,12 +248,25 @@ export interface AskAnswer {
 export interface IndividualAnalyticsData {
   available: boolean;
   match_format: "singles" | "doubles" | null;
-  participants: Record<string, {
-    name: string | null; team_id: string | null; total_shots: number;
-    shot_distribution: Record<string, number>; event_ids: string[];
-    events: Array<{ event_id: string; frame: number; stroke: string; track_id: number; review_id: string; rally_id: string }>;
-    rally_ids: string[];
-  }>;
+  participants: Record<
+    string,
+    {
+      name: string | null;
+      team_id: string | null;
+      total_shots: number;
+      shot_distribution: Record<string, number>;
+      event_ids: string[];
+      events: Array<{
+        event_id: string;
+        frame: number;
+        stroke: string;
+        track_id: number;
+        review_id: string;
+        rally_id: string;
+      }>;
+      rally_ids: string[];
+    }
+  >;
   teams: Record<string, { score_slot: "P1" | "P2" | null; attributed_shots: number }>;
   accounting: { total_shots: number; attributed_shots: number; unattributed_shots: number };
   unattributed_event_ids: string[];
@@ -249,8 +283,22 @@ export interface EstimatedIndividualAnalyticsData {
   policy: Record<string, unknown>;
 }
 export interface EstimatedShotScope {
-  participants: Record<string, {name: string | null; team_id: string | null; estimated_shots: number; shot_distribution: Record<string, number>; events?: unknown[]}>;
-  accounting: {total_linked_shots: number; estimated_shots: number; unresolved_shots: number; verified_shots?: number};
+  participants: Record<
+    string,
+    {
+      name: string | null;
+      team_id: string | null;
+      estimated_shots: number;
+      shot_distribution: Record<string, number>;
+      events?: unknown[];
+    }
+  >;
+  accounting: {
+    total_linked_shots: number;
+    estimated_shots: number;
+    unresolved_shots: number;
+    verified_shots?: number;
+  };
   unresolved_event_ids: string[];
   legacy_unlinked_shots: number;
 }

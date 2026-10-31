@@ -59,6 +59,7 @@ class PlayerStats:
     distance_expected: int = 0
     distance_observed_s: float = 0.0
     distance_segments: int = 0
+    latest_travel: dict[str, Any] | None = None
     points_won_under_pressure: int = 0  # at game point (either side) or deuce
 
     def distance_quality(self) -> dict[str, Any]:
@@ -94,6 +95,15 @@ class PlayerStats:
             "serve_points_won": self.serve_points_won,
             "distance_m": round(self.distance_m, 1) if self.distance_segments else None,
             "distance_quality": self.distance_quality(),
+            "travel": {
+                "status": "estimate" if self.distance_segments else "unavailable",
+                "meaning": "direction_of_travel",
+                "coordinate_system": "court_metres",
+                "heading_convention": "0=+x (right from near end), 90=+y (toward far end)",
+                "mean_speed_m_s": round(self.distance_m / self.distance_observed_s, 3)
+                if self.distance_observed_s else None,
+                "latest": self.latest_travel,
+            },
             "points_won_under_pressure": self.points_won_under_pressure,
         }
 
@@ -108,6 +118,7 @@ class Highlight:
     categories: list[str]
     reasons: dict[str, float]  # decomposition of the score ("why ranked")
     player: str | None
+    evidence_ids: list[str] = field(default_factory=list)
 
     def to_public(self) -> dict[str, Any]:
         return {
@@ -119,6 +130,9 @@ class Highlight:
             "categories": self.categories,
             "reasons": {k: round(v, 2) for k, v in self.reasons.items()},
             "player": self.player,
+            "evidence_ids": list(self.evidence_ids),
+            "evidence_status": "estimated_events",
+            "score_semantics": "ranking_score_not_probability",
         }
 
 
@@ -204,6 +218,10 @@ class MatchAnalytics:
         stats.distance_m += measured.distance_m
         stats.distance_observed_s += measured.observed_s
         stats.distance_segments += measured.segments
+        if measured.motion:
+            latest = measured.motion[-1].to_public(self.fps)
+            if stats.latest_travel is None or latest["frame_end"] >= stats.latest_travel["frame_end"]:
+                stats.latest_travel = latest
         for (x, y), distance in zip(measured.xy, measured.weights, strict=True):
             self.heatmaps.add(player, "presence", float(x), float(y))
             if distance:
@@ -280,7 +298,7 @@ class MatchAnalytics:
         reasons["length"] = min(3.0, r.n_shots / 6.0)
         if r.n_shots >= max(12, longest) and r.n_shots == longest:
             cats.append("longest_rally")
-        stroke_set = {s.get("stroke") for s in r.shots}
+        stroke_set = {s.get("stroke") for s in r.shots} - {None, "unknown"}
         reasons["variety"] = min(1.5, 0.3 * len(stroke_set))
         last = r.shots[-1] if r.shots else {}
         if last.get("stroke") == "smash" and last.get("player_id") == r.winner:
@@ -320,7 +338,17 @@ class MatchAnalytics:
             reasons["comeback"] = 1.5
             cats.append("comeback")
         score = min(10.0, sum(reasons.values()))
-        return Highlight(r.rally_id, r.rally_no, r.start, r.end, score, cats, reasons, r.winner)
+        return Highlight(
+            r.rally_id,
+            r.rally_no,
+            r.start,
+            r.end,
+            score,
+            cats,
+            reasons,
+            r.winner,
+            list(dict.fromkeys([r.rally_id, *(s["event_id"] for s in r.shots if s.get("event_id"))])),
+        )
 
     def _is_comeback_point(self, r: RallyRecord) -> bool:
         """The winner levels or takes the lead in a game after trailing by ≥ 5."""

@@ -1,16 +1,16 @@
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { type APIRequestContext, expect, type Page, test } from "@playwright/test";
 
 const CLIP = fileURLToPath(new URL("./.tmp/clip.mp4", import.meta.url));
 const ROUTES = [
-  ["/", "Good to see you"],
-  ["/matches", "Your matches"],
-  ["/moments", "Moments worth another look"],
-  ["/people", "People you play with"],
-  ["/progress", "Your progress"],
+  ["/", "Home"],
+  ["/matches", "Matches"],
+  ["/moments", "Moments"],
+  ["/people", "People"],
+  ["/progress", "Progress"],
   ["/settings", "Settings"],
-  ["/help", "Understanding your analytics"],
+  ["/help", "Help and evidence"],
 ] as const;
 
 async function noHorizontalOverflow(page: Page) {
@@ -20,9 +20,15 @@ async function noHorizontalOverflow(page: Page) {
 }
 
 async function upload(request: APIRequestContext) {
+  // Keep this recording distinct from smoke.spec.ts. The API intentionally reopens
+  // identical source bytes with their saved metadata rather than creating a copy.
+  const source = Buffer.concat([
+    await readFile(CLIP),
+    Buffer.from([0, 0, 0, 8, 0x66, 0x72, 0x65, 0x65]), // empty MP4 "free" atom
+  ]);
   const response = await request.post("/api/sessions", {
     multipart: {
-      file: { name: "production-e2e.mp4", mimeType: "video/mp4", buffer: await readFile(CLIP) },
+      file: { name: "production-e2e.mp4", mimeType: "video/mp4", buffer: source },
       title: "Production integration match",
       player1: "Integration Near",
       player2: "Integration Far",
@@ -127,7 +133,9 @@ test("real upload creates playable media with range delivery and exact frame nav
   await expect(page.getByTestId("evidence-details")).toContainText("source frame 90");
   await expect(page.getByTestId("selected-event-marker")).toBeVisible();
   await expect.poll(async () => video.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
-  await expect.poll(async () => video.evaluate((v: HTMLVideoElement) => Math.floor(v.currentTime * 30))).toBe(105);
+  await expect
+    .poll(async () => video.evaluate((v: HTMLVideoElement) => Math.floor(v.currentTime * 30)))
+    .toBe(105);
   // Re-selecting the same event is a new playback request, not a no-op from stale query state.
   await cue();
   await expect.poll(async () => video.evaluate((v: HTMLVideoElement) => v.paused)).toBe(false);
@@ -137,12 +145,18 @@ test("real upload creates playable media with range delivery and exact frame nav
   await page.keyboard.press("Home");
   await expect(page.getByTestId("selected-event-marker")).toHaveCount(0);
   await expect(page.getByText("Canonical test moment · bounded clip", { exact: true })).toHaveCount(0);
-  await expect.poll(async () => video.evaluate((v: HTMLVideoElement) => Math.floor(v.currentTime * 30))).toBe(0);
+  await expect
+    .poll(async () => video.evaluate((v: HTMLVideoElement) => Math.floor(v.currentTime * 30)))
+    .toBe(0);
   await expect(timeline).toHaveAttribute("aria-valuemax", String(session.media.n_frames - 1));
   const picture = await page.getByTestId("video-stage").boundingBox();
   expect(picture).not.toBeNull();
   expect((picture?.width ?? 0) / (picture?.height ?? 1)).toBeCloseTo(16 / 9, 1);
-  await page.screenshot({ path: "/tmp/bai-audit-frontend-desktop.png", fullPage: true });
+  await page.getByRole("button", { name: "Focus video", exact: true }).click();
+  const focused = await page.getByTestId("video-stage").boundingBox();
+  expect((focused?.width ?? 0) / (focused?.height ?? 1)).toBeCloseTo(16 / 9, 1);
+  await page.getByRole("button", { name: "Standard view", exact: true }).click();
+  await page.screenshot({ path: "test-results/screens/desktop.png", fullPage: true });
   await page.getByRole("button", { name: "Overlay layers", exact: true }).click();
   const shuttle = page.getByRole("switch", { name: "Shuttle trail", exact: true });
   await shuttle.click();
@@ -191,7 +205,9 @@ test("real upload creates playable media with range delivery and exact frame nav
   await page.setViewportSize({ width: 390, height: 844 });
   await noHorizontalOverflow(page);
   await expect(page.getByRole("button", { name: "Full screen", exact: true })).toBeVisible();
-  await page.screenshot({ path: "/tmp/bai-audit-frontend-narrow.png", fullPage: true });
+  const narrow = await page.getByTestId("video-stage").boundingBox();
+  expect((narrow?.width ?? 0) / (narrow?.height ?? 1)).toBeCloseTo(16 / 9, 1);
+  await page.screenshot({ path: "test-results/screens/narrow.png", fullPage: true });
   expect(errors).toEqual([]);
 });
 
@@ -204,11 +220,11 @@ test("sign-in failure remains an actionable authentication boundary", async ({ p
     route.fulfill({ status: 401, json: { detail: "That passphrase is not correct" } }),
   );
   await page.goto("/matches");
-  await expect(page.getByRole("heading", { name: "Sign in to Badminton AI" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Sign in to Rally" })).toBeVisible();
   await page.getByLabel("Passphrase").fill("invalid-test-passphrase");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText(/passphrase/i);
-  await expect(page.getByRole("heading", { name: "Your matches", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Matches", exact: true })).toHaveCount(0);
 });
 
 test("an unknown match reports a missing record rather than displaying sample data", async ({ page }) => {
@@ -231,7 +247,7 @@ test("display preferences survive refresh and progress uses the recorded player 
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await expect(page.locator("html")).toHaveAttribute("data-reduced-motion", "true");
   await page.goto("/progress");
-  await expect(page.getByRole("heading", { name: "Your progress", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Progress", exact: true })).toBeVisible();
   await expect(page.getByText("Viktor Axelsen", { exact: true })).toHaveCount(0);
   await page.goto("/matches");
   await page.getByLabel("Find a match", { exact: true }).fill("does not exist");

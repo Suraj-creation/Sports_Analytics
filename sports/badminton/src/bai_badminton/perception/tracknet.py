@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass, field
+from itertools import pairwise
 from pathlib import Path
 
 import cv2
@@ -24,6 +25,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from bai_engine.obs import get_logger
+from bai_engine.runtime.device import ort_runtime
 
 log = get_logger(__name__)
 
@@ -134,12 +136,16 @@ def heatmap_to_point(
     hm: NDArray[np.float32], threshold: float, mask: NDArray[np.uint8] | None = None
 ) -> tuple[float, float, float] | None:
     """Centroid (heatmap-weighted) of the blob containing the peak; ``conf`` = peak value."""
+    if hm.ndim != 2 or not hm.size or not np.isfinite(hm).all():
+        raise ValueError(f"shuttle heatmap must be a nonempty, finite 2D array, got {hm.shape}")
+    if not np.isfinite(threshold) or not 0 <= threshold <= 1:
+        raise ValueError("shuttle heatmap threshold must be finite and in [0, 1]")
     if mask is not None:
         if mask.shape != hm.shape:
             raise ValueError("shuttle mask must match the heatmap shape")
         hm = np.where(mask, hm, 0.0)
     peak = float(hm.max())
-    if peak < threshold:
+    if peak <= 0 or peak < threshold:
         return None
     binary = (hm >= threshold).astype(np.uint8)
     _, labels = cv2.connectedComponents(binary, connectivity=8)
@@ -161,9 +167,14 @@ class TrackNetV3:
         onnx_dir: Path | None = None,
         providers: list[object] | None = None,
         batch: int = 1,
+        precision: str = "fp32",
     ) -> None:
         import torch
 
+        if backend not in ("torch-cpu", "torch-cuda", "onnx-cpu", "onnx-cuda", "tensorrt"):
+            raise ValueError(f"unsupported TrackNet backend {backend!r}")
+        if precision not in ("fp32", "fp16"):
+            raise ValueError(f"unsupported TrackNet precision {precision!r}")
         ckpt = torch.load(weights, map_location="cpu", weights_only=False)
         p = ckpt.get("param_dict", {})
         self.seq_len = int(p.get("seq_len", 8))
@@ -184,8 +195,8 @@ class TrackNetV3:
         model.eval()
         self._torch = model
         self._ort = None
-        if backend.startswith("torch-cuda"):
-            self._torch = model.cuda().half() if torch.cuda.is_available() else model
+        if backend == "torch-cuda" and torch.cuda.is_available():
+            self._torch = model.cuda().half() if precision == "fp16" else model.cuda().float()
         elif backend in ("onnx-cpu", "onnx-cuda", "tensorrt"):
             onnx_path = (onnx_dir or weights.parent) / f"tracknetv3_seq{self.seq_len}_{self.bg_mode}.onnx"
             if not onnx_path.exists():
@@ -193,7 +204,20 @@ class TrackNetV3:
             import onnxruntime as ort
 
             self._ort = ort.InferenceSession(str(onnx_path), providers=providers or ["CPUExecutionProvider"])
-        log.info("tracknet.loaded", seq_len=self.seq_len, backend=backend)
+        if self._ort is not None:
+            self.runtime = ort_runtime(backend, self._ort)
+        else:
+            param = next(self._torch.parameters())
+            actual = "torch-cuda" if param.device.type == "cuda" else "torch-cpu"
+            self.runtime = {
+                "requested_backend": backend, "actual_backend": actual,
+                "device": str(param.device), "dtype": str(param.dtype),
+                "backend_fallback": actual != backend,
+            }
+        self.runtime["requested_precision"] = precision
+        if self.runtime["backend_fallback"]:
+            log.warning("tracknet.backend_fallback", **self.runtime)
+        log.info("tracknet.loaded", seq_len=self.seq_len, **self.runtime)
 
     @property
     def model_ref(self) -> str:
@@ -253,6 +277,8 @@ class TrackNetV3:
             return []
         if masks is not None and len(masks) != len(frames_bgr):
             raise ValueError("one shuttle mask is required per frame")
+        if shots is not None and len(shots) != len(frames_bgr):
+            raise ValueError("one camera-shot ID is required per frame")
         L = self.seq_len
         step = L if step is None else max(1, min(step, L))
         shots = shots or [0] * len(frames_bgr)
@@ -260,18 +286,22 @@ class TrackNetV3:
         sx, sy = w / WIDTH, h / HEIGHT
         small = self._prep(frames_bgr, shots)
         n = len(small)
-        starts = list(range(0, max(1, n - L + 1), step))
-        if starts[-1] + L < n:
-            starts.append(n - L if n >= L else 0)
         acc = np.zeros((n, HEIGHT, WIDTH), np.float32)
         cnt = np.zeros(n, np.float32)
         windows, spans = [], []
-        for s0 in starts:
-            idx = [min(s0 + j, n - 1) for j in range(L)]
-            bg = self.bg.get(shots[s0], small[s0])
-            stack = np.concatenate([bg[None], np.stack([small[i] for i in idx])], axis=0)
-            windows.append(np.moveaxis(stack, -1, 1).reshape(self.in_dim, HEIGHT, WIDTH))
-            spans.append(idx)
+        # A temporal network must never see frames from different camera shots
+        # in one input. Pad only within each shot, including very short tails.
+        boundaries = [0, *[i for i in range(1, n) if shots[i] != shots[i - 1]], n]
+        for lo, hi in pairwise(boundaries):
+            starts = list(range(lo, max(lo + 1, hi - L + 1), step))
+            if starts[-1] + L < hi:
+                starts.append(max(lo, hi - L))
+            for s0 in starts:
+                idx = [min(s0 + j, hi - 1) for j in range(L)]
+                bg = self.bg.get(shots[s0], small[s0])
+                stack = np.concatenate([bg[None], np.stack([small[i] for i in idx])], axis=0)
+                windows.append(np.moveaxis(stack, -1, 1).reshape(self.in_dim, HEIGHT, WIDTH))
+                spans.append(idx)
         for b in range(0, len(windows), self.batch):
             x = np.stack(windows[b : b + self.batch]).astype(np.float32) / 255.0
             hms = self._forward(x)  # (B, L, H, W)

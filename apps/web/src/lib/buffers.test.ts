@@ -89,11 +89,105 @@ describe("TrackBuffer", () => {
     expect(t.trail(8, 4).map((p) => p.f)).toEqual([5, 6, 8]);
   });
 
-  it("player() bridges short detection gaps only", () => {
+  it("does not turn an analysed missing observation into a carried pose", () => {
     const t = new TrackBuffer();
     t.ingest(win(0, 20, []));
-    expect(t.player("P1", 3)).toBeDefined();
+    expect(t.player("P1", 3)).toBeUndefined();
     expect(t.player("P1", 4)).toBeUndefined();
+  });
+
+  it("preserves four anonymous players and their observation provenance", () => {
+    const t = new TrackBuffer();
+    const anonymous = Object.fromEntries(
+      [1, 2, 3, 4].map((track) => [
+        `episode:${track}`,
+        {
+          f: [0],
+          t: [track],
+          b: [10, 20, 30, 80],
+          k: new Array(51).fill(0.7),
+          cx: [1],
+          cy: [2],
+          obs: [`episode-${track}`],
+          c: [0.9],
+          d: [true],
+          m: [track !== 4],
+        },
+      ]),
+    );
+    t.ingest({ ...win(0, 9, []), players: {}, anonymous });
+    expect(t.playersAt(0)).toHaveLength(4);
+    expect(t.playersAt(0).every((p) => p.playerId === null && p.kps?.length === 51)).toBe(true);
+    expect(t.playersAt(0)[3]?.detectorMatched).toBe(false);
+    expect(t.playersAt(1)).toEqual([]);
+    t.ingest({ ...win(0, 9, []), players: {} });
+    expect(t.playersAt(0)).toEqual([]);
+  });
+
+  const sampledPoses = (frames: number[], ids = frames.map(() => "episode-a")) => ({
+    ...win(0, 6, []),
+    players: {},
+    anonymous: {
+      a: {
+        f: frames,
+        t: frames.map(() => 7),
+        obs: ids,
+        b: frames.flatMap((f) => [10 + f, 20, 30 + f, 80]),
+        k: frames.flatMap((f) => (f === 0 ? [15, 25, 0.9, ...new Array(48).fill(0)] : new Array(51).fill(0))),
+        cx: frames.map(() => 0),
+        cy: frames.map(() => 0),
+      },
+    },
+  });
+
+  it("holds a pose for display between samples without changing observed keypoints", () => {
+    const t = new TrackBuffer();
+    t.ingest(sampledPoses([0, 1, 2]));
+    const current = t.playersAt(2)[0];
+    expect(current?.kps).toBeNull();
+    const display = current ? t.displayPose(current, 2) : null;
+    expect(display?.observedFrame).toBe(0);
+    expect(display?.ageFrames).toBe(2);
+    expect(display?.keypoints[0]).toBe(17); // bbox translated +2; pose is an estimate
+    expect(current?.kps).toBeNull();
+    expect(t.playersAt(0)[0]?.kps?.[0]).toBe(15);
+  });
+
+  it("never holds a pose across a missing body, changed episode or expired age", () => {
+    for (const window of [
+      sampledPoses([0, 2]),
+      sampledPoses([0, 1], ["old", "new"]),
+      sampledPoses([0, 1, 2, 3, 4, 5, 6]),
+    ]) {
+      const t = new TrackBuffer();
+      t.ingest(window);
+      const frame = window.anonymous.a.f.at(-1) as number;
+      const current = t.playersAt(frame)[0];
+      expect(current ? t.displayPose(current, frame) : null).toBeNull();
+    }
+  });
+
+  it("never holds a pose from another camera or an unknown episode", () => {
+    const eye = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+    const t = new TrackBuffer();
+    t.ingest({ ...sampledPoses([0, 1]), cam: { f: [0, 1], g: [...eye, ...eye], h: [0, 2] } });
+    const current = t.playersAt(1)[0];
+    expect(current ? t.displayPose(current, 1) : null).toBeNull();
+    const unknown = new TrackBuffer();
+    unknown.ingest(sampledPoses([0, 1], ["", ""]));
+    const person = unknown.playersAt(1)[0];
+    expect(person ? unknown.displayPose(person, 1) : null).toBeNull();
+  });
+
+  it("does not estimate through an abrupt bbox jump or a stricter age limit", () => {
+    const t = new TrackBuffer();
+    const window = sampledPoses([0, 1, 2]);
+    window.anonymous.a.b.splice(8, 4, 500, 20, 520, 80);
+    t.ingest(window);
+    const jumped = t.playersAt(2)[0];
+    expect(jumped ? t.displayPose(jumped, 2) : null).toBeNull();
+    const previous = t.playersAt(1)[0];
+    expect(previous ? t.displayPose(previous, 1, 0) : null).toBeNull();
   });
 });
 

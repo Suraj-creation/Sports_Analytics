@@ -20,13 +20,17 @@ export class SessionSocket {
     private readonly lastSeq: () => number,
     private readonly onState: (s: "connecting" | "open" | "closed") => void = () => {},
     private readonly generation: () => string | undefined = () => undefined,
+    private readonly revision: () => number = () => 0,
   ) {
     this.connect();
   }
 
   private url(): string {
     const proto = location.protocol === "https:" ? "wss" : "ws";
-    const query = new URLSearchParams({ last_seq: String(this.lastSeq()) });
+    const query = new URLSearchParams({
+      last_seq: String(this.lastSeq()),
+      analysis_revision: String(this.revision()),
+    });
     const generation = this.generation();
     if (generation) query.set("generation", generation);
     return `${proto}://${location.host}/ws/sessions/${this.sessionId}?${query}`;

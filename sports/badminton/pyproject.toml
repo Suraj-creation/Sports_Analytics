@@ -13,7 +13,7 @@ dependencies = [
 [project.optional-dependencies]
 perception = [
     "rtmlib>=0.0.15",
-    "trackers>=2.0",
+    "trackers>=2.6.1",  # timestamp-aware update for changing detector cadence
     "rapidocr>=3.0",
 ]
 

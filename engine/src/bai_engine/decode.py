@@ -53,6 +53,8 @@ class SegmentDecoder:
         return self._init
 
     def decode_segment(self, k: int) -> DecodedChunk:
+        if k < 0:
+            raise ValueError("segment index must be non-negative")
         seg = segment_path(self.media, k)
         data = self._init_bytes() + seg.read_bytes()
         frames: list[Frame] = []
@@ -62,14 +64,20 @@ class SegmentDecoder:
             stream.codec_context.thread_count = self.threads
             for fr in container.decode(stream):
                 frames.append(fr.to_ndarray(format="bgr24"))
+        if not frames:
+            raise ValueError(f"segment {k} has no decoded frames")
         if len(frames) > self.F:
-            frames = frames[: self.F]
+            raise ValueError(f"segment {k} has {len(frames)} frames, expected at most {self.F}")
         return DecodedChunk(start=k * self.F, frames=frames)
 
     def decode_frame(self, frame_idx: int) -> Frame:
+        if frame_idx < 0:
+            raise ValueError("frame index must be non-negative")
         k, i = divmod(frame_idx, self.F)
         chunk = self.decode_segment(k)
-        return chunk.frames[min(i, len(chunk.frames) - 1)]
+        if i >= len(chunk.frames):
+            raise IndexError(f"frame {frame_idx} is beyond the decoded segment")
+        return chunk.frames[i]
 
     def keyframe(self, k: int) -> Frame:
         """First frame of segment ``k`` only (cheap: decodes one IDR)."""

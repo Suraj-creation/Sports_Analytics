@@ -77,6 +77,7 @@ class MatchState(BaseModel):
     games_won: dict[str, int] = Field(default_factory=lambda: {"P1": 0, "P2": 0})
     completed_games: tuple[tuple[int, int], ...] = ()  # (P1, P2) per finished game
     server: PlayerId = "P1"
+    server_known: bool = True  # False when a mid-game broadcast supplies points but no server
     ends: dict[str, End] = Field(default_factory=lambda: {"P1": End.NEAR, "P2": End.FAR})
     rally_no: int = 0  # rallies completed in the match
     interval_taken: bool = False  # mid-game interval already taken in the current game
@@ -134,6 +135,7 @@ class MatchState(BaseModel):
             "games_won": dict(self.games_won),
             "completed_games": [list(g) for g in self.completed_games],
             "server": self.server,
+            "server_known": self.server_known,
             "receiver": self.receiver,
             "service_court": self.service_court.value,
             "ends": {k: v.value for k, v in self.ends.items()},

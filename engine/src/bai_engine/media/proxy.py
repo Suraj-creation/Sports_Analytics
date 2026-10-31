@@ -24,7 +24,7 @@ from fractions import Fraction
 from pathlib import Path
 
 from bai_engine.media.ffmpeg import FFmpegJob, MediaError, Tools, nvenc_works
-from bai_engine.media.probe import ProbeResult
+from bai_engine.media.probe import ProbeResult, probe
 from bai_engine.store.sessions import MediaPaths
 from bai_engine.timeline import _snap_rate
 
@@ -53,7 +53,8 @@ def plan_proxy(p: ProbeResult, tools: Tools, max_height: int = 720, prefer_gpu: 
         fps = Fraction(60)  # high-speed footage: analyse at 60 (TrackNet-family models expect 25–60)
     else:
         fps = Fraction(30)
-    height = min(max_height, p.height - (p.height % 2))
+    display_height = p.display_size[1]
+    height = min(max_height, display_height - (display_height % 2))
     fps_seg = max(1, round(float(fps) * SEGMENT_SECONDS))
     encoder = "h264_nvenc" if prefer_gpu and nvenc_works(tools.ffmpeg) else "libx264"
     return ProxyPlan(fps=fps, height=height, frames_per_segment=fps_seg, encoder=encoder, audio=p.has_audio)
@@ -210,11 +211,12 @@ def build_sprite(
     ]
     FFmpegJob(cmd).run()
     n_thumbs = math.ceil(duration_s / every)
+    width, height = probe(src, tools).display_size
     meta = {
         "interval_s": every,
         "tile": tile,
         "thumb_w": thumb_w,
-        "thumb_h": round(thumb_w * 9 / 16),
+        "thumb_h": round(thumb_w * height / width / 2) * 2,
         "count": n_thumbs,
         "sheets": sorted(p.name for p in mp.root.glob("sprite_*.jpg")),
     }

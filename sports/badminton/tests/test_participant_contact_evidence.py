@@ -128,6 +128,7 @@ def test_engine_buffers_four_track_episodes_and_clears_uncovered_frames(tmp_path
 def test_real_engine_ingest_retains_episode_evidence_in_doubles(tmp_path: Path):
     from bai_badminton.engine import BadmintonMatchEngine, EngineConfig
     from bai_badminton.perception_types import ChunkPerception, PersonObs
+    from bai_badminton.rules import MatchConfig
     from bai_badminton.testing.synth import make_rally, to_frames
     from bai_engine.store import EventStore
 
@@ -141,7 +142,11 @@ def test_real_engine_ingest_retains_episode_evidence_in_doubles(tmp_path: Path):
             ]
         )
     store = EventStore(tmp_path / "actual-ingest.sqlite", "S1")
-    engine = BadmintonMatchEngine("S1", EngineConfig(fps=30, frame_width=1280, frame_height=720), store)
+    engine = BadmintonMatchEngine(
+        "S1",
+        EngineConfig(fps=30, frame_width=1280, frame_height=720, match=MatchConfig(discipline="doubles")),
+        store,
+    )
     engine.set_calibration(0, rally.homography)
     engine.ingest(ChunkPerception(start=0, end=len(frames) - 1, frames=frames, models={"player_detector": "test"}))
     engine.flush()

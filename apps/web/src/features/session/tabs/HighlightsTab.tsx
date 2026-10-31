@@ -4,6 +4,7 @@ import { Download, Play } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Empty, ErrorNote, PlayerDot, Spinner } from "@/components/ui";
 import { playEvidence } from "@/features/player/clip";
+import { useAnalysisQueryKey } from "@/lib/analysisQuery";
 import { api, exportUrl } from "@/lib/api";
 import { CATEGORY_LABEL, clock, shortName } from "@/lib/format";
 import type { PlayerId, Session } from "@/lib/types";
@@ -31,7 +32,7 @@ export function HighlightsTab({ session, selectedPlayer }: { session: Session; s
     if (v > 0) void qc.invalidateQueries({ queryKey: ["highlights", session.session_id, player] });
   }, [qc, session.session_id, player, v]);
   const q = useQuery({
-    queryKey: ["highlights", session.session_id, player],
+    queryKey: useAnalysisQueryKey("highlights", session, player),
     queryFn: () => api.highlights(session.session_id, 12, player),
   });
 

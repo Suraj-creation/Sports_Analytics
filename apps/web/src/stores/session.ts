@@ -1,10 +1,10 @@
 import { create } from "zustand";
-import { usePlayback } from "./playback";
 import { api } from "@/lib/api";
 import { EventLog } from "@/lib/events";
 import { type ServerMsg, SessionSocket } from "@/lib/socket";
 import { TrackBuffer } from "@/lib/tracks";
 import type { BaiEvent, Calibration, MatchState, Session, StatusMsg } from "@/lib/types";
+import { usePlayback } from "./playback";
 
 /**
  * Live state of the open session. Heavy, high-rate data (tracks, events) lives in mutable
@@ -31,8 +31,16 @@ interface SessionStore {
 
 /** Fields the live socket keeps fresher than a REST snapshot. */
 function pickLive(s: Session): Partial<Session> {
-  return { status: s.status, status_detail: s.status_detail, frontier_frame: s.frontier_frame };
+  return {
+    status: s.status,
+    status_detail: s.status_detail,
+    frontier_frame: s.frontier_frame,
+    analysed_frames: s.analysed_frames,
+    meta: s.meta,
+  };
 }
+
+let lifecycle = 0;
 
 export const useSession = create<SessionStore>((set, get) => ({
   session: null,
@@ -50,10 +58,23 @@ export const useSession = create<SessionStore>((set, get) => ({
   socket: null,
 
   open: (id) => {
+    const active = ++lifecycle;
     get().socket?.close();
     const tracks = new TrackBuffer();
     const events = new EventLog();
-    set({ tracks, events, session: null, state: null, status: null, calibration: null, lastEvents: [] });
+    set({
+      tracks,
+      events,
+      session: null,
+      state: null,
+      status: null,
+      calibration: null,
+      lastEvents: [],
+      eventsVersion: 0,
+      tracksVersion: 0,
+      analyticsVersion: 0,
+      ingestProgress: null,
+    });
     // `hello` can arrive before ffprobe has run (media: null); status messages don't carry media,
     // so fetch the session once when it's still missing — the player can't attach without it.
     let mediaFetch: Promise<void> | null = null;
@@ -62,7 +83,7 @@ export const useSession = create<SessionStore>((set, get) => ({
       mediaFetch = api
         .session(id)
         .then((full) => {
-          if (!full.media) return;
+          if (!full.media || active !== lifecycle) return;
           set((s) => (s.session?.session_id === id ? { session: { ...full, ...pickLive(s.session) } } : {}));
         })
         .catch(() => {})
@@ -71,8 +92,9 @@ export const useSession = create<SessionStore>((set, get) => ({
         });
     };
     let generation: string | undefined;
+    let revision = 0;
     let socket: SessionSocket | null = null;
-    const generationOf = (value: unknown) => typeof value === "string" && value ? value : undefined;
+    const generationOf = (value: unknown) => (typeof value === "string" && value ? value : undefined);
     const resetAnalysis = (next: string | undefined, calibration: Calibration | null = null) => {
       generation = next;
       events.clear();
@@ -86,53 +108,87 @@ export const useSession = create<SessionStore>((set, get) => ({
         calibration,
         status: null,
         lastEvents: [],
-        session: s.session ? {
-          ...s.session,
-          status: "analysing",
-          status_detail: "Reanalysis starting",
-          frontier_frame: 0,
-          analysed_frames: 0,
-          meta: { ...s.session.meta, analysis_generation: next },
-        } : null,
+        session: s.session
+          ? {
+              ...s.session,
+              status: "analysing",
+              status_detail: "Reanalysis starting",
+              frontier_frame: 0,
+              analysed_frames: 0,
+              meta: { ...s.session.meta, analysis_generation: next, analysis_revision: revision },
+            }
+          : null,
       }));
     };
     // Reconnect only reads the new log from zero; it never starts analysis.
     const connect = () => {
       socket?.close();
-      socket = new SessionSocket(id, onMessage, () => events.lastSeq,
-        (c) => set({ connection: c }), () => generation);
+      socket = new SessionSocket(
+        id,
+        onMessage,
+        () => events.lastSeq,
+        (c) => {
+          if (active === lifecycle) set({ connection: c });
+        },
+        () => generation,
+        () => revision,
+      );
       set({ socket });
     };
     const onMessage = (m: ServerMsg) => {
+      if (active !== lifecycle) return;
+      const incomingRevision =
+        m.analysis_revision ?? (m.type === "hello" ? m.session.meta?.analysis_revision : undefined);
+      if (typeof incomingRevision === "number" && incomingRevision < revision) return;
+      const newerRevision = typeof incomingRevision === "number" && incomingRevision > revision;
+      if (newerRevision) revision = incomingRevision;
       const incomingGeneration = generationOf(m.generation);
-      if (m.type !== "hello" && m.type !== "analysis_reset" &&
-          incomingGeneration !== undefined && incomingGeneration !== generation) {
+      if (
+        m.type !== "hello" &&
+        m.type !== "analysis_reset" &&
+        incomingGeneration !== undefined &&
+        incomingGeneration !== generation
+      ) {
         resetAnalysis(incomingGeneration);
         connect();
         return;
       }
+      if (newerRevision && m.type !== "hello" && m.type !== "analysis_reset") resetAnalysis(generation);
       switch (m.type) {
         case "hello": {
           const next = generationOf(m.session.meta?.analysis_generation);
           const changed = next !== generation;
           const rolledBack = typeof m.last_seq === "number" && m.last_seq < events.lastSeq;
-          if (changed || rolledBack) resetAnalysis(next);
+          if (changed || rolledBack || newerRevision || m.reset) resetAnalysis(next);
           generation = next;
-          set({ session: m.session, state: m.state ?? null, calibration: m.calibration ?? null });
+          set((s) => ({
+            session: m.session,
+            state: m.state ?? null,
+            calibration: m.calibration ?? null,
+            analyticsVersion: s.analyticsVersion + 1,
+          }));
           // Older servers do not clamp an obsolete resume cursor.
           if (rolledBack && !changed) connect();
           break;
         }
         case "analysis_reset":
-          if (incomingGeneration !== generation || (incomingGeneration === undefined && events.lastSeq > 0))
+          if (
+            newerRevision ||
+            incomingGeneration !== generation ||
+            (incomingGeneration === undefined && events.lastSeq > 0)
+          )
             resetAnalysis(incomingGeneration, m.calibration ?? null);
           break;
         case "events": {
           const evs = m.events as BaiEvent[];
           // Legacy live streams have no generation marker, but a fresh sequence
           // one with a new ID cannot belong to the log already on screen.
-          if (generation === undefined && !m.backlog && events.lastSeq > 0 &&
-              evs.some((event) => event.seq === 1 && !events.get(event.event_id))) {
+          if (
+            generation === undefined &&
+            !m.backlog &&
+            events.lastSeq > 0 &&
+            evs.some((event) => event.seq === 1 && !events.get(event.event_id))
+          ) {
             resetAnalysis(generation);
             connect();
             return;
@@ -145,9 +201,7 @@ export const useSession = create<SessionStore>((set, get) => ({
             lastEvents: m.backlog ? s.lastEvents : evs,
             calibration: cal ? (cal.payload as Calibration) : s.calibration,
             state: point ? (point.payload.state_after as MatchState) : s.state,
-            analyticsVersion: evs.some((e) => e.type === "rally_end" || e.type === "point")
-              ? s.analyticsVersion + 1
-              : s.analyticsVersion,
+            analyticsVersion: evs.length ? s.analyticsVersion + 1 : s.analyticsVersion,
           }));
           break;
         }
@@ -160,8 +214,25 @@ export const useSession = create<SessionStore>((set, get) => ({
         case "status":
           set((s) => ({
             status: m as StatusMsg,
+            ingestProgress: m.ingest_progress ?? s.ingestProgress,
+            analyticsVersion:
+              s.session?.status !== m.status || s.session?.frontier_frame !== m.frontier_frame
+                ? s.analyticsVersion + 1
+                : s.analyticsVersion,
             session: s.session
-              ? { ...s.session, status: m.status, status_detail: m.detail, frontier_frame: m.frontier_frame }
+              ? {
+                  ...s.session,
+                  status: m.status,
+                  status_detail: m.detail,
+                  frontier_frame: m.frontier_frame,
+                  analysed_frames: m.analysed_frames ?? s.session.analysed_frames,
+                  meta: {
+                    ...s.session.meta,
+                    analysis_revision: revision,
+                    ...(m.degraded ? { degraded: m.degraded } : {}),
+                    ...(m.capabilities ? { capabilities: m.capabilities } : {}),
+                  },
+                }
               : s.session,
           }));
           if (m.status !== "created" && m.status !== "ingesting") ensureMedia();
@@ -170,7 +241,7 @@ export const useSession = create<SessionStore>((set, get) => ({
           set({ ingestProgress: m.progress });
           break;
         case "state":
-          if (m.state) set({ state: m.state });
+          if (m.state) set((s) => ({ state: m.state, analyticsVersion: s.analyticsVersion + 1 }));
           break;
         default:
           break;
@@ -180,6 +251,7 @@ export const useSession = create<SessionStore>((set, get) => ({
   },
 
   close: () => {
+    lifecycle++;
     get().socket?.close();
     set({ socket: null, connection: "closed" });
   },

@@ -113,3 +113,21 @@ it("ignores malformed source board rows", () => {
   render(<ScoreBug session={SESSION} />);
   expect(screen.getByTestId("score-bug")).toHaveTextContent("Score unavailable");
 });
+
+it("shows a seeded score without inventing an unknown opening server", () => {
+  const log = new EventLog();
+  log.apply([
+    ev("point", 100, {
+      payload: {
+        state_before: { ...state(8, 3), server_known: false },
+        state_after: { ...state(9, 3), server_known: true },
+      },
+    }),
+  ]);
+  useSession.setState({ events: log, eventsVersion: log.version, session: SESSION });
+  act(() => usePlayback.setState({ frame: 30 }));
+  render(<ScoreBug session={SESSION} />);
+  expect(screen.queryByText("serving")).not.toBeInTheDocument();
+  act(() => usePlayback.setState({ frame: 100 }));
+  expect(screen.getByText("serving")).toBeInTheDocument();
+});

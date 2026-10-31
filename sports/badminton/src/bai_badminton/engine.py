@@ -30,7 +30,13 @@ import numpy as np
 from bai_badminton.analytics.match import MatchAnalytics, RallyRecord
 from bai_badminton.court import Homography
 from bai_badminton.events.activity import ActivityInterval, ActivityObservation, ActivityState, ActivityTracker
-from bai_badminton.events.contact import ATTRIBUTION_POLICY, CONTACT_MODEL, ContactCandidate, detect_contacts
+from bai_badminton.events.contact import (
+    ATTRIBUTION_MIN_PROXIMITY,
+    ATTRIBUTION_POLICY,
+    CONTACT_MODEL,
+    ContactCandidate,
+    detect_contacts,
+)
 from bai_badminton.events.match_phase import (
     MatchPhaseTracker,
     Phase,
@@ -235,7 +241,7 @@ class BadmintonMatchEngine:
         self.timeline = Timeline.from_rate(cfg.fps, 10**9)
         self.ont = get_ontology()
         self.stroke_clf: StrokeClassifier = stroke_classifier or RuleStrokeClassifier()
-        self.identity = IdentityResolver(frame_height=float(cfg.frame_height))
+        self.identity = IdentityResolver(frame_height=float(cfg.frame_height), rebind_gap_frames=round(2 * cfg.fps))
         self.participants: ParticipantTracker | None = None
         self._participant_births: dict[str, str] = {}
         self._participant_shot_id: int | None = None
@@ -290,6 +296,7 @@ class BadmintonMatchEngine:
         self._last_frame = -1
         self._final = -1  # last finalised frame
         self._open_contacts: list[_Contact] = []
+        self._last_contact_candidate: ContactCandidate | None = None
         self._rally_start_event: Event | None = None
         self._pending: list[_PendingRally] = []
         self._rallies: list[_RallyEvents] = []
@@ -371,24 +378,29 @@ class BadmintonMatchEngine:
         self._ocr_seen = True
         stable = self.ocr.add(reading)
         if stable is not None:
-            self._emit([
-                self._event(
-                    "broadcast_score",
-                    stable.frame_idx,
-                    stable.frame_idx,
-                    payload={
-                        "rows": [{"name": name, "points": points} for name, points in stable.rows],
-                        "player_mapping": dict(self.ocr.row_map) if self.ocr.row_map is not None else None,
-                        "source": "broadcast_ocr",
-                        "confirmation": "two_distinct_observations",
-                    },
-                    confidence=min(stable.conf, self.ocr.readings[-2].conf),
-                    evidence=(Evidence(kind=EvidenceKind.SCORE_OCR,
-                                       frames=(self.ocr.readings[-2].frame_idx, stable.frame_idx)),),
-                    model="scoreboard_observation_v1",
-                    status=EventStatus.CONFIRMED,
-                )
-            ])
+            self._emit(
+                [
+                    self._event(
+                        "broadcast_score",
+                        stable.frame_idx,
+                        stable.frame_idx,
+                        payload={
+                            "rows": [{"name": name, "points": points} for name, points in stable.rows],
+                            "player_mapping": dict(self.ocr.row_map) if self.ocr.row_map is not None else None,
+                            "source": "broadcast_ocr",
+                            "confirmation": "two_distinct_observations",
+                        },
+                        confidence=min(stable.conf, self.ocr.readings[-2].conf),
+                        evidence=(
+                            Evidence(
+                                kind=EvidenceKind.SCORE_OCR, frames=(self.ocr.readings[-2].frame_idx, stable.frame_idx)
+                            ),
+                        ),
+                        model="scoreboard_observation_v1",
+                        status=EventStatus.CONFIRMED,
+                    )
+                ]
+            )
 
     def ingest(self, chunk: ChunkPerception) -> None:
         if chunk.start != self._last_frame + 1:
@@ -401,7 +413,7 @@ class BadmintonMatchEngine:
             self._append(fp, tracked)
         self._last_frame = chunk.end
         self._emit_scenes(self.scenes.drain())
-        self._advance(self._last_frame - self.cfg.lookahead)
+        self._advance(self._last_frame - max(self.cfg.lookahead, round(0.2 * self.cfg.fps) + 5))
         self._finalize_pending(self._last_frame)
         self._maybe_checkpoint()
         self._trim()
@@ -712,7 +724,7 @@ class BadmintonMatchEngine:
                 ]
             )
         assigned = (
-            self.identity.assign(persons, {k: v.value for k, v in self.state.ends.items()})
+            self.identity.assign(persons, {k: v.value for k, v in self.state.ends.items()}, fp.frame_idx)
             if geometry_valid
             and not fp.replay
             and not self._multi_person_identity_ambiguous
@@ -738,13 +750,16 @@ class BadmintonMatchEngine:
             )
         )
         raw = {q.track_id: q for q in fp.persons}
-        if (self._multi_person_identity_ambiguous or self.match_cfg.discipline == "doubles") and geometry_valid:
-            # Keep visual trajectories usable for overlays without assigning a
-            # singles player or allowing them into player-specific statistics.
+        assigned_track_ids = {person.track_id for person in assigned.values()}
+        if geometry_valid:
+            # Missing/partial singles identity is independent of the number of
+            # people previously seen. Preserve each unassigned visual track for
+            # overlays, disjoint from named rows and named-player statistics.
             snapshots_by_track = {snapshot.track_id: snapshot for snapshot in snapshots.values()}
             for p in fp.persons:
                 if (
-                    (p.track_id < 0 and (p.raw_track_id is None or p.raw_track_id < 0))
+                    p.track_id in assigned_track_ids
+                    or (p.track_id < 0 and (p.raw_track_id is None or p.raw_track_id < 0))
                     or not np.isfinite(p.conf)
                     or not 0 <= p.conf <= 1
                     or not np.isfinite(p.bbox).all()
@@ -886,39 +901,134 @@ class BadmintonMatchEngine:
         start = self._final + 1
         if upto < start:
             return
-        lo = max(self._buf0, start - self.cfg.context_back)
+        lo = max(self._buf0, start - max(self.cfg.context_back, round(0.2 * self.cfg.fps) + 5))
         w = self._window(lo, self._last_frame)
         self._proc, self._proc0 = w.shuttle, lo
         i0, i1 = w.idx(start), w.idx(upto) + 1
-        if self.match_cfg.discipline == "doubles":
-            a = w.frame0 - self._buf0
-            b = a + w.n
-            frames = (
-                self._participant_frames[a:b]
-                if 0 <= a <= b <= len(self._participant_frames)
-                else [{} for _ in range(w.n)]
-            )
-            episode_window = participant_window(w, frames, restrict_target_court=True)
-            # Episode hypotheses affect contact scoring, but never become P1/P2 actors.
-            contacts = {
-                c.frame: replace(c, player_id=None)
-                for c in detect_contacts(episode_window, start=i0, stop=i1, enforce_alternation=False)
-            }
+        a = w.frame0 - self._buf0
+        b = a + w.n
+        frames = (
+            self._participant_frames[a:b] if 0 <= a <= b <= len(self._participant_frames) else [{} for _ in range(w.n)]
+        )
+        if self.match_cfg.discipline == "singles":
+            # Extra/unresolved people remain missing cues, never an implicit
+            # four-person inference mode for a singles session.
+            frames = [
+                snapshots
+                if len(snapshots) == 2
+                and len({snapshot.track_id for snapshot in snapshots.values()}) == 2
+                and (
+                    not 0 <= a + i < len(self._participant_visible_counts)
+                    or self._participant_visible_counts[a + i] == 2
+                )
+                and (
+                    not 0 <= a + i < len(self._participant_identity_unresolved)
+                    or not self._participant_identity_unresolved[a + i]
+                )
+                else {}
+                for i, snapshots in enumerate(frames)
+            ]
+        episode_window = participant_window(w, frames, restrict_target_court=True)
+        if episode_window.players or self.match_cfg.discipline == "doubles":
+            # Contact evidence depends on visible bodies/poses, not whether a
+            # human has assigned durable names. Singles previously discarded
+            # these cues until AFTER selecting trajectory-only candidates.
+            contacts = {}
+            for candidate in detect_contacts(
+                episode_window,
+                start=i0,
+                stop=i1,
+                enforce_alternation=False,
+                proximity_split=ATTRIBUTION_MIN_PROXIMITY,
+            ):
+                snapshot = frames[candidate.frame - w.frame0].get(candidate.player_id)
+                idx = candidate.frame - self._buf0
+                named = [
+                    pid
+                    for pid, series in self._players.items()
+                    if snapshot is not None
+                    and 0 <= idx < len(series["track_id"])
+                    and series["track_id"][idx] == snapshot.track_id
+                ]
+                # Episode IDs never become actors or trigger singles alternation.
+                # Preserve an existing unique named assignment at THIS frame only.
+                actor = named[0] if self.match_cfg.discipline == "singles" and len(named) == 1 else None
+                contacts[candidate.frame] = replace(candidate, player_id=actor)
         else:
-            contacts = {c.frame: c for c in detect_contacts(w, start=i0, stop=i1)}
+            # Legacy/synthetic named observations without participant episodes.
+            contacts = {
+                c.frame: c
+                for c in detect_contacts(
+                    w,
+                    start=i0,
+                    stop=i1,
+                    enforce_alternation=False,
+                    proximity_split=ATTRIBUTION_MIN_PROXIMITY,
+                )
+            }
         t = w.shuttle
         spd = np.zeros(w.n)
         spd[1:] = np.nan_to_num(np.hypot(np.diff(t.x), np.diff(t.y)))
         for i in range(i0, i1):
             f = w.frame0 + i
             c = contacts.get(f)
+            if c is not None and c.scores.get("proximity", 0.0) < ATTRIBUTION_MIN_PROXIMITY:
+                # A shuttle redirect/acceleration alone is not a stroke-producing
+                # hit. Preserve the turn as inspectable diagnostic evidence.
+                self._emit(
+                    [
+                        self._event(
+                            "shuttle_turn",
+                            f,
+                            f,
+                            payload={
+                                "shuttle_xy": self._raw_xy(f, c.shuttle_xy),
+                                "contact_eligible": False,
+                                "reason": "insufficient_player_proximity",
+                                "support": c.p,
+                                "confidence_semantics": "uncalibrated_heuristic_support",
+                            },
+                            evidence=(Evidence(kind=EvidenceKind.COMPONENT_SCORES, scores=c.components),),
+                            model=CONTACT_MODEL,
+                        )
+                    ]
+                )
+                c = None
+            if w.replay[i]:
+                self._last_contact_candidate = None
+            previous = self._last_contact_candidate
+            if (
+                c is not None
+                and self.match_cfg.discipline == "singles"
+                and previous is not None
+                and c.player_id is not None
+                and c.player_id == previous.player_id
+                and c.frame - previous.frame < round(0.9 * self.cfg.fps)
+            ):
+                c = None
             if c is not None:
+                self._last_contact_candidate = c
                 self._handle_fsm(self.fsm.on_contact(f), f)
                 self._on_contact(c, w)
             self._handle_fsm(self.fsm.step(f, bool(t.vis[i]), float(spd[i]), bool(w.replay[i])), f)
         self._final = upto
 
     def _handle_fsm(self, upd: Any, frame: int) -> None:
+        # One step may finalize the old rally and start another. Consume the
+        # old start reference before assigning the new one, or corrections and
+        # short-rally cancellation attach to the wrong exchange.
+        if upd.cancelled_start is not None:
+            if self._rally_start_event is not None:
+                self._emit([self._rally_start_event.retract(self._prov("rally_fsm_v1"), "rally shorter than minimum")])
+            for c in self._open_contacts:
+                self._retract_contact(c, "rally cancelled")
+            self._open_contacts, self._rally_start_event = [], None
+        if upd.finalized is not None:
+            seg: RallySegment = upd.finalized
+            in_rally = [c for c in self._open_contacts if seg.start - 3 <= c.cand.frame <= seg.end + 3]
+            self._open_contacts = [c for c in self._open_contacts if c not in in_rally]
+            self._pending.append(_PendingRally(seg, in_rally, self._rally_start_event))
+            self._rally_start_event = None
         if upd.started is not None:
             self._rally_start_event = self._event(
                 "rally_start",
@@ -929,17 +1039,6 @@ class BadmintonMatchEngine:
                 model="rally_fsm_v1",
             )
             self._emit([self._rally_start_event])
-        if upd.cancelled_start is not None and self._rally_start_event is not None:
-            self._emit([self._rally_start_event.retract(self._prov("rally_fsm_v1"), "rally shorter than minimum")])
-            for c in self._open_contacts:
-                self._retract_contact(c, "rally cancelled")
-            self._open_contacts, self._rally_start_event = [], None
-        if upd.finalized is not None:
-            seg: RallySegment = upd.finalized
-            in_rally = [c for c in self._open_contacts if seg.start - 3 <= c.cand.frame <= seg.end + 3]
-            self._open_contacts = [c for c in self._open_contacts if c not in in_rally]
-            self._pending.append(_PendingRally(seg, in_rally, self._rally_start_event))
-            self._rally_start_event = None
 
     # ================================================================== contacts & strokes
     def _retract_contact(self, c: _Contact, note: str) -> None:
@@ -958,6 +1057,10 @@ class BadmintonMatchEngine:
             "shuttle_xy": list(self._raw_xy(c.frame, c.shuttle_xy) or ()) or None,
             "attribution_reason": c.attribution_reason,
             "attribution_policy": ATTRIBUTION_POLICY if c.attribution_reason else None,
+            "contact_status": "estimated",
+            "contact_method": CONTACT_MODEL,
+            "confidence_semantics": "uncalibrated_heuristic_support",
+            "racket_contact_observed": False,
         }
         # For an unresolved named hitter, retain separately-scored provisional
         # track-episode evidence without asserting a player or team identity.
@@ -992,6 +1095,7 @@ class BadmintonMatchEngine:
             actors=Actors(player_id=c.player_id, track_id=track_id),
             payload=payload,
             confidence=c.p,
+            band=ConfidenceBand.PROBABLE if c.p >= 0.6 else ConfidenceBand.UNCERTAIN,
             evidence=(
                 Evidence(kind=EvidenceKind.COMPONENT_SCORES, scores=c.components),
                 Evidence(kind=EvidenceKind.TRACK_WINDOW, obj="shuttle", frames=(c.frame - 3, c.frame + 3)),
@@ -1050,6 +1154,7 @@ class BadmintonMatchEngine:
 
     def _classify(self, c: _Contact, next_frame: int | None, is_serve: bool, receiver: ContactCandidate | None) -> None:
         cand = c.cand
+        serve, serve_evidence = self._serve_context(cand.frame, initial=is_serve)
         bbox, _, court_xy = self._player_at(cand.player_id, cand.frame)
         context_source = "named_player" if cand.player_id is not None else None
         index = cand.frame - self._buf0
@@ -1111,7 +1216,7 @@ class BadmintonMatchEngine:
         ctx = StrokeContext(
             frame=cand.frame,
             player_id=cand.player_id,
-            is_serve=is_serve,
+            is_serve=serve,
             hitter_court_xy=court_xy,
             speed_after_px_s=speed,
             frame_height_px=float(self.cfg.frame_height),
@@ -1126,7 +1231,13 @@ class BadmintonMatchEngine:
             "stroke": stroke,
             "label": self.ont.stroke(stroke).label,
             "probs": dict(sorted(pred.probs.items(), key=lambda kv: -kv[1])[:4]),
-            "is_serve": is_serve,
+            "is_serve": serve,
+            "serve_evidence": serve_evidence,
+            "contact_status": "estimated",
+            "classification_status": "unknown" if stroke == "unknown" else "estimated",
+            "confidence_semantics": "uncalibrated_heuristic_support"
+            if pred.model == RuleStrokeClassifier.name
+            else "model_score",
             "hitter_court_xy": list(court_xy) if court_xy else None,
             "speed_px_s": speed,
             "flight_time_s": flight,
@@ -1196,8 +1307,74 @@ class BadmintonMatchEngine:
         )
         c.event = confirmed_contact
         self._emit([ev, confirmed_contact])
-        # Classification confirms a physical event; match statistics require
-        # its containing rally's official-play decision below.
+        # CONFIRMED is the finalized ledger lifecycle, not visual proof of
+        # racket contact; contact_status and the heuristic method stay explicit.
+
+    def _serve_context(self, frame: int, *, initial: bool) -> tuple[bool | None, dict[str, Any]]:
+        """Qualify an initial hit without assuming that a segment starts at serve.
+
+        Incoming observed motion establishes that play was already underway.
+        Otherwise a stationary diagonal service formation over 0.6 seconds is
+        supporting evidence only, never verified service or official play.
+        Doubles/anonymous formations remain unresolved until their roles are
+        supported; subsequent hits can still receive ordinary shot estimates.
+        """
+        evidence: dict[str, Any] = {"method": "service_context_v1", "status": "not_initial"}
+        if not initial:
+            return False, evidence
+        end = frame - self._buf0
+        length = max(3, round(0.6 * self.cfg.fps))
+        start = end - length
+        if start < 0 or end > len(self._svis):
+            return None, {**evidence, "status": "unknown", "reason": "insufficient_precontact_context"}
+        # Exclude the immediate contact-scoring neighbourhood. Two consecutive
+        # moving steps are observed incoming flight, even after an FSM gap/cut.
+        moving = 0
+        for i in range(start + 1, max(start + 1, end - 3)):
+            if (
+                self._svis[i - 1]
+                and self._svis[i]
+                and np.hypot(self._sx[i] - self._sx[i - 1], self._sy[i] - self._sy[i - 1]) > 3
+            ):
+                moving += 1
+                if moving >= 2:
+                    return False, {**evidence, "status": "nonserve", "reason": "observed_incoming_flight"}
+            else:
+                moving = 0
+        if (
+            self.match_cfg.discipline != "singles"
+            or not all(self._geometry_valid[start:end])
+            or any(self._replay[start:end])
+            or len(set(self._shot[start : end + 1])) != 1
+        ):
+            return None, {**evidence, "status": "unknown", "reason": "unsupported_service_formation"}
+        positions: dict[str, tuple[float, float]] = {}
+        for pid, buf in self._players.items():
+            points = buf["court"][start:end]
+            ids = buf["track_id"][start:end]
+            if (
+                len(points) != length
+                or any(p is None for p in points)
+                or any(t is None for t in ids)
+                or len(set(ids)) != 1
+            ):
+                return None, {**evidence, "status": "unknown", "reason": "incomplete_player_history"}
+            xy = np.asarray(points, dtype=float)
+            if (
+                not np.isfinite(xy).all()
+                or np.linalg.norm(np.percentile(xy, 90, axis=0) - np.percentile(xy, 10, axis=0))
+                > self.cfg.phase.still_max_m
+            ):
+                return None, {**evidence, "status": "unknown", "reason": "players_not_stationary"}
+            positions[pid] = tuple(np.median(xy, axis=0))
+        if not serve_formation(positions.get("P1"), positions.get("P2"), self.cfg.phase.court_tol_m):
+            return None, {**evidence, "status": "unknown", "reason": "unsupported_service_formation"}
+        return True, {
+            **evidence,
+            "status": "estimated",
+            "reason": "stationary_diagonal_formation",
+            "observed_history_s": length / self.cfg.fps,
+        }
 
     def _jump_features(self, pid: str | None, frame: int) -> dict[str, float] | None:
         if pid is None:
@@ -1254,6 +1431,7 @@ class BadmintonMatchEngine:
         loser_pid = other(winner) if winner in ("P1", "P2") else None  # type: ignore[arg-type]
         shots = [
             {
+                **(c.stroke_event.payload if c.stroke_event else {}),
                 "event_id": c.stroke_event.event_id if c.stroke_event else None,
                 "frame": c.cand.frame,
                 "player_id": c.cand.player_id,
@@ -1264,14 +1442,15 @@ class BadmintonMatchEngine:
             for c in p.contacts
         ]
         rally_no = before.rally_no + 1 if decision.official else None
-        conf = conf_s if source == "geometry" else 0.97
+        conf = 0.97 if source == "ocr" else conf_s
         rally_end = self._event(
             "rally_end",
             seg.start,
             seg.end,
             payload={
                 "rally_no": rally_no,
-                "serve_frame": seg.serve_frame,
+                "serve_frame": next((s["frame"] for s in shots if s.get("is_serve") is True), None),
+                "initial_contact_frame": seg.serve_frame,
                 "end_reason": seg.reason,
                 "outcome": outcome,
                 "fault_side": fault,
@@ -1359,10 +1538,10 @@ class BadmintonMatchEngine:
                         seg.end,
                         actors=Actors(player_id=h.player),
                         payload=h.to_public(),
-                        confidence=min(1.0, h.score / 10),
+                        confidence=None,
                         model="highlight_mmr_v1",
                         status=EventStatus.CONFIRMED,
-                        evidence=(Evidence(kind=EvidenceKind.EVENT, event_id=rally_end.event_id),),
+                        evidence=tuple(Evidence(kind=EvidenceKind.EVENT, event_id=eid) for eid in h.evidence_ids),
                     )
                 ]
             )
@@ -1446,17 +1625,21 @@ class BadmintonMatchEngine:
         if first is None:
             return
         self._seed_checked = True
-        val = self.ocr.stable_before(first.record.start, first.record.start - int(30 * self.cfg.fps))
+        reading = self.ocr.stable_reading_before(first.record.start, first.record.start - int(30 * self.cfg.fps))
+        if reading is None:
+            return
+        mapping = self.ocr.mapping_at(reading)
+        val = (reading.rows[0][1], reading.rows[1][1])
         cfg = self.match_cfg
-        if val is None or val == (0, 0) or max(val) >= cfg.point_cap:
+        if mapping is None or val == (0, 0) or max(val) >= cfg.point_cap:
             return
         hi, lo = max(val), min(val)
         if hi >= cfg.points_to_win and hi - lo >= 2:
             return  # a finished game's score: not a starting point
-        score = {self.ocr.row_map[0]: val[0], self.ocr.row_map[1]: val[1]}
-        self._base_state = self._base_state.model_copy(update={"score": score})
+        score = {mapping[0]: val[0], mapping[1]: val[1]}
+        self._base_state = self._base_state.model_copy(update={"score": score, "server_known": False})
         f = first.record.start
-        self._emit(
+        seed = self._emit(
             [
                 self._event(
                     "match_phase",
@@ -1474,6 +1657,14 @@ class BadmintonMatchEngine:
                     status=EventStatus.CONFIRMED,
                 )
             ]
+        )[0]
+        self.store.put_state(
+            StateSnapshot(
+                session_id=self.session_id,
+                frame_idx=f,
+                state=self._base_state.to_public(cfg),
+                event_seq=seed.seq,
+            )
         )
         self._refold(self._prov("score_ocr"), force=True)
 
@@ -1504,7 +1695,23 @@ class BadmintonMatchEngine:
         if a < 0 or b > len(self._geometry_valid) or not all(self._geometry_valid[a:b]):
             return Outcome.UNKNOWN.value, "unknown", "invalid_court_geometry", 0.2
         w = self._window(lo, end)
-        res = analyze_rally_end(w.frames, w.shuttle.x, w.shuttle.y, w.shuttle.vis, end, calib.geometry, self.cfg.fps)
+        observed = w.shuttle.vis & ~w.shuttle.interp & np.isfinite(w.shuttle.conf) & (w.shuttle.conf >= 0.5)
+        terminal = np.flatnonzero(observed)[-4:]
+        # Disappearance closes an observation interval, not a sporting point.
+        # A projected in/out location or extrapolated flight is diagnostic only.
+        # Accept geometric scoring only with consecutive observed rest samples;
+        # interpolated positions cannot establish that the shuttle landed.
+        if (
+            len(terminal) < 4
+            or not (np.diff(terminal) == 1).all()
+            or not (
+                np.hypot(np.diff(w.shuttle.x[terminal]), np.diff(w.shuttle.y[terminal])) < 15.0 / self.cfg.fps
+            ).all()
+        ):
+            return Outcome.UNKNOWN.value, "unknown", "terminal_not_observed", 0.2
+        res = analyze_rally_end(w.frames, w.shuttle.x, w.shuttle.y, observed, end, calib.geometry, self.cfg.fps)
+        if not res.check.startswith("c0_static_"):
+            return Outcome.UNKNOWN.value, "unknown", "terminal_not_observed", 0.2
         return res.outcome.value, res.fault, res.check, outcome_confidence(res)
 
     def _shot_at(self, frame: int) -> int:
@@ -1762,6 +1969,8 @@ class BadmintonMatchEngine:
         for ph in phases:
             if ph.payload.get("base_state"):
                 self._base_state = MatchState.model_validate(ph.payload["base_state"])
+                if ph.payload.get("server_known") is False:
+                    self._base_state = self._base_state.model_copy(update={"server_known": False})
                 self._seed_checked = True
             if not ph.payload.get("marker") and ph.payload.get("phase"):
                 self.phase.phase = Phase(ph.payload["phase"])

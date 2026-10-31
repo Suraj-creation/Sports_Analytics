@@ -155,11 +155,11 @@ def test_static_cache_is_invalid_after_changing_selected_court(tmp_path):
     session._apply_calibration(Homography(MAIN.H, 0.0, 4))
     assert session.perception.ref_id is None
     cached = session.encode_perception(session.perceive(chunk(0, 4)))
-    assert session.decode_perception(cached).start == 0
+    assert session.decode_perception(cached, diagnostic=True).start == 0
     shifted = MAIN.H @ np.array([[1, 0, 8], [0, 1, 0], [0, 0, 1]], float)
     session._apply_calibration(Homography(shifted, 0.0, 4))
     with pytest.raises(StaleCacheError):
-        session.decode_perception(cached)
+        session.decode_perception(cached, diagnostic=True)
 
 
 def test_uncalibrated_session_rejects_calibrated_cache(tmp_path):
@@ -176,7 +176,7 @@ def test_uncalibrated_session_rejects_calibrated_cache(tmp_path):
     fresh_dir.mkdir()
     fresh, _ = make_session(fresh_dir)
     with pytest.raises(StaleCacheError):
-        fresh.decode_perception(cached)
+        fresh.decode_perception(cached, diagnostic=True)
 
 
 def test_cache_is_invalid_after_camera_lock_policy_changes(tmp_path):
@@ -192,4 +192,4 @@ def test_cache_is_invalid_after_camera_lock_policy_changes(tmp_path):
     cached = session.encode_perception(session.perceive(chunk(0, 4)))
     session._apply_calibration(h, mode="lines", record={"fixed_camera": True})
     with pytest.raises(StaleCacheError):
-        session.decode_perception(cached)
+        session.decode_perception(cached, diagnostic=True)

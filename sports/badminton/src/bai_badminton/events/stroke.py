@@ -25,7 +25,7 @@ class StrokeContext:
 
     frame: int
     player_id: str | None
-    is_serve: bool
+    is_serve: bool | None  # None: initial contact with unresolved serve context
     hitter_court_xy: tuple[float, float] | None  # feet position (m) at contact
     speed_after_px_s: float | None  # initial shuttle speed after contact (image px/s)
     frame_height_px: float
@@ -88,8 +88,7 @@ def post_contact_motion(
     When the next contact is known, only observations strictly before it are used;
     the next hit can change shuttle velocity and cannot describe this flight.
     """
-    if not (math.isfinite(fps) and fps > 0 and math.isfinite(frame_height_px)
-            and frame_height_px > 0):
+    if not (math.isfinite(fps) and fps > 0 and math.isfinite(frame_height_px) and frame_height_px > 0):
         return None, None
     n = min(len(x), len(y), len(visible), len(interpolated))
     if contact_idx < 0 or contact_idx >= n:
@@ -97,15 +96,16 @@ def post_contact_motion(
     if next_contact_idx is not None and next_contact_idx <= contact_idx:
         return None, None
     end = min(n, contact_idx + 6, next_contact_idx if next_contact_idx is not None else n)
-    indices = [j for j in range(contact_idx + 1, end)
-               if visible[j] and not interpolated[j]
-               and math.isfinite(x[j]) and math.isfinite(y[j])]
+    indices = [
+        j
+        for j in range(contact_idx + 1, end)
+        if visible[j] and not interpolated[j] and math.isfinite(x[j]) and math.isfinite(y[j])
+    ]
     if len(indices) < 3:
         return None, None
     points = np.asarray([(x[j], y[j]) for j in indices], dtype=float)
     t = np.asarray(indices, dtype=float) - indices[0]
-    slopes = np.asarray([(points[j] - points[i]) / (t[j] - t[i])
-                         for i in range(len(t)) for j in range(i + 1, len(t))])
+    slopes = np.asarray([(points[j] - points[i]) / (t[j] - t[i]) for i in range(len(t)) for j in range(i + 1, len(t))])
     slope = np.median(slopes, axis=0)
     intercept = np.median(points - t[:, None] * slope, axis=0)
     residuals = np.linalg.norm(points - (intercept + t[:, None] * slope), axis=1)
@@ -125,11 +125,17 @@ class RuleStrokeClassifier:
         # An absent observation is not a zero-speed flight or a mid-court hit.
         flight_valid = ctx.flight_time_s is not None and math.isfinite(ctx.flight_time_s) and ctx.flight_time_s > 0
         court_valid = ctx.hitter_court_xy is not None and all(math.isfinite(v) for v in ctx.hitter_court_xy)
-        speed_valid = (ctx.speed_after_px_s is not None and math.isfinite(ctx.speed_after_px_s)
-                       and ctx.speed_after_px_s > 0 and math.isfinite(ctx.frame_height_px)
-                       and ctx.frame_height_px > 0)
+        speed_valid = (
+            ctx.speed_after_px_s is not None
+            and math.isfinite(ctx.speed_after_px_s)
+            and ctx.speed_after_px_s > 0
+            and math.isfinite(ctx.frame_height_px)
+            and ctx.frame_height_px > 0
+        )
         if not flight_valid or not speed_valid or (not ctx.is_serve and not court_valid):
             return StrokePrediction({"unknown": 0.0}, self.name, "missing_required_evidence")
+        if ctx.is_serve is None:
+            return StrokePrediction({"unknown": 0.0}, self.name, "unresolved_initial_contact")
         strokes = [s for s in get_ontology().strokes if s != "unknown"]
         scores = dict.fromkeys(strokes, 0.0)
         v = (ctx.speed_after_px_s or 0.0) / max(ctx.frame_height_px, 1.0)  # frame heights per second

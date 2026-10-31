@@ -10,7 +10,7 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
+import { type CSSProperties, useEffect, useId, useRef, useState } from "react";
 import { IconButton, Spinner } from "@/components/ui";
 import { clock, fps as fpsOf, PLAYER_HEX, shortName } from "@/lib/format";
 import { frameClock, timeToFrame } from "@/lib/frameClock";
@@ -187,6 +187,7 @@ export function VideoStage({
       layers: off,
       colors: PLAYER_HEX,
       names: { P1: shortName(session, "P1"), P2: shortName(session, "P2") },
+      fps,
     };
     frameClock.poke();
   }, [video, tracks, events, calibration, layers, hidden, session, tracksVersion, eventsVersion]);
@@ -314,7 +315,12 @@ export function VideoStage({
       <div
         ref={stageRef}
         className="video-picture relative w-full bg-black"
-        style={{ aspectRatio: `${session.media?.width || 16} / ${session.media?.height || 9}` }}
+        style={
+          {
+            aspectRatio: `${session.media?.width || 16} / ${session.media?.height || 9}`,
+            "--source-aspect": (session.media?.width || 16) / (session.media?.height || 9),
+          } as CSSProperties
+        }
         data-testid="video-stage"
       >
         <video

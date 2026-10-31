@@ -224,17 +224,19 @@ def test_video_starting_at_the_serve_is_scored(tmp_path: Path, pos: dict) -> Non
     assert eng.public_state()["score"] == {"P1": 2, "P2": 0}
 
 
-def test_video_starting_mid_game_takes_the_score_from_the_board(tmp_path: Path) -> None:
+@pytest.mark.parametrize("swapped", [False, True])
+def test_video_starting_mid_game_takes_the_score_from_the_board(tmp_path: Path, swapped: bool) -> None:
     rallies = [_rally("P1", 1), _rally("P2", 2)]
     starts, n = [], 0
     for r in rallies:
         starts.append(n)
         n += r.obs.n
 
-    def read(f: int, a: int, b: int) -> list[ScoreReading]:
-        return [ScoreReading(frame_idx=f + k, rows=(("AXELSEN", a), ("LEE", b)), conf=0.9) for k in (0, 5)]
+    def read(f: int, a: int, b: int, swap: bool = False) -> list[ScoreReading]:
+        rows = (("LEE", b), ("AXELSEN", a)) if swap else (("AXELSEN", a), ("LEE", b))
+        return [ScoreReading(frame_idx=f + k, rows=rows, conf=0.9) for k in (0, 5)]
 
-    ocr = read(starts[0] + 2, 11, 9) + read(starts[1] + 2, 12, 9) + read(n - 12, 12, 10)
+    ocr = read(starts[0] + 2, 11, 9) + read(starts[1] + 2, 12, 9, swapped) + read(n - 12, 12, 10, swapped)
     names = {"P1": "Viktor Axelsen", "P2": "Lee Zii Jia"}
     eng, store = _run(tmp_path, rallies, ocr, names)
     assert eng.public_state()["score"] == {"P1": 12, "P2": 10}
@@ -244,6 +246,11 @@ def test_video_starting_mid_game_takes_the_score_from_the_board(tmp_path: Path) 
     assert [p.payload["state_after"]["score"] for p in pts] == [{"P1": 12, "P2": 9}, {"P1": 12, "P2": 10}]
     base = [e for e in store.query(types=["match_phase"]) if e.payload.get("base_state")]
     assert base and base[0].payload["base_state"]["score"] == {"P1": 11, "P2": 9}
+    initial_snapshot = store.state_at(base[0].frame_start)
+    assert initial_snapshot is not None and initial_snapshot.state["score"] == {"P1": 11, "P2": 9}
+    assert initial_snapshot.state["server_known"] is False
+    assert pts[0].payload["state_before"]["server_known"] is False
+    assert pts[0].payload["state_after"]["server_known"] is True
     eng2 = BadmintonMatchEngine("S1", EngineConfig(fps=FPS, frame_width=1280, frame_height=720), store)
     eng2.restore_from_log(10**6)
     assert eng2.public_state()["score"] == {"P1": 12, "P2": 10}

@@ -3,6 +3,7 @@ import { ArrowUp, BookOpen, CircleAlert } from "lucide-react";
 import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
 import { Empty, ErrorNote, Spinner } from "@/components/ui";
 import { playEventEvidence } from "@/features/player/clip";
+import { useAnalysisQueryKey, useAnalysisRevision } from "@/lib/analysisQuery";
 import { api } from "@/lib/api";
 import { clock, fps as fpsOf, shortName } from "@/lib/format";
 import type { AskAnswer, Session } from "@/lib/types";
@@ -18,11 +19,16 @@ interface Turn {
 const CITE = /\[\[(ev|kb):([^\]]+)\]\]/g;
 
 export function AskTab({ session }: { session: Session }) {
+  const revision = useAnalysisRevision(session);
+  return <AskGeneration key={`${session.session_id}:${revision}`} session={session} />;
+}
+
+function AskGeneration({ session }: { session: Session }) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [q, setQ] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
   const provider = useQuery({
-    queryKey: ["ask-provider", session.session_id],
+    queryKey: useAnalysisQueryKey("ask-provider", session),
     queryFn: () => api.askProvider(session.session_id),
     staleTime: 60_000,
   });
