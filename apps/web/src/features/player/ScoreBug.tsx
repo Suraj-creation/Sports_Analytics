@@ -19,6 +19,14 @@ export function ScoreBug({ session }: { session: Session }) {
   const rows = observed?.payload.rows as { name: string; points: number }[] | undefined;
   const point = events.latestBefore("point", frame);
   const rally = point?.parent_id ? events.get(point.parent_id) : undefined;
+  // An accepted backend point advances the score even when OCR has not read
+  // the changed board yet. Compare video frames, not packet arrival order.
+  const acceptedScore =
+    known &&
+    point &&
+    (point.status === "confirmed" || point.status === "corrected" || point.status === "human_verified") &&
+    (point.frame_start > (observed?.frame_start ?? -1) ||
+      (point.frame_start === observed?.frame_start && (point.seq ?? 0) >= (observed.seq ?? 0)));
   const humanScore =
     point &&
     (point.status === "human_verified" ||
@@ -28,6 +36,7 @@ export function ScoreBug({ session }: { session: Session }) {
     (point.frame_start >= (observed?.frame_start ?? 0) ||
       Math.max(point.seq ?? 0, rally?.seq ?? 0) > (observed?.seq ?? 0));
   const broadcast =
+    !acceptedScore &&
     !humanScore &&
     Array.isArray(rows) &&
     rows.length === 2 &&
