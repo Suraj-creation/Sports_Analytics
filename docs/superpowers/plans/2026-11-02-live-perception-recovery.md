@@ -15,7 +15,7 @@
 
 ## Investigation evidence
 
-- Production HEAD is `510b703`; local HEAD is `fd11525`, including undeployed recovery commits `74a200a` and `9e105e9`.
+- At investigation start, production HEAD was `510b703` and local HEAD was `fd11525`, including undeployed recovery commits `74a200a` and `9e105e9`.
 - Affected recording: `01M56T2EED5Z7W9VTGG19FHNTF`, He/Ren vs Rankireddy/Shetty, 12,148 canonical frames at 25 fps, 1280×720.
 - Stored player rows: 27,296; named player rows: zero; rows with poses: 19,560. Production wire encoder omits anonymous players, so neither their boxes nor poses reach the canvas.
 - The existing 1–0 point at frame 849 is a human correction. It is not proof of an automatically observed opening score. Existing saved analysis has no broadcast-score event in the first 2,000 frames.
@@ -25,20 +25,22 @@
 ## Execution
 
 - [x] Read the supplied mission, production source, recovery history, wire boundaries and real session metadata without reanalysis.
-- [ ] Transfer local HEAD and new failing regression tests with a Git bundle to an isolated server checkout. Share only existing runtime/model assets, not mutable test data.
-- [ ] Run the anonymous-player transport fixture, detector/pose/court/scoring regressions and new frontend regressions on the GPU server before production changes.
-- [ ] Fix independent labels and equal-frame event ordering; test labels/boxes/poses/court/shuttle independently, including letterboxing and unknown identities.
-- [ ] Run broad backend/frontend tests, typecheck, build and real installed-model inference on backed-up representative video windows. Record actual model/provider/observation counts separately from synthetic test results.
-- [ ] Inspect real court alignment, identity continuity, OCR/name mapping and accepted score transitions. Repair additional demonstrated defects with focused failing tests before implementation.
-- [ ] Verify protected local work, commit only this task's source/tests/report, and deploy the tested Git revision and built frontend without deleting user files.
-- [ ] Confirm public REST/WebSocket delivery, visible model-derived overlays, bounded analysis playback, accepted/corrected scoring, no passphrase and the restored Cloudflare URL.
+- [x] Transfer local HEAD and new failing regression tests with a Git bundle to an isolated server checkout. Share only existing runtime/model assets, not mutable test data.
+- [x] Run the anonymous-player transport fixture, detector/pose/court/scoring regressions and new frontend regressions on the GPU server before production changes.
+- [x] Fix independent labels and equal-frame event ordering; test labels/boxes/poses/court/shuttle independently, including letterboxing and unknown identities.
+- [x] Run broad backend/frontend tests, typecheck, build and real installed-model inference on backed-up representative video windows. Record actual model/provider/observation counts separately from synthetic test results.
+- [x] Inspect real court alignment, identity continuity, OCR/name mapping and accepted score transitions. Repair additional demonstrated defects with focused failing tests before implementation. Leave unverified names/winners unresolved.
+- [x] Correct stale OCR priority and carried-human-decision timing after reproducing each failure on the server.
+- [x] Finish all 12,148 frames on a disposable copy; verify unchanged source inputs/ledger and promote only after full original-session/catalogue backup with application writers stopped.
+- [x] Verify protected local work, commit only this task's source/tests/report, and deploy the tested Git revision and built frontend without deleting user files.
+- [x] Confirm public REST/WebSocket delivery, visible model-derived overlays, frame-aligned accepted/corrected scoring, no passphrase and the restored Cloudflare URL. Existing frontier gating was retained; no new source-rate live-ingestion guarantee is made.
 
 ## Primary validation commands (server only)
 
 Source `../gpu-env.sh`; activate the existing `.venv` and put this isolated checkout's engine, badminton, API, agents and research source directories first in PYTHONPATH.
 
-Backend: `python -m pytest -q engine/tests sports/badminton/tests apps/api/tests agents/tests research/tests -m 'not network and not slow'` (explicit real GPU checks are reported separately).
+Backend: `python -m pytest -q engine/tests sports/badminton/tests agents/tests apps/api/tests research/tests -m 'not gpu and not slow and not network' --tb=short` (explicit real GPU checks are reported separately).
 
-Frontend, with existing dependencies: `pnpm exec vitest run`, `pnpm exec tsc -b --noEmit`, `pnpm exec vite build`; use the existing Playwright browser on localhost through an SSH forward for actual workflow verification.
+Frontend, with existing dependencies: `pnpm exec vitest run`, `pnpm exec tsc -b --noEmit`, `pnpm exec vite build`; inspect the actual recording in the existing browser through an SSH forward, then verify the restored public application. Browser access is the only desktop runtime activity; tests and media/inference execution stay on the GPU server.
 
 Keep a defect register and exact pass/fail/skip counts in `docs/testing/live-perception-recovery-20261102.md`. No geometric or adapter check is labelled model/event accuracy.
