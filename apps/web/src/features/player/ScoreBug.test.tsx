@@ -101,6 +101,70 @@ it("keeps a newer human score correction over an older broadcast reading", () =>
   expect(bug).not.toHaveTextContent("Broadcast score");
 });
 
+it("shows an accepted automatic point while an older OCR reading remains unchanged", () => {
+  const log = new EventLog();
+  log.apply([
+    ev("broadcast_score", 249, {
+      payload: {
+        rows: [
+          { name: "ANTONSEN", points: 3 },
+          { name: "FARHAN", points: 2 },
+        ],
+      },
+    }),
+    ev("point", 300, { payload: { state_after: state(4, 2) } }),
+  ]);
+  useSession.setState({ events: log, eventsVersion: log.version, session: SESSION });
+  act(() => usePlayback.setState({ frame: 350 }));
+  render(<ScoreBug session={SESSION} />);
+  expect(screen.getByTestId("score-bug").textContent).toMatch(/Axelsen.*04.*Momota.*02/s);
+  expect(screen.getByTestId("score-bug")).not.toHaveTextContent("Broadcast score");
+});
+
+it("does not revert a human-corrected score when the next automatic point arrives", () => {
+  const log = new EventLog();
+  const reviewed = ev("rally_end", 260, { status: "human_verified" });
+  log.apply([
+    ev("broadcast_score", 249, {
+      payload: {
+        rows: [
+          { name: "ANTONSEN", points: 3 },
+          { name: "FARHAN", points: 2 },
+        ],
+      },
+    }),
+    reviewed,
+    ev("point", 300, { parent_id: reviewed.event_id, payload: { state_after: state(5, 4) } }),
+  ]);
+  useSession.setState({ events: log, eventsVersion: log.version, session: SESSION });
+  act(() => usePlayback.setState({ frame: 350 }));
+  render(<ScoreBug session={SESSION} />);
+  expect(screen.getByTestId("score-bug").textContent).toMatch(/Axelsen.*05.*Momota.*04/s);
+  act(() => {
+    log.apply([ev("point", 400, { payload: { state_after: state(6, 4) } })]);
+    useSession.setState({ eventsVersion: log.version });
+    usePlayback.setState({ frame: 450 });
+  });
+  expect(screen.getByTestId("score-bug").textContent).toMatch(/Axelsen.*06.*Momota.*04/s);
+  expect(screen.getByTestId("score-bug")).not.toHaveTextContent("Broadcast score");
+  act(() => {
+    log.apply([
+      ev("broadcast_score", 500, {
+        payload: {
+          rows: [
+            { name: "ANTONSEN", points: 7 },
+            { name: "FARHAN", points: 4 },
+          ],
+        },
+      }),
+    ]);
+    useSession.setState({ eventsVersion: log.version });
+    usePlayback.setState({ frame: 500 });
+  });
+  expect(screen.getByTestId("score-bug")).toHaveTextContent("Broadcast score");
+  expect(screen.getByTestId("score-bug").textContent).toMatch(/ANTONSEN.*7.*FARHAN.*4/s);
+});
+
 it("ignores malformed source board rows", () => {
   const log = new EventLog();
   log.apply([ev("broadcast_score", 10, { payload: { rows: [null, { name: "FARHAN", points: 2 }] } })]);
