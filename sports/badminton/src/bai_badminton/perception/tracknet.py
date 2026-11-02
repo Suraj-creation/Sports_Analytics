@@ -348,7 +348,13 @@ class TrackNetV3:
         return hashlib.sha256(data).hexdigest()
 
     def _cached_onnx(self, base: Path, cache_key: str) -> tuple[Path, str] | None:
-        """A manifest commits an immutable, content-addressed single-file graph."""
+        """A manifest commits a content-addressed single-file graph.
+
+        These are application-owned cache paths. Verification does not protect
+        against an independent hostile writer changing a graph between validation
+        and the final ORT path open; registry checkpoint snapshots close that
+        distinct checkpoint-to-deserialization race.
+        """
         manifest_path = base.with_suffix(".json")
         try:
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
