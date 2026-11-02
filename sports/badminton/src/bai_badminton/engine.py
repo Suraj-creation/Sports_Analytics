@@ -1247,6 +1247,9 @@ class BadmintonMatchEngine:
 
     def _classify(self, c: _Contact, next_frame: int | None, is_serve: bool, receiver: ContactCandidate | None) -> None:
         cand = c.cand
+        # Even an untrusted next-hit link remains an upper bound: its sample
+        # must never be used to estimate the preceding shot's outgoing speed.
+        motion_next_frame = next_frame
         if next_frame is not None and not self._same_segment(cand.frame, next_frame):
             next_frame, receiver = None, None
         elif receiver is not None and not self._same_segment(cand.frame, receiver.frame):
@@ -1302,7 +1305,7 @@ class BadmintonMatchEngine:
                         court_xy = snapshot.court_xy
                     if bbox is not None or court_xy is not None:
                         context_source = "provisional_track_episode"
-        speed, vy = self._post_contact_kinematics(cand.frame, next_frame)
+        speed, vy = self._post_contact_kinematics(cand.frame, motion_next_frame)
         above_head: bool | None = None
         if bbox is not None and cand.shuttle_xy is not None:
             above_head = bool(cand.shuttle_xy[1] < bbox[1] + 0.12 * (bbox[3] - bbox[1]))
