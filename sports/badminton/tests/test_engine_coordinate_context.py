@@ -95,3 +95,26 @@ def test_uncalibrated_alternate_view_is_not_a_raw_motion_continuation(tmp_path):
     window = engine._window(0, 9)
     assert not window.shuttle.vis[4:6].any()
     assert window.break_before[4] and window.break_before[6]
+
+
+def test_completed_short_rally_keeps_terminal_evidence_after_an_earlier_cut(tmp_path):
+    from bai_badminton.events.rally_fsm import RallySegment
+    from bai_badminton.testing.synth import make_rally, to_frames
+
+    rally = make_rally(n_shots=3, shot_frames=22, lead_in=0)
+    outcomes = []
+    for cut in (False, True):
+        engine = BadmintonMatchEngine(
+            "S1", EngineConfig(fps=30, frame_width=1280, frame_height=720, lookahead=200),
+            EventStore(tmp_path / f"outcome-{cut}.sqlite", "S1"),
+        )
+        engine.set_calibration(0, rally.homography)
+        frames = [FramePerception(frame_idx=i) for i in range(30)] + to_frames(rally, 30)
+        if cut:
+            for frame in frames[30:]:
+                frame.shot_id = 1
+        engine.ingest(ChunkPerception(0, len(frames) - 1, frames))
+        engine._proc = engine._window(0, len(frames) - 1).shuttle
+        outcomes.append(engine._outcome(RallySegment(30, 30 + rally.end_frame, 30, "stationary")))
+    assert outcomes[0][2].startswith("c0_static_")
+    assert outcomes[1] == outcomes[0]
