@@ -28,17 +28,25 @@ def controlled_onnx(monkeypatch, tmp_path):
     exports = []
 
     class Session:
-        def __init__(self, path, providers):
+        def __init__(self, path, providers, **_kwargs):
             used_paths.append(path)
 
         def get_providers(self):
             return ["CPUExecutionProvider"]
 
+        def get_inputs(self):
+            return [SimpleNamespace(name="frames", type="tensor(float)", shape=["batch", 27, 288, 512])]
+
+        def get_outputs(self):
+            return [SimpleNamespace(name="heatmaps", type="tensor(float)", shape=["batch", 8, 288, 512])]
+
     def export(_self, path):
         exports.append(path)
         path.write_bytes(b"complete exported model")
 
-    monkeypatch.setitem(sys.modules, "onnxruntime", SimpleNamespace(InferenceSession=Session))
+    monkeypatch.setitem(
+        sys.modules, "onnxruntime", SimpleNamespace(InferenceSession=Session, SessionOptions=SimpleNamespace)
+    )
     monkeypatch.setattr(tracknet.TrackNetV3, "export_onnx", export)
     weights = tmp_path / "weights.pt"
     weights.write_bytes(b"checkpoint A")

@@ -12,12 +12,15 @@ from __future__ import annotations
 import hashlib
 import json
 import shutil
+import tempfile
 import threading
 import urllib.request
 import zipfile
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, BinaryIO
 
 import yaml
 
@@ -47,6 +50,20 @@ class ModelSpec:
     @property
     def ref(self) -> str:
         return f"{self.name}@{self.version}"
+
+
+@dataclass(frozen=True)
+class VerifiedArtifact:
+    """A private, seekable snapshot whose bytes match a registry integrity pin.
+
+    ``path`` describes provenance; loaders must read ``stream``. First-use pins
+    establish later integrity, not publisher authenticity or pickle safety.
+    The registry owns the stream and closes it when its context exits.
+    """
+
+    path: Path
+    sha256: str
+    stream: BinaryIO
 
 
 class ModelRegistry:
@@ -119,6 +136,35 @@ class ModelRegistry:
                 return self._extract_onnx(spec, art)
             return art
 
+    @contextmanager
+    def open_verified(self, name: str, *, fetch: bool = True) -> Iterator[VerifiedArtifact]:
+        """Open exact verified raw-artifact bytes without a path-to-load race.
+
+        A disk-backed snapshot bounds memory and remains stable if another
+        process replaces or mutates the cached path after verification. Archive
+        extraction needs a separate derived-artifact contract and is deliberately
+        unavailable through this raw-checkpoint API.
+        """
+        spec = self.get(name)
+        if spec.format in ("builtin", "package", "onnx-zip"):
+            raise ModelError(f"{name} has no supported raw file artifact")
+        with tempfile.TemporaryFile(mode="w+b", prefix=".verified-", dir=self.cache) as snapshot:
+            with self._lock:
+                art = self._artifact_path(spec)
+                if not art.exists():
+                    if not fetch:
+                        raise ModelError(f"{name} is not downloaded; run `bai models fetch {name}`")
+                    self._fetch(spec, art)
+                digest = hashlib.sha256()
+                with art.open("rb") as original:
+                    for block in iter(lambda: original.read(1 << 20), b""):
+                        snapshot.write(block)
+                        digest.update(block)
+                verified_digest = digest.hexdigest()
+                self._verify_digest(spec, verified_digest)
+            snapshot.seek(0)
+            yield VerifiedArtifact(path=art, sha256=verified_digest, stream=snapshot)
+
     def status(self) -> list[dict[str, Any]]:
         out = []
         locked = self._locked()
@@ -171,6 +217,9 @@ class ModelRegistry:
 
     def _verify(self, spec: ModelSpec, art: Path) -> None:
         digest = _sha256(art)
+        self._verify_digest(spec, digest)
+
+    def _verify_digest(self, spec: ModelSpec, digest: str) -> None:
         expected = spec.sha256 if spec.sha256 not in (None, PIN) else self._locked().get(spec.name)
         if expected is None:
             self._pin(spec.name, digest)

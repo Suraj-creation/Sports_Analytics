@@ -158,8 +158,11 @@ class BadmintonPerception:
         }
         return RacketDetector()
 
-    def _providers(self, choice: ModelChoice, cache: Path) -> list[Any]:
-        return ort_providers(choice.backend, engine_cache=cache / choice.model, fp16=choice.precision == "fp16")
+    def _providers(self, choice: ModelChoice, cache: Path, *, model_digest: str | None = None) -> list[Any]:
+        return ort_providers(
+            choice.backend, engine_cache=cache / choice.model, fp16=choice.precision == "fp16",
+            model_digest=model_digest,
+        )
 
     def _load_shuttle(self, c: ModelChoice, reg: ModelRegistry, cache: Path):  # type: ignore[no-untyped-def]
         if c.model == "none" or c.backend == "none":
@@ -167,15 +170,18 @@ class BadmintonPerception:
         try:
             from bai_badminton.perception.tracknet import TrackNetV3
 
-            m = TrackNetV3(
-                reg.path(c.model),
-                backend=c.backend,
-                threshold=float(c.params.get("threshold", 0.5)),
-                onnx_dir=cache / c.model,
-                providers=self._providers(c, cache),
-                batch=c.batch,
-                precision=c.precision,
-            )
+            with reg.open_verified(c.model) as artifact:
+                m = TrackNetV3(
+                    artifact.path,
+                    checkpoint_stream=artifact.stream,
+                    expected_sha256=artifact.sha256,
+                    backend=c.backend,
+                    threshold=float(c.params.get("threshold", 0.5)),
+                    onnx_dir=cache / c.model,
+                    provider_factory=lambda graph_sha: self._providers(c, cache, model_digest=graph_sha),
+                    batch=c.batch,
+                    precision=c.precision,
+                )
             self._record_runtime("shuttle", m.runtime)
             self.models["shuttle"] = reg.get(c.model).ref
             return m

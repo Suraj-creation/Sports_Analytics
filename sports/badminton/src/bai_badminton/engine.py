@@ -287,7 +287,7 @@ class BadmintonMatchEngine:
         # describe analysis coordinates, not independent shuttle observations.
         self._temporal_valid: list[bool] = []
         self._coordinate_epoch = 0
-        self._coordinate_context: list[tuple[int, bool, bool, bool]] = []
+        self._coordinate_context: list[tuple[int, bool, bool, bool, str]] = []
         self._replay: list[bool] = []
         self._shot: list[int] = []
         self._geometry_valid: list[bool] = []
@@ -507,7 +507,7 @@ class BadmintonMatchEngine:
             self._svis.append(False)
         self._sconf.append(fp.shuttle_conf)
         self._temporal_valid.append(
-            (not tracked or G is not None) and (sxy is None or bool(np.isfinite(sxy).all()))
+            fp.scene == "main" and (not tracked or G is not None) and (sxy is None or bool(np.isfinite(sxy).all()))
         )
         self._replay.append(fp.replay)
         self._shot.append(fp.shot_id)
@@ -534,7 +534,7 @@ class BadmintonMatchEngine:
         # visual track IDs. Start a fresh deterministic epoch rather than link them.
         geometry_valid = not geometry_unavailable and calib is not None
         self._geometry_valid.append(geometry_valid)
-        self._coordinate_context.append((self._coordinate_epoch, tracked, G is not None, geometry_valid))
+        self._coordinate_context.append((self._coordinate_epoch, tracked, G is not None, geometry_valid, fp.scene))
         self._pose_stride.append(
             (fp.pose_stride if type(fp.pose_stride) is int and fp.pose_stride >= 0 else -1)
             if geometry_valid and not fp.replay
@@ -1656,6 +1656,14 @@ class BadmintonMatchEngine:
     def _phase_evidence(self, seg: RallySegment, until: int) -> RallyEvidence:
         """Evidence for "was this rally official play?" (see :mod:`bai_badminton.events.match_phase`)."""
         ph, fps = self.cfg.phase, self.cfg.fps
+        if seg.start < self._buf0:
+            # A motion-only exchange can outlast the bounded dense buffer.
+            # Its retained terminal evidence cannot reconstruct serve context.
+            return RallyEvidence(
+                calibrated=False,
+                gap_s=(seg.start - self._last_rally_end) / fps if self._last_rally_end is not None else None,
+                scoreboard=self.ocr.board_change(seg.start, seg.end, until, lookback=int(30 * fps)),
+            )
         lo = max(self._buf0, seg.start - int(ph.still_window_s * fps))
         # A formation from another coordinate context cannot establish a serve.
         boundaries = self._segment_breaks(lo, seg.start)
@@ -1804,7 +1812,7 @@ class BadmintonMatchEngine:
         # legacy pipeline did with its stop-frame end times.
         settle = self.fsm.params.stationary_window if seg.reason == "stationary" else 3
         end = min(self._last_frame, seg.end + settle)
-        lo = max(self._buf0, end - int(3.5 * self.cfg.fps))
+        lo = max(self._buf0, seg.start, end - int(3.5 * self.cfg.fps))
         a, b = lo - self._buf0, end - self._buf0 + 1
         if (
             a < 0
