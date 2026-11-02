@@ -74,7 +74,7 @@ export function drawOverlay(o: OverlayCtx, frame: number): void {
   }
   if (layers.labels && view) drawSceneChip(g, view.view, px, video.videoHeight || 720);
 
-  if (layers.players || layers.pose) {
+  if (layers.players || layers.pose || layers.labels) {
     for (const p of tracks.playersAt(frame)) {
       const color = p.playerId ? o.colors[p.playerId] : "#e8c46b";
       const carried = p.detectorMatched === false;

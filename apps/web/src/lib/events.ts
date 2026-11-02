@@ -55,7 +55,14 @@ export class EventLog {
   latestBefore(type: string, frame: number): BaiEvent | undefined {
     let best: BaiEvent | undefined;
     for (const e of this.live.values()) {
-      if (e.type === type && e.frame_start <= frame && (!best || e.frame_start > best.frame_start)) best = e;
+      if (
+        e.type === type &&
+        e.frame_start <= frame &&
+        (!best ||
+          e.frame_start > best.frame_start ||
+          (e.frame_start === best.frame_start && (e.seq ?? 0) > (best.seq ?? 0)))
+      )
+        best = e;
     }
     return best;
   }
