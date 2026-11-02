@@ -43,6 +43,20 @@ describe("EventLog", () => {
     expect(log.latestBefore("point", 99)).toBeUndefined();
     expect(log.window(110, 115).map((e) => e.type)).toEqual(["rally_end"]);
   });
+
+  it.each(["point", "broadcast_score", "calibration"])(
+    "keeps the newest %s sequence at a tied frame despite out-of-order delivery",
+    (type) => {
+      const log = new EventLog();
+      const older = ev(type, 100, { seq: 4 });
+      const newer = ev(type, 100, { seq: 9 });
+      log.apply([older, newer]);
+      expect(log.latestBefore(type, 100)?.event_id).toBe(newer.event_id);
+      log.apply([older]);
+      expect(log.latestBefore(type, 100)?.event_id).toBe(newer.event_id);
+      expect(log.latestBefore(type, 99)).toBeUndefined();
+    },
+  );
 });
 
 const win = (from: number, to: number, shuttleFrames: number[]) => ({
