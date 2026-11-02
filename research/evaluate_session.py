@@ -29,7 +29,6 @@ from bai_engine.schema.events import Event, EventStatus, current_view
 from bai_engine.schema.session import Session
 from bai_engine.store.sessions import MediaPaths
 
-
 _ANNOTATION_FIELDS = frozenset(
     {
         "schema_version", "media_sha256", "timebase", "status", "split", "population", "exhaustive",
