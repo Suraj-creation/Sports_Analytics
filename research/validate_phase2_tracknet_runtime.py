@@ -175,7 +175,9 @@ def _run(args: argparse.Namespace, report: dict[str, Any]) -> None:
     configure_logging()
     repo = Path(__file__).resolve().parents[1]
     if Path(candidate.__file__).resolve() != repo / SOURCE:
-        raise RuntimeError("candidate import is not this checkout; set PYTHONPATH to engine/src and sports/badminton/src")
+        raise RuntimeError(
+            "candidate import is not this checkout; set PYTHONPATH to engine/src and sports/badminton/src"
+        )
     registry_source = repo / "engine/src/bai_engine/runtime/registry.py"
     if Path(sys.modules[ModelRegistry.__module__].__file__).resolve() != registry_source:
         raise RuntimeError("ModelRegistry import is not this checkout")
@@ -183,7 +185,9 @@ def _run(args: argparse.Namespace, report: dict[str, Any]) -> None:
     report["source"] = {
         "baseline_revision": baseline_revision, "candidate_revision": _git(repo, "rev-parse", "HEAD"),
         "candidate_source_sha256": _sha256(repo / SOURCE),
-        "candidate_worktree_changes": _git(repo, "status", "--porcelain", "--", SOURCE, "engine/src/bai_engine/runtime"),
+        "candidate_worktree_changes": _git(
+            repo, "status", "--porcelain", "--", SOURCE, "engine/src/bai_engine/runtime"
+        ),
         "harness_sha256": _sha256(Path(__file__)),
     }
     versions = {}

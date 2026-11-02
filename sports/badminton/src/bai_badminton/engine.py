@@ -291,6 +291,9 @@ class BadmintonMatchEngine:
         self._replay: list[bool] = []
         self._shot: list[int] = []
         self._geometry_valid: list[bool] = []
+        # Calibrations are replaced on review/reacquisition. Delayed outcomes
+        # must use the immutable reference that produced these observations.
+        self._frame_calib: list[_Calib | None] = []
         self._pose_stride: list[int] = []
         self._participant_frames: list[dict[str, ParticipantSnapshot]] = []
         self._participant_visible_counts: list[int] = []
@@ -534,6 +537,7 @@ class BadmintonMatchEngine:
         # visual track IDs. Start a fresh deterministic epoch rather than link them.
         geometry_valid = not geometry_unavailable and calib is not None
         self._geometry_valid.append(geometry_valid)
+        self._frame_calib.append(calib)
         self._coordinate_context.append((self._coordinate_epoch, tracked, G is not None, geometry_valid, fp.scene))
         self._pose_stride.append(
             (fp.pose_stride if type(fp.pose_stride) is int and fp.pose_stride >= 0 else -1)
@@ -895,6 +899,7 @@ class BadmintonMatchEngine:
             self._shot,
             self._cam,
             self._geometry_valid,
+            self._frame_calib,
             self._pose_stride,
             self._participant_frames,
             self._participant_visible_counts,
@@ -1804,7 +1809,8 @@ class BadmintonMatchEngine:
         if seg.reason in ("cut", "flush"):
             return Outcome.UNKNOWN.value, "unknown", "incomplete_rally", 0.2
 
-        calib = self._calib(self._shot_at(seg.end))
+        index = seg.end - self._buf0
+        calib = self._frame_calib[index] if 0 <= index < len(self._frame_calib) else None
         if calib is None or self._proc is None:
             return Outcome.UNKNOWN.value, "unknown", "uncalibrated", 0.2
         # The FSM marks the *start* of the end condition (first stationary / invisible frame);
