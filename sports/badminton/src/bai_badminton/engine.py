@@ -282,6 +282,12 @@ class BadmintonMatchEngine:
         self._sy: list[float] = []
         self._svis: list[bool] = []
         self._sconf: list[float] = []
+        # Raw proxy detections remain overlay evidence even when they cannot
+        # be compared in the current stabilized reference. These private masks
+        # describe analysis coordinates, not independent shuttle observations.
+        self._temporal_valid: list[bool] = []
+        self._coordinate_epoch = 0
+        self._coordinate_context: list[tuple[int, bool, bool, bool]] = []
         self._replay: list[bool] = []
         self._shot: list[int] = []
         self._geometry_valid: list[bool] = []
@@ -311,6 +317,8 @@ class BadmintonMatchEngine:
         calibration; ``None``: not tracked)."""
         if self.participants is not None and cam_ref != self._cam_ref:
             self._participant_reference_changed = True
+        if cam_ref != self._cam_ref:
+            self._coordinate_epoch += 1
         self._cam_ref = cam_ref
 
     def set_calibration(
@@ -335,6 +343,7 @@ class BadmintonMatchEngine:
         """
         if self.participants is not None:
             self._participant_reference_changed = True
+        self._coordinate_epoch += 1
         geom = CourtImageGeometry.from_homography(
             homography, net_top_left, net_top_right, singles=self.match_cfg.discipline == "singles"
         )
@@ -409,9 +418,12 @@ class BadmintonMatchEngine:
         self._provenance.update(chunk.models)
         for r in chunk.ocr:
             self.on_ocr(r)
-        tracked = chunk.cam_ref is not None and chunk.cam_ref == self._cam_ref
+        # A mismatched or absent reference cannot turn tracked input into
+        # fixed-camera raw coordinates under an unrelated calibration.
+        tracked = chunk.cam_ref is not None or self._cam_ref is not None
+        reference_matches = chunk.cam_ref is not None and chunk.cam_ref == self._cam_ref
         for fp in chunk.frames:
-            self._append(fp, tracked)
+            self._append(fp, tracked, reference_matches=reference_matches)
         self._last_frame = chunk.end
         self._emit_scenes(self.scenes.drain())
         self._advance(self._last_frame - max(self.cfg.lookahead, round(0.2 * self.cfg.fps) + 5))
@@ -477,8 +489,8 @@ class BadmintonMatchEngine:
         )
 
     # ================================================================== buffering
-    def _append(self, fp: FramePerception, tracked: bool = False) -> None:
-        G = _usable_camera_pose(fp) if tracked else None
+    def _append(self, fp: FramePerception, tracked: bool = False, *, reference_matches: bool = True) -> None:
+        G = _usable_camera_pose(fp) if tracked and reference_matches else None
         self._cam.append(G)
         Ginv = np.linalg.inv(G) if G is not None else None
         sxy = fp.shuttle_xy
@@ -494,6 +506,9 @@ class BadmintonMatchEngine:
             self._sy.append(np.nan)
             self._svis.append(False)
         self._sconf.append(fp.shuttle_conf)
+        self._temporal_valid.append(
+            (not tracked or G is not None) and (sxy is None or bool(np.isfinite(sxy).all()))
+        )
         self._replay.append(fp.replay)
         self._shot.append(fp.shot_id)
         # a tracked camera has one calibration (in the reference view) wherever the court is in view
@@ -519,6 +534,7 @@ class BadmintonMatchEngine:
         # visual track IDs. Start a fresh deterministic epoch rather than link them.
         geometry_valid = not geometry_unavailable and calib is not None
         self._geometry_valid.append(geometry_valid)
+        self._coordinate_context.append((self._coordinate_epoch, tracked, G is not None, geometry_valid))
         self._pose_stride.append(
             (fp.pose_stride if type(fp.pose_stride) is int and fp.pose_stride >= 0 else -1)
             if geometry_valid and not fp.replay
@@ -836,7 +852,7 @@ class BadmintonMatchEngine:
                 )
             )
         if tracked:
-            self._track_out.append(camera_sample(fp))
+            self._track_out.append(camera_sample(fp if reference_matches else replace(fp, cam=None, cam_lost=True)))
         self.scenes.add(fp.frame_idx, fp.scene, fp.head, fp.court_q)
 
     def _raw_xy(self, frame: int, xy: tuple[float, float] | None) -> tuple[float, float] | None:
@@ -873,6 +889,8 @@ class BadmintonMatchEngine:
             self._sy,
             self._svis,
             self._sconf,
+            self._temporal_valid,
+            self._coordinate_context,
             self._replay,
             self._shot,
             self._cam,
@@ -888,20 +906,32 @@ class BadmintonMatchEngine:
                 del lst[:drop]
         self._buf0 += drop
 
+    def _segment_breaks(self, lo: int, hi: int) -> np.ndarray:
+        """Aligned boundaries for absolute frames [lo, hi], including coordinate changes."""
+        a, b = lo - self._buf0, hi - self._buf0 + 1
+        if not 0 <= a <= b <= len(self._shot):
+            raise ValueError("segment bounds must be inside the retained frame buffer")
+        n = b - a
+        break_before = np.zeros(n, dtype=bool)
+        for i, j in enumerate(range(a, b)):
+            if j > 0:
+                break_before[i] = (
+                    self._shot[j] != self._shot[j - 1]
+                    or self._replay[j] != self._replay[j - 1]
+                    or self._coordinate_context[j] != self._coordinate_context[j - 1]
+                )
+        return break_before
+
     def _window(self, lo: int, hi: int) -> WindowObs:
         """Dense observation arrays for absolute frames [lo, hi]."""
         a, b = lo - self._buf0, hi - self._buf0 + 1
         n = b - a
-        # Different shots or replay states may depict different moments and
-        # camera geometry. Neither spline anchors nor spike comparisons can
-        # establish continuity across those boundaries.
-        shots = np.asarray(self._shot[a:b])
         replay = np.asarray(self._replay[a:b], dtype=bool)
-        break_before = np.zeros(n, dtype=bool)
-        break_before[1:] = (shots[1:] != shots[:-1]) | (replay[1:] != replay[:-1])
+        break_before = self._segment_breaks(lo, hi)
+        visible = np.asarray(self._svis[a:b], dtype=bool) & np.asarray(self._temporal_valid[a:b], dtype=bool)
         track = process(
             Track.from_arrays(
-                np.array(self._sx[a:b]), np.array(self._sy[a:b]), np.array(self._svis[a:b]), np.array(self._sconf[a:b])
+                np.array(self._sx[a:b]), np.array(self._sy[a:b]), visible, np.array(self._sconf[a:b])
             ),
             break_before=break_before,
         )
@@ -930,6 +960,12 @@ class BadmintonMatchEngine:
             pose_stride=np.array(self._pose_stride[a:b], dtype=np.int64),
             break_before=break_before,
         )
+
+    def _same_segment(self, first: int, last: int) -> bool:
+        """Whether retained context establishes continuity between two frames."""
+        if not self._buf0 <= first <= last <= self._last_frame:
+            return False
+        return not self._segment_breaks(first, last)[1:].any()
 
     # ================================================================== frame advance
     def _advance(self, upto: int) -> None:
@@ -1002,8 +1038,10 @@ class BadmintonMatchEngine:
                 )
             }
         t = w.shuttle
-        spd = np.zeros(w.n)
-        spd[1:] = np.nan_to_num(np.hypot(np.diff(t.x), np.diff(t.y)))
+        observed = t.vis & ~t.interp
+        spd = np.full(w.n, np.nan)
+        adjacent = observed[1:] & observed[:-1]
+        spd[1:] = np.where(adjacent, np.hypot(np.diff(t.x), np.diff(t.y)), np.nan)
         # A jump between camera shots or replay states is not shuttle motion.
         # NaN also prevents the FSM's stationary gate from treating the
         # unknown boundary speed as a measured zero.
@@ -1012,6 +1050,9 @@ class BadmintonMatchEngine:
         spd[scene_breaks] = np.nan
         for i in range(i0, i1):
             f = w.frame0 + i
+            if scene_breaks[i]:
+                # Close the old evidence before accepting a current-frame hit.
+                self._handle_fsm(self.fsm.on_discontinuity(f), f)
             c = contacts.get(f)
             if c is not None and c.scores.get("proximity", 0.0) < ATTRIBUTION_MIN_PROXIMITY:
                 # A shuttle redirect/acceleration alone is not a stroke-producing
@@ -1051,7 +1092,7 @@ class BadmintonMatchEngine:
                 self._last_contact_candidate = c
                 self._handle_fsm(self.fsm.on_contact(f), f)
                 self._on_contact(c, w)
-            self._handle_fsm(self.fsm.step(f, bool(t.vis[i]), float(spd[i]), bool(w.replay[i])), f)
+            self._handle_fsm(self.fsm.step(f, bool(observed[i]), float(spd[i]), bool(w.replay[i])), f)
         self._final = upto
 
     def _handle_fsm(self, upd: Any, frame: int) -> None:
@@ -1173,6 +1214,14 @@ class BadmintonMatchEngine:
             return None, None
         t, i = located
         next_idx = i + next_frame - frame if next_frame is not None else None
+        lo = frame - i
+        # Synthetic callers may supply an independent track. Use boundaries
+        # only when they can be aligned to retained perception unambiguously.
+        breaks = (
+            self._segment_breaks(lo, lo + len(t) - 1)
+            if self._buf0 <= lo and lo + len(t) - 1 <= self._last_frame
+            else None
+        )
         return post_contact_motion(
             t.x,
             t.y,
@@ -1182,6 +1231,7 @@ class BadmintonMatchEngine:
             self.cfg.fps,
             float(self.cfg.frame_height),
             next_contact_idx=next_idx,
+            break_before=breaks,
         )
 
     def _player_at(
@@ -1197,6 +1247,10 @@ class BadmintonMatchEngine:
 
     def _classify(self, c: _Contact, next_frame: int | None, is_serve: bool, receiver: ContactCandidate | None) -> None:
         cand = c.cand
+        if next_frame is not None and not self._same_segment(cand.frame, next_frame):
+            next_frame, receiver = None, None
+        elif receiver is not None and not self._same_segment(cand.frame, receiver.frame):
+            receiver = None
         serve, serve_evidence = self._serve_context(cand.frame, initial=is_serve)
         bbox, _, court_xy = self._player_at(cand.player_id, cand.frame)
         context_source = "named_player" if cand.player_id is not None else None
@@ -1370,6 +1424,8 @@ class BadmintonMatchEngine:
         start = end - length
         if start < 0 or end > len(self._svis):
             return None, {**evidence, "status": "unknown", "reason": "insufficient_precontact_context"}
+        if not self._same_segment(frame - length, frame):
+            return None, {**evidence, "status": "unknown", "reason": "discontinuous_precontact_context"}
         # Exclude the immediate contact-scoring neighbourhood. Two consecutive
         # moving steps are observed incoming flight, even after an FSM gap/cut.
         moving = 0
@@ -1377,6 +1433,8 @@ class BadmintonMatchEngine:
             if (
                 self._svis[i - 1]
                 and self._svis[i]
+                and self._temporal_valid[i - 1]
+                and self._temporal_valid[i]
                 and np.hypot(self._sx[i] - self._sx[i - 1], self._sy[i] - self._sy[i - 1]) > 3
             ):
                 moving += 1
@@ -1426,6 +1484,8 @@ class BadmintonMatchEngine:
         a, b = lo - self._buf0, hi - self._buf0
         buf = self._players[pid]
         if a < 0 or b > len(buf["kps"]):
+            return None
+        if not self._same_segment(lo, hi - 1) or not all(self._geometry_valid[a:b]) or any(self._replay[a:b]):
             return None
         n = b - a
         ank = np.full((n, 2), np.nan)
@@ -1594,6 +1654,10 @@ class BadmintonMatchEngine:
         """Evidence for "was this rally official play?" (see :mod:`bai_badminton.events.match_phase`)."""
         ph, fps = self.cfg.phase, self.cfg.fps
         lo = max(self._buf0, seg.start - int(ph.still_window_s * fps))
+        # A formation from another coordinate context cannot establish a serve.
+        boundaries = self._segment_breaks(lo, seg.start)
+        if boundaries.any():
+            lo += int(np.flatnonzero(boundaries)[-1])
         a, b = lo - self._buf0, seg.start - self._buf0 + 1
         pos: dict[str, tuple[float, float]] = {}
         spread: list[float] = []
@@ -1616,7 +1680,11 @@ class BadmintonMatchEngine:
             formation=serve_formation(pos.get("P1"), pos.get("P2"), ph.court_tol_m) if both else None,
             still=all(x <= ph.still_max_m for x in spread) if both else None,
             gap_s=(seg.start - self._last_rally_end) / fps if self._last_rally_end is not None else None,
-            after_cut=any(self._replay[cut_lo : b - 1]) or len(recent_shots) > 1,
+            after_cut=(
+                any(self._replay[cut_lo : b - 1])
+                or len(recent_shots) > 1
+                or bool(self._segment_breaks(self._buf0 + cut_lo, seg.start).any())
+            ),
             scoreboard=self.ocr.board_change(seg.start, seg.end, until, lookback=int(30 * fps)),
         )
 
@@ -1735,7 +1803,12 @@ class BadmintonMatchEngine:
         end = min(self._last_frame, seg.end + settle)
         lo = max(self._buf0, end - int(3.5 * self.cfg.fps))
         a, b = lo - self._buf0, end - self._buf0 + 1
-        if a < 0 or b > len(self._geometry_valid) or not all(self._geometry_valid[a:b]):
+        if (
+            a < 0
+            or b > len(self._geometry_valid)
+            or not all(self._geometry_valid[a:b])
+            or not self._same_segment(lo, end)
+        ):
             return Outcome.UNKNOWN.value, "unknown", "invalid_court_geometry", 0.2
         w = self._window(lo, end)
         observed = w.shuttle.vis & ~w.shuttle.interp & np.isfinite(w.shuttle.conf) & (w.shuttle.conf >= 0.5)

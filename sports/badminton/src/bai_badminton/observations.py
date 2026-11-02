@@ -19,6 +19,25 @@ from bai_badminton.perception_types import RacketObservation
 PLAYER_IDS = ("P1", "P2")
 
 
+def temporal_segment_bounds(break_before: NDArray[np.bool_], index: int) -> tuple[int, int]:
+    """Half-open relative bounds of the contiguous segment containing ``index``.
+
+    A true entry starts a new segment at that frame. Index zero has no preceding
+    frame inside the supplied window, so its marker is ignored. Ordinary missing
+    observations do not create a temporal boundary by themselves.
+    """
+    boundaries = np.asarray(break_before)
+    if boundaries.ndim != 1 or boundaries.dtype != np.bool_:
+        raise ValueError("break_before must contain one boolean per frame")
+    if not 0 <= index < len(boundaries):
+        raise IndexError("segment index is outside the window")
+    starts = np.flatnonzero(boundaries[1:]) + 1
+    position = int(np.searchsorted(starts, index, side="right"))
+    lo = int(starts[position - 1]) if position else 0
+    hi = int(starts[position]) if position < len(starts) else len(boundaries)
+    return lo, hi
+
+
 @dataclass
 class PlayerSeries:
     """Per-frame observations of one *identified* player (``player_id``) over a window."""
@@ -99,3 +118,8 @@ class WindowObs:
 
     def idx(self, frame: int) -> int:
         return frame - self.frame0
+
+    def segment_bounds(self, index: int) -> tuple[int, int]:
+        """Contiguous temporal context for a relative frame index, half-open."""
+        assert self.break_before is not None
+        return temporal_segment_bounds(self.break_before, index)

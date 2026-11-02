@@ -150,18 +150,9 @@ def _wrist_speed(
 
 def _context_bounds(w: WindowObs, i: int, half: int) -> tuple[int, int]:
     """Bound the small velocity/pose neighborhood to the candidate's scene."""
-    assert w.break_before is not None
-    lo = max(0, i - max(half, 4))  # wrist motion also looks one frame further back
-    hi = min(w.n, i + max(half, 3) + 1)
-    for j in range(i, lo, -1):
-        if w.break_before[j]:
-            lo = j
-            break
-    for j in range(i + 1, hi):
-        if w.break_before[j]:
-            hi = j
-            break
-    return lo, hi
+    segment_lo, segment_hi = w.segment_bounds(i)
+    # Wrist motion also looks one frame further back than shuttle velocity.
+    return max(segment_lo, i - max(half, 4)), min(segment_hi, i + max(half, 3) + 1)
 
 
 def score_frame(w: WindowObs, i: int, half: int = 3) -> ContactCandidate | None:
