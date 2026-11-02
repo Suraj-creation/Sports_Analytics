@@ -3,7 +3,8 @@
 * Artifacts are cached under ``models/cache/<name>/``.
 * Every artifact's sha256 is pinned: either in the manifest, or — for ``pin-on-first-fetch`` —
   in ``models/cache/lock.json`` the first time it is downloaded.  A later load whose digest
-  differs is refused (supply-chain / corrupted-download protection).
+  differs is refused (integrity protection). First-use pinning does not
+  authenticate the publisher or establish that a pickle is safe to execute.
 * Zip artifacts (OpenMMLab ONNX SDK bundles) are extracted and the ``.onnx`` inside is returned.
 """
 
@@ -11,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import tempfile
 import threading
@@ -103,9 +105,54 @@ class ModelRegistry:
             return {}
 
     def _pin(self, name: str, digest: str) -> None:
+        """Commit pins atomically; the caller owns the process transaction lock."""
         data = self._locked()
         data[name] = digest
-        self._lock_path.write_text(json.dumps(data, indent=2, sort_keys=True), encoding="utf-8")
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w", encoding="utf-8", prefix=".pins-", suffix=".tmp", dir=self.cache, delete=False
+            ) as stream:
+                temporary = Path(stream.name)
+                stream.write(json.dumps(data, indent=2, sort_keys=True))
+                stream.flush()
+                os.fsync(stream.fileno())
+            temporary.replace(self._lock_path)
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
+
+    @contextmanager
+    def _pin_transaction(self) -> Iterator[None]:
+        """Serialize read/compare/pin across registry instances and processes.
+
+        The lock lives in a stable separate file because lock.json is replaced
+        atomically. OS advisory locks are released on descriptor close/process
+        exit; a leftover lock pathname is not a stale ownership marker.
+        """
+        with (self.cache / ".pins.lock").open("a+b") as stream:
+            if os.name == "nt":
+                import msvcrt
+
+                stream.seek(0)
+                if not stream.read(1):
+                    stream.write(b"\0")
+                    stream.flush()
+                stream.seek(0)
+                msvcrt.locking(stream.fileno(), msvcrt.LK_LOCK, 1)
+                try:
+                    yield
+                finally:
+                    stream.seek(0)
+                    msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(stream.fileno(), fcntl.LOCK_EX)
+                try:
+                    yield
+                finally:
+                    fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
 
     # ------------------------------------------------------------------ public
     def get(self, name: str) -> ModelSpec:
@@ -220,12 +267,21 @@ class ModelRegistry:
         self._verify_digest(spec, digest)
 
     def _verify_digest(self, spec: ModelSpec, digest: str) -> None:
-        expected = spec.sha256 if spec.sha256 not in (None, PIN) else self._locked().get(spec.name)
-        if expected is None:
-            self._pin(spec.name, digest)
-            log.info("model.pinned", model=spec.name, sha256=digest)
-        elif expected != digest:
-            raise ModelError(f"{spec.name}: sha256 mismatch ({digest} != pinned {expected}); refusing to load")
+        if spec.sha256 not in (None, PIN):
+            if spec.sha256 != digest:
+                raise ModelError(
+                    f"{spec.name}: sha256 mismatch ({digest} != pinned {spec.sha256}); refusing to load"
+                )
+            return
+        # The thread lock alone cannot coordinate another registry/process.
+        # Keep expected-read, mismatch rejection and first-pin commit together.
+        with self._pin_transaction():
+            expected = self._locked().get(spec.name)
+            if expected is None:
+                self._pin(spec.name, digest)
+                log.info("model.pinned", model=spec.name, sha256=digest)
+            elif expected != digest:
+                raise ModelError(f"{spec.name}: sha256 mismatch ({digest} != pinned {expected}); refusing to load")
 
     def _extract_onnx(self, spec: ModelSpec, zpath: Path) -> Path:
         out_dir = zpath.parent / "extracted"
