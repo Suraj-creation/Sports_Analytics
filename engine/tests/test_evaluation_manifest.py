@@ -60,6 +60,23 @@ def test_incompatible_evidence_is_rejected(sample, key, value, error):
 
 def test_reviewed_heldout_manifest_accepts_rational_media_timebase(sample):
     session, labels, path = sample
-    labels.update(status="reviewed", split="held_out")
+    labels.update(status="reviewed", split="held_out", review={"human_verified": True})
     path.write_text(json.dumps(labels))
     assert load_annotations(path, session)["window_s"] == [0, 10]
+
+
+@pytest.mark.parametrize("review", [None, {}, {"human_verified": False}, {"human_verified": "true"}])
+def test_reviewed_rally_labels_require_explicit_human_attestation(sample, review):
+    session, labels, path = sample
+    labels.update(status="reviewed", split="held_out", review=review)
+    path.write_text(json.dumps(labels))
+    with pytest.raises(ValueError, match="human verification"):
+        load_annotations(path, session, allow_draft=True)
+
+
+def test_unrecognized_annotation_status_is_not_admitted_as_draft(sample):
+    session, labels, path = sample
+    labels["status"] = "unverified"
+    path.write_text(json.dumps(labels))
+    with pytest.raises(ValueError, match="status must be reviewed or draft"):
+        load_annotations(path, session, allow_draft=True)

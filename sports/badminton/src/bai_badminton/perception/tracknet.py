@@ -15,10 +15,15 @@ Model definition vendored from qaz812345/TrackNetV3 (MIT License, Copyright (c) 
 
 from __future__ import annotations
 
+import hashlib
+import marshal
+import sys
+import tempfile
 from collections import deque
 from dataclasses import dataclass, field
 from itertools import pairwise
 from pathlib import Path
+from typing import BinaryIO
 
 import cv2
 import numpy as np
@@ -30,6 +35,45 @@ from bai_engine.runtime.device import ort_runtime
 log = get_logger(__name__)
 
 WIDTH, HEIGHT = 512, 288
+# Bump for export-contract changes not represented by the other inputs. This
+# is not a TensorRT engine-cache or complete dependency/toolchain fingerprint.
+ONNX_EXPORT_CONTRACT = "tracknetv3-onnx-opset17-embedded-v2"
+
+
+def _sha256_stream(stream: BinaryIO) -> str:
+    """Hash a seekable binary stream without retaining checkpoint bytes in RAM."""
+    stream.seek(0)
+    digest = hashlib.sha256()
+    for block in iter(lambda: stream.read(1024 * 1024), b""):
+        digest.update(block)
+    return digest.hexdigest()
+
+
+def _onnx_cache_key(checkpoint_digest: str, torch_version: str) -> str:
+    """Key an exported graph by its checkpoint and loaded export implementation.
+
+    The executing code-object digest includes nested builder code. Including it
+    avoids conflating an already-running process's old code with new source on
+    disk after an edit. It does not fingerprint every exporter dependency.
+    """
+    with Path(__file__).open("rb") as stream:
+        source_digest = _sha256_stream(stream)
+    digest = hashlib.sha256()
+    components = (
+        ONNX_EXPORT_CONTRACT,
+        checkpoint_digest,
+        source_digest,
+        torch_version,
+        str(sys.version_info[:3]),
+        str(WIDTH),
+        str(HEIGHT),
+    )
+    for value in components:
+        digest.update(value.encode("utf-8"))
+        digest.update(b"\0")
+    for function in (_build_torch_model, TrackNetV3.export_onnx):
+        digest.update(marshal.dumps(function.__code__))
+    return digest.hexdigest()
 
 
 def _build_torch_model(in_dim: int, out_dim: int):  # type: ignore[no-untyped-def]
@@ -175,7 +219,22 @@ class TrackNetV3:
             raise ValueError(f"unsupported TrackNet backend {backend!r}")
         if precision not in ("fp32", "fp16"):
             raise ValueError(f"unsupported TrackNet precision {precision!r}")
-        ckpt = torch.load(weights, map_location="cpu", weights_only=False)
+        # ONNX cache identity must describe the actual bytes loaded. Compare
+        # the open file before and after loading to reject concurrent mutation.
+        # This is not artifact authentication: the registry verifies a path
+        # before this method reopens it, so replacement between those steps is
+        # still possible. Only trusted checkpoints may be deserialized here.
+        checkpoint_digest = None
+        cache_key = None
+        if backend in ("onnx-cpu", "onnx-cuda", "tensorrt"):
+            with weights.open("rb") as stream:
+                checkpoint_digest = _sha256_stream(stream)
+                stream.seek(0)
+                ckpt = torch.load(stream, map_location="cpu", weights_only=False)
+                if _sha256_stream(stream) != checkpoint_digest:
+                    raise ValueError("TrackNet checkpoint changed during loading")
+        else:
+            ckpt = torch.load(weights, map_location="cpu", weights_only=False)
         p = ckpt.get("param_dict", {})
         self.seq_len = int(p.get("seq_len", 8))
         self.bg_mode = str(p.get("bg_mode", "concat"))
@@ -198,9 +257,12 @@ class TrackNetV3:
         if backend == "torch-cuda" and torch.cuda.is_available():
             self._torch = model.cuda().half() if precision == "fp16" else model.cuda().float()
         elif backend in ("onnx-cpu", "onnx-cuda", "tensorrt"):
-            onnx_path = (onnx_dir or weights.parent) / f"tracknetv3_seq{self.seq_len}_{self.bg_mode}.onnx"
+            if checkpoint_digest is None:
+                raise RuntimeError("TrackNet ONNX export requires a checkpoint digest")
+            cache_key = _onnx_cache_key(checkpoint_digest, str(torch.__version__))
+            onnx_path = (onnx_dir or weights.parent) / f"tracknetv3_seq{self.seq_len}_{self.bg_mode}_{cache_key}.onnx"
             if not onnx_path.exists():
-                self.export_onnx(onnx_path)
+                self._publish_onnx(onnx_path)
             import onnxruntime as ort
 
             self._ort = ort.InferenceSession(str(onnx_path), providers=providers or ["CPUExecutionProvider"])
@@ -215,6 +277,9 @@ class TrackNetV3:
                 "backend_fallback": actual != backend,
             }
         self.runtime["requested_precision"] = precision
+        if checkpoint_digest is not None and cache_key is not None:
+            self.runtime["checkpoint_sha256"] = checkpoint_digest
+            self.runtime["onnx_cache_key"] = cache_key
         if self.runtime["backend_fallback"]:
             log.warning("tracknet.backend_fallback", **self.runtime)
         log.info("tracknet.loaded", seq_len=self.seq_len, **self.runtime)
@@ -222,6 +287,24 @@ class TrackNetV3:
     @property
     def model_ref(self) -> str:
         return "tracknetv3@3.0"
+
+    def _publish_onnx(self, path: Path) -> None:
+        """Publish a completed single-file export; never strand a sidecar."""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        cache_root = path.parent.resolve()
+        # The unique directory confines this export's graph and any unexpected
+        # auxiliary files. It is removed after success, rejection or failure.
+        with tempfile.TemporaryDirectory(prefix=".tracknet-", dir=cache_root) as tmp:
+            temporary_dir = Path(tmp).resolve()
+            if temporary_dir.parent != cache_root:
+                raise RuntimeError("TrackNet temporary export directory is outside the cache")
+            temporary = temporary_dir / "model.onnx"
+            self.export_onnx(temporary)
+            if not temporary.is_file() or any(entry != temporary for entry in temporary_dir.iterdir()):
+                raise ValueError("TrackNet ONNX export produced unexpected auxiliary files")
+            if temporary.stat().st_size == 0:
+                raise ValueError("TrackNet ONNX export produced an empty file")
+            temporary.replace(path)
 
     def export_onnx(self, path: Path) -> None:
         import torch
@@ -236,6 +319,7 @@ class TrackNetV3:
             output_names=["heatmaps"],
             dynamic_axes={"frames": {0: "batch"}, "heatmaps": {0: "batch"}},
             opset_version=17,
+            external_data=False,
         )
         log.info("tracknet.onnx_exported", path=str(path))
 

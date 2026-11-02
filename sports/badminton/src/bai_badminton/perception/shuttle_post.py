@@ -158,6 +158,37 @@ def velocity(t: Track, fps: float, win: int = 2) -> tuple[F, F, F]:
     return vx, vy, np.hypot(vx, vy)
 
 
-def process(t: Track) -> Track:
-    """Default chain used by the engine: spike removal → gap filling."""
-    return fill_gaps(remove_spikes(t))
+def process(t: Track, *, break_before: B | None = None) -> Track:
+    """Apply spike removal and gap filling within independent temporal segments.
+
+    ``break_before[i]`` starts a new segment at index ``i``. A boundary at
+    index zero has no effect. Callers can mark camera-shot and replay
+    transitions without discarding observations in either segment. The mask
+    must be boolean and have one entry per frame. With no mask, the original
+    unsegmented behavior is preserved.
+
+    Segmenting this processing does not prevent downstream consumers from
+    comparing observed samples across the same boundaries; they must enforce
+    their own temporal context rules.
+    """
+    if break_before is None:
+        return fill_gaps(remove_spikes(t))
+
+    boundaries = np.asarray(break_before)
+    if boundaries.dtype != np.bool_ or boundaries.shape != (len(t),):
+        raise ValueError("break_before must contain one boolean per track frame")
+    starts = np.flatnonzero(boundaries[1:]) + 1
+    if starts.size == 0:
+        return fill_gaps(remove_spikes(t))
+
+    result = Track(t.x.copy(), t.y.copy(), t.vis.copy(), t.conf.copy(), t.interp.copy())
+    edges = [0, *starts.tolist(), len(t)]
+    for lo, hi in zip(edges[:-1], edges[1:], strict=True):
+        part = Track(t.x[lo:hi], t.y[lo:hi], t.vis[lo:hi], t.conf[lo:hi], t.interp[lo:hi])
+        filtered = fill_gaps(remove_spikes(part))
+        result.x[lo:hi] = filtered.x
+        result.y[lo:hi] = filtered.y
+        result.vis[lo:hi] = filtered.vis
+        result.conf[lo:hi] = filtered.conf
+        result.interp[lo:hi] = filtered.interp
+    return result

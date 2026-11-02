@@ -101,14 +101,18 @@ def _wrist_speed(
     *,
     frame0: int = 0,
     pose_stride: NDArray[np.int64] | None = None,
+    context_bounds: tuple[int, int] | None = None,
 ) -> float | None:
     """Observed wrist motion in body heights/frame, respecting pose scheduling.
 
     Sparse pairs can bridge only known unscheduled frames with continuous boxes.
     Missing scheduled observations and unknown/disabled cadence cannot bridge.
+    ``context_bounds`` restricts pose evidence to a half-open scene interval.
     """
     n = s.kps.shape[0]
     lo, hi = max(0, i - win - 1), min(n, i + win + 1)
+    if context_bounds is not None:
+        lo, hi = max(lo, context_bounds[0]), min(hi, context_bounds[1])
     best = None
     for kp in (KP.L_WRIST, KP.R_WRIST):
         points = s.kps[lo:hi, kp]
@@ -144,13 +148,30 @@ def _wrist_speed(
     return best
 
 
+def _context_bounds(w: WindowObs, i: int, half: int) -> tuple[int, int]:
+    """Bound the small velocity/pose neighborhood to the candidate's scene."""
+    assert w.break_before is not None
+    lo = max(0, i - max(half, 4))  # wrist motion also looks one frame further back
+    hi = min(w.n, i + max(half, 3) + 1)
+    for j in range(i, lo, -1):
+        if w.break_before[j]:
+            lo = j
+            break
+    for j in range(i + 1, hi):
+        if w.break_before[j]:
+            hi = j
+            break
+    return lo, hi
+
+
 def score_frame(w: WindowObs, i: int, half: int = 3) -> ContactCandidate | None:
     t = w.shuttle
     ok = t.vis & ~t.interp
-    if not ok[i]:
+    if w.replay[i] or not ok[i]:
         return None
-    vb = _seg_velocity(t.x, t.y, ok, i - half, i)
-    va = _seg_velocity(t.x, t.y, ok, i, i + half)
+    lo, hi = _context_bounds(w, i, half)
+    vb = _seg_velocity(t.x, t.y, ok, max(lo, i - half), i)
+    va = _seg_velocity(t.x, t.y, ok, i, min(hi - 1, i + half))
     if vb is None or va is None:
         return None
     nb, na = math.hypot(*vb), math.hypot(*va)
@@ -211,7 +232,8 @@ def score_frame(w: WindowObs, i: int, half: int = 3) -> ContactCandidate | None:
     elif attribution_reason == "ambiguous_racket_overlap":
         swing_players = list(overlapping_rackets)
     wrist_speeds = [
-        _wrist_speed(w.players[pid], i, frame0=w.frame0, pose_stride=w.pose_stride) for pid in swing_players
+        _wrist_speed(w.players[pid], i, frame0=w.frame0, pose_stride=w.pose_stride, context_bounds=(lo, hi))
+        for pid in swing_players
     ]
     observed_speeds = [speed for speed in wrist_speeds if speed is not None]
     s_swing = float(np.clip((max(observed_speeds) - 0.05) / 0.25, 0.0, 1.0)) if observed_speeds else 0.0
@@ -274,6 +296,8 @@ def detect_contacts(
 
     Optional singles alternation is a causal heuristic over returned peaks;
     streaming callers must maintain that state across calls themselves.
+    Peak suppression and alternation never compare candidates across a scene
+    boundary supplied in ``w.break_before`` or inferred from replay changes.
 
     With ``proximity_split``, body-supported hits and trajectory-only diagnostic
     turns form separate groups BEFORE peak selection. A stronger unsupported
@@ -282,6 +306,8 @@ def detect_contacts(
     """
     stop = w.n if stop is None else stop
     nms = max(1, int(round(nms_s * w.fps)))
+    assert w.break_before is not None
+    segments = np.cumsum(w.break_before, dtype=np.int64)
     cands = [
         c
         for i in range(max(0, start - nms), min(w.n, stop + nms))
@@ -293,6 +319,7 @@ def detect_contacts(
         if start <= c.frame - w.frame0 < stop
         and not any(
             abs(c.frame - other.frame) <= nms
+            and segments[c.frame - w.frame0] == segments[other.frame - w.frame0]
             and (
                 proximity_split is None
                 or (c.scores.get("proximity", 0.0) >= proximity_split)
@@ -308,7 +335,13 @@ def detect_contacts(
     gap = int(round(min_same_player_gap_s * w.fps))
     out: list[ContactCandidate] = []
     for c in kept:
-        if out and c.player_id is not None and c.player_id == out[-1].player_id and c.frame - out[-1].frame < gap:
+        if (
+            out
+            and segments[c.frame - w.frame0] == segments[out[-1].frame - w.frame0]
+            and c.player_id is not None
+            and c.player_id == out[-1].player_id
+            and c.frame - out[-1].frame < gap
+        ):
             continue
         out.append(c)
     return out

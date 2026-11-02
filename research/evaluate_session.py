@@ -4,6 +4,8 @@ Run from repository root after sourcing ../gpu-env.sh:
   .venv/bin/python research/evaluate_session.py --session ID --annotations labels.json
 The annotation window must be exhaustively reviewed. Draft labels are rejected
 unless --allow-draft is explicit; their reports cannot count as accuracy claims.
+Reviewed labels must include a human-verification attestation. This is a statement
+by the annotator, not independent proof of annotation quality or split isolation.
 """
 
 from __future__ import annotations
@@ -29,8 +31,15 @@ def load_annotations(path: Path, session: Session, *, allow_draft: bool = False)
         raise ValueError("annotation media hash does not match session source")
     if labels.get("timebase") != "canonical_media_seconds":
         raise ValueError("annotations require canonical_media_seconds")
-    if labels.get("status") != "reviewed" and not allow_draft:
+    if labels.get("status") not in ("reviewed", "draft"):
+        raise ValueError("status must be reviewed or draft")
+    if labels["status"] == "draft" and not allow_draft:
         raise ValueError("draft annotations require explicit --allow-draft; no accuracy claim permitted")
+    review = labels.get("review")
+    if labels["status"] == "reviewed" and (
+        not isinstance(review, dict) or review.get("human_verified") is not True
+    ):
+        raise ValueError("reviewed labels require human verification")
     if labels.get("split") not in ("held_out", "development", "diagnostic"):
         raise ValueError("explicit evaluation split required")
     if labels.get("population") not in ("official_rallies", "all_exchanges"):

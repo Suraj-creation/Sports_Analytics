@@ -25,3 +25,29 @@ The application is started with `../start-server.sh` on port 8010.
 Court-isolation design and evaluation instructions are in
 `docs/multi-court-isolation.md`. Back up session results before reanalysis.
 Geometric exclusion metrics are not labelled shuttle/event accuracy.
+
+## Engineering principles
+
+- Extend the existing engine and sport plugin boundaries. Keep video, scheduling,
+  storage, generic evidence and model execution in `engine/`; keep badminton
+  geometry, perception, rules, contacts and analytics in `sports/badminton/`.
+- Give replaceable components explicit configuration, input/output contracts,
+  version and failure behavior. Prefer existing interfaces to speculative abstractions.
+- Preserve evidence provenance: distinguish model observations, tracker estimates,
+  reconstructed points, derived events, identity hypotheses, review and unknowns.
+  Do not describe heuristic scores as calibrated probabilities or ground truth.
+- Use the canonical CFR proxy timeline for analysis while distinguishing it from
+  source timestamps and duplicated observations. A floor homography is not a 3D
+  measurement of airborne shuttle position, speed, contact or landing.
+- Invalidate dependent caches for changed inputs, models, configuration and
+  calibration; maintain schema compatibility and record reproducibility metadata.
+- Preserve existing baselines and model artifacts. Adopt alternatives only on
+  comparable evidence; document missing labels, unavailable models and failures.
+- Keep singles, four-player doubles, uncertain identity and multi-court scenes in
+  scope. Do not force an identity, shot class, point or line call without evidence.
+- Add focused regression coverage for behavior changes. Validate in the runtime
+  specified above; report any tests or real-video checks that could not be run.
+- External source, datasets, model weights and dependencies have separate licenses;
+  verify each before reuse. Never commit credentials, large weights or generated data.
+- During parallel work, assign exclusive production-file ownership and coordinate
+  shared schemas, registries and configuration with the integration owner.

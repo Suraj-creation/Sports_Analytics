@@ -891,12 +891,20 @@ class BadmintonMatchEngine:
     def _window(self, lo: int, hi: int) -> WindowObs:
         """Dense observation arrays for absolute frames [lo, hi]."""
         a, b = lo - self._buf0, hi - self._buf0 + 1
+        n = b - a
+        # Different shots or replay states may depict different moments and
+        # camera geometry. Neither spline anchors nor spike comparisons can
+        # establish continuity across those boundaries.
+        shots = np.asarray(self._shot[a:b])
+        replay = np.asarray(self._replay[a:b], dtype=bool)
+        break_before = np.zeros(n, dtype=bool)
+        break_before[1:] = (shots[1:] != shots[:-1]) | (replay[1:] != replay[:-1])
         track = process(
             Track.from_arrays(
                 np.array(self._sx[a:b]), np.array(self._sy[a:b]), np.array(self._svis[a:b]), np.array(self._sconf[a:b])
-            )
+            ),
+            break_before=break_before,
         )
-        n = b - a
         players = {}
         for pid, buf in self._players.items():
             s = PlayerSeries.empty(n)
@@ -918,8 +926,9 @@ class BadmintonMatchEngine:
             fps=self.cfg.fps,
             shuttle=track,
             players=players,
-            replay=np.array(self._replay[a:b], bool),
+            replay=replay,
             pose_stride=np.array(self._pose_stride[a:b], dtype=np.int64),
+            break_before=break_before,
         )
 
     # ================================================================== frame advance
@@ -995,6 +1004,12 @@ class BadmintonMatchEngine:
         t = w.shuttle
         spd = np.zeros(w.n)
         spd[1:] = np.nan_to_num(np.hypot(np.diff(t.x), np.diff(t.y)))
+        # A jump between camera shots or replay states is not shuttle motion.
+        # NaN also prevents the FSM's stationary gate from treating the
+        # unknown boundary speed as a measured zero.
+        assert w.break_before is not None
+        scene_breaks = w.break_before
+        spd[scene_breaks] = np.nan
         for i in range(i0, i1):
             f = w.frame0 + i
             c = contacts.get(f)
@@ -1020,7 +1035,7 @@ class BadmintonMatchEngine:
                     ]
                 )
                 c = None
-            if w.replay[i]:
+            if w.replay[i] or scene_breaks[i]:
                 self._last_contact_candidate = None
             previous = self._last_contact_candidate
             if (

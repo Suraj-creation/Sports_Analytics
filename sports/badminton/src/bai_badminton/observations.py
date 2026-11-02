@@ -58,11 +58,25 @@ class WindowObs:
     players: dict[str, PlayerSeries]
     replay: NDArray[np.bool_] = field(default_factory=lambda: np.zeros(0, bool))
     pose_stride: NDArray[np.int64] | None = None  # -1 unknown; 0 disabled; >0 actual schedule
+    # True at an index whose preceding frame belongs to another temporal context.
+    break_before: NDArray[np.bool_] | None = None
 
     def __post_init__(self) -> None:
         n = len(self.shuttle)
         if self.replay.shape[0] == 0:
             self.replay = np.zeros(n, bool)
+        elif self.replay.shape != (n,):
+            raise ValueError("replay must contain one value per frame")
+        if self.break_before is None:
+            self.break_before = np.zeros(n, dtype=bool)
+        else:
+            boundaries = np.asarray(self.break_before)
+            if boundaries.shape != (n,) or boundaries.dtype != np.bool_:
+                raise ValueError("break_before must contain one boolean per frame")
+            self.break_before = boundaries.copy()
+        if n:
+            self.break_before[0] = False  # no predecessor inside this window
+            self.break_before[1:] |= self.replay[1:] != self.replay[:-1]
         if self.pose_stride is None:
             self.pose_stride = np.full(n, -1, dtype=np.int64)
         elif (
