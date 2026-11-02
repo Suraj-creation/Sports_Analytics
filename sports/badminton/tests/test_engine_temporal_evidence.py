@@ -66,3 +66,17 @@ def test_next_contact_in_another_scene_is_not_a_flight_or_receiver(tmp_path):
     assert stroke.payload["flight_time_s"] is None
     assert stroke.payload["receiver_id"] is None
     assert "landing_source" not in stroke.payload
+
+
+def test_motion_only_exchange_outlasting_retained_history_has_unknown_start_context(tmp_path):
+    store = EventStore(tmp_path / "long.sqlite", "S1")
+    engine = BadmintonMatchEngine(
+        "S1", EngineConfig(fps=30, frame_width=1280, frame_height=720, history=60, context_back=15), store
+    )
+    frames = _frames(360, missing=range(300, 360))
+    for start in range(0, len(frames), 30):
+        engine.ingest(ChunkPerception(start, start + 29, frames[start:start + 30]))
+    engine.flush()
+    rallies = store.query(types=["rally_end"])
+    assert len(rallies) == 1
+    assert rallies[0].payload["phase_evidence"]["formation"] is None

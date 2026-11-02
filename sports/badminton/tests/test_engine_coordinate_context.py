@@ -82,3 +82,16 @@ def test_calibration_change_starts_a_new_temporal_context(tmp_path):
     engine.set_calibration(0, broadcast_homography(), cam_ref=10)
     engine.ingest(ChunkPerception(4, 7, [_frame(i) for i in range(4, 8)], cam_ref=10))
     assert engine._window(0, 7).break_before[4]
+
+
+def test_uncalibrated_alternate_view_is_not_a_raw_motion_continuation(tmp_path):
+    engine = BadmintonMatchEngine(
+        "S1", EngineConfig(fps=30, frame_width=1280, frame_height=720), EventStore(tmp_path / "raw.sqlite", "S1")
+    )
+    frames = [_frame(i) for i in range(10)]
+    for frame in frames[4:6]:
+        frame.view = "alt"
+    engine.ingest(ChunkPerception(0, 9, frames))
+    window = engine._window(0, 9)
+    assert not window.shuttle.vis[4:6].any()
+    assert window.break_before[4] and window.break_before[6]
