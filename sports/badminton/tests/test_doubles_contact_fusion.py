@@ -10,6 +10,7 @@ from bai_badminton.events.contact import ContactCandidate, detect_contacts
 from bai_badminton.observations import WindowObs
 from bai_badminton.participant_contact import ParticipantSnapshot
 from bai_badminton.perception.shuttle_post import Track
+from bai_badminton.perception_types import ChunkPerception, FramePerception
 from bai_badminton.rules.bwf import MatchConfig
 from bai_engine.store import EventStore
 
@@ -64,7 +65,10 @@ def test_classification_uses_unique_episode_context_without_naming_hitter(tmp_pa
     store = EventStore(tmp_path / "classify.sqlite", "S1")
     engine = BadmintonMatchEngine("S1", EngineConfig(fps=30, frame_width=1280, frame_height=720,
                                                  match=MatchConfig(discipline="doubles")), store)
-    engine._participant_frames = frames()
+    engine.ingest(ChunkPerception(0, 35, [
+        FramePerception(frame_idx=f, shuttle_xy=None, shuttle_conf=0.0) for f in range(36)
+    ]))
+    engine._participant_frames[:7] = frames()
     engine._post_contact_kinematics = lambda _, next_frame=None: (800.0, -30.0)
     engine._on_contact(ContactCandidate(frame=3, player_id=None, p=0.9, shuttle_xy=(100., 100.)), window())
     engine._classify(engine._open_contacts[-1], next_frame=35, is_serve=False, receiver=None)

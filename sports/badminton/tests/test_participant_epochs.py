@@ -21,7 +21,7 @@ def setup(tmp_path: Path):
     return engine, store, match
 
 
-def send(engine, start, end, *, shot=0, valid=True):
+def send(engine, start, end, *, shot=0, valid=True, cam_ref=None):
     frames = []
     for i in range(start, end + 1):
         person = PersonObs(track_id=5, bbox=np.array([300.0, 400.0, 330.0, 650.0]), conf=0.95)
@@ -34,9 +34,10 @@ def send(engine, start, end, *, shot=0, valid=True):
                 shot_id=shot,
                 calibration_state=CalibrationState.VALID if valid else CalibrationState.LOST,
                 detector_observed=valid,
+                cam=np.eye(3) if cam_ref is not None else None,
             )
         )
-    engine.ingest(ChunkPerception(start=start, end=end, frames=frames, models={"player_detector": "test"}))
+    engine.ingest(ChunkPerception(start=start, end=end, frames=frames, models={"player_detector": "test"}, cam_ref=cam_ref))
 
 
 def assert_new_episode_without_singles_assignment(engine, store, first_id, cutoff):
@@ -74,7 +75,7 @@ def test_long_invalid_coverage_requires_new_participant_episode(tmp_path: Path):
 def test_recalibration_requires_new_participant_episode(tmp_path: Path):
     engine, store, match, first_id = first_episode(tmp_path)
     engine.set_calibration(0, match.homography, cam_ref=123)
-    send(engine, 4, 7)
+    send(engine, 4, 7, cam_ref=123)
     assert_new_episode_without_singles_assignment(engine, store, first_id, 4)
 
 

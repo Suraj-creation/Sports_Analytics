@@ -12,7 +12,7 @@ from bai_badminton.events.contact import ContactCandidate
 from bai_badminton.observations import WindowObs
 from bai_badminton.perception.calibration_state import CalibrationState
 from bai_badminton.perception.shuttle_post import Track
-from bai_badminton.perception_types import FramePerception, PersonObs
+from bai_badminton.perception_types import ChunkPerception, FramePerception, PersonObs
 from bai_badminton.testing.synth import broadcast_homography
 from bai_engine.schema import Event, EventStatus, Provenance
 from bai_engine.schema.session import ParticipantInfo, ParticipantRoster
@@ -76,6 +76,12 @@ def contact(engine, window):
 
 def test_post_cut_singles_geometry_classifies_without_assigning_a_named_player(tmp_path):
     engine, store, window = setup(tmp_path)
+    # The classifier's next-hit flight requires a retained compatible timeline,
+    # even though this attribution test supplies controlled outgoing velocity.
+    engine._last_frame = 6
+    engine.ingest(ChunkPerception(7, 35, [
+        FramePerception(frame_idx=f, shuttle_xy=None, shuttle_conf=0.0, shot_id=1) for f in range(7, 36)
+    ]))
     item = contact(engine, window)
     before = deepcopy(engine._players)
     engine._classify(item, next_frame=35, is_serve=False, receiver=None)

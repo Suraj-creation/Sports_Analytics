@@ -24,6 +24,7 @@ def _window(tmp_path: Path, boundary: str):  # type: ignore[no-untyped-def]
                 shuttle_conf=0.9 if point is not None else 0.0,
                 shot_id=int(boundary == "shot" and frame >= 5),
                 replay=boundary == "replay" and frame >= 5,
+                view="main",  # known camera view; replay still separates temporal context
             )
         )
     return engine._window(0, 9)
