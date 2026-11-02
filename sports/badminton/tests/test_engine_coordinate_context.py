@@ -109,7 +109,7 @@ def test_completed_short_rally_keeps_terminal_evidence_after_an_earlier_cut(tmp_
             EventStore(tmp_path / f"outcome-{cut}.sqlite", "S1"),
         )
         engine.set_calibration(0, rally.homography)
-        frames = [FramePerception(frame_idx=i) for i in range(30)] + to_frames(rally, 30)
+        frames = [FramePerception(frame_idx=i, shuttle_xy=None, shuttle_conf=0.0) for i in range(30)] + to_frames(rally, 30)
         if cut:
             for frame in frames[30:]:
                 frame.shot_id = 1
