@@ -121,6 +121,42 @@ it("shows an accepted automatic point while an older OCR reading remains unchang
   expect(screen.getByTestId("score-bug")).not.toHaveTextContent("Broadcast score");
 });
 
+it("does not let a carried human correction freeze later video-time broadcast readings", () => {
+  const log = new EventLog();
+  const reviewed = ev("rally_end", 260, { status: "human_verified", seq: 100 });
+  // Carried human decisions are appended after inference, so their sequence is
+  // newer even though the decision belongs to an EARLIER video frame.
+  log.apply([
+    ev("broadcast_score", 249, {
+      seq: 10,
+      payload: {
+        rows: [
+          { name: "ANTONSEN", points: 3 },
+          { name: "FARHAN", points: 2 },
+        ],
+      },
+    }),
+    ev("broadcast_score", 500, {
+      seq: 20,
+      payload: {
+        rows: [
+          { name: "ANTONSEN", points: 7 },
+          { name: "FARHAN", points: 4 },
+        ],
+      },
+    }),
+    reviewed,
+    ev("point", 300, { seq: 101, parent_id: reviewed.event_id, payload: { state_after: state(5, 4) } }),
+  ]);
+  useSession.setState({ events: log, eventsVersion: log.version, session: SESSION });
+  act(() => usePlayback.setState({ frame: 350 }));
+  render(<ScoreBug session={SESSION} />);
+  expect(screen.getByTestId("score-bug").textContent).toMatch(/Axelsen.*05.*Momota.*04/s);
+  act(() => usePlayback.setState({ frame: 500 }));
+  expect(screen.getByTestId("score-bug")).toHaveTextContent("Broadcast score");
+  expect(screen.getByTestId("score-bug").textContent).toMatch(/ANTONSEN.*7.*FARHAN.*4/s);
+});
+
 it("does not revert a human-corrected score when the next automatic point arrives", () => {
   const log = new EventLog();
   const reviewed = ev("rally_end", 260, { status: "human_verified" });
