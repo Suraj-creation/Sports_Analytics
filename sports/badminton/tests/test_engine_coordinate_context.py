@@ -118,3 +118,25 @@ def test_completed_short_rally_keeps_terminal_evidence_after_an_earlier_cut(tmp_
         outcomes.append(engine._outcome(RallySegment(30, 30 + rally.end_frame, 30, "stationary")))
     assert outcomes[0][2].startswith("c0_static_")
     assert outcomes[1] == outcomes[0]
+
+
+def test_delayed_outcome_uses_the_calibration_that_produced_its_observations(tmp_path):
+    from bai_badminton.court import Homography
+    from bai_badminton.events.rally_fsm import RallySegment
+    from bai_badminton.testing.synth import make_rally, to_frames
+
+    rally = make_rally(n_shots=3, shot_frames=22)
+    engine = BadmintonMatchEngine(
+        "S1", EngineConfig(fps=30, frame_width=1280, frame_height=720, lookahead=200),
+        EventStore(tmp_path / "delayed.sqlite", "S1"),
+    )
+    engine.set_calibration(0, rally.homography)
+    frames = to_frames(rally, 0)
+    engine.ingest(ChunkPerception(0, len(frames) - 1, frames))
+    engine._proc = engine._window(0, len(frames) - 1).shuttle
+    segment = RallySegment(rally.start_frame, rally.end_frame, rally.start_frame, "stationary")
+    expected = engine._outcome(segment)
+    assert expected[2].startswith("c0_static_")
+    shift = np.array([[1.0, 0, 1000], [0, 1, 0], [0, 0, 1]])
+    engine.set_calibration(0, Homography(shift @ rally.homography.H, 0.0, 4))
+    assert engine._outcome(segment) == expected
