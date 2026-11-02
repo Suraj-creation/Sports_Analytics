@@ -63,6 +63,12 @@ def setup(tmp_path, *, new_people=0):
 
 
 def contact(engine, window):
+    # Retain compatible future frames in every classifier case, so negative
+    # person-evidence tests cannot pass merely because flight context is absent.
+    engine._last_frame = 6
+    engine.ingest(ChunkPerception(7, 35, [
+        FramePerception(frame_idx=f, shuttle_xy=None, shuttle_conf=0.0, shot_id=1) for f in range(7, 36)
+    ]))
     engine._on_contact(
         ContactCandidate(
             frame=3, player_id=None, p=0.9, shuttle_xy=(100.0, 100.0), attribution_reason="no_player_observation"
@@ -76,12 +82,6 @@ def contact(engine, window):
 
 def test_post_cut_singles_geometry_classifies_without_assigning_a_named_player(tmp_path):
     engine, store, window = setup(tmp_path)
-    # The classifier's next-hit flight requires a retained compatible timeline,
-    # even though this attribution test supplies controlled outgoing velocity.
-    engine._last_frame = 6
-    engine.ingest(ChunkPerception(7, 35, [
-        FramePerception(frame_idx=f, shuttle_xy=None, shuttle_conf=0.0, shot_id=1) for f in range(7, 36)
-    ]))
     item = contact(engine, window)
     before = deepcopy(engine._players)
     engine._classify(item, next_frame=35, is_serve=False, receiver=None)
