@@ -1,5 +1,10 @@
 # Full pipeline: engineering report
 
+Historical phase-1 report. The later
+[phase-2 report](full-pipeline-phase-2-report.md) records committed fixes, authorized
+server tests, GPU checks and current limitations; its verification status supersedes
+the local-only status below.
+
 Date: 2 November 2026. Working branch `full_pipeline` begins at
 `32a8295d9645d81bd1586a777541bb2f72c08bed`. This is a partial implementation
 and static review, not a completed or production-validated full-pipeline upgrade.

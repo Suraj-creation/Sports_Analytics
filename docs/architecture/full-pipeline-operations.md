@@ -1,100 +1,126 @@
 # Pipeline operation and evaluation notes
 
-The active project is a modular engine plus a badminton plugin; see
-[full-pipeline-architecture.md](full-pipeline-architecture.md). Select model
-identifiers and device/backends through the YAML files under `config/profiles/`;
-`models/manifest.yaml` describes artifacts and candidates. A configured model or
-manifest entry is not proof that its adapter is active or the weights exist.
-Check `BadmintonPerception` loaders and `BadmintonSession.degraded()` for actual
-runtime support. Do not download or switch a model solely because it is newer.
+The existing engine/sport-plugin architecture remains in place. Current Phase 2
+contracts and measured evidence are in [the report](full-pipeline-phase-2-report.md)
+and [the ledger](full-pipeline-phase-2-ledger.md). The phase-1 architecture/research
+files retain their historical evidence statements; the later report supersedes
+unexecuted-test and unresolved-temporal-implementation descriptions.
 
-For the configured GPU runtime, use the existing environment and `../gpu-env.sh` as
-specified by the root `AGENTS.md`. Preserve existing sessions before reanalysis and
-keep Cloudflare disabled. For the scoped evaluation-integrity regression when a
-permitted test runtime is available:
+## Authorized runtime and transfer
+
+Author changes in the local Windows checkout. Commit scoped files, push
+`origin/full_pipeline`, and pull with `git pull --ff-only origin full_pipeline` in
+the isolated server worktree. Preserve unrelated local changes, primary server
+checkout state, existing model artifacts and session results. Use the existing
+GPU environment; do not install or replace dependencies to make a check pass.
+The latest user instruction authorizes SSH and server tests/inference. Keep
+Cloudflare disabled; use loopback or a local SSH forward for browser access.
+
+From `/home/administrator/Desktop/sport-analytics/full-pipeline-phase2-20261102`:
 
 ```bash
 source ../gpu-env.sh
-.venv/bin/python -m pytest engine/tests/test_evaluation_manifest.py -q
-.venv/bin/python -m pytest sports/badminton/tests/test_shuttle_post_segmentation.py \
-  sports/badminton/tests/test_shuttle_scene_boundaries.py \
-  sports/badminton/tests/test_contact_scene_boundaries.py -q
-.venv/bin/python -m pytest sports/badminton/tests/test_tracknet_onnx_cache_integrity.py -q
+export GPU_PY=/home/administrator/Desktop/sport-analytics/Sports_Analytics/.venv/bin/python
+export PYTHONPATH="$PWD/engine/src:$PWD/sports/badminton/src:$PWD/agents/src:$PWD/apps/api/src:$PWD"
+"$GPU_PY" -m pytest -q engine/tests sports/badminton/tests agents/tests apps/api/tests research/tests
 ```
 
-This command has not been run as part of the local-only session. A synthetic or
-mocked pass would verify logic only, not model, GPU, real-video or accuracy claims.
+Logs and fresh diagnostic outputs live in `../full-pipeline-validation-20261102/`.
+Do not rerun analysis over user sessions without backing them up. The configured
+application uses `../start-server.sh` on 8010; the isolated model-free smoke used
+8011 to preserve that running service. It is validation, not deployment.
 
-## Rally evaluation manifest
+## Coordinate and temporal evidence
 
-`research/evaluate_session.py` consumes a source-bound, exhaustive rally manifest
-whose `media_sha256` matches the session. The `window_s` and all rally boundaries
-use canonical analysis-proxy seconds; the window is half-open. Choose the event
-population and split explicitly. A `draft` requires `--allow-draft` and is never
-accuracy-claim eligible. A `reviewed` manifest must contain
-`"review": {"human_verified": true}` as an explicit human-review attestation;
-a mere `status` string is insufficient. `held_out` is a declaration of the split,
-not proof that the recording was isolated from tuning. Neither attestation proves
-annotation correctness, exhaustive review, or independence: record the reviewer,
-method, uncertainty and provenance outside the tool as appropriate.
+Persisted shuttle/player overlays use original analysis-proxy image pixels.
+Tracked temporal analysis uses the calibrated reference image. Missing, singular,
+nonfinite or reference-mismatched poses cannot supply temporal shuttle observations
+or authoritative court positions. Recovery, view changes, shot/replay transitions
+and recalibration form barriers; ordinary missing detections retain bounded gap
+handling. Raw overlay evidence is preserved during loss.
 
-The evaluator matches rallies one-to-one, reports unmatched truth and predictions,
-separates unresolved winners, and records media/annotation/event-log hashes. A
-labelled rally evaluator does not validate contact events, shot classification,
-player identity, shuttle accuracy or line calls. See
-`research/shot-annotation-protocol.md` and
-`research/tracking-annotation-protocol.md` for separately scoped evaluation.
+`Track.vis` may include reconstructed positions. Independently observed shuttle
+support is `vis & ~interp`. The rally FSM receives only this observed support and
+adjacent observed motion. Cuts close old evidence before new contacts, clear
+history and prevent cross-cut merging. Post-contact motion, next-contact flight,
+receiver context, service/jump windows and geometric outcomes obey the same
+segment contract. No measurement is invented when context is missing. Delayed
+outcomes retain the calibration used by their observations.
 
-## Known limitations
+Court coordinates describe the floor plane. They cannot reconstruct airborne 3D
+position/speed, prove physical racket contact or establish an official line call.
+The CFR proxy Timeline also does not provide a per-frame original-source PTS or
+establish that duplicated source frames are independent observations.
 
-The current canonical frame index and derived presentation time are based on the
-CFR analysis proxy. Source-level variable frame timestamps and duplicates are not
-fully represented per frame. Court homography maps floor-plane points; it cannot
-measure airborne shuttle coordinates in three dimensions. The external repository
-report identifies transferable ideas and their limits, not proven performance on
-this project's footage. Do not replace models or change cache versions without a
-separate compatibility and baseline assessment.
+## TrackNet artifacts and derived caches
 
-Shuttle post-processing is segmented at changes of shot ID and replay state, so
-its spike and gap-fill windows should not cross those boundaries. This change is
-untested until the commands above run. The same boundaries are passed to contact
-velocity and wrist windows, and the rally FSM is given unknown speed at a boundary;
-these changes also need runtime validation. The rally FSM still uses the internal
-`vis` mask, which includes reconstructed positions. Temporarily unusable camera
-geometry may mix stabilized and raw image coordinates without a shot/replay change;
-that case is not covered by these boundaries. Post-contact shot kinematics and a
-next-contact flight duration may also use evidence across a cut; those consumers
-have not yet been isolated. The rally FSM also retains stationary-history samples
-across a non-replay shot cut; a cut may combine different scenes' evidence. Whether
-an open rally should close or remain uncertain on such a cut needs separate design
-and validation. Real-video and labelled before/after analysis is needed before
-asserting improved rally, contact or classification accuracy.
+The application consumes a registry-verified private checkpoint stream, and checks
+its expected digest before deserialization. Atomic process-serialized first-use
+pins establish later integrity, not publisher authenticity or pickle safety.
+Continue using only previously trusted weights. No manifest/checkpoint/model
+choice changed in this phase.
 
-TrackNet's newly keyed ONNX export does not solve every cache issue. It does not
-independently verify an existing derived ONNX file's contents, fingerprint every
-exporter dependency, or validate TensorRT engine caches against all model, driver,
-runtime and hardware changes. The PyTorch checkpoint loader still requires a
-trusted artifact. A missing or stale cache must not be treated as a model-quality
-finding, and the new path has not been exercised with real checkpoints.
+The TrackNet v3 export cache requires a fresh export for a new key; legacy graphs
+are preserved and not silently adopted. Cache identity includes checkpoint,
+exporter/builder/source and configured tensor/export inputs. ORT validates graph
+bytes, float32 dynamic-batch tensor shapes and names before publication/reuse.
+A content-hash graph is published before its atomic manifest; digest or contract
+failure rebuilds instead of reusing a corrupt graph. Final ORT path loading assumes
+application-owned cache paths. Cache growth has no automatic eviction policy;
+preserve historical artifacts and manage space separately.
 
-## ONNX cache deployment caveats
+The real server export attempt failed because `onnxscript` is missing; `onnx` was
+also absent at preflight. Torch FP32 CUDA tensor parity passed exactly, but this
+does not establish ONNX numerical parity. Do not install packages or reuse an
+unproven legacy graph to conceal the failed export. An ONNX-requesting profile can
+report a degraded shuttle stage until exporter readiness is separately resolved.
+Existing Torch profiles retain the baseline model contract.
 
-The candidate TrackNet change deliberately stops reusing legacy unkeyed ONNX files.
-The first ONNX/TensorRT run for each new key therefore needs enough space for a
-fresh export and a working PyTorch ONNX exporter, including the dependencies
-appropriate to the installed PyTorch version. The configured server has not been
-inspected in this local-only session. A missing export dependency or read-only
-cache may degrade the shuttle stage at startup; verify it before deployment and
-keep the existing environment and unrelated jobs intact. Do not delete legacy
-files or historical session artifacts as part of this change.
+Persistent TensorRT engine and timing caching is explicitly disabled by default.
+The internal compatibility namespace includes graph/runtime/driver/GPU identity
+and precision/builder options, but does not itself make native ORT writes atomic.
+Only a future owner of native build/use lifecycle may provide cache context.
+TensorRT provider advertisement is not proof of usable execution on Pascal GPUs.
+No native engine-build or throughput claim was established here.
 
-The candidate exporter requests embedded ONNX weights and refuses unexpected
-sidecar files before publishing. PyTorch's default exporter varies by version;
-actual export success, graph semantics and numeric parity remain unverified on
-the configured runtime. Exporter failures must remain visible as degradation.
+The existing `onnx-zip` path API remains outside the new snapshot contract. Its
+extraction cache is not digest-bound and its lexical containment check needs
+separate hardening; `open_verified` rejects archives. Preserve that limitation
+when assessing pose/other legacy archive adapters.
 
-The content digest records the checkpoint bytes used in naming the export; it is
-not a signature, does not prove that a cached ONNX graph matches those weights, and
-does not close the gap between registry verification of a path and reopening it.
-Pinning a first fetch is not authentication. Provider-specific TensorRT caches and
-hardware/runtime changes need their own tested invalidation policy.
+## Rally evaluation manifest and migration
+
+`research/evaluate_session.py` consumes schema v1 with one source-bound exhaustive
+rally window in half-open canonical proxy seconds. Choose population and split
+explicitly. A draft requires `--allow-draft` and cannot support an accuracy claim.
+Reviewed labels require `review.human_verified=true` supplied by an actual human
+reviewer. Attestation and `held_out` remain declarations, not independent proof of
+annotation correctness or match-level split isolation.
+
+Top-level supported fields are `schema_version`, `media_sha256`, `timebase`,
+`status`, `split`, `population`, `exhaustive`, `window_s`, `rallies`, `review`,
+`boundary_uncertainty_s`, `notes`, `provenance`, and optional `session_id`,
+`fps_num`, `fps_den`, `n_frames`, `proxy_sha256`. Rally rows accept `start_s`,
+`end_s`, `winner`, `notes`, `provenance`, `boundary_uncertainty_s`. Unknown semantic
+fields are rejected. Windows/rows require finite non-boolean numbers; winner is
+`P1`, `P2` or null. Null means unknown outcome of a known rally, and is excluded
+from winner metrics rather than treated as a negative or definite label.
+
+Partial review, uncertain rally existence or unreviewed intervals cannot be
+expressed silently in v1. Use separate fully reviewed exhaustive-window manifests
+and exclude uncertain spans. A future version can add explicit evaluated coverage
+with defined truth/prediction clipping; v1 rejects those proposed semantic keys.
+Do not mechanically promote review flags or fabricate labels.
+
+The CLI hashes actual source/proxy files and the exact parsed annotation snapshot.
+It supports stored source extensions and records `media_verification` in output.
+Legacy labels without proxy SHA remain usable with `proxy_label_bound=false`.
+Declare the optional proxy hash and rational FPS/frame count for new annotations;
+this binds them to catalogue metadata, not an independent FFprobe recount.
+
+The evaluator reports one-to-one interval matches, unmatched predictions/truth and
+unknown winners. It does not validate court identity, individual identity, shuttle
+localization/visibility, contact timing, shot family, floor contact or line calls.
+Use the existing tracking/shot annotation protocols for those labels. No reduced
+candidate event count, geometric exclusion statistic or synthetic pass establishes
+accuracy without independently reviewed target-footage labels.

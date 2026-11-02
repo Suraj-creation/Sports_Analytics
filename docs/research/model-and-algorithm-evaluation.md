@@ -1,5 +1,11 @@
 # Model and algorithm evaluation for the badminton pipeline
 
+Historical research snapshot. Later authorized runtime checks of the unchanged
+TrackNet model are recorded in the
+[phase-2 report](../architecture/full-pipeline-phase-2-report.md); they establish
+bounded Torch tensor parity, not model-accuracy improvement or alternative-model
+validation. Exporter dependencies remain unavailable in the existing environment.
+
 Snapshot: 2 November 2026. This is source and model-card research, not a benchmark. No weights, packages, or datasets were downloaded; no model, test, video, or GPU was run. Hardware estimates below are qualitative unless the originator's measurement is explicitly identified. The objective is to guide controlled experiments against our existing baseline, not to select a replacement from a leaderboard. See [the external-repository analysis](../../research/EXTERNAL_BADMINTON_REPOSITORIES_ANALYSIS.md) for J/D/V execution paths and [the architecture contract](../architecture/full-pipeline-architecture.md) for evidence, ownership and runtime constraints.
 
 ## Decisions

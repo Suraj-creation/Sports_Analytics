@@ -1,5 +1,12 @@
 # Full pipeline: architecture and integration contract
 
+This is the phase-1 architecture snapshot. See the
+[phase-2 report](full-pipeline-phase-2-report.md) and
+[ledger](full-pipeline-phase-2-ledger.md) for implemented temporal/coordinate
+contracts, verified checkpoint/cache handoff and current server evidence. The
+later user authorization enabled isolated server validation while keeping editing
+local; the earlier local-only restrictions below describe the original phase.
+
 Status: working architecture and ownership map, 2 November 2026. Baseline commit:
 `32a8295d9645d81bd1586a777541bb2f72c08bed`; branch: `full_pipeline`. This
 specification describes existing interfaces and proposed constraints; it is not a

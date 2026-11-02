@@ -13,15 +13,17 @@
 - Server primary checkout remains on `main` at `510b7039fee99b017a643bfcaf62804f0d9b7564`,
   with untracked `apps/web/dist.old/` and `client-website/`; it was not switched or reset.
 - Isolated server worktree: `/home/administrator/Desktop/sport-analytics/full-pipeline-phase2-20261102`,
-  tracking `origin/full_pipeline`, pulled at `27e2a20`.
+  tracking `origin/full_pipeline`; each scoped correction was committed locally,
+  pushed and pulled before server validation.
 - Validation uses the existing `Sports_Analytics/.venv`, sources `../gpu-env.sh`, and
   explicitly places this worktree's packages first in `PYTHONPATH`. No environment
   installation/upgrade, model download, data replacement or deployment is authorized.
 - Server runtime inventory: Python 3.12.12; PyTorch 2.14.1+cu126; ORT 1.29.0; two
   GTX 1080 Ti GPUs, 11 GiB each, with no compute jobs reported at initial inspection.
   Cloudflare PID 701600 was stopped before broader tests; it required SIGKILL after TERM.
-- Phase-1 targeted tests: **44 passed**, server log
-  `../full-pipeline-validation-20261102/phase1-targeted.log`. Broader baseline pending.
+- Phase-1 targeted tests: **44 passed**. Baseline including research tests:
+  **1,148 passed**, 12 existing Starlette deprecation warnings. Server logs are
+  under `../full-pipeline-validation-20261102/`.
 
 ## Ownership and dependency order
 
@@ -33,14 +35,19 @@ uses SSH independently, commits shared work or edits another owner's files.
 
 | Issue | Evidence classification and existing behavior | Expected correction / owner | Regression and runtime gates | Status |
 |---|---|---|---|---|
-| Reconstructed shuttle visibility reaches rally FSM | Confirmed source path: `fill_gaps` sets internal `vis`; `_advance` passes it to `RallyFSM.step` | Use observed evidence for start/end/motion while tolerating ordinary short gaps; rally agent owns `events/rally_fsm.py`, root owns engine wiring | Reconstruction-only motion cannot start/extend play indefinitely; short missing observations tolerated | Investigating |
-| Non-replay cuts retain stationary/rally state | Confirmed source path: prior mask resets contact suppression but not FSM history | Explicit cut policy with no cross-cut merge/history, no inferred winner; rally agent | Open rally cut, history reset, replay, short/long gaps; related engine regressions | Investigating |
-| Post-contact flight/receiver context crosses cuts | Confirmed source path: `_shuttle_around`, `post_contact_motion`, `_classify` | Shared contiguous-segment bounds and unknown context on boundary; temporal agent owns `observations.py`, `events/contact.py`, `events/stroke.py`, dedicated tests; root integrates engine | Velocity, next-hit flight and receiver cannot use another segment; no-boundary parity | Investigating |
-| Raw/stabilized image coordinates can mix during recovery | Confirmed risk in `_append`: transform availability changes while shot/replay may stay fixed | Explicit temporal coordinate-context barriers and valid-transform gating; root owns engine/camera integration | Loss/recovery, invalid transforms, camera-reference changes; raw persisted image evidence retained | Investigating |
-| ONNX artifact lifecycle | Existing content key and atomic graph publication, untested real export; cached graph only checked by existence | Validate/cache graph contract and digest; verified checkpoint handoff; cache agent owns `perception/tracknet.py`, `engine/runtime/registry.py`, dedicated tests | Corrupt graph, failed/concurrent publication, replaced checkpoint, first export/parity on existing trusted model | Investigating |
-| TensorRT cache compatibility | Plausible risk: provider cache directory lacks complete graph/runtime/device binding | Inspect actual ORT-managed cache; scoped namespace/manifest or explicit safe fallback; cache agent owns `engine/runtime/device.py`; root wires callers | Controlled provider tests; actual Pascal provider run if supported, no environment replacement | Investigating |
-| Evaluation eligibility and label readiness | Phase-1 gate passes focused tests; attestation is not independently verified truth | Audit source/split/exhaustive/unknown semantics in existing tooling; root | Invalid manifest and unknown labels; no manufactured ground truth | Investigating |
-| Full-video accuracy | Independent target footage labels not yet established | Inventory trusted existing assets and reviewed labels before evaluation | Identical baseline/candidate footage, per-component metrics, GPU timing, no official line-call claims | Pending asset inventory |
+| Reconstructed shuttle visibility reaches rally FSM | Confirmed by server RED: reconstruction could start/extend play | Rally agent plus root: observed mask `vis & ~interp`; velocity requires adjacent observed positions | Initial temporal RED: 33 failed / 4 passed; subsequent focused gates passed | Implemented; final suite passed |
+| Non-replay cuts retain stationary/rally state | Confirmed by server RED: old scene history survived | Rally agent: `on_discontinuity(frame)` closes pre-boundary evidence before new contacts, prevents merges, clears history | Open/closed exchange, tentative end, replay, short/long gaps | Implemented; final suite passed |
+| Post-contact flight/receiver context crosses cuts | Confirmed by server RED | Temporal agent/root: shared half-open segment bounds, clipped motion, unknown cross-segment flight/receiver; next hit remains an exclusion bound | New segment cases plus existing stroke/contact suites; 28-test correction gate passed | Implemented; final suite passed |
+| Raw/stabilized coordinates mix during recovery | Confirmed by server RED; mismatched chunk reference was treated as raw fixed-camera input | Root: private coordinate epoch/context and temporal validity; preserve raw overlay rows; reject incompatible camera pose | Pose loss/recovery, singular/nonfinite transforms, references, calibration, alternate views | Implemented; 24 camera/outcome tests passed |
+| Delayed outcomes use replacement calibration | Independent review found old pixels reinterpreted through new homography; RED changed in to out | Root: retain each frame's actual calibration reference and trim with buffers | Shifted recalibration reproducer failed, then passed with camera/outcome gate | Implemented; final review closed |
+| Bounded history and preceding cut | New integration review found trimmed start crash and overly broad outcome lookback | Root: unavailable start context stays unknown; outcome lookback begins within current rally | Long motion-only exchange and short completed post-cut rally regressions | Implemented; integration gate passed |
+| ONNX/checkpoint artifact lifecycle | 27 cache/snapshot/provider cases failed before correction | Cache agent/root: verified snapshot handoff, digest and ORT IO validation, content-addressed graph plus atomic manifest, lazy graph-digest provider selection | 62 cache/integration tests passed; real Torch CUDA tensor parity exact | Implemented; fresh real ONNX export blocked by missing `onnxscript`/`onnx` |
+| First-use pin publication | Separate RED reproduced failed-write and cross-process races | Cache agent: OS advisory transaction lock and fsynced atomic pin replacement | 6 pin/snapshot tests passed, including independent processes | Implemented |
+| Native TensorRT engine/timing caches | Compatibility directory alone could not guarantee native build publication safety | Cache agent: persistent caches explicitly disabled by default; internal compatibility namespace requires complete build identity and a lifecycle-aware owner | Version/hardware/model/precision and incomplete-identity tests; no native engine built | Safe default implemented; native cache lifecycle unvalidated |
+| Evaluation eligibility and label readiness | RED: unknown/partial review semantics ignored, invalid winners accepted, annotation file reread, media bytes unchecked | Evaluation agent/root: strict v1 semantics, optional timeline/proxy bindings, actual source/proxy hashes, one annotation snapshot | 73 failed / 45 passed before fix; 118 passed after fix | Implemented; split independence still a protocol requirement |
+| Full-video accuracy | Existing weights/proxies/caches inventoried; no new independent reviewed target labels | Root: same cached observations replayed into fresh baseline/candidate stores; 27,744 frames complete | Diagnostic counts changed; all compared outcomes unresolved; no accuracy claim | Labelled accuracy unavailable |
+| Integrated application | Isolated localhost test server, fresh disposable data, no production reanalysis | Root: build, upload, proxy/HLS, engine, API export and browser playback | Build passed; 240/240 frames analysed; browser readyState 4, no media/console error | Smoke and final Python suite passed |
+| Legacy archive extraction | Source audit: `onnx-zip` extraction can reuse stale files; lexical containment is weak | Existing path API unchanged; new snapshot API rejects archives | Separate digest-bound extraction and traversal regression work required | Explicitly outside completed TrackNet cache scope |
 
 ## Validation plan
 
@@ -53,3 +60,24 @@ uses SSH independently, commits shared work or edits another owner's files.
 5. Exercise the integrated application on localhost/SSH forward, with existing session
    results preserved and new validation artifacts outside user sessions. Report missing
    labels, unsupported providers and runtime failures explicitly.
+
+## Evidence and current limits
+
+The final integrated command is `python -m pytest -q engine/tests
+sports/badminton/tests agents/tests apps/api/tests research/tests`; **1,307 passed**
+with 12 existing Starlette deprecation warnings in 203.20 s, exit 0, at code revision
+`5f9d0a4`. Evidence is in `phase2-verified-full.log` and
+`phase2-verified-full.exit`. An earlier default-path run exposed four
+fixtures without required timeline/camera evidence; their 45-test gate passed after
+correction. The negative attribution fixtures now also retain valid flight context,
+so unknown results must arise from the person-evidence condition under test.
+
+The real GPU probe used the existing pinned TrackNet checkpoint, no download or
+installation. Both revisions returned finite FP32 `[1,8,288,512]` heatmaps with
+maximum and mean absolute difference **0**. One measured forward after one warmup
+was 21.189 ms baseline / 20.892 ms candidate; this is not a throughput benchmark.
+Eight existing proxy frames decoded and one detector call completed. Real fresh
+ONNX export failed with `ModuleNotFoundError: onnxscript`; no graph was published.
+
+See [full-pipeline-phase-2-report.md](full-pipeline-phase-2-report.md) for exact
+commands, replay counts, evidence paths, schema migration and remaining gates.
