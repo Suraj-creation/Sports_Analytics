@@ -16,6 +16,7 @@ import numpy as np
 from bai_badminton.analytics.match import MatchAnalytics, RallyRecord
 from bai_badminton.events.activity import ActivityEstimate, ActivityInterval, ActivityObservation, ActivityTracker
 from bai_badminton.events.contact import ContactCandidate, detect_contacts
+from bai_badminton.events.rally_evidence import EvidenceRallyFSM, RallyObservation
 from bai_badminton.events.rally_fsm import RallyFSM, RallyParams, RallySegment, RallyState, RallyUpdate
 from bai_badminton.events.rally_outcome import CourtImageGeometry, analyze_rally_end, outcome_confidence
 from bai_badminton.events.stroke import RuleStrokeClassifier, StrokeContext, StrokePrediction
@@ -121,6 +122,13 @@ class RallySegmentation(Protocol):
     def on_discontinuity(self, frame: int) -> RallyUpdate: ...
 
     def flush(self, frame: int) -> RallyUpdate: ...
+
+
+@runtime_checkable
+class EvidenceRallySegmentation(RallySegmentation, Protocol):
+    """Optional v2 observation input; legacy independent providers stay valid."""
+
+    def step_evidence(self, observation: RallyObservation) -> RallyUpdate: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -312,6 +320,21 @@ class _Rally(_BaselineTemporalState, RallyFSM):
         self._recent.clear()
 
 
+class _EvidenceRally(_BaselineTemporalState, EvidenceRallyFSM):
+    def __init__(self, params: RallyParams, *, use_reconstruction: bool = True, motion_guard: bool = False) -> None:
+        self._checkpoint_owner = str(uuid4())
+        super().__init__(params, use_reconstruction=use_reconstruction, motion_guard=motion_guard)
+
+    def reset(self) -> None:
+        EvidenceRallyFSM.__init__(
+            self, self.params, use_reconstruction=self.use_reconstruction, motion_guard=self.motion_guard
+        )
+
+    def close(self) -> None:
+        self._recent.clear()
+        self._motion.clear()
+
+
 class _Outcome:
     def predict(self, request: OutcomeInput) -> OutcomePrediction:
         window = request.window
@@ -439,3 +462,33 @@ def register_domain_components(registry: ComponentRegistry) -> None:
             ),
             factory(kind),
         )
+
+    def evidence_rally(context: DomainContext, configuration: dict[str, Any]) -> EvidenceRallySegmentation:
+        params = dict(configuration.get("params", configuration))
+        reconstruction = params.pop("use_reconstruction", True)
+        motion_guard = params.pop("motion_guard", False)
+        return _EvidenceRally(
+            RallyParams(fps=context.fps, **params), use_reconstruction=reconstruction, motion_guard=motion_guard
+        )
+
+    registry.register(
+        ComponentContract(
+            kind="rally",
+            implementation="rally-evidence-v2",
+            version="1",
+            input_schema="badminton-rally-evidence:v2",
+            output_schema="badminton-rally-output:v1",
+            interface=EvidenceRallySegmentation,
+            context_type=DomainContext,
+            supported_formats=frozenset({"singles", "doubles", "unknown"}),
+            failure_policy="abstain",
+            stateful=True,
+            declaration={
+                **CONTRACT_DETAILS["rally"],
+                "required_evidence": ["typed_frame_aligned_observation_quality"],
+                "optional_evidence": ["bounded_estimated_trajectory", "independently_observed_body_motion"],
+                "promotion": "exploratory_opt_in;not_validated_on_held_out_matches",
+            },
+        ),
+        evidence_rally,
+    )

@@ -44,3 +44,59 @@ The most informative sequence is: preserve the original detector; measure an unc
 6. Require independent held-out annotated video before default replacement; include amateur view, doubles, top-of-frame flight, stationary spare shuttles and white line/background distractors where independently labeled evidence is available.
 
 No extra models, environment replacement, fabricated predictions, or production edits were made in this audit.
+
+## Actual controlled follow-up: existing TrackNet step8 versus step4
+
+This follow-up was run after the diagnosis gate at Git revision `3859f832fcb05d8c2560d3ed665e971ad263d954`. It is **real CUDA FP16 inference**, not the earlier synthetic window-contract test, and it evaluates the existing checkpoint rather than an alternative pretrained model. Production TrackNet source and the frozen baseline were unchanged. The orchestrator's concurrent FSM edits do not enter this component experiment.
+
+Reproduction script: `research/audit_c_paired_inference.py`. Evidence: `artifacts/benchmarking/experiments/tracknet_window_pair/{manifest.json,case_metrics.json,metrics.json,observations_step8.csv,observations_step4.csv,execution.log,frozen_background.png}`. The script refuses to overwrite the experiment directory.
+
+```bash
+source ../gpu-env.sh
+CUDA_VISIBLE_DEVICES=1 python research/audit_c_paired_inference.py
+```
+
+Physical GPU1 was confirmed idle before execution; the environment exposes it as logicalCUDA0. It was released at completion. The first GPU was left free. Model runtime confirms torch-cuda, torch.float16 and no fallback; checkpointSHA256 remains `df867641a02712b021f04548ff4b1208ddfdb47f629ab2094ceb978667e83b1a`.
+
+### Controlled inputs and interpretation
+
+Twelve fixed180-frame windows (2,160frames per strategy) cover GT2,5,19,20,23,25,27,28,29,31 plus control cases7 and32 from the55 recorded failure packages. Case annotations select the review windows only; no annotated boundaries, target counts or positions are passed to the detector. Exact frame ranges and case-file/input/cache/checkpoint hashes are in the manifest.
+
+Within every pair, decoded720p proxy frames, cached camera-shot IDs, production `flight_mask` masks reconstructed from the fixed baseline calibration, checkpoint, threshold0.5, FP16 and batch4 are identical. Only temporal window step changes8→4. Inference order alternates across cases. Background is one immutableRGB median from24 uniformly sampled proxy frames; rolling updates are disabled identically in both strategies. This freezes a confound but differs from the original baseline's rolling background. The180-frame window context also differs from the baseline's60-frame chunks. Consequently, this is a paired **component** experiment, not a rerun of the original detector context or a full rally benchmark.
+
+| Measure | Step8 | Step4 |
+| --- | ---: | ---: |
+| Real input/output frames | 2160 | 2160 |
+| Accepted detections (coverage, not recall) | 1582 | 1567 |
+| Accepted fraction | 73.24% | 72.55% |
+| Total component walltime | 20.355s | 29.722s |
+| Aggregate component throughput | 106.11frames/s | 72.67frames/s |
+| Peak CUDA allocated bytes | 1,133,421,056 | 1,133,421,056 |
+| Peak CUDA reserved bytes | 1,874,853,888 | 1,874,853,888 |
+
+Step4 cost1.46× the measured component walltime. Timings include preparation, actual model forwards and coordinate extraction, but exclude video decoding, model loading, background construction and other pipeline stages. A first8-frame warmup was excluded; differing final batch shapes and short-window timing noise remain limitations. These component rates must not be presented as full-pipeline rates.
+
+| Review case | Step8 accepted /180 | Step4 accepted /180 | Step4-only / step8-only accepted frames | Median / maximum shared-point disagreement (proxy px) |
+| --- | ---: | ---: | --- | --- |
+| GT2 | 136 | 136 | 0 /0 | .271 /2.320 |
+| GT5 | 127 | 126 | 0 /1 | .272 /1.766 |
+| GT19 | 130 | 124 | 2 /8 | .274 /12.829 |
+| GT20 | 131 | 131 | 2 /2 | .300 /5.004 |
+| GT23 | 140 | 140 | 0 /0 | .276 /2.162 |
+| GT25 | 118 | 114 | 0 /4 | .343 /5.135 |
+| GT27 | 142 | 143 | 2 /1 | .335 /21.963 |
+| GT28 | 44 | 43 | 1 /2 | .227 /2.907 |
+| GT29 | 140 | 142 | 2 /0 | .365 /35.736 |
+| GT31 | 131 | 132 | 1 /0 | .284 /204.508 |
+| Control GT7 | 177 | 174 | 0 /3 | .262 /4.771 |
+| Control GT32 | 166 | 162 | 1 /5 | .271 /2.233 |
+
+The large204.5px maximum disagreement in GT31 means candidate identity can change abruptly even when most shared predictions barely move. Neither candidate can be called correct from these results without independent shuttle-location labels. More accepted outputs are not automatically better outputs.
+
+### The two decisive regions
+
+- **Upper-image gap9526–9542:** both strategies accept **0/17** detections. Overlapping windows do not recover this diagnosed temporary observation loss. Original-frame/trajectory evidence supports upper-image flight; component inference alone cannot prove physical invisibility.
+- **Baseline static T cluster12748–12768:** both strategies accept **0/21** detections under the common fixed background/window context. Thus step4 is not responsible for removing the old static T predictions: step8 also removes them under these controls. Background and chunk context differ from the original run, so their separate contributions require a further controlled factorial experiment. Missing coordinates here also do not demonstrate recovered correct shuttle locations.
+- Step4 does not uniformly reduce dropouts. Counts of≥10-frame missing runs stay unchanged in the ten selected failure windows and control7; control32 gains one such run (0→1). This argues against changing overlap as the default solely to improve coverage.
+
+No rally CSV or F1 improvement is claimed from these component outputs. They contain per-frame positions/confidence/visibility with original indices; the primary seven-column rally schema and matching protocol were untouched. Retain step8 while investigating the proven continuation mechanisms. If pursuing perception improvements, isolate background construction, chunk alignment and temporal peak association before adopting an overlap policy or new backbone. A held-out localization/boundary evaluation remains required.

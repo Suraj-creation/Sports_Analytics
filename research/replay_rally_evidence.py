@@ -20,7 +20,7 @@ from types import SimpleNamespace
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from bai_badminton.components import _Rally  # noqa: E402
+from bai_badminton.components import _EvidenceRally, _Rally  # noqa: E402
 from bai_badminton.court import Homography  # noqa: E402
 from bai_badminton.engine import BadmintonMatchEngine, EngineConfig  # noqa: E402
 from bai_badminton.events.rally_fsm import RallyParams  # noqa: E402
@@ -35,10 +35,15 @@ def finite(value):
     return float(value) if value is not None and math.isfinite(value) else None
 
 
-def replay(baseline: Path, output: Path, overrides: dict):
+def replay(baseline: Path, output: Path, overrides: dict, *, implementation="rally-fsm-v1", candidate=False):
     import msgpack
 
     output.mkdir(parents=True, exist_ok=False)
+    source_before = {
+        str(p.relative_to(ROOT)): digest(p)
+        for root in ("engine/src", "sports/badminton/src")
+        for p in sorted((ROOT / root).rglob("*.py"))
+    }
     metadata = json.loads((baseline / "benchmark_metadata.json").read_text())
     inference = json.loads((baseline / "inference.json").read_text())
     original_events = [json.loads(line) for line in (baseline / "raw_events.jsonl").open()]
@@ -60,7 +65,9 @@ def replay(baseline: Path, output: Path, overrides: dict):
             "last_contact": fsm._last_contact_frame,
         }
 
-    class TracedRally(_Rally):
+    base_provider = _EvidenceRally if implementation == "rally-evidence-v2" else _Rally
+
+    class TracedRally(base_provider):
         def step(self, frame, visible, speed, replay=False):
             before = state(self)
             result = super().step(frame, visible, speed, replay)
@@ -113,7 +120,38 @@ def replay(baseline: Path, output: Path, overrides: dict):
             )
             return result
 
-    params = RallyParams(fps=metadata["video_fps"], **overrides)
+    if implementation == "rally-evidence-v2":
+
+        def traced_evidence(self, observation):
+            before = state(self)
+            result = super(TracedRally, self).step_evidence(observation)
+            idx = observation.frame - engine._proc0
+            processed = engine._proc
+            trace.append(
+                {
+                    "call": "step",
+                    "frame": observation.frame,
+                    "visible": observation.kind.value == "observed",
+                    "speed": observation.speed,
+                    "replay": observation.replay,
+                    "x": finite(processed.x[idx]),
+                    "y": finite(processed.y[idx]),
+                    "interpolated": bool(processed.interp[idx]),
+                    "evidence": asdict(observation),
+                    "before": before,
+                    "after": state(self),
+                    "update": asdict(result),
+                }
+            )
+            return result
+
+        TracedRally.step_evidence = traced_evidence
+    configured = dict(overrides)
+    evidence_options = {}
+    for key in ("use_reconstruction", "motion_guard"):
+        if key in configured:
+            evidence_options[key] = configured.pop(key)
+    params = RallyParams(fps=metadata["video_fps"], **configured)
     store = EventStore(output / "events.sqlite", "DiagnosticReplay")
     engine = BadmintonMatchEngine(
         "DiagnosticReplay",
@@ -121,7 +159,7 @@ def replay(baseline: Path, output: Path, overrides: dict):
             fps=params.fps, frame_width=1280, frame_height=720, profile="gpu-rtx4000", match_format_known=False
         ),
         store,
-        rally_segmenter=TracedRally(params),
+        rally_segmenter=TracedRally(params, **evidence_options),
     )
     net = calibration["net_top"]
     engine.set_calibration(
@@ -181,17 +219,16 @@ def replay(baseline: Path, output: Path, overrides: dict):
             "interval_count": len(ends),
             "parameters": asdict(params),
             "overrides": overrides,
+            "implementation": implementation,
+            "candidate_replay": candidate,
             "elapsed_seconds": time.monotonic() - started,
             "git_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
             "video_sha256": metadata["source_video_sha256"],
             "ground_truth_sha256": metadata["ground_truth_sha256"],
             "ground_truth_usage": "hash copied as provenance; no label file read by replay",
             "cache_sha256": {path.name: digest(path) for path in cache_paths},
-            "source_sha256": {
-                str(p.relative_to(ROOT)): digest(p)
-                for root in ("engine/src", "sports/badminton/src")
-                for p in sorted((ROOT / root).rglob("*.py"))
-            },
+            "source_sha256": source_before,
+            "source_unchanged": all(digest(ROOT / name) == value for name, value in source_before.items()),
             "checkpoint_identifiers": metadata["models"],
             "runtime_versions": metadata["runtime_dependencies"],
             "profile": inference["effective_profile"],
@@ -200,8 +237,10 @@ def replay(baseline: Path, output: Path, overrides: dict):
     )
     engine.close()
     store.close()
+    if any(digest(ROOT / name) != value for name, value in source_before.items()):
+        raise RuntimeError("source changed during semantic replay; repeat before acceptance")
     print(json.dumps({"parity": parity, "intervals": len(ends)}), flush=True)
-    if not overrides and not parity:
+    if not candidate and not overrides and not parity:
         raise RuntimeError("baseline replay is not interval-exact; do not use its traces as causal evidence")
 
 
@@ -210,5 +249,13 @@ if __name__ == "__main__":
     parser.add_argument("--baseline", type=Path, default=ROOT / "outputs/benchmarking/test1")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--rally-params", type=json.loads, default={})
+    parser.add_argument("--rally-implementation", choices=["rally-fsm-v1", "rally-evidence-v2"], default="rally-fsm-v1")
+    parser.add_argument("--candidate", action="store_true", help="explicit candidate run, baseline parity not required")
     args = parser.parse_args()
-    replay(args.baseline.resolve(), args.output.resolve(), args.rally_params)
+    replay(
+        args.baseline.resolve(),
+        args.output.resolve(),
+        args.rally_params,
+        implementation=args.rally_implementation,
+        candidate=args.candidate,
+    )

@@ -39,6 +39,7 @@ from bai_badminton.components import (
     Analytics,
     ContactInference,
     DomainContext,
+    EvidenceRallySegmentation,
     IdentityInference,
     OutcomeInference,
     OutcomeInput,
@@ -62,7 +63,9 @@ from bai_badminton.events.match_phase import (
     RallyEvidence,
     serve_formation,
 )
+from bai_badminton.events.rally_evidence import ObservationKind, RallyObservation
 from bai_badminton.events.rally_fsm import RallySegment, RallyState
+from bai_badminton.events.rally_motion import observed_participant_motion, trajectory_continuation_supported
 from bai_badminton.events.rally_outcome import CourtImageGeometry, Outcome
 from bai_badminton.events.scene import SceneSegment, SceneSegmenter
 from bai_badminton.events.stroke import (
@@ -1515,7 +1518,34 @@ class BadmintonMatchEngine:
                 self._last_contact_candidate = c
                 self._handle_fsm(self.fsm.on_contact(f), f)
                 self._on_contact(c, w)
-            self._handle_fsm(self.fsm.step(f, bool(observed[i]), float(spd[i]), bool(w.replay[i])), f)
+            if isinstance(self.fsm, EvidenceRallySegmentation):
+                context_valid = bool(self._temporal_valid[f - self._buf0]) and not bool(w.replay[i])
+                kind = (
+                    ObservationKind.INVALID
+                    if not context_valid
+                    else ObservationKind.OBSERVED
+                    if observed[i]
+                    else ObservationKind.RECONSTRUCTED
+                    if t.vis[i] and t.interp[i]
+                    else ObservationKind.MISSING
+                )
+                observation = RallyObservation(
+                    frame=f,
+                    kind=kind,
+                    speed=float(spd[i]) if observed[i] and np.isfinite(spd[i]) else None,
+                    shuttle_support=float(t.conf[i]) if np.isfinite(t.conf[i]) else None,
+                    player_motion=observed_participant_motion(episode_window, frames, i),
+                    context_valid=context_valid,
+                    replay=bool(w.replay[i]),
+                    continuation_supported=(
+                        kind is ObservationKind.RECONSTRUCTED
+                        and trajectory_continuation_supported(w, i, minimum_speed=self.fsm.params.start_speed)
+                    ),
+                )
+                update = self.fsm.step_evidence(observation)
+            else:
+                update = self.fsm.step(f, bool(observed[i]), float(spd[i]), bool(w.replay[i]))
+            self._handle_fsm(update, f)
         self._final = upto
 
     def _handle_fsm(self, upd: Any, frame: int) -> None:
