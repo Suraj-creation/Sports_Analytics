@@ -1,0 +1,880 @@
+{
+  "status": "completed",
+  "benchmark_execution_date": "2026-11-04T17:44:55.120184+00:00",
+  "source_video_filename": "Test1_Full_rev.mp4",
+  "source_video_sha256": "877c6d39d34ccfb302865ed44f7e08949b0f72be2833f71777066f837e6b8bd6",
+  "source_drive_folder": "https://drive.google.com/drive/folders/1_2QWSYd_X_BojdRwbu-AMKdx74cIQvGp",
+  "source_drive_subfolder_id": "1XxAJXTE0cfKZRDSVPfKp9cB0QPcq9fsr",
+  "source_drive_file_id": "1vR71QTkUYEGWy4PjXa5vfMdJEXt_OwLn",
+  "ground_truth_path": "Part2/dataset/Test1_Full/Test1_Full_rally.csv",
+  "ground_truth_sha256": "30651cf7238924d6a5072b1dd71d34ca5839cd5b842f696e745229033ae4f887",
+  "ground_truth_rally_count": 36,
+  "git_commit_sha": "301baf08be5e989dd0ed93cb885733c3cf6f356a",
+  "active_branch": "Benchmarking",
+  "main_base_sha": "301baf08be5e989dd0ed93cb885733c3cf6f356a",
+  "working_tree_status": "?? outputs/\n?? scripts/\n?? tests/\n",
+  "production_source_hashes": {
+    "engine/src/bai_engine/__init__.py": "fedbdc99942dd9528b8a0385e70525e8c7648558940d9597ec431901be1b0f1e",
+    "engine/src/bai_engine/bus.py": "5d093ff1293b9248e1c27bb843cc03d47e765741389423583fd5b551e1aa60fb",
+    "engine/src/bai_engine/components.py": "4838d6debf28f5af1b50a8fd681d1e994353267760532722e632c5160913ac2d",
+    "engine/src/bai_engine/config.py": "a06bb0cbe319f0923462b81574dab63377ead41c2988aeca040a01a58e8b556f",
+    "engine/src/bai_engine/decode.py": "0589b3d08b08420dc56b7081c958503403e39397f4ff38c64960299c65651cfc",
+    "engine/src/bai_engine/evaluation.py": "892c96a866937498c737669386c4816004c9902d7022936bee0a42b0459b680d",
+    "engine/src/bai_engine/media/__init__.py": "8816eb22065ff28f24ba59cc8c8b77d05d3ac53533d57ce2faad729d0548495d",
+    "engine/src/bai_engine/media/ffmpeg.py": "98f8203b6fec47e7455a640eab23d37acfe0f244f7fde73dd34d990fd4c43075",
+    "engine/src/bai_engine/media/probe.py": "a6c619b0666fea72d6fa9ac306a6ae3981a203b00988f981c8cd50b0456c2fc6",
+    "engine/src/bai_engine/media/proxy.py": "673acfdc7ac3013bd685f708b197146cafc93dd5fc3c6728e3e1a12af5d9d4d4",
+    "engine/src/bai_engine/obs.py": "c68809b8bfd1135cae7502beb542270851c836a800944e7109b64f029f1b1aa1",
+    "engine/src/bai_engine/runtime/__init__.py": "bafe3564c2d47cdd629d8d4ef5fafc6c260d595aa154653c9698bc665af44796",
+    "engine/src/bai_engine/runtime/device.py": "c01f302d2d18537bccee5be3b41626c219dace415b5706574cb7e92b43b56d8c",
+    "engine/src/bai_engine/runtime/registry.py": "5610a388730b804899a09bde287e608dee9e3c4f73f453ee7912e0cb604f2925",
+    "engine/src/bai_engine/runtime/runner.py": "b922a15dd80c352b366a72ebb2d87cfef49657814c747220d1be963d77ef1763",
+    "engine/src/bai_engine/schema/__init__.py": "7b8318ef1f618f22948945cbc2e2d7c85f767431cb4148e1384d1e8ebc67c6af",
+    "engine/src/bai_engine/schema/events.py": "4f9d48f11cad5270462b9835c5a0cb6c66f8544affb62adf15f1a0a4f840168b",
+    "engine/src/bai_engine/schema/session.py": "c4f9396b7dcea45cf8bdfc1a0659f17a83a4f67b8a6210928afd4f9258df5811",
+    "engine/src/bai_engine/schema/state.py": "9566f018138c0805a3681c6bb7c4d7428ad4bdcca6a428421cbed064de9a1501",
+    "engine/src/bai_engine/schema/tracks.py": "876bbf8054fb49bdf246bac9837893118c2262f04b5b88254ac62be28cd4e2b5",
+    "engine/src/bai_engine/sources.py": "197f54612716bb5a7e9eb4c6ab0d0f49b8d47c6c17f3499c7bf6b6b5932df772",
+    "engine/src/bai_engine/sport.py": "e589132e857d5a5f06d48a4cf0b4404aa015883d52b5244822124c882d61b587",
+    "engine/src/bai_engine/store/__init__.py": "e03c8995c3faae700618dc824afa244ee13f4f358b59f51a16e4d7c6ec8c9b9d",
+    "engine/src/bai_engine/store/events.py": "85315b1955cca0401a314c304913c6fbcb45a0311949a452228110d86239131f",
+    "engine/src/bai_engine/store/sessions.py": "cea5ef9f0e6c35052f5131d9ffa2e85f97a09d370cc489e9c0897a265dcf1710",
+    "engine/src/bai_engine/store/tracks.py": "41a602e4c1311cd539d6639ce8d9fbef78df8fc3f9f3223f7bd251119ba06dd4",
+    "engine/src/bai_engine/timeline.py": "ae721ef661627acc61515989970e6c509f0806e43e22ec3cfb3530c7c7096c1c",
+    "engine/src/bai_engine/wire.py": "88f5c0c101db0ac836f1df5840ca6ee0ed3937cd9120e71a8d20014d09d38f89",
+    "sports/badminton/src/bai_badminton/__init__.py": "00527617e5728f6584aeabe47fc21a5ca390e2dd1c9c39ed562e4346bd441b0f",
+    "sports/badminton/src/bai_badminton/analytics/automatic_individual.py": "8ab2a93ae6ff8fcede594427d243bb804f7ee9a9f82365aea27e89924045ad60",
+    "sports/badminton/src/bai_badminton/analytics/doubles_service.py": "39f74cc2c537597029767359e20d5ba356c7262fc936bed6bd1c08c85565acb2",
+    "sports/badminton/src/bai_badminton/analytics/heatmaps.py": "5980a36a0f4b794f04fa4689067442446ce89620648517f6aabfbfc1fa4ae48a",
+    "sports/badminton/src/bai_badminton/analytics/individual.py": "6c0a6ccc8781badeff21dde1dd6ed78f196d8012d5cdf0a89e68d4f7b2d0d889",
+    "sports/badminton/src/bai_badminton/analytics/match.py": "c66605a810014be58dd0c2ba38aae0049ecd6fe54018a6690a386cfa534c8b93",
+    "sports/badminton/src/bai_badminton/analytics/rebuild.py": "ae5800412066111e5af62acfc31effce8c2d9d542f1299bafa6655bbcb7c1a73",
+    "sports/badminton/src/bai_badminton/analytics/reviewed_motion.py": "480ca12bc8c84368afcdf69bd471723f037ebf7c1a197a759a4217db753479a2",
+    "sports/badminton/src/bai_badminton/analytics/spatial.py": "9301a0e7d59f656d024f6dc11904494e364382e345257dee0055b849d1b61de5",
+    "sports/badminton/src/bai_badminton/components.py": "74f49d1914263e0236695aa133b4f58a49b970a43b0f4c989583f0b84c49c8ff",
+    "sports/badminton/src/bai_badminton/court.py": "0959fedd5bb5d7414eed2e081706247a51df7d41cbe6fc298b34dc2e939db425",
+    "sports/badminton/src/bai_badminton/engine.py": "8b17ec464062840dcd9cb671dcedbe9dc74a00f1b9040622e19aa400c455caf5",
+    "sports/badminton/src/bai_badminton/events/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "sports/badminton/src/bai_badminton/events/_bst_network.py": "c17a9bcb7188dc730df0e4edcf42da58f79d6fc356ee6419bd15058a26bfcd12",
+    "sports/badminton/src/bai_badminton/events/activity.py": "7d58b324d293376013d94c27757ad1af21c4eabd4934791dcfdc914a1742d013",
+    "sports/badminton/src/bai_badminton/events/bst.py": "06b81ae1759a292285c8d4cb759749c07f01a6df6311f21353097c28054faa9f",
+    "sports/badminton/src/bai_badminton/events/contact.py": "97b724a0ab3974f87bcb0aac28f531d86953d850f02e037befd03e767108f257",
+    "sports/badminton/src/bai_badminton/events/match_phase.py": "a424ddf7a60892e5070208d1f5e61b333128e6b13292aa204b8e00218e8fd4a1",
+    "sports/badminton/src/bai_badminton/events/rally_fsm.py": "b84e5afffc6703e9a7da224312a70686589377575db89eac4c33a390e64d4a56",
+    "sports/badminton/src/bai_badminton/events/rally_outcome.py": "d1ed6f9e32602d7622d5fa2d652b91d71f5af5b4a839660491e30278ba1de446",
+    "sports/badminton/src/bai_badminton/events/scene.py": "fab58d1bcc57ee642ceea6adeba17fa86938088f95ded869b236d742e6c4573f",
+    "sports/badminton/src/bai_badminton/events/stroke.py": "cdc7a6ed3e7db91086dc8882c7b5a4289eadcc32cf6be421d7f05582637dd647",
+    "sports/badminton/src/bai_badminton/format_understanding.py": "1fcfbb19120a7856d7d1e2eafef558399a89018a68d929415f5a257cfa8e67f3",
+    "sports/badminton/src/bai_badminton/identity.py": "12bc936b63d6b3e06d15ac85684d3200961c50673b6b23afbf9a6bffc76c32b0",
+    "sports/badminton/src/bai_badminton/identity_review.py": "13f84d5809d82627e171eaf4709e291fede279c6d058205b1587a1efaaf5f079",
+    "sports/badminton/src/bai_badminton/observations.py": "5bffa32d192130ead475bcb93e6eb382c0226401fc9f974227e2537e4cf0c7e3",
+    "sports/badminton/src/bai_badminton/ontology.py": "6e2c322dd355e08f03ebddc360adcd51037b564959e2b83ee40ee3e2263abcb3",
+    "sports/badminton/src/bai_badminton/participant_contact.py": "f96ed17bb981391e234e18d8cf87b400073ae55a0ada07e524b32a36a8ad5b9d",
+    "sports/badminton/src/bai_badminton/participant_geometry.py": "45b8d044d88c6837079ca74aa3aca7894b5fa259b2e3bb75ba6738c1533ca35c",
+    "sports/badminton/src/bai_badminton/participation.py": "f986ac14fab9631986906f460e53b77b6695f8512abb4b9820093c44fe3c1645",
+    "sports/badminton/src/bai_badminton/perception/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "sports/badminton/src/bai_badminton/perception/_vendor/__init__.py": "40b81791a7a2349d589639f4f02a76df3291cbdcf025ee772ff8bc1161d805af",
+    "sports/badminton/src/bai_badminton/perception/_vendor/osnet_ain.py": "8f114392af7c76d075dcbaf7adee7114fb5e9c20b11a028bfc431fa1bfebace3",
+    "sports/badminton/src/bai_badminton/perception/calibration_state.py": "82c0134f9d3b506d482787f3489f0c8df5457e9ba75c627a2d44b1fffd837cf2",
+    "sports/badminton/src/bai_badminton/perception/camera.py": "85c49dc1f703e0e8bdfa2849c6c433b43258f0dc30af78406ca254d7df7e1117",
+    "sports/badminton/src/bai_badminton/perception/components.py": "b8e5b4e7228c0e755776a4669d6caffdb8bfe93f9bf6daadec4b39101aa38b85",
+    "sports/badminton/src/bai_badminton/perception/court_lines.py": "1a366141fd792634bdc792acbadc207f02968fd31ecd0f9785a1fb9e0fd6df8d",
+    "sports/badminton/src/bai_badminton/perception/isolation.py": "bb765d8edec2a16486d36b0fb1f60e6380928835e5dc112572534daac7757658",
+    "sports/badminton/src/bai_badminton/perception/keypoints.py": "870b09013456beb6dfff923bf1822dc8e2bfaccc90176a0057304875b72a72ec",
+    "sports/badminton/src/bai_badminton/perception/offline_reid.py": "ea4cf4395ffab3fed57f1dac1bab7b9c07750d4c6b764fbbf51a430fe1822720",
+    "sports/badminton/src/bai_badminton/perception/pipeline.py": "037db618bd28bdee01c4ef3feb7e96316b015b1372b4dae9c3f802a257f4d2f0",
+    "sports/badminton/src/bai_badminton/perception/player_association.py": "500adfd61fecd16fc902b93dc34015c8452d08ce13a7d94fc35c57b5df594683",
+    "sports/badminton/src/bai_badminton/perception/players.py": "d0672152755ec87c662409a9523f713965b5a14f1613fb8aafe8d9917f30a074",
+    "sports/badminton/src/bai_badminton/perception/racket.py": "895cd640103c7fcedbdac99514cbba81c6f96cd3ebb25ee8b95695bf6bfb9d89",
+    "sports/badminton/src/bai_badminton/perception/scene.py": "bbd72a88ba5237a5d914672b742eb43a2c8dab30b7848a001f21b70d0721eb0e",
+    "sports/badminton/src/bai_badminton/perception/scoreboard.py": "541009a669fdfa62a4267162caabdf6233fce1d95c9d0024248cbb4d42e7e588",
+    "sports/badminton/src/bai_badminton/perception/shuttle_post.py": "a51a2c1ee4211f06017488ef809fa63ec3cf7449a9cf3172b4d250b5f59925fb",
+    "sports/badminton/src/bai_badminton/perception/tracknet.py": "801f150b61b2711c1904a7d151e1243de0fa37c6bbcaf16bf108a2ac739d2760",
+    "sports/badminton/src/bai_badminton/perception_types.py": "a5921f189e74d7516949ae0a55b34497cfcb03e9c38365c00c5baedaf277c7a7",
+    "sports/badminton/src/bai_badminton/plugin.py": "132b1cee05b736b521c3ceae9d2a3cea396d68a65583ab31e73b47fd707caffe",
+    "sports/badminton/src/bai_badminton/rules/__init__.py": "df77eb1e41be475072269068769c84e1151785e575d6ea4d37a9b9622a0922dc",
+    "sports/badminton/src/bai_badminton/rules/bwf.py": "c69decd01f28d4928fff2bf3f5ad2832338e167dc27a77e3ab0e16bbb9ccc527",
+    "sports/badminton/src/bai_badminton/rules/doubles.py": "d192c013ea14e5f68059330690d85852b2036b5f171219df71c332aaaa37e5c2",
+    "sports/badminton/src/bai_badminton/score_ocr.py": "ea62d0c38396cd64627c78599a3f44fbbf5d936e6deaf59b96defd9bf02ddac8",
+    "sports/badminton/src/bai_badminton/teams.py": "90e3c7a7dd496d57ce77bf132019172f642f578cf5101a9959cc6a02b3a5cfa2",
+    "sports/badminton/src/bai_badminton/testing/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "sports/badminton/src/bai_badminton/testing/court_render.py": "68d1a5b48b5f91e9c3f2e850c94d63834833d58ee2e29ee045179175a0cd5cc3",
+    "sports/badminton/src/bai_badminton/testing/synth.py": "85fc218a55aa5d668e5220ece37f241d5aa47a15b72aa2820b53971a9571e88f"
+  },
+  "benchmark_script_hashes": {
+    "run_test1_benchmark.py": "04fffa944505d6545f84dc963762074dcdb2ffc78ea50d8da4261a02079337af",
+    "evaluate_rallies.py": "04708c7a4139d2e7685bc0c762e7f2bcb5e44b281f0af0f658a905a028fa5a5f",
+    "production_inference.py": "5329498d9fb57497f7e672df29ef742ec4260497f892b3fed7d0502431f388be"
+  },
+  "pipeline_entry_point": "bai_engine.runtime.runner.SessionRunner._ensure_media + _analyse",
+  "pipeline_mode": "VOD upload / badminton plugin / rally-fsm-v1; all current finalized rally_end events",
+  "matching_policy": {
+    "version": "rally-boundaries-v1",
+    "minimum_iou": 0.5,
+    "assignment": "maximum cardinality, then total IoU + 1e-9/(1 + boundary distance seconds)",
+    "intervals": "[start timestamp, end timestamp); duration=end-start; no inclusive-frame addition",
+    "tolerance_denominators": "matched pairs and all ground-truth rallies reported separately",
+    "zero_denominators": "precision/recall/F1=0; unavailable conditional metrics=null"
+  },
+  "python": "3.12.12 (main, Jan 14 2026, 19:35:58) [Clang 21.1.4 ]",
+  "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+  "frame_conventions": "zero-based original and CFR proxy indices; preserve inclusive end observation index, measure boundary span as (end-start)/fps",
+  "leakage_control": "Worker subprocess receives video, frozen profile, output directory only; no annotations, count target, or Part2 predictions.",
+  "video_fps": 30.0,
+  "frame_count": 17268,
+  "duration_seconds": 575.6,
+  "resolution": [
+    1920,
+    1080
+  ],
+  "annotation_audit": {
+    "rally_count": 36,
+    "frame_base": 0,
+    "fps": 30.0,
+    "max_frame_time_residual_seconds": 0.0,
+    "max_duration_residual_seconds": 0.0,
+    "human_timestamps": "MM:SS, floor to whole seconds",
+    "span": "end boundary timestamp minus start boundary timestamp; no inclusive-frame addition",
+    "evidence": "Every supplied timestamp equals frame/actual FPS; related Part2 shuttle table enumerates 0..17267, matching source decode count.",
+    "ambiguity": "Original annotation tool/reviewer history is unavailable. Arithmetic supports zero-based indexing but cannot independently exclude a one-frame human annotation offset; no offset is fitted or corrected.",
+    "provenance_limit": "User identifies these 36 rows as manual annotations. Related *_T.csv is not ground truth; legacy exporter uses the same schema. Independent manual-review provenance is not in the repository."
+  },
+  "source_timeline_audit": {
+    "fps": 30.0,
+    "decoded_frame_count": 17268,
+    "packet_count": 17268,
+    "first_pts_seconds": 0.0,
+    "last_pts_seconds": 575.566667,
+    "maximum_pts_deviation_from_zero_based_cfr_seconds": 3.333333467026023e-07,
+    "verified_zero_origin_cfr": true
+  },
+  "pipeline_configuration": {
+    "profile": "gpu-rtx4000",
+    "profile_sha256": "ae83f0a05dc9c86543c95ec50c9475b65dc677a91e18b69065092c8df2cc6395",
+    "profile_yaml": "# Primary target: Ubuntu + NVIDIA RTX 4000 Ada (20 GB). Report Option B (multi-rate, cascaded,\n# event-triggered). All model choices are re-validated by the Phase-1 benchmark (docs/benchmarks).\ndescription: RTX 4000 Ada \u2014 TensorRT FP16, multi-rate, event-triggered specialists\ndevice: cuda\nanalysis_height: 720\nchunk_frames: 64          # multiple of the TrackNet window (8)\nlead_buffer_s: 5.0\n\nshuttle:                  # VOD: TrackNetV3, non-overlapping 8-frame windows, per-shot median bg\n  model: tracknetv3\n  backend: torch-cuda\n  precision: fp16\n  batch: 4                # windows per forward\n  input_size: [512, 288]\n  params: {seq_len: 8, bg_mode: concat, threshold: 0.5, step: 8}\nshuttle_live:             # causal model for live sources (E3 decides; balltrack is the default)\n  model: racketvision_balltrack\n  backend: torch-cuda\n  precision: fp16\nshuttle_second_opinion:   # disagreement oracle on low-confidence windows\n  model: wasb_badminton\n  backend: torch-cuda\n  precision: fp16\nplayer_detector:\n  model: rfdetr_small\n  backend: onnx-cuda\n  precision: fp16\n  input_size: [512, 512]\n  params: {score_threshold: 0.35, court_roi: true}\nplayer_reid:\n  model: osnet_ain_x0_25\n  backend: torch-cuda\n  precision: fp32\n  params: {retention_seconds: 8}\npose:\n  model: rtmpose_m_body7\n  backend: onnx-cuda\n  precision: fp16\n  batch: 2\n  input_size: [192, 256]\nracket:\n  model: racket_geometry_v1\n  backend: opencv-cpu\n  precision: fp32\n# The active baseline is the rule classifier, not an installed BST checkpoint.\ncomponents:\n  stroke: {implementation: stroke-rules-v0, model: none, backend: none}\nstroke: {model: none, backend: none}\ncontact:\n  model: contact_fusion_v2  # deterministic, optional observed racket support\n  backend: none\nocr:\n  model: rapidocr_v4\n  backend: onnx-cuda\n\ndetector_rates: {in_play: 2, idle: 6, replay: 0}\npose_rates:     {in_play: 1, idle: 6, replay: 0}\nshuttle_rates:  {in_play: 1, idle: 1, replay: 0}\nocr_every_s: 1.0\ncourt_verify_every_s: 2.0\nescalation_budget: 0.15\nracket_window: 6\n",
+    "proxy_height": 720
+  },
+  "pipeline": {
+    "plugin": "badminton",
+    "pipeline_id": "badminton-broadcast",
+    "pipeline_version": "2",
+    "input_schema": "canonical-cfr-bgr-chunk:v1",
+    "output_schema": "events-and-observation-tracks:v1",
+    "supported_formats": [
+      "singles",
+      "doubles",
+      "unknown"
+    ],
+    "configuration": {
+      "profile": "gpu-rtx4000",
+      "source_sha256": "877c6d39d34ccfb302865ed44f7e08949b0f72be2833f71777066f837e6b8bd6",
+      "input_transform": {},
+      "scoring_names": {
+        "P1": null,
+        "P2": null
+      },
+      "roster": null,
+      "calibration": 1866490011
+    },
+    "stages": [
+      {
+        "id": "perception",
+        "depends_on": [],
+        "components": [
+          "shuttle",
+          "player_detector",
+          "pose",
+          "player_reid",
+          "tracking",
+          "racket",
+          "ocr"
+        ]
+      },
+      {
+        "id": "format",
+        "depends_on": [
+          "perception"
+        ],
+        "components": [
+          "format"
+        ]
+      },
+      {
+        "id": "identity",
+        "depends_on": [
+          "perception",
+          "format"
+        ],
+        "components": [
+          "identity"
+        ]
+      },
+      {
+        "id": "activity",
+        "depends_on": [
+          "perception",
+          "identity"
+        ],
+        "components": [
+          "activity"
+        ]
+      },
+      {
+        "id": "contact",
+        "depends_on": [
+          "perception",
+          "format",
+          "identity"
+        ],
+        "components": [
+          "contact"
+        ]
+      },
+      {
+        "id": "rally",
+        "depends_on": [
+          "contact",
+          "activity"
+        ],
+        "components": [
+          "rally"
+        ]
+      },
+      {
+        "id": "stroke",
+        "depends_on": [
+          "contact",
+          "rally",
+          "identity"
+        ],
+        "components": [
+          "stroke"
+        ]
+      },
+      {
+        "id": "outcome",
+        "depends_on": [
+          "rally",
+          "format",
+          "perception"
+        ],
+        "components": [
+          "outcome"
+        ]
+      },
+      {
+        "id": "scoring",
+        "depends_on": [
+          "format",
+          "rally",
+          "outcome",
+          "perception"
+        ],
+        "components": [
+          "scoring"
+        ]
+      },
+      {
+        "id": "analytics",
+        "depends_on": [
+          "scoring",
+          "stroke",
+          "identity"
+        ],
+        "components": [
+          "analytics"
+        ]
+      }
+    ],
+    "lifecycle": {
+      "per_session_factory": true,
+      "ordered_ingest": true,
+      "state_restore": "recompute_perception;restore_event_fold",
+      "close": "owned_components_after_resident_commands"
+    },
+    "failure_behavior": "explicit_unavailable_or_unknown;no_fabricated_points",
+    "components": {
+      "shuttle": {
+        "implementation": "tracknet-v3",
+        "version": "1",
+        "fingerprint": "87d6167cdd3e8fa24356a9870143977d2f1d6cfc83b9f351b83e926172f95311",
+        "status": "selected"
+      },
+      "player_detector": {
+        "implementation": "person-onnx-v1",
+        "version": "1",
+        "fingerprint": "eafd71798235788a94d68552959b86e24537144c7ffefdf3629fbe9c4700f70c",
+        "status": "selected"
+      },
+      "pose": {
+        "implementation": "rtmpose-v1",
+        "version": "1",
+        "fingerprint": "84da862fe2297c4d924bddaab03243b1fb1bc9dcb6c08dc655b26f2492fe1154",
+        "status": "selected"
+      },
+      "ocr": {
+        "implementation": "rapidocr-v1",
+        "version": "3",
+        "fingerprint": "243d3cc56d12ff44cc2d395919bbaeede63ff41efb6479db1f9dbb732e3ef6c6",
+        "status": "selected"
+      },
+      "racket": {
+        "implementation": "racket-geometry-v1",
+        "version": "1",
+        "fingerprint": "d0ae3f80b101e15bc3f2dbe88dc5960ceac2276d2458c8315f2b53d5087853f8",
+        "status": "selected"
+      },
+      "tracking": {
+        "implementation": "court-player-episodes-v1",
+        "version": "1",
+        "fingerprint": "325a3184eefeca7d4866151025224b333950cf08e7f1a67d9ad16c35ddd1a173",
+        "status": "selected"
+      },
+      "identity": {
+        "implementation": "participant-identity-v1",
+        "version": "1",
+        "fingerprint": "230066575c77f597d7cfa69b3cf68d4c031a957fdbd8a7204694c3f0ece4d441",
+        "status": "selected"
+      },
+      "contact": {
+        "implementation": "contact-fusion-v1",
+        "version": "1",
+        "fingerprint": "aca9b92acb89fa2faf843e01e4302d8292f460cb5a714e70d917bc80cad7e15d",
+        "status": "selected"
+      },
+      "stroke": {
+        "implementation": "stroke-rules-v0",
+        "version": "1",
+        "fingerprint": "a73f2b026a300be9ebe97e390a1eaaccd4a263030519fa6cff789851e42b0741",
+        "status": "selected"
+      },
+      "activity": {
+        "implementation": "temporal-activity-v3",
+        "version": "1",
+        "fingerprint": "94b11d16ce55db3d90df97ab52d8831b36639fca90e7b8fbe0b8db2c01fdbcd7",
+        "status": "selected"
+      },
+      "rally": {
+        "implementation": "rally-fsm-v1",
+        "version": "1",
+        "fingerprint": "fd63426178276d182a664b60bd72695290cd939883a4104e28a47a5549e90889",
+        "status": "selected"
+      },
+      "outcome": {
+        "implementation": "observed-terminal-v1",
+        "version": "1",
+        "fingerprint": "8cdf73fc5109a603f5b426e66503afe0ac432a47bdbe31ccc8fd2cb25deea813",
+        "status": "selected"
+      },
+      "scoring": {
+        "implementation": "bwf-rally-point-v1",
+        "version": "1",
+        "fingerprint": "094c4195eb11b0b548985def48f17eca6a1f1d8d60cfd1daee0ecec159dbb6f1",
+        "status": "selected"
+      },
+      "analytics": {
+        "implementation": "match-analytics-v1",
+        "version": "1",
+        "fingerprint": "cba68ae184109631c57bf59ddf603fd5763de445c584df7fd564636e0b94e0f7",
+        "status": "selected"
+      },
+      "format": {
+        "implementation": "sustained-court-v1",
+        "version": "1",
+        "fingerprint": "1a14e7b1676589eab59a5e717d65112cc3164a7714f9bf3344aa03528179de09",
+        "status": "selected"
+      },
+      "player_reid": {
+        "implementation": null,
+        "status": "unavailable"
+      }
+    },
+    "format": {
+      "method": "sustained_target_court_format_v1",
+      "match_format": "singles",
+      "source": "inferred",
+      "reason": "unobserved_frame",
+      "revision": 1,
+      "observed_frames": [
+        30,
+        36,
+        42,
+        48,
+        54,
+        60,
+        66,
+        72,
+        78,
+        84,
+        90,
+        96,
+        102,
+        108,
+        114,
+        120
+      ],
+      "side_counts": [
+        1,
+        1
+      ],
+      "epoch": "1",
+      "support_kind": "uncalibrated_observation_policy",
+      "requires_configuration": false
+    },
+    "fingerprint": "c2f3fe0cb6a2208443fd22c5b4c5d7f4f9a5d9475ae4bae604d3a5d73f76da88"
+  },
+  "models": [
+    {
+      "name": "bst_cg_ap_shuttleset",
+      "task": "stroke",
+      "version": "1.0",
+      "format": "torch",
+      "license": "MIT source; separate checkpoint grant not independently verified (Va6lue/BST-Badminton-Stroke-type-Transformer)",
+      "status": "candidate",
+      "available": false,
+      "sha256": "997f43e52b20cb47517132c71d3e147d7d717a2d9651cfbe7651a5003bd66809"
+    },
+    {
+      "name": "contact_fusion_v0",
+      "task": "contact",
+      "version": "0",
+      "format": "builtin",
+      "license": "project",
+      "status": "active",
+      "available": true,
+      "sha256": null
+    },
+    {
+      "name": "contact_fusion_v2",
+      "task": "contact",
+      "version": "2",
+      "format": "builtin",
+      "license": "project",
+      "status": "active",
+      "available": true,
+      "sha256": null
+    },
+    {
+      "name": "inpaintnet",
+      "task": "shuttle_refine",
+      "version": "3.0",
+      "format": "torch",
+      "license": "MIT (qaz812345/TrackNetV3)",
+      "status": "active",
+      "available": true,
+      "sha256": "5749b66b8002f3ad9e0af841604004706fc796df30599e6bf01952696009688c"
+    },
+    {
+      "name": "osnet_ain_x0_25",
+      "task": "person_reidentification",
+      "version": "1",
+      "format": "torch",
+      "license": "MIT (Torchreid/LibreYOLO weights and code); research-data provenance documented in model card",
+      "status": "candidate",
+      "available": false,
+      "sha256": "ce171fe160b3608f5e4c19489774991419be965b1d6f4bdccc4b4cfd2ef95347"
+    },
+    {
+      "name": "racket_geometry_v1",
+      "task": "racket_pose",
+      "version": "1",
+      "format": "builtin",
+      "license": "project (OpenCV runtime)",
+      "status": "active",
+      "available": true,
+      "sha256": null
+    },
+    {
+      "name": "racketvision_balltrack",
+      "task": "shuttle_live",
+      "version": "1.0",
+      "format": "torch",
+      "license": "MIT (RacketVision, AAAI 2026); YouTube-sourced training data \u2014 check content rights",
+      "status": "candidate",
+      "available": false,
+      "sha256": null
+    },
+    {
+      "name": "racketvision_racketpose",
+      "task": "racket_pose",
+      "version": "1.0",
+      "format": "torch",
+      "license": "MIT (RacketVision); mmpose checkpoint \u2014 exported to ONNX in the research container",
+      "status": "candidate",
+      "available": false,
+      "sha256": null
+    },
+    {
+      "name": "rapidocr_v4",
+      "task": "ocr",
+      "version": "4",
+      "format": "package",
+      "license": "Apache-2.0 (RapidOCR / PP-OCR models)",
+      "status": "active",
+      "available": true,
+      "sha256": null
+    },
+    {
+      "name": "rfdetr_medium",
+      "task": "person_detection",
+      "version": "1.4.2",
+      "format": "onnx",
+      "license": "Apache-2.0 (RF-DETR); ONNX export mirror",
+      "status": "active",
+      "available": true,
+      "sha256": "7fc5834e2fc7205e399a77d29dd0e89b694b075eeb496d5c8464d25137cad788"
+    },
+    {
+      "name": "rfdetr_nano",
+      "task": "person_detection",
+      "version": "1.4.2",
+      "format": "onnx",
+      "license": "Apache-2.0 (RF-DETR N/S/M/L); ONNX export mirror",
+      "status": "active",
+      "available": true,
+      "sha256": "aceebff282d046fae831217136c4c0ce91fb28a6b834dfd48f3a3f46fddc1d9e"
+    },
+    {
+      "name": "rfdetr_small",
+      "task": "person_detection",
+      "version": "1.4.2",
+      "format": "onnx",
+      "license": "Apache-2.0 (RF-DETR); ONNX export mirror",
+      "status": "active",
+      "available": true,
+      "sha256": "fcd3c3c4e0d3d5533ee9c3a174deb7f02dfe4b042b6fdd3d29040f3c6da7845e"
+    },
+    {
+      "name": "rtmpose_m_body7",
+      "task": "pose",
+      "version": "1.0",
+      "format": "onnx-zip",
+      "license": "Apache-2.0 (MMPose RTMPose)",
+      "status": "active",
+      "available": true,
+      "sha256": "f7fbb6c5c11a1bb70f3d445e4ddec5d144ea89ad5649c081ef976f9b24a0b741"
+    },
+    {
+      "name": "rtmpose_x_halpe26",
+      "task": "pose",
+      "version": "1.0",
+      "format": "onnx-zip",
+      "license": "Apache-2.0 (MMPose RTMPose)",
+      "status": "active",
+      "available": true,
+      "sha256": "1174dd5ccf780501835017eb7376a93fc202238457549a8af8f6aa6d44ae548a"
+    },
+    {
+      "name": "tracknetv3",
+      "task": "shuttle",
+      "version": "3.0",
+      "format": "torch",
+      "license": "MIT (qaz812345/TrackNetV3 code + checkpoints); HF mirror of the official Google Drive release",
+      "status": "active",
+      "available": true,
+      "sha256": "df867641a02712b021f04548ff4b1208ddfdb47f629ab2094ceb978667e83b1a"
+    },
+    {
+      "name": "yolox_m_humanart",
+      "task": "person_detection",
+      "version": "1.0",
+      "format": "onnx",
+      "license": "Apache-2.0 (MMPose / YOLOX)",
+      "status": "active",
+      "available": true,
+      "sha256": "3dea6513388889f0fff4b77bf7a26013600321b9eb9ceb0e9a400a82572f5f23"
+    }
+  ],
+  "execution_backends": {
+    "shuttle": {
+      "requested_backend": "torch-cuda",
+      "actual_backend": "torch-cuda",
+      "device": "cuda:0",
+      "dtype": "torch.float16",
+      "backend_fallback": false,
+      "requested_precision": "fp16",
+      "checkpoint_sha256": "df867641a02712b021f04548ff4b1208ddfdb47f629ab2094ceb978667e83b1a"
+    },
+    "player_detector": {
+      "requested_backend": "onnx-cuda",
+      "providers": [
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "actual_backend": "onnx-cuda",
+      "backend_fallback": false
+    },
+    "pose": {
+      "requested_backend": "onnx-cuda",
+      "providers": [
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "actual_backend": "onnx-cuda",
+      "backend_fallback": false
+    }
+  },
+  "degraded": [
+    {
+      "stage": "player_identity",
+      "reason": "osnet_ain_x0_25: osnet_ain_x0_25 is not downloaded; run `bai models fetch osnet_ain_x0_25`"
+    },
+    {
+      "stage": "player_reid",
+      "reason": "baseline player_reid provider is unavailable"
+    }
+  ],
+  "elapsed_seconds": 1469.2373393960297,
+  "proxy_sha256": "d352d684fb5399d804b8f50c785a3605346e7f03987ecb1d9a73ef3482535a97",
+  "prediction_sha256": "0df3afe420eb1737a32df7d442f8203d8e13428745856e18b183e7197d7dd555",
+  "completed_at": "2026-11-04T18:11:29.569963+00:00",
+  "proxy_timeline_audit": {
+    "fps": 30.0,
+    "decoded_frame_count": 17268,
+    "packet_count": 17268,
+    "first_pts_seconds": 0.0,
+    "last_pts_seconds": 575.566667,
+    "maximum_pts_deviation_from_zero_based_cfr_seconds": 3.333333467026023e-07,
+    "verified_zero_origin_cfr": true
+  },
+  "runtime_dependencies": {
+    "torch": "2.14.1+cu126",
+    "torchvision": null,
+    "onnxruntime-gpu": "1.29.0",
+    "opencv-python": "5.0.0.93",
+    "av": "19.0.1",
+    "numpy": "2.5.3",
+    "scipy": "1.18.1",
+    "rapidocr": "3.10.0",
+    "rtmlib": "0.0.16",
+    "boxmot": null,
+    "pydantic": "2.14.0",
+    "msgpack": "1.2.3",
+    "pytest": "9.1.1"
+  },
+  "perception_models": {
+    "shuttle": "tracknetv3@3.0",
+    "player_detector": "rfdetr_small@1.4.2",
+    "pose": "rtmpose_m_body7@1.0",
+    "ocr": "rapidocr@3.10.0+bbb248356812",
+    "racket": "racket_geometry_v1@1",
+    "tracking": "court-player-episodes-v1@1"
+  },
+  "perception_runtimes": {
+    "shuttle": {
+      "requested_backend": "torch-cuda",
+      "actual_backend": "torch-cuda",
+      "device": "cuda:0",
+      "dtype": "torch.float16",
+      "backend_fallback": false,
+      "requested_precision": "fp16",
+      "checkpoint_sha256": "df867641a02712b021f04548ff4b1208ddfdb47f629ab2094ceb978667e83b1a"
+    },
+    "player_detector": {
+      "requested_backend": "onnx-cuda",
+      "providers": [
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "actual_backend": "onnx-cuda",
+      "backend_fallback": false
+    },
+    "pose": {
+      "requested_backend": "onnx-cuda",
+      "providers": [
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "actual_backend": "onnx-cuda",
+      "backend_fallback": false
+    },
+    "ocr": {
+      "package_version": "3.10.0",
+      "requested_backend": "onnx-cuda",
+      "stages": {
+        "det": {
+          "model_file": "PP-OCRv6_det_small.onnx",
+          "sha256": "090f04abcd9d9a7498bc4ebf677e4cb9bdce1fe4197ddb7e529f1ef44e1ff94f",
+          "configured_ocr_version": "PP-OCRv6",
+          "providers": [
+            "CUDAExecutionProvider",
+            "CPUExecutionProvider"
+          ],
+          "provider_options": {
+            "CPUExecutionProvider": {},
+            "CUDAExecutionProvider": {
+              "sdpa_kernel": "0",
+              "use_tf32": "1",
+              "fuse_conv_bias": "0",
+              "prefer_nhwc": "0",
+              "tunable_op_max_tuning_duration_ms": "0",
+              "tunable_op_enable": "0",
+              "tunable_op_tuning_enable": "0",
+              "enable_cudnn": "1",
+              "use_ep_level_unified_stream": "0",
+              "device_id": "0",
+              "has_user_compute_stream": "0",
+              "gpu_external_empty_cache": "0",
+              "cudnn_conv_algo_search": "EXHAUSTIVE",
+              "cudnn_conv1d_pad_to_nc1d": "0",
+              "gpu_mem_limit": "18446744073709551615",
+              "gpu_external_alloc": "0",
+              "gpu_external_free": "0",
+              "arena_extend_strategy": "kNextPowerOfTwo",
+              "do_copy_in_default_stream": "1",
+              "enable_cuda_graph": "0",
+              "user_compute_stream": "0",
+              "cudnn_conv_use_max_workspace": "1"
+            }
+          }
+        },
+        "cls": {
+          "model_file": "ch_ppocr_mobile_v2.0_cls_mobile.onnx",
+          "sha256": "e47acedf663230f8863ff1ab0e64dd2d82b838fceb5957146dab185a89d6215c",
+          "configured_ocr_version": "PP-OCRv4",
+          "providers": [
+            "CUDAExecutionProvider",
+            "CPUExecutionProvider"
+          ],
+          "provider_options": {
+            "CPUExecutionProvider": {},
+            "CUDAExecutionProvider": {
+              "sdpa_kernel": "0",
+              "use_tf32": "1",
+              "fuse_conv_bias": "0",
+              "prefer_nhwc": "0",
+              "tunable_op_max_tuning_duration_ms": "0",
+              "tunable_op_enable": "0",
+              "tunable_op_tuning_enable": "0",
+              "enable_cudnn": "1",
+              "use_ep_level_unified_stream": "0",
+              "device_id": "0",
+              "has_user_compute_stream": "0",
+              "gpu_external_empty_cache": "0",
+              "cudnn_conv_algo_search": "EXHAUSTIVE",
+              "cudnn_conv1d_pad_to_nc1d": "0",
+              "gpu_mem_limit": "18446744073709551615",
+              "gpu_external_alloc": "0",
+              "gpu_external_free": "0",
+              "arena_extend_strategy": "kNextPowerOfTwo",
+              "do_copy_in_default_stream": "1",
+              "enable_cuda_graph": "0",
+              "user_compute_stream": "0",
+              "cudnn_conv_use_max_workspace": "1"
+            }
+          }
+        },
+        "rec": {
+          "model_file": "PP-OCRv6_rec_small.onnx",
+          "sha256": "6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884",
+          "configured_ocr_version": "PP-OCRv6",
+          "providers": [
+            "CUDAExecutionProvider",
+            "CPUExecutionProvider"
+          ],
+          "provider_options": {
+            "CPUExecutionProvider": {},
+            "CUDAExecutionProvider": {
+              "sdpa_kernel": "0",
+              "use_tf32": "1",
+              "fuse_conv_bias": "0",
+              "prefer_nhwc": "0",
+              "tunable_op_max_tuning_duration_ms": "0",
+              "tunable_op_enable": "0",
+              "tunable_op_tuning_enable": "0",
+              "enable_cudnn": "1",
+              "use_ep_level_unified_stream": "0",
+              "device_id": "0",
+              "has_user_compute_stream": "0",
+              "gpu_external_empty_cache": "0",
+              "cudnn_conv_algo_search": "EXHAUSTIVE",
+              "cudnn_conv1d_pad_to_nc1d": "0",
+              "gpu_mem_limit": "18446744073709551615",
+              "gpu_external_alloc": "0",
+              "gpu_external_free": "0",
+              "arena_extend_strategy": "kNextPowerOfTwo",
+              "do_copy_in_default_stream": "1",
+              "enable_cuda_graph": "0",
+              "user_compute_stream": "0",
+              "cudnn_conv_use_max_workspace": "1"
+            }
+          }
+        }
+      },
+      "backend_fallback": false
+    },
+    "racket": {
+      "requested_backend": "opencv-cpu",
+      "actual_backend": "opencv-cpu",
+      "backend_fallback": false,
+      "method": "opencv_ellipse_shaft_v1"
+    }
+  },
+  "rally_parameters": {
+    "provider": "rally-fsm-v1",
+    "fps": 30.0,
+    "start_speed": 3.0,
+    "start_visible": 3,
+    "end_gap": 10,
+    "stationary_window": 10,
+    "stationary_count": 7,
+    "stationary_speed": 3.0,
+    "end_lookahead": 15,
+    "min_duration_s": 2.0,
+    "merge_gap_s": 0.75,
+    "resume_speed": 6.0,
+    "source": "Unmodified RallyParams defaults; no rally override in frozen profile"
+  },
+  "engine_temporal_parameters": {
+    "lookahead_frames": 40,
+    "context_back_frames": 45,
+    "history_frames": 1800
+  },
+  "postprocessing_verification": {
+    "initial_evaluation_preserved": "initial_evaluation/",
+    "executed_launch_scripts_preserved": "executed_scripts/",
+    "existing_metrics_and_comparison_values_identical": true,
+    "predictions_unchanged": true,
+    "additions": "Median signed errors; explicit row-level absolute time errors; generated failure report only.",
+    "final_script_sha256": {
+      "run_test1_benchmark.py": "3252ad709c1d567c552f742520349c57471e64fab3e82c7671bdba79a707a3c8",
+      "report_test1_benchmark.py": "3379fed1d284a649d3c64225f59400b202520f59cb1c00a5dff1a7cf335c0aae",
+      "evaluate_rallies.py": "1c46c63c2041a0e477b43f0d522da3a799e700e0ed898508c27d61d9ae705c26",
+      "production_inference.py": "0d47d951c063c44d34f0989b26410591252e24a2a563a977cf40328874cc9d76"
+    },
+    "runtime_reporting_correction": "Use the already-recorded component runtime metadata to unwrap the shuttle provider; no model or prediction change."
+  },
+  "validation": {
+    "synthetic_evaluator_tests": "35 passed",
+    "ruff_check": "passed",
+    "ruff_format_check": "passed"
+  },
+  "artifact_hashes": {
+    "predicted_rallies.csv": "0df3afe420eb1737a32df7d442f8203d8e13428745856e18b183e7197d7dd555",
+    "rally_comparison.csv": "1fb757a9aa6f0a0fc8777b4bd1e0b5ff3e71b8b30a9ccd603fdb95d432f20891",
+    "metrics.json": "d91f25414a41d4221b08d568910c665810d0d19129f39490e46fd289f039e2c9",
+    "execution.log": "64888782858f890700e8f0b2010bed9a84fd9db4a86cee9c9302a7cffbf3f6ae",
+    "raw_events.jsonl": "c26349e4043c71eeabeddd1a74d222c09ed79a62e3db658a077fe0e64c9396d7",
+    "inference.json": "41cc64a31b77668e61636ecbdcafa6616e93a789d65a14e2f2cd32a2c443ca9e",
+    "annotation_audit.json": "33ba76ec30c066bad98ea3d112fd3fc203eb23bb692b213e25011b0c53ed6936",
+    "source_timeline_audit.json": "67c874d3cc32321fe631cfdce8d24dbfabafb322d2df54e4f8e7919ec959d0da",
+    "source_provenance.json": "13f57acc4b3b37f1689b53543ba74c94cfb750047d0cf3a85d4d2957a6c47423",
+    "gpu_runtime.csv": "261cf10202885d47ef26e1dfd53bf4dfcf4e71819c34012220349efe286f0faf",
+    "BENCHMARK_REPORT.md": "b7f77954c763d757472ceea0bc554327f8866dfbc7042149bd14427fb2360da3",
+    "boundary_diagnostics.json": "077c92f6aa55cf6479ba11c6ab57db7eaab1371f0557619d9505ef05d28979e8"
+  },
+  "execution_backend_reporting_note": "The initial legacy inspection helper returned null for the wrapped shuttle port. Actual component runtime records and the execution log independently record torch-cuda, cuda:0, FP16 and the checkpoint digest. Raw inference.json is preserved unchanged.",
+  "gpu_runtime": [
+    {
+      "name": "NVIDIA GeForce GTX 1080 Ti",
+      " driver_version": " 580.178.04",
+      " memory.total [MiB]": " 11264 MiB"
+    },
+    {
+      "name": "NVIDIA GeForce GTX 1080 Ti",
+      " driver_version": " 580.178.04",
+      " memory.total [MiB]": " 11264 MiB"
+    }
+  ],
+  "ffmpeg_version": "ffmpeg version n8.1.3-18-g46d899d7a0-20261016 Copyright (c) 2000-2026 the FFmpeg developers"
+}

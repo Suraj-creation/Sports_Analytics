@@ -1,0 +1,9 @@
+{
+  "fps": 30.0,
+  "decoded_frame_count": 17268,
+  "packet_count": 17268,
+  "first_pts_seconds": 0.0,
+  "last_pts_seconds": 575.566667,
+  "maximum_pts_deviation_from_zero_based_cfr_seconds": 3.333333467026023e-07,
+  "verified_zero_origin_cfr": true
+}

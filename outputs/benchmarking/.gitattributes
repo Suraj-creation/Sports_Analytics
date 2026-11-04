@@ -1,0 +1,2 @@
+# Metadata binds exact CSV bytes; preserve writer line endings across checkouts.
+*.csv -text whitespace=cr-at-eol

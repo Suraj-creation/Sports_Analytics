@@ -1,0 +1,12 @@
+{
+  "rally_count": 36,
+  "frame_base": 0,
+  "fps": 30.0,
+  "max_frame_time_residual_seconds": 0.0,
+  "max_duration_residual_seconds": 0.0,
+  "human_timestamps": "MM:SS, floor to whole seconds",
+  "span": "end boundary timestamp minus start boundary timestamp; no inclusive-frame addition",
+  "evidence": "Every supplied timestamp equals frame/actual FPS; related Part2 shuttle table enumerates 0..17267, matching source decode count.",
+  "ambiguity": "Original annotation tool/reviewer history is unavailable. Arithmetic supports zero-based indexing but cannot independently exclude a one-frame human annotation offset; no offset is fitted or corrected.",
+  "provenance_limit": "User identifies these 36 rows as manual annotations. Related *_T.csv is not ground truth; legacy exporter uses the same schema. Independent manual-review provenance is not in the repository."
+}

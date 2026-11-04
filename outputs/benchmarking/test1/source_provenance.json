@@ -1,0 +1,80 @@
+{
+  "folder_id": "1_2QWSYd_X_BojdRwbu-AMKdx74cIQvGp",
+  "subfolder_name": "video_raw",
+  "subfolder_id": "1XxAJXTE0cfKZRDSVPfKp9cB0QPcq9fsr",
+  "public_listing": [
+    {
+      "file_id": "1iwjp0Aph_00mznu-PNxsLKb_Y3B0-e1u",
+      "filename": "test_9.mp4",
+      "modified_epoch_ms": 1792925456336,
+      "created_epoch_ms": 1785490387654,
+      "size_bytes": 2778705525
+    },
+    {
+      "file_id": "1Zr3JVT1ICpJlFqGE9r7sUaxmrfwWQ72l",
+      "filename": "Test_10.mp4",
+      "modified_epoch_ms": 1792922982194,
+      "created_epoch_ms": 1785487596183,
+      "size_bytes": 3112811045
+    },
+    {
+      "file_id": "1vR71QTkUYEGWy4PjXa5vfMdJEXt_OwLn",
+      "filename": "Test1_Full_rev.mp4",
+      "modified_epoch_ms": 1792921527737,
+      "created_epoch_ms": 1785489310485,
+      "size_bytes": 1026166541
+    },
+    {
+      "file_id": "17EeE7JmLC4zQNWzeTjr7cZk_DFYdh3Bs",
+      "filename": "Test2_Full_Rev.mp4",
+      "modified_epoch_ms": 1792924478776,
+      "created_epoch_ms": 1785488465200,
+      "size_bytes": 2453914397
+    },
+    {
+      "file_id": "1BOqrabc6KqyvjsC0llTUm6g6BM7fD6fd",
+      "filename": "Test3_Full_Rev.mp4",
+      "modified_epoch_ms": 1792922158765,
+      "created_epoch_ms": 1785486143325,
+      "size_bytes": 696523353
+    },
+    {
+      "file_id": "1W8gjgQz8QX2MkvqmtsQFb3-3y9wfRuy7",
+      "filename": "Test4_Full_Rev.mp4",
+      "modified_epoch_ms": 1792924725966,
+      "created_epoch_ms": 1785488926267,
+      "size_bytes": 1296890124
+    },
+    {
+      "file_id": "1-LZqc81x-WNyzbddT6g_ZoF37H6dPrsB",
+      "filename": "Test5_Full.mp4",
+      "modified_epoch_ms": 1792923947124,
+      "created_epoch_ms": 1785485677919,
+      "size_bytes": 3454360910
+    },
+    {
+      "file_id": "1LxlJnH5bJo_tLVfgDH73UQ35XCtRg1tC",
+      "filename": "Test6_Full.mp4",
+      "modified_epoch_ms": 1792922038622,
+      "created_epoch_ms": 1785486575999,
+      "size_bytes": 1330306904
+    },
+    {
+      "file_id": "1WS9suAtgbuwB2qc4IteGgFL6xf5hs0Gq",
+      "filename": "Test7_Full.mp4",
+      "modified_epoch_ms": 1792923193007,
+      "created_epoch_ms": 1785485897490,
+      "size_bytes": 664899136
+    }
+  ],
+  "selected": {
+    "file_id": "1vR71QTkUYEGWy4PjXa5vfMdJEXt_OwLn",
+    "filename": "Test1_Full_rev.mp4",
+    "modified_epoch_ms": 1792921527737,
+    "created_epoch_ms": 1785489310485,
+    "size_bytes": 1026166541
+  },
+  "downloaded_video_count": 1,
+  "download_method": "Google Drive public download with standard large-file confirmation; original bytes preserved",
+  "selection_reason": "Exact Test1_Full_rev.mp4 match for Test 1, confirmed size and later source/annotation timebase audit"
+}

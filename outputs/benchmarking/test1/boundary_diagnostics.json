@@ -1,0 +1,940 @@
+[
+  {
+    "gt_rally": 1,
+    "matching_status": "matched",
+    "frames_inclusive": 473,
+    "raw_shuttle_observed_frames": 395,
+    "raw_shuttle_observed_fraction": 0.8350951374207188,
+    "view_counts": {
+      "main": 473
+    },
+    "calibration_state_counts": {
+      "VALID": 473
+    },
+    "camera_lost_frames": 0,
+    "replay_flag_frames": 0,
+    "overlapping_production_segments": [
+      {
+        "event_id": "01M6KTX174QVRMW5WZAGB069QK",
+        "start": 339,
+        "end": 717,
+        "end_reason": "gap"
+      }
+    ]
+  },
+  {
+    "gt_rally": 2,
+    "matching_status": "matched",
+    "frames_inclusive": 376,
+    "raw_shuttle_observed_frames": 313,
+    "raw_shuttle_observed_fraction": 0.8324468085106383,
+    "view_counts": {
+      "main": 376
+    },
+    "calibration_state_counts": {
+      "VALID": 376
+    },
+    "camera_lost_frames": 0,
+    "replay_flag_frames": 0,
+    "overlapping_production_segments": [
+      {
+        "event_id": "01M6KTYZAYC6YCPQPKYP03AG35",
+        "start": 891,
+        "end": 1023,
+        "end_reason": "gap"
+      },
+      {
+        "event_id": "01M6KTZA1JBAXG0W3FXFVWVFZJ",
+        "start": 1066,
+        "end": 1255,
+        "end_reason": "stationary"
+      }
+    ]
+  },
+  {
+    "gt_rally": 3,
+    "matching_status": "matched",
+    "frames_inclusive": 267,
+    "raw_shuttle_observed_frames": 236,
+    "raw_shuttle_observed_fraction": 0.8838951310861424,
+    "view_counts": {
+      "main": 267
+    },
+    "calibration_state_counts": {
+      "VALID": 267
+    },
+    "camera_lost_frames": 0,
+    "replay_flag_frames": 0,
+    "overlapping_production_segments": [
+      {
+        "event_id": "01M6KTZYCV7A6HVQV3XYB9A7E4",
+        "start": 1402,
+        "end": 1561,
+        "end_reason": "gap"
+      },
+      {
+        "event_id": "01M6KV02676H4AQ034D0ZFHX1C",
+        "start": 1585,
+        "end": 1654,
+        "end_reason": "stationary"
+      }
+    ]
+  },
+  {
+    "gt_rally": 4,
+    "matching_status": "matched",
+    "frames_inclusive": 288,
+    "raw_shuttle_observed_frames": 241,
+    "raw_shuttle_observed_fraction": 0.8368055555555556,
+    "view_counts": {
+      "main": 288
+    },
+    "calibration_state_counts": {
+      "VALID": 288
+    },
+    "camera_lost_frames": 0,
+    "replay_flag_frames": 0,
+    "overlapping_production_segments": [
+      {
+        "event_id": "01M6KV13FXQPDWM3Z6YWFZB6QJ",
+        "start": 1889,
+        "end": 2167,
+        "end_reason": "gap"
+      }
+    ]
+  },
+  {
+    "gt_rally": 5,
+    "matching_status": "missed",
+    "frames_inclusive": 291,
+    "raw_shuttle_observed_frames": 199,
+    "raw_shuttle_observed_fraction": 0.6838487972508591,
+    "view_counts": {
+      "main": 291
+    },
+    "calibration_state_counts": {
+      "VALID": 291
+    },
+    "camera_lost_frames": 0,
+    "replay_flag_frames": 0,
+    "overlapping_production_segments": [
+      {
+        "event_id": "01M6KV1HN44FZGMQNFPAVTJ5D9",
+        "start": 2309,
+        "end": 2423,
+        "end_reason": "gap"
+      }
+    ]
+  },
+  {
+    "gt_rally": 6,
+    "matching_status": "matched",
+    "frames_inclusive": 249,
+    "raw_shuttle_observed_frames": 169,
+    "raw_shuttle_observed_fraction": 0.678714859437751,
+    "view_counts": {
+      "none": 16,
+      "main": 233
+    },
+    "calibration_state_counts": {
+      "LOST": 16,
+      "REACQUIRING": 2,
+      "VALID": 231
+    },
+    "camera_lost_frames": 16,
+    "replay_flag_frames": 16,
+    "overlapping_production_segments": [
+      {
+        "event_id": "01M6KV26R02NEZ62GCF4FKBYH2",
+        "start": 2661,
+        "end": 2799,
+        "end_reason": "gap"
+      }
+    ]
+  },
+  {
+    "gt_rally": 7,
+    "matching_status": "matched",
+    "frames_inclusive": 402,
+    "raw_shuttle_observed_frames": 391,
+    "raw_shuttle_observed_fraction": 0.972636815920398,
+    "view_counts": {
+      "main": 402
+    },
+    "calibration_state_counts": {
+      "VALID": 402
+    },
+    "camera_lost_frames": 0,
+    "replay_flag_frames": 0,
+    "overlapping_production_segments": [
+      {
+        "event_id": "01M6KV3C15S6F6E16CVKC004Z6",
+        "start": 2983,
+        "end": 3377,
+        "end_reason": "stationary"
+      }
+    ]
+  },
+  {
+    "gt_rally": 8,
+    "matching_status": "matched",
+    "frames_inclusive": 245,
+    "raw_shuttle_observed_frames": 181,
+    "raw_shuttle_observed_fraction": 0.7387755102040816,
+    "view_counts": {
+      "none": 14,
+      "main": 231
+    },
+    "calibration_state_counts": {
+      "LOST": 14,
+      "REACQUIRING": 2,
+      "VALID": 229
+    },
+    "camera_lost_frames": 14,
+    "replay_flag_frames": 14,
+    "overlapping_production_segments": [
+      {
+        "event_id": "01M6KV3X1C4R2QEN3A54BR6X7K",
+        "start": 3523,
+        "end": 3698,
+        "end_reason": "stationary"
+      }
+    ]
+  },
+  {
+    "gt_rally": 9,
+    "matching_status": "matched",
+    "frames_inclusive": 323,
+    "raw_shuttle_observed_frames": 247,
+    "raw_shuttle_observed_fraction": 0.7647058823529411,
+    "view_counts": {
+      "none": 15,
+      "main": 308
+    },
+    "calibration_state_counts": {
+      "LOST": 15,
+      "REACQUIRING": 2,
+      "VALID": 306
+    },
+    "camera_lost_frames": 15,
+    "replay_flag_frames": 15,
+    "overlapping_production_segments": [
+      {
+        "event_id": "01M6KV4HZNFSCX5ZNDKRC5A6SZ",
+        "start": 3863,
+        "end": 4059,
+        "end_reason": "stationary"
+      }
+    ]
+  },
+  {
+    "gt_rally": 10,
+    "matching_status": "matched",
+    "frames_inclusive": 593,
+    "raw_shuttle_observed_frames": 454,
+    "raw_shuttle_observed_fraction": 0.7655986509274874,
+    "view_counts": {
+      "main": 593
+    },
+    "calibration_state_counts": {
+      "VALID": 593
+    },
+    "camera_lost_frames": 0,
+    "replay_flag_frames": 0,
+    "overlapping_production_segments": [
+      {
+        "event_id": "01M6KV5RZWH79CYGX8T1N6FNA6",
+        "start": 4344,
+        "end": 4728,
+        "end_reason": "gap"
+      }
+    ]
+  },
+  {
+    "gt_rally": 11,
+    "matching_status": "matched",
+    "frames_inclusive": 174,
+    "raw_shuttle_observed_frames": 169,
+    "raw_shuttle_observed_fraction": 0.9712643678160919,
+    "view_counts": {
+      "main": 174
+    },
+    "calibration_state_counts": {
+      "VALID": 174
+    },
+    "camera_lost_frames": 0,
+    "replay_flag_frames": 0,
+    "overlapping_production_segments": [
+      {
+        "event_id": "01M6KV6AH5MJKYNQHR34VJWVYF",
+        "start": 4901,
+        "end": 5027,
+        "end_reason": "stationary"
+      }
+    ]
+  },
+  {
+    "gt_rally": 12,
+    "matching_status": "matched",
+    "frames_inclusive": 442,
+    "raw_shuttle_observed_frames": 400,
+    "raw_shuttle_observed_fraction": 0.9049773755656109,
+    "view_counts": {
+      "main": 442
+    },
+    "calibration_state_counts": {
+      "VALID": 442
+    },
+    "camera_lost_frames": 0,
+    "replay_flag_frames": 0,
+    "overlapping_production_segments": [
+      {
+        "event_id": "01M6KV8135R0ZKT1HM0K9NZ802",
+        "start": 5455,
+        "end": 5887,
+        "end_reason": "stationary"
+      }
+    ]
+  },
+  {
+    "gt_rally": 13,
+    "matching_status": "matched",
+    "frames_inclusive": 355,
+    "raw_shuttle_observed_frames": 321,
+    "raw_shuttle_observed_fraction": 0.9042253521126761,
+    "view_counts": {
+      "none": 2,
+      "main": 353
+    },
+    "calibration_state_counts": {
+      "LOST": 2,
+      "REACQUIRING": 2,
+      "VALID": 351
+    },
+    "camera_lost_frames": 2,
+    "replay_flag_frames": 2,
+    "overlapping_production_segments": [
+      {
+        "event_id": "01M6KV8W0FT38BKW3FTA326VZ8",
+        "start": 5979,
+        "end": 6310,
+        "end_reason": "stationary"
+      }
+    ]
+  },
+  {
+    "gt_rally": 14,
+    "matching_status": "matched",
+    "frames_inclusive": 275,
+    "raw_shuttle_observed_frames": 176,
+    "raw_shuttle_observed_fraction": 0.64,
+    "view_counts": {
+      "none": 10,
+      "main": 265
+    },
+    "calibration_state_counts": {
+      "LOST": 10,
+      "REACQUIRING": 2,
+      "VALID": 263
+    },
+    "camera_lost_frames": 10,
+    "replay_flag_frames": 10,
+    "overlapping_production_segments": [
+      {
+        "event_id": "01M6KV9EFH0KMD8E3XXMA1E9MH",
+        "start": 6451,
+        "end": 6639,
+        "end_reason": "gap"
+      }
+    ]
+  },
+  {
+    "gt_rally": 15,
+    "matching_status": "matched",
+    "frames_inclusive": 198,
+    "raw_shuttle_observed_frames": 136,
+    "raw_shuttle_observed_fraction": 0.6868686868686869,
+    "view_counts": {
+      "main": 198
+    },
+    "calibration_state_counts": {
+      "REACQUIRING": 2,
+      "VALID": 196
+    },
+    "camera_lost_frames": 0,
+    "replay_flag_frames": 0,
+    "overlapping_production_segments": [
+      {
+        "event_id": "01M6KV9ZP67AVGA54VQF6NWQXS",
+        "start": 6803,
+        "end": 6908,
+        "end_reason": "stationary"
+      }
+    ]
+  },
+  {
+    "gt_rally": 16,
+    "matching_status": "matched",
+    "frames_inclusive": 483,
+    "raw_shuttle_observed_frames": 444,
+    "raw_shuttle_observed_fraction": 0.9192546583850931,
+    "view_counts": {
+      "none": 15,
+      "main": 468
+    },
+    "calibration_state_counts": {
+      "LOST": 15,
+      "REACQUIRING": 2,
+      "VALID": 466
+    },
+    "camera_lost_frames": 15,
+    "replay_flag_frames": 15,
+    "overlapping_production_segments": [
+      {
+        "event_id": "01M6KVB5402YN8AN22F4JJ50NF",
+        "start": 7006,
+        "end": 7497,
+        "end_reason": "stationary"
+      }
+    ]
+  },
+  {
+    "gt_rally": 17,
+    "matching_status": "matched",
+    "frames_inclusive": 210,
+    "raw_shuttle_observed_frames": 198,
+    "raw_shuttle_observed_fraction": 0.9428571428571428,
+    "view_counts": {
+      "main": 210
+    },
+    "calibration_state_counts": {
+      "VALID": 210
+    },
+    "camera_lost_frames": 0,
+    "replay_flag_frames": 0,
+    "overlapping_production_segments": [
+      {
+        "event_id": "01M6KVBN0ESQB3NSKC2JAE60AY",
+        "start": 7535,
+        "end": 7731,
+        "end_reason": "gap"
+      }
+    ]
+  },
+  {
+    "gt_rally": 18,
+    "matching_status": "matched",
+    "frames_inclusive": 107,
+    "raw_shuttle_observed_frames": 100,
+    "raw_shuttle_observed_fraction": 0.9345794392523364,
+    "view_counts": {
+      "main": 107
+    },
+    "calibration_state_counts": {
+      "VALID": 107
+    },
+    "camera_lost_frames": 0,
+    "replay_flag_frames": 0,
+    "overlapping_production_segments": [
+      {
+        "event_id": "01M6KVCBVS8P20W6DCD7FRJJQW",
+        "start": 7953,
+        "end": 8052,
+        "end_reason": "stationary"
+      }
+    ]
+  },
+  {
+    "gt_rally": 19,
+    "matching_status": "matched",
+    "frames_inclusive": 523,
+    "raw_shuttle_observed_frames": 445,
+    "raw_shuttle_observed_fraction": 0.8508604206500956,
+    "view_counts": {
+      "main": 523
+    },
+    "calibration_state_counts": {
+      "VALID": 523
+    },
+    "camera_lost_frames": 0,
+    "replay_flag_frames": 0,
+    "overlapping_production_segments": [
+      {
+        "event_id": "01M6KVCPT2C9YECF47EGP7WA3J",
+        "start": 8110,
+        "end": 8266,
+        "end_reason": "gap"
+      },
+      {
+        "event_id": "01M6KVDGQHZ2AC11J9AWEX4TJE",
+        "start": 8308,
+        "end": 8627,
+        "end_reason": "gap"
+      }
+    ]
+  },
+  {
+    "gt_rally": 20,
+    "matching_status": "matched",
+    "frames_inclusive": 1285,
+    "raw_shuttle_observed_frames": 1151,
+    "raw_shuttle_observed_fraction": 0.8957198443579767,
+    "view_counts": {
+      "none": 14,
+      "main": 1271
+    },
+    "calibration_state_counts": {
+      "LOST": 14,
+      "REACQUIRING": 2,
+      "VALID": 1269
+    },
+    "camera_lost_frames": 14,
+    "replay_flag_frames": 14,
+    "overlapping_production_segments": [
+      {
+        "event_id": "01M6KVFKZWCDB8168GDJXST5S1",
+        "start": 8715,
+        "end": 9525,
+        "end_reason": "gap"
+      },
+      {
+        "event_id": "01M6KVFTWBXDWPHY74V74A15Q6",
+        "start": 9548,
+        "end": 9646,
+        "end_reason": "gap"
+      },
+      {
+        "event_id": "01M6KVGJJVRX59TSEQQZR7MBXH",
+        "start": 9685,
+        "end": 9947,
+        "end_reason": "gap"
+      }
+    ]
+  },
+  {
+    "gt_rally": 21,
+    "matching_status": "matched",
+    "frames_inclusive": 319,
+    "raw_shuttle_observed_frames": 304,
+    "raw_shuttle_observed_fraction": 0.9529780564263323,
+    "view_counts": {
+      "main": 319
+    },
+    "calibration_state_counts": {
+      "VALID": 319
+    },
+    "camera_lost_frames": 0,
+    "replay_flag_frames": 0,
+    "overlapping_production_segments": [
+      {
+        "event_id": "01M6KVKVV7N6APD15DTTBSBWR5",
+        "start": 10250,
+        "end": 10539,
+        "end_reason": "stationary"
+      }
+    ]
+  },
+  {
+    "gt_rally": 22,
+    "matching_status": "matched",
+    "frames_inclusive": 102,
+    "raw_shuttle_observed_frames": 93,
+    "raw_shuttle_observed_fraction": 0.9117647058823529,
+    "view_counts": {
+      "main": 102
+    },
+    "calibration_state_counts": {
+      "VALID": 102
+    },
+    "camera_lost_frames": 0,
+    "replay_flag_frames": 0,
+    "overlapping_production_segments": [
+      {
+        "event_id": "01M6KVMYMPWFFJGCCTSMB9MBK8",
+        "start": 10601,
+        "end": 10737,
+        "end_reason": "stationary"
+      }
+    ]
+  },
+  {
+    "gt_rally": 23,
+    "matching_status": "missed",
+    "frames_inclusive": 346,
+    "raw_shuttle_observed_frames": 294,
+    "raw_shuttle_observed_fraction": 0.8497109826589595,
+    "view_counts": {
+      "main": 346
+    },
+    "calibration_state_counts": {
+      "VALID": 346
+    },
+    "camera_lost_frames": 0,
+    "replay_flag_frames": 0,
+    "overlapping_production_segments": [
+      {
+        "event_id": "01M6KVMYMPWFFJGCCTSMB9MBK8",
+        "start": 10601,
+        "end": 10737,
+        "end_reason": "stationary"
+      },
+      {
+        "event_id": "01M6KVNKPKEJ13P9R9Z4EH1DK5",
+        "start": 10769,
+        "end": 10908,
+        "end_reason": "gap"
+      },
+      {
+        "event_id": "01M6KVP11K3BAX2XWWG2RR6QP8",
+        "start": 10949,
+        "end": 11085,
+        "end_reason": "stationary"
+      }
+    ]
+  },
+  {
+    "gt_rally": 24,
+    "matching_status": "matched",
+    "frames_inclusive": 122,
+    "raw_shuttle_observed_frames": 89,
+    "raw_shuttle_observed_fraction": 0.7295081967213115,
+    "view_counts": {
+      "main": 122
+    },
+    "calibration_state_counts": {
+      "VALID": 122
+    },
+    "camera_lost_frames": 0,
+    "replay_flag_frames": 0,
+    "overlapping_production_segments": [
+      {
+        "event_id": "01M6KVPMEWJNCZDHJ3KCZFV3H6",
+        "start": 11274,
+        "end": 11397,
+        "end_reason": "stationary"
+      }
+    ]
+  },
+  {
+    "gt_rally": 25,
+    "matching_status": "missed",
+    "frames_inclusive": 298,
+    "raw_shuttle_observed_frames": 208,
+    "raw_shuttle_observed_fraction": 0.697986577181208,
+    "view_counts": {
+      "main": 298
+    },
+    "calibration_state_counts": {
+      "VALID": 298
+    },
+    "camera_lost_frames": 0,
+    "replay_flag_frames": 0,
+    "overlapping_production_segments": [
+      {
+        "event_id": "01M6KVQCAB5FHGRHEMR285YNTV",
+        "start": 11634,
+        "end": 11745,
+        "end_reason": "gap"
+      },
+      {
+        "event_id": "01M6KVQKGKZ7E133N96APW3HEV",
+        "start": 11801,
+        "end": 11867,
+        "end_reason": "gap"
+      }
+    ]
+  },
+  {
+    "gt_rally": 26,
+    "matching_status": "matched",
+    "frames_inclusive": 222,
+    "raw_shuttle_observed_frames": 159,
+    "raw_shuttle_observed_fraction": 0.7162162162162162,
+    "view_counts": {
+      "main": 222
+    },
+    "calibration_state_counts": {
+      "VALID": 222
+    },
+    "camera_lost_frames": 0,
+    "replay_flag_frames": 0,
+    "overlapping_production_segments": [
+      {
+        "event_id": "01M6KVRD8NXPKKBC440XTMXYVX",
+        "start": 12046,
+        "end": 12196,
+        "end_reason": "stationary"
+      }
+    ]
+  },
+  {
+    "gt_rally": 27,
+    "matching_status": "matched",
+    "frames_inclusive": 516,
+    "raw_shuttle_observed_frames": 483,
+    "raw_shuttle_observed_fraction": 0.936046511627907,
+    "view_counts": {
+      "main": 516
+    },
+    "calibration_state_counts": {
+      "VALID": 516
+    },
+    "camera_lost_frames": 0,
+    "replay_flag_frames": 0,
+    "overlapping_production_segments": [
+      {
+        "event_id": "01M6KVSJBHQ3QJYYB32GZ9G87F",
+        "start": 12455,
+        "end": 12748,
+        "end_reason": "stationary"
+      },
+      {
+        "event_id": "01M6KVSZ8X78HRNM97X9RXZE3C",
+        "start": 12771,
+        "end": 12954,
+        "end_reason": "stationary"
+      }
+    ]
+  },
+  {
+    "gt_rally": 28,
+    "matching_status": "missed",
+    "frames_inclusive": 389,
+    "raw_shuttle_observed_frames": 248,
+    "raw_shuttle_observed_fraction": 0.6375321336760925,
+    "view_counts": {
+      "main": 389
+    },
+    "calibration_state_counts": {
+      "REACQUIRING": 2,
+      "VALID": 387
+    },
+    "camera_lost_frames": 0,
+    "replay_flag_frames": 0,
+    "overlapping_production_segments": [
+      {
+        "event_id": "01M6KVV92N1MBF88MPE8A8Q7R4",
+        "start": 13176,
+        "end": 13252,
+        "end_reason": "gap"
+      },
+      {
+        "event_id": "01M6KVVQJM92THWFNYAZ8KAXJP",
+        "start": 13273,
+        "end": 13439,
+        "end_reason": "gap"
+      }
+    ]
+  },
+  {
+    "gt_rally": 29,
+    "matching_status": "missed",
+    "frames_inclusive": 316,
+    "raw_shuttle_observed_frames": 247,
+    "raw_shuttle_observed_fraction": 0.7816455696202531,
+    "view_counts": {
+      "main": 316
+    },
+    "calibration_state_counts": {
+      "VALID": 316
+    },
+    "camera_lost_frames": 0,
+    "replay_flag_frames": 0,
+    "overlapping_production_segments": [
+      {
+        "event_id": "01M6KVWJR2N502EFPEBDMFZHAG",
+        "start": 13686,
+        "end": 13843,
+        "end_reason": "gap"
+      },
+      {
+        "event_id": "01M6KVWZD2N82J9MG5Z9JTET3P",
+        "start": 13883,
+        "end": 13982,
+        "end_reason": "stationary"
+      }
+    ]
+  },
+  {
+    "gt_rally": 30,
+    "matching_status": "matched",
+    "frames_inclusive": 117,
+    "raw_shuttle_observed_frames": 108,
+    "raw_shuttle_observed_fraction": 0.9230769230769231,
+    "view_counts": {
+      "main": 117
+    },
+    "calibration_state_counts": {
+      "VALID": 117
+    },
+    "camera_lost_frames": 0,
+    "replay_flag_frames": 0,
+    "overlapping_production_segments": [
+      {
+        "event_id": "01M6KVXMNVDD93X4J96GT78344",
+        "start": 14222,
+        "end": 14331,
+        "end_reason": "gap"
+      }
+    ]
+  },
+  {
+    "gt_rally": 31,
+    "matching_status": "missed",
+    "frames_inclusive": 748,
+    "raw_shuttle_observed_frames": 579,
+    "raw_shuttle_observed_fraction": 0.7740641711229946,
+    "view_counts": {
+      "none": 21,
+      "main": 727
+    },
+    "calibration_state_counts": {
+      "LOST": 21,
+      "REACQUIRING": 2,
+      "VALID": 725
+    },
+    "camera_lost_frames": 21,
+    "replay_flag_frames": 21,
+    "overlapping_production_segments": [
+      {
+        "event_id": "01M6KVYDQ3JVRYGKAHTYCCPVQT",
+        "start": 14491,
+        "end": 14646,
+        "end_reason": "gap"
+      },
+      {
+        "event_id": "01M6KVZ5WR2DS1S0CVCNPRSPVQ",
+        "start": 14701,
+        "end": 14969,
+        "end_reason": "gap"
+      },
+      {
+        "event_id": "01M6KVZK9TQTWGWHCCRXZNA4K2",
+        "start": 14994,
+        "end": 15171,
+        "end_reason": "stationary"
+      }
+    ]
+  },
+  {
+    "gt_rally": 32,
+    "matching_status": "matched",
+    "frames_inclusive": 186,
+    "raw_shuttle_observed_frames": 162,
+    "raw_shuttle_observed_fraction": 0.8709677419354839,
+    "view_counts": {
+      "main": 186
+    },
+    "calibration_state_counts": {
+      "VALID": 186
+    },
+    "camera_lost_frames": 0,
+    "replay_flag_frames": 0,
+    "overlapping_production_segments": [
+      {
+        "event_id": "01M6KW0CK74XQMKMYTBZG0WDD3",
+        "start": 15354,
+        "end": 15529,
+        "end_reason": "stationary"
+      }
+    ]
+  },
+  {
+    "gt_rally": 33,
+    "matching_status": "matched",
+    "frames_inclusive": 351,
+    "raw_shuttle_observed_frames": 272,
+    "raw_shuttle_observed_fraction": 0.7749287749287749,
+    "view_counts": {
+      "main": 351
+    },
+    "calibration_state_counts": {
+      "VALID": 351
+    },
+    "camera_lost_frames": 0,
+    "replay_flag_frames": 0,
+    "overlapping_production_segments": [
+      {
+        "event_id": "01M6KW10CM24GNAFD86V2Z8KKT",
+        "start": 15668,
+        "end": 15735,
+        "end_reason": "gap"
+      },
+      {
+        "event_id": "01M6KW1C4N0PNE2GY160AT8QWA",
+        "start": 15764,
+        "end": 15951,
+        "end_reason": "gap"
+      }
+    ]
+  },
+  {
+    "gt_rally": 34,
+    "matching_status": "matched",
+    "frames_inclusive": 390,
+    "raw_shuttle_observed_frames": 367,
+    "raw_shuttle_observed_fraction": 0.941025641025641,
+    "view_counts": {
+      "main": 390
+    },
+    "calibration_state_counts": {
+      "VALID": 390
+    },
+    "camera_lost_frames": 0,
+    "replay_flag_frames": 0,
+    "overlapping_production_segments": [
+      {
+        "event_id": "01M6KW2HW3M020XWDSN5PD2WEK",
+        "start": 15983,
+        "end": 16385,
+        "end_reason": "stationary"
+      }
+    ]
+  },
+  {
+    "gt_rally": 35,
+    "matching_status": "matched",
+    "frames_inclusive": 514,
+    "raw_shuttle_observed_frames": 449,
+    "raw_shuttle_observed_fraction": 0.8735408560311284,
+    "view_counts": {
+      "main": 514
+    },
+    "calibration_state_counts": {
+      "VALID": 514
+    },
+    "camera_lost_frames": 0,
+    "replay_flag_frames": 0,
+    "overlapping_production_segments": [
+      {
+        "event_id": "01M6KW3ZQVDGVGBZ9D0JRN79W7",
+        "start": 16521,
+        "end": 16934,
+        "end_reason": "gap"
+      }
+    ]
+  },
+  {
+    "gt_rally": 36,
+    "matching_status": "matched",
+    "frames_inclusive": 161,
+    "raw_shuttle_observed_frames": 136,
+    "raw_shuttle_observed_fraction": 0.84472049689441,
+    "view_counts": {
+      "main": 161
+    },
+    "calibration_state_counts": {
+      "VALID": 161
+    },
+    "camera_lost_frames": 0,
+    "replay_flag_frames": 0,
+    "overlapping_production_segments": [
+      {
+        "event_id": "01M6KW4DEVQVJ06PX47B5VXQKX",
+        "start": 17074,
+        "end": 17204,
+        "end_reason": "stationary"
+      }
+    ]
+  }
+]

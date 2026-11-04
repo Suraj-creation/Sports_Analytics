@@ -61,3 +61,16 @@ env
 # Local design review captures can contain private recordings.
 .impeccable/review/
 .taste-skill/
+
+# Single-video rally benchmark: keep only the dataset placeholder in Git.
+!/data/
+/data/*
+!/data/benchmarking/
+/data/benchmarking/*
+!/data/benchmarking/test1/
+/data/benchmarking/test1/*
+!/data/benchmarking/test1/.gitkeep
+
+# Preserve expensive evidence locally, without adding media/caches/event logs.
+/outputs/benchmarking/**/runtime/
+/outputs/benchmarking/**/raw_events.jsonl

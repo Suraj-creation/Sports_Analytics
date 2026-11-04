@@ -1,0 +1,1097 @@
+{
+  "status": "analysed",
+  "elapsed_seconds": 1469.2373393960297,
+  "source_sha256": "877c6d39d34ccfb302865ed44f7e08949b0f72be2833f71777066f837e6b8bd6",
+  "media": {
+    "fps_num": 30,
+    "fps_den": 1,
+    "n_frames": 17268,
+    "width": 1280,
+    "height": 720,
+    "duration_us": 575600000,
+    "codec": "h264",
+    "has_audio": true,
+    "source_width": 1920,
+    "source_height": 1080,
+    "source_codec": "h264",
+    "source_fps": "30",
+    "variable_frame_rate": false
+  },
+  "proxy_sha256": "d352d684fb5399d804b8f50c785a3605346e7f03987ecb1d9a73ef3482535a97",
+  "frontier_frame": 17267,
+  "event_counts": {
+    "calibration": 1,
+    "activity_interval": 136,
+    "scene": 17,
+    "participant_observation": 192,
+    "format_decision": 1,
+    "rally_start": 49,
+    "rally_end": 49,
+    "stroke": 432,
+    "contact": 432,
+    "shuttle_turn": 44,
+    "identity_ambiguity": 37,
+    "broadcast_score": 473,
+    "match_phase": 1,
+    "highlight": 2
+  },
+  "rally_events": [
+    {
+      "event_id": "01M6KTX174QVRMW5WZAGB069QK",
+      "start": 339,
+      "end": 717,
+      "end_reason": "gap"
+    },
+    {
+      "event_id": "01M6KTYZAYC6YCPQPKYP03AG35",
+      "start": 891,
+      "end": 1023,
+      "end_reason": "gap"
+    },
+    {
+      "event_id": "01M6KTZA1JBAXG0W3FXFVWVFZJ",
+      "start": 1066,
+      "end": 1255,
+      "end_reason": "stationary"
+    },
+    {
+      "event_id": "01M6KTZYCV7A6HVQV3XYB9A7E4",
+      "start": 1402,
+      "end": 1561,
+      "end_reason": "gap"
+    },
+    {
+      "event_id": "01M6KV02676H4AQ034D0ZFHX1C",
+      "start": 1585,
+      "end": 1654,
+      "end_reason": "stationary"
+    },
+    {
+      "event_id": "01M6KV13FXQPDWM3Z6YWFZB6QJ",
+      "start": 1889,
+      "end": 2167,
+      "end_reason": "gap"
+    },
+    {
+      "event_id": "01M6KV1HN44FZGMQNFPAVTJ5D9",
+      "start": 2309,
+      "end": 2423,
+      "end_reason": "gap"
+    },
+    {
+      "event_id": "01M6KV26R02NEZ62GCF4FKBYH2",
+      "start": 2661,
+      "end": 2799,
+      "end_reason": "gap"
+    },
+    {
+      "event_id": "01M6KV3C15S6F6E16CVKC004Z6",
+      "start": 2983,
+      "end": 3377,
+      "end_reason": "stationary"
+    },
+    {
+      "event_id": "01M6KV3X1C4R2QEN3A54BR6X7K",
+      "start": 3523,
+      "end": 3698,
+      "end_reason": "stationary"
+    },
+    {
+      "event_id": "01M6KV4HZNFSCX5ZNDKRC5A6SZ",
+      "start": 3863,
+      "end": 4059,
+      "end_reason": "stationary"
+    },
+    {
+      "event_id": "01M6KV5RZWH79CYGX8T1N6FNA6",
+      "start": 4344,
+      "end": 4728,
+      "end_reason": "gap"
+    },
+    {
+      "event_id": "01M6KV6AH5MJKYNQHR34VJWVYF",
+      "start": 4901,
+      "end": 5027,
+      "end_reason": "stationary"
+    },
+    {
+      "event_id": "01M6KV8135R0ZKT1HM0K9NZ802",
+      "start": 5455,
+      "end": 5887,
+      "end_reason": "stationary"
+    },
+    {
+      "event_id": "01M6KV8W0FT38BKW3FTA326VZ8",
+      "start": 5979,
+      "end": 6310,
+      "end_reason": "stationary"
+    },
+    {
+      "event_id": "01M6KV9EFH0KMD8E3XXMA1E9MH",
+      "start": 6451,
+      "end": 6639,
+      "end_reason": "gap"
+    },
+    {
+      "event_id": "01M6KV9ZP67AVGA54VQF6NWQXS",
+      "start": 6803,
+      "end": 6908,
+      "end_reason": "stationary"
+    },
+    {
+      "event_id": "01M6KVB5402YN8AN22F4JJ50NF",
+      "start": 7006,
+      "end": 7497,
+      "end_reason": "stationary"
+    },
+    {
+      "event_id": "01M6KVBN0ESQB3NSKC2JAE60AY",
+      "start": 7535,
+      "end": 7731,
+      "end_reason": "gap"
+    },
+    {
+      "event_id": "01M6KVCBVS8P20W6DCD7FRJJQW",
+      "start": 7953,
+      "end": 8052,
+      "end_reason": "stationary"
+    },
+    {
+      "event_id": "01M6KVCPT2C9YECF47EGP7WA3J",
+      "start": 8110,
+      "end": 8266,
+      "end_reason": "gap"
+    },
+    {
+      "event_id": "01M6KVDGQHZ2AC11J9AWEX4TJE",
+      "start": 8308,
+      "end": 8627,
+      "end_reason": "gap"
+    },
+    {
+      "event_id": "01M6KVFKZWCDB8168GDJXST5S1",
+      "start": 8715,
+      "end": 9525,
+      "end_reason": "gap"
+    },
+    {
+      "event_id": "01M6KVFTWBXDWPHY74V74A15Q6",
+      "start": 9548,
+      "end": 9646,
+      "end_reason": "gap"
+    },
+    {
+      "event_id": "01M6KVGJJVRX59TSEQQZR7MBXH",
+      "start": 9685,
+      "end": 9947,
+      "end_reason": "gap"
+    },
+    {
+      "event_id": "01M6KVKVV7N6APD15DTTBSBWR5",
+      "start": 10250,
+      "end": 10539,
+      "end_reason": "stationary"
+    },
+    {
+      "event_id": "01M6KVMYMPWFFJGCCTSMB9MBK8",
+      "start": 10601,
+      "end": 10737,
+      "end_reason": "stationary"
+    },
+    {
+      "event_id": "01M6KVNKPKEJ13P9R9Z4EH1DK5",
+      "start": 10769,
+      "end": 10908,
+      "end_reason": "gap"
+    },
+    {
+      "event_id": "01M6KVP11K3BAX2XWWG2RR6QP8",
+      "start": 10949,
+      "end": 11085,
+      "end_reason": "stationary"
+    },
+    {
+      "event_id": "01M6KVPMEWJNCZDHJ3KCZFV3H6",
+      "start": 11274,
+      "end": 11397,
+      "end_reason": "stationary"
+    },
+    {
+      "event_id": "01M6KVQCAB5FHGRHEMR285YNTV",
+      "start": 11634,
+      "end": 11745,
+      "end_reason": "gap"
+    },
+    {
+      "event_id": "01M6KVQKGKZ7E133N96APW3HEV",
+      "start": 11801,
+      "end": 11867,
+      "end_reason": "gap"
+    },
+    {
+      "event_id": "01M6KVRD8NXPKKBC440XTMXYVX",
+      "start": 12046,
+      "end": 12196,
+      "end_reason": "stationary"
+    },
+    {
+      "event_id": "01M6KVSJBHQ3QJYYB32GZ9G87F",
+      "start": 12455,
+      "end": 12748,
+      "end_reason": "stationary"
+    },
+    {
+      "event_id": "01M6KVSZ8X78HRNM97X9RXZE3C",
+      "start": 12771,
+      "end": 12954,
+      "end_reason": "stationary"
+    },
+    {
+      "event_id": "01M6KVV92N1MBF88MPE8A8Q7R4",
+      "start": 13176,
+      "end": 13252,
+      "end_reason": "gap"
+    },
+    {
+      "event_id": "01M6KVVQJM92THWFNYAZ8KAXJP",
+      "start": 13273,
+      "end": 13439,
+      "end_reason": "gap"
+    },
+    {
+      "event_id": "01M6KVWJR2N502EFPEBDMFZHAG",
+      "start": 13686,
+      "end": 13843,
+      "end_reason": "gap"
+    },
+    {
+      "event_id": "01M6KVWZD2N82J9MG5Z9JTET3P",
+      "start": 13883,
+      "end": 13982,
+      "end_reason": "stationary"
+    },
+    {
+      "event_id": "01M6KVXMNVDD93X4J96GT78344",
+      "start": 14222,
+      "end": 14331,
+      "end_reason": "gap"
+    },
+    {
+      "event_id": "01M6KVYDQ3JVRYGKAHTYCCPVQT",
+      "start": 14491,
+      "end": 14646,
+      "end_reason": "gap"
+    },
+    {
+      "event_id": "01M6KVZ5WR2DS1S0CVCNPRSPVQ",
+      "start": 14701,
+      "end": 14969,
+      "end_reason": "gap"
+    },
+    {
+      "event_id": "01M6KVZK9TQTWGWHCCRXZNA4K2",
+      "start": 14994,
+      "end": 15171,
+      "end_reason": "stationary"
+    },
+    {
+      "event_id": "01M6KW0CK74XQMKMYTBZG0WDD3",
+      "start": 15354,
+      "end": 15529,
+      "end_reason": "stationary"
+    },
+    {
+      "event_id": "01M6KW10CM24GNAFD86V2Z8KKT",
+      "start": 15668,
+      "end": 15735,
+      "end_reason": "gap"
+    },
+    {
+      "event_id": "01M6KW1C4N0PNE2GY160AT8QWA",
+      "start": 15764,
+      "end": 15951,
+      "end_reason": "gap"
+    },
+    {
+      "event_id": "01M6KW2HW3M020XWDSN5PD2WEK",
+      "start": 15983,
+      "end": 16385,
+      "end_reason": "stationary"
+    },
+    {
+      "event_id": "01M6KW3ZQVDGVGBZ9D0JRN79W7",
+      "start": 16521,
+      "end": 16934,
+      "end_reason": "gap"
+    },
+    {
+      "event_id": "01M6KW4DEVQVJ06PX47B5VXQKX",
+      "start": 17074,
+      "end": 17204,
+      "end_reason": "stationary"
+    }
+  ],
+  "degraded": [
+    {
+      "stage": "player_identity",
+      "reason": "osnet_ain_x0_25: osnet_ain_x0_25 is not downloaded; run `bai models fetch osnet_ain_x0_25`"
+    },
+    {
+      "stage": "player_reid",
+      "reason": "baseline player_reid provider is unavailable"
+    }
+  ],
+  "execution_backends": {
+    "player_detector": {
+      "runtime": "onnxruntime",
+      "providers": [
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider"
+      ]
+    },
+    "pose": {
+      "runtime": "onnxruntime",
+      "providers": [
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider"
+      ]
+    },
+    "shuttle": null
+  },
+  "pipeline": {
+    "plugin": "badminton",
+    "pipeline_id": "badminton-broadcast",
+    "pipeline_version": "2",
+    "input_schema": "canonical-cfr-bgr-chunk:v1",
+    "output_schema": "events-and-observation-tracks:v1",
+    "supported_formats": [
+      "singles",
+      "doubles",
+      "unknown"
+    ],
+    "configuration": {
+      "profile": "gpu-rtx4000",
+      "source_sha256": "877c6d39d34ccfb302865ed44f7e08949b0f72be2833f71777066f837e6b8bd6",
+      "input_transform": {},
+      "scoring_names": {
+        "P1": null,
+        "P2": null
+      },
+      "roster": null,
+      "calibration": 1866490011
+    },
+    "stages": [
+      {
+        "id": "perception",
+        "depends_on": [],
+        "components": [
+          "shuttle",
+          "player_detector",
+          "pose",
+          "player_reid",
+          "tracking",
+          "racket",
+          "ocr"
+        ]
+      },
+      {
+        "id": "format",
+        "depends_on": [
+          "perception"
+        ],
+        "components": [
+          "format"
+        ]
+      },
+      {
+        "id": "identity",
+        "depends_on": [
+          "perception",
+          "format"
+        ],
+        "components": [
+          "identity"
+        ]
+      },
+      {
+        "id": "activity",
+        "depends_on": [
+          "perception",
+          "identity"
+        ],
+        "components": [
+          "activity"
+        ]
+      },
+      {
+        "id": "contact",
+        "depends_on": [
+          "perception",
+          "format",
+          "identity"
+        ],
+        "components": [
+          "contact"
+        ]
+      },
+      {
+        "id": "rally",
+        "depends_on": [
+          "contact",
+          "activity"
+        ],
+        "components": [
+          "rally"
+        ]
+      },
+      {
+        "id": "stroke",
+        "depends_on": [
+          "contact",
+          "rally",
+          "identity"
+        ],
+        "components": [
+          "stroke"
+        ]
+      },
+      {
+        "id": "outcome",
+        "depends_on": [
+          "rally",
+          "format",
+          "perception"
+        ],
+        "components": [
+          "outcome"
+        ]
+      },
+      {
+        "id": "scoring",
+        "depends_on": [
+          "format",
+          "rally",
+          "outcome",
+          "perception"
+        ],
+        "components": [
+          "scoring"
+        ]
+      },
+      {
+        "id": "analytics",
+        "depends_on": [
+          "scoring",
+          "stroke",
+          "identity"
+        ],
+        "components": [
+          "analytics"
+        ]
+      }
+    ],
+    "lifecycle": {
+      "per_session_factory": true,
+      "ordered_ingest": true,
+      "state_restore": "recompute_perception;restore_event_fold",
+      "close": "owned_components_after_resident_commands"
+    },
+    "failure_behavior": "explicit_unavailable_or_unknown;no_fabricated_points",
+    "components": {
+      "shuttle": {
+        "implementation": "tracknet-v3",
+        "version": "1",
+        "fingerprint": "87d6167cdd3e8fa24356a9870143977d2f1d6cfc83b9f351b83e926172f95311",
+        "status": "selected"
+      },
+      "player_detector": {
+        "implementation": "person-onnx-v1",
+        "version": "1",
+        "fingerprint": "eafd71798235788a94d68552959b86e24537144c7ffefdf3629fbe9c4700f70c",
+        "status": "selected"
+      },
+      "pose": {
+        "implementation": "rtmpose-v1",
+        "version": "1",
+        "fingerprint": "84da862fe2297c4d924bddaab03243b1fb1bc9dcb6c08dc655b26f2492fe1154",
+        "status": "selected"
+      },
+      "ocr": {
+        "implementation": "rapidocr-v1",
+        "version": "3",
+        "fingerprint": "243d3cc56d12ff44cc2d395919bbaeede63ff41efb6479db1f9dbb732e3ef6c6",
+        "status": "selected"
+      },
+      "racket": {
+        "implementation": "racket-geometry-v1",
+        "version": "1",
+        "fingerprint": "d0ae3f80b101e15bc3f2dbe88dc5960ceac2276d2458c8315f2b53d5087853f8",
+        "status": "selected"
+      },
+      "tracking": {
+        "implementation": "court-player-episodes-v1",
+        "version": "1",
+        "fingerprint": "325a3184eefeca7d4866151025224b333950cf08e7f1a67d9ad16c35ddd1a173",
+        "status": "selected"
+      },
+      "identity": {
+        "implementation": "participant-identity-v1",
+        "version": "1",
+        "fingerprint": "230066575c77f597d7cfa69b3cf68d4c031a957fdbd8a7204694c3f0ece4d441",
+        "status": "selected"
+      },
+      "contact": {
+        "implementation": "contact-fusion-v1",
+        "version": "1",
+        "fingerprint": "aca9b92acb89fa2faf843e01e4302d8292f460cb5a714e70d917bc80cad7e15d",
+        "status": "selected"
+      },
+      "stroke": {
+        "implementation": "stroke-rules-v0",
+        "version": "1",
+        "fingerprint": "a73f2b026a300be9ebe97e390a1eaaccd4a263030519fa6cff789851e42b0741",
+        "status": "selected"
+      },
+      "activity": {
+        "implementation": "temporal-activity-v3",
+        "version": "1",
+        "fingerprint": "94b11d16ce55db3d90df97ab52d8831b36639fca90e7b8fbe0b8db2c01fdbcd7",
+        "status": "selected"
+      },
+      "rally": {
+        "implementation": "rally-fsm-v1",
+        "version": "1",
+        "fingerprint": "fd63426178276d182a664b60bd72695290cd939883a4104e28a47a5549e90889",
+        "status": "selected"
+      },
+      "outcome": {
+        "implementation": "observed-terminal-v1",
+        "version": "1",
+        "fingerprint": "8cdf73fc5109a603f5b426e66503afe0ac432a47bdbe31ccc8fd2cb25deea813",
+        "status": "selected"
+      },
+      "scoring": {
+        "implementation": "bwf-rally-point-v1",
+        "version": "1",
+        "fingerprint": "094c4195eb11b0b548985def48f17eca6a1f1d8d60cfd1daee0ecec159dbb6f1",
+        "status": "selected"
+      },
+      "analytics": {
+        "implementation": "match-analytics-v1",
+        "version": "1",
+        "fingerprint": "cba68ae184109631c57bf59ddf603fd5763de445c584df7fd564636e0b94e0f7",
+        "status": "selected"
+      },
+      "format": {
+        "implementation": "sustained-court-v1",
+        "version": "1",
+        "fingerprint": "1a14e7b1676589eab59a5e717d65112cc3164a7714f9bf3344aa03528179de09",
+        "status": "selected"
+      },
+      "player_reid": {
+        "implementation": null,
+        "status": "unavailable"
+      }
+    },
+    "format": {
+      "method": "sustained_target_court_format_v1",
+      "match_format": "singles",
+      "source": "inferred",
+      "reason": "unobserved_frame",
+      "revision": 1,
+      "observed_frames": [
+        30,
+        36,
+        42,
+        48,
+        54,
+        60,
+        66,
+        72,
+        78,
+        84,
+        90,
+        96,
+        102,
+        108,
+        114,
+        120
+      ],
+      "side_counts": [
+        1,
+        1
+      ],
+      "epoch": "1",
+      "support_kind": "uncalibrated_observation_policy",
+      "requires_configuration": false
+    },
+    "fingerprint": "c2f3fe0cb6a2208443fd22c5b4c5d7f4f9a5d9475ae4bae604d3a5d73f76da88"
+  },
+  "model_registry_after": [
+    {
+      "name": "bst_cg_ap_shuttleset",
+      "task": "stroke",
+      "version": "1.0",
+      "format": "torch",
+      "license": "MIT source; separate checkpoint grant not independently verified (Va6lue/BST-Badminton-Stroke-type-Transformer)",
+      "status": "candidate",
+      "available": false,
+      "sha256": "997f43e52b20cb47517132c71d3e147d7d717a2d9651cfbe7651a5003bd66809"
+    },
+    {
+      "name": "contact_fusion_v0",
+      "task": "contact",
+      "version": "0",
+      "format": "builtin",
+      "license": "project",
+      "status": "active",
+      "available": true,
+      "sha256": null
+    },
+    {
+      "name": "contact_fusion_v2",
+      "task": "contact",
+      "version": "2",
+      "format": "builtin",
+      "license": "project",
+      "status": "active",
+      "available": true,
+      "sha256": null
+    },
+    {
+      "name": "inpaintnet",
+      "task": "shuttle_refine",
+      "version": "3.0",
+      "format": "torch",
+      "license": "MIT (qaz812345/TrackNetV3)",
+      "status": "active",
+      "available": true,
+      "sha256": "5749b66b8002f3ad9e0af841604004706fc796df30599e6bf01952696009688c"
+    },
+    {
+      "name": "osnet_ain_x0_25",
+      "task": "person_reidentification",
+      "version": "1",
+      "format": "torch",
+      "license": "MIT (Torchreid/LibreYOLO weights and code); research-data provenance documented in model card",
+      "status": "candidate",
+      "available": false,
+      "sha256": "ce171fe160b3608f5e4c19489774991419be965b1d6f4bdccc4b4cfd2ef95347"
+    },
+    {
+      "name": "racket_geometry_v1",
+      "task": "racket_pose",
+      "version": "1",
+      "format": "builtin",
+      "license": "project (OpenCV runtime)",
+      "status": "active",
+      "available": true,
+      "sha256": null
+    },
+    {
+      "name": "racketvision_balltrack",
+      "task": "shuttle_live",
+      "version": "1.0",
+      "format": "torch",
+      "license": "MIT (RacketVision, AAAI 2026); YouTube-sourced training data \u2014 check content rights",
+      "status": "candidate",
+      "available": false,
+      "sha256": null
+    },
+    {
+      "name": "racketvision_racketpose",
+      "task": "racket_pose",
+      "version": "1.0",
+      "format": "torch",
+      "license": "MIT (RacketVision); mmpose checkpoint \u2014 exported to ONNX in the research container",
+      "status": "candidate",
+      "available": false,
+      "sha256": null
+    },
+    {
+      "name": "rapidocr_v4",
+      "task": "ocr",
+      "version": "4",
+      "format": "package",
+      "license": "Apache-2.0 (RapidOCR / PP-OCR models)",
+      "status": "active",
+      "available": true,
+      "sha256": null
+    },
+    {
+      "name": "rfdetr_medium",
+      "task": "person_detection",
+      "version": "1.4.2",
+      "format": "onnx",
+      "license": "Apache-2.0 (RF-DETR); ONNX export mirror",
+      "status": "active",
+      "available": true,
+      "sha256": "7fc5834e2fc7205e399a77d29dd0e89b694b075eeb496d5c8464d25137cad788"
+    },
+    {
+      "name": "rfdetr_nano",
+      "task": "person_detection",
+      "version": "1.4.2",
+      "format": "onnx",
+      "license": "Apache-2.0 (RF-DETR N/S/M/L); ONNX export mirror",
+      "status": "active",
+      "available": true,
+      "sha256": "aceebff282d046fae831217136c4c0ce91fb28a6b834dfd48f3a3f46fddc1d9e"
+    },
+    {
+      "name": "rfdetr_small",
+      "task": "person_detection",
+      "version": "1.4.2",
+      "format": "onnx",
+      "license": "Apache-2.0 (RF-DETR); ONNX export mirror",
+      "status": "active",
+      "available": true,
+      "sha256": "fcd3c3c4e0d3d5533ee9c3a174deb7f02dfe4b042b6fdd3d29040f3c6da7845e"
+    },
+    {
+      "name": "rtmpose_m_body7",
+      "task": "pose",
+      "version": "1.0",
+      "format": "onnx-zip",
+      "license": "Apache-2.0 (MMPose RTMPose)",
+      "status": "active",
+      "available": true,
+      "sha256": "f7fbb6c5c11a1bb70f3d445e4ddec5d144ea89ad5649c081ef976f9b24a0b741"
+    },
+    {
+      "name": "rtmpose_x_halpe26",
+      "task": "pose",
+      "version": "1.0",
+      "format": "onnx-zip",
+      "license": "Apache-2.0 (MMPose RTMPose)",
+      "status": "active",
+      "available": true,
+      "sha256": "1174dd5ccf780501835017eb7376a93fc202238457549a8af8f6aa6d44ae548a"
+    },
+    {
+      "name": "tracknetv3",
+      "task": "shuttle",
+      "version": "3.0",
+      "format": "torch",
+      "license": "MIT (qaz812345/TrackNetV3 code + checkpoints); HF mirror of the official Google Drive release",
+      "status": "active",
+      "available": true,
+      "sha256": "df867641a02712b021f04548ff4b1208ddfdb47f629ab2094ceb978667e83b1a"
+    },
+    {
+      "name": "yolox_m_humanart",
+      "task": "person_detection",
+      "version": "1.0",
+      "format": "onnx",
+      "license": "Apache-2.0 (MMPose / YOLOX)",
+      "status": "active",
+      "available": true,
+      "sha256": "3dea6513388889f0fff4b77bf7a26013600321b9eb9ceb0e9a400a82572f5f23"
+    }
+  ],
+  "effective_profile": {
+    "name": "gpu-rtx4000",
+    "description": "RTX 4000 Ada \u2014 TensorRT FP16, multi-rate, event-triggered specialists",
+    "device": "cuda",
+    "analysis_height": 720,
+    "chunk_frames": 64,
+    "lead_buffer_s": 5.0,
+    "components": {
+      "stroke": {
+        "model": "none",
+        "implementation": "stroke-rules-v0",
+        "backend": "none",
+        "precision": "fp32",
+        "batch": 1,
+        "input_size": null,
+        "params": {}
+      }
+    },
+    "shuttle": {
+      "model": "tracknetv3",
+      "implementation": null,
+      "backend": "torch-cuda",
+      "precision": "fp16",
+      "batch": 4,
+      "input_size": [
+        512,
+        288
+      ],
+      "params": {
+        "seq_len": 8,
+        "bg_mode": "concat",
+        "threshold": 0.5,
+        "step": 8
+      }
+    },
+    "shuttle_live": {
+      "model": "racketvision_balltrack",
+      "implementation": null,
+      "backend": "torch-cuda",
+      "precision": "fp16",
+      "batch": 1,
+      "input_size": null,
+      "params": {}
+    },
+    "shuttle_second_opinion": {
+      "model": "wasb_badminton",
+      "implementation": null,
+      "backend": "torch-cuda",
+      "precision": "fp16",
+      "batch": 1,
+      "input_size": null,
+      "params": {}
+    },
+    "player_detector": {
+      "model": "rfdetr_small",
+      "implementation": null,
+      "backend": "onnx-cuda",
+      "precision": "fp16",
+      "batch": 1,
+      "input_size": [
+        512,
+        512
+      ],
+      "params": {
+        "score_threshold": 0.35,
+        "court_roi": true
+      }
+    },
+    "player_reid": {
+      "model": "osnet_ain_x0_25",
+      "implementation": null,
+      "backend": "torch-cuda",
+      "precision": "fp32",
+      "batch": 1,
+      "input_size": null,
+      "params": {
+        "retention_seconds": 8
+      }
+    },
+    "pose": {
+      "model": "rtmpose_m_body7",
+      "implementation": null,
+      "backend": "onnx-cuda",
+      "precision": "fp16",
+      "batch": 2,
+      "input_size": [
+        192,
+        256
+      ],
+      "params": {}
+    },
+    "racket": {
+      "model": "racket_geometry_v1",
+      "implementation": null,
+      "backend": "opencv-cpu",
+      "precision": "fp32",
+      "batch": 1,
+      "input_size": null,
+      "params": {}
+    },
+    "stroke": {
+      "model": "none",
+      "implementation": null,
+      "backend": "none",
+      "precision": "fp32",
+      "batch": 1,
+      "input_size": null,
+      "params": {}
+    },
+    "contact": {
+      "model": "contact_fusion_v2",
+      "implementation": null,
+      "backend": "none",
+      "precision": "fp32",
+      "batch": 1,
+      "input_size": null,
+      "params": {}
+    },
+    "ocr": {
+      "model": "rapidocr_v4",
+      "implementation": null,
+      "backend": "onnx-cuda",
+      "precision": "fp32",
+      "batch": 1,
+      "input_size": null,
+      "params": {}
+    },
+    "detector_rates": {
+      "in_play": 2,
+      "idle": 6,
+      "replay": 0
+    },
+    "pose_rates": {
+      "in_play": 1,
+      "idle": 6,
+      "replay": 0
+    },
+    "shuttle_rates": {
+      "in_play": 1,
+      "idle": 1,
+      "replay": 0
+    },
+    "ocr_every_s": 1.0,
+    "court_verify_every_s": 2.0,
+    "escalation_budget": 0.15,
+    "racket_window": 6
+  },
+  "perception_models": {
+    "shuttle": "tracknetv3@3.0",
+    "player_detector": "rfdetr_small@1.4.2",
+    "pose": "rtmpose_m_body7@1.0",
+    "ocr": "rapidocr@3.10.0+bbb248356812",
+    "racket": "racket_geometry_v1@1",
+    "tracking": "court-player-episodes-v1@1"
+  },
+  "perception_runtimes": {
+    "shuttle": {
+      "requested_backend": "torch-cuda",
+      "actual_backend": "torch-cuda",
+      "device": "cuda:0",
+      "dtype": "torch.float16",
+      "backend_fallback": false,
+      "requested_precision": "fp16",
+      "checkpoint_sha256": "df867641a02712b021f04548ff4b1208ddfdb47f629ab2094ceb978667e83b1a"
+    },
+    "player_detector": {
+      "requested_backend": "onnx-cuda",
+      "providers": [
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "actual_backend": "onnx-cuda",
+      "backend_fallback": false
+    },
+    "pose": {
+      "requested_backend": "onnx-cuda",
+      "providers": [
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "actual_backend": "onnx-cuda",
+      "backend_fallback": false
+    },
+    "ocr": {
+      "package_version": "3.10.0",
+      "requested_backend": "onnx-cuda",
+      "stages": {
+        "det": {
+          "model_file": "PP-OCRv6_det_small.onnx",
+          "sha256": "090f04abcd9d9a7498bc4ebf677e4cb9bdce1fe4197ddb7e529f1ef44e1ff94f",
+          "configured_ocr_version": "PP-OCRv6",
+          "providers": [
+            "CUDAExecutionProvider",
+            "CPUExecutionProvider"
+          ],
+          "provider_options": {
+            "CPUExecutionProvider": {},
+            "CUDAExecutionProvider": {
+              "sdpa_kernel": "0",
+              "use_tf32": "1",
+              "fuse_conv_bias": "0",
+              "prefer_nhwc": "0",
+              "tunable_op_max_tuning_duration_ms": "0",
+              "tunable_op_enable": "0",
+              "tunable_op_tuning_enable": "0",
+              "enable_cudnn": "1",
+              "use_ep_level_unified_stream": "0",
+              "device_id": "0",
+              "has_user_compute_stream": "0",
+              "gpu_external_empty_cache": "0",
+              "cudnn_conv_algo_search": "EXHAUSTIVE",
+              "cudnn_conv1d_pad_to_nc1d": "0",
+              "gpu_mem_limit": "18446744073709551615",
+              "gpu_external_alloc": "0",
+              "gpu_external_free": "0",
+              "arena_extend_strategy": "kNextPowerOfTwo",
+              "do_copy_in_default_stream": "1",
+              "enable_cuda_graph": "0",
+              "user_compute_stream": "0",
+              "cudnn_conv_use_max_workspace": "1"
+            }
+          }
+        },
+        "cls": {
+          "model_file": "ch_ppocr_mobile_v2.0_cls_mobile.onnx",
+          "sha256": "e47acedf663230f8863ff1ab0e64dd2d82b838fceb5957146dab185a89d6215c",
+          "configured_ocr_version": "PP-OCRv4",
+          "providers": [
+            "CUDAExecutionProvider",
+            "CPUExecutionProvider"
+          ],
+          "provider_options": {
+            "CPUExecutionProvider": {},
+            "CUDAExecutionProvider": {
+              "sdpa_kernel": "0",
+              "use_tf32": "1",
+              "fuse_conv_bias": "0",
+              "prefer_nhwc": "0",
+              "tunable_op_max_tuning_duration_ms": "0",
+              "tunable_op_enable": "0",
+              "tunable_op_tuning_enable": "0",
+              "enable_cudnn": "1",
+              "use_ep_level_unified_stream": "0",
+              "device_id": "0",
+              "has_user_compute_stream": "0",
+              "gpu_external_empty_cache": "0",
+              "cudnn_conv_algo_search": "EXHAUSTIVE",
+              "cudnn_conv1d_pad_to_nc1d": "0",
+              "gpu_mem_limit": "18446744073709551615",
+              "gpu_external_alloc": "0",
+              "gpu_external_free": "0",
+              "arena_extend_strategy": "kNextPowerOfTwo",
+              "do_copy_in_default_stream": "1",
+              "enable_cuda_graph": "0",
+              "user_compute_stream": "0",
+              "cudnn_conv_use_max_workspace": "1"
+            }
+          }
+        },
+        "rec": {
+          "model_file": "PP-OCRv6_rec_small.onnx",
+          "sha256": "6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884",
+          "configured_ocr_version": "PP-OCRv6",
+          "providers": [
+            "CUDAExecutionProvider",
+            "CPUExecutionProvider"
+          ],
+          "provider_options": {
+            "CPUExecutionProvider": {},
+            "CUDAExecutionProvider": {
+              "sdpa_kernel": "0",
+              "use_tf32": "1",
+              "fuse_conv_bias": "0",
+              "prefer_nhwc": "0",
+              "tunable_op_max_tuning_duration_ms": "0",
+              "tunable_op_enable": "0",
+              "tunable_op_tuning_enable": "0",
+              "enable_cudnn": "1",
+              "use_ep_level_unified_stream": "0",
+              "device_id": "0",
+              "has_user_compute_stream": "0",
+              "gpu_external_empty_cache": "0",
+              "cudnn_conv_algo_search": "EXHAUSTIVE",
+              "cudnn_conv1d_pad_to_nc1d": "0",
+              "gpu_mem_limit": "18446744073709551615",
+              "gpu_external_alloc": "0",
+              "gpu_external_free": "0",
+              "arena_extend_strategy": "kNextPowerOfTwo",
+              "do_copy_in_default_stream": "1",
+              "enable_cuda_graph": "0",
+              "user_compute_stream": "0",
+              "cudnn_conv_use_max_workspace": "1"
+            }
+          }
+        }
+      },
+      "backend_fallback": false
+    },
+    "racket": {
+      "requested_backend": "opencv-cpu",
+      "actual_backend": "opencv-cpu",
+      "backend_fallback": false,
+      "method": "opencv_ellipse_shaft_v1"
+    }
+  }
+}
