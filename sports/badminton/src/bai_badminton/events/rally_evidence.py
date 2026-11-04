@@ -33,6 +33,7 @@ class RallyObservation:
     context_valid: bool = True
     replay: bool = False
     continuation_supported: bool = False  # independently moving observed brackets; not generic interpolation
+    exit_return_supported: bool = False  # observed top exit/re-entry, without fabricated positions
 
     def __post_init__(self) -> None:
         if type(self.frame) is not int or self.frame < 0 or not isinstance(self.kind, ObservationKind):
@@ -60,19 +61,24 @@ class RallyObservation:
             raise ValueError("only a reconstructed sample can carry explicit continuation support")
         if self.player_motion is not None and type(self.player_motion) is not bool:
             raise ValueError("motion support must be true, false or unavailable")
+        if type(self.exit_return_supported) is not bool or (
+            self.exit_return_supported and self.kind not in {ObservationKind.MISSING, ObservationKind.RECONSTRUCTED}
+        ):
+            raise ValueError("image-exit support belongs only to unobserved or estimated samples")
 
 
 @dataclass
 class EvidenceRallyFSM(RallyFSM):
     use_reconstruction: bool = True
     motion_guard: bool = False
+    use_exit_recovery: bool = False
     _motion: deque[bool | None] = field(default_factory=deque)
     _stationary_conflict: bool = False
     last_evidence: RallyObservation | None = None
 
     def __post_init__(self) -> None:
         super().__post_init__()
-        if type(self.use_reconstruction) is not bool or type(self.motion_guard) is not bool:
+        if any(type(flag) is not bool for flag in (self.use_reconstruction, self.motion_guard, self.use_exit_recovery)):
             raise ValueError("evidence switches must be booleans")
         self._motion = deque(maxlen=self.params.stationary_window)
 
@@ -110,10 +116,22 @@ class EvidenceRallyFSM(RallyFSM):
             and observation.continuation_supported
         )
         motion_conflict = self.motion_guard and any(value is True for value in self._motion)
-        self._stationary_conflict = reconstructed or motion_conflict
-        if self.state is RallyState.ENDING and (reconstructed or (motion_conflict and self.end_reason == "stationary")):
+        exit_supported = self.use_exit_recovery and observation.exit_return_supported
+        self._stationary_conflict = reconstructed or exit_supported or motion_conflict
+        if (
+            self.state is RallyState.CLOSED
+            and exit_supported
+            and self.closed is not None
+            and self.closed.reason == "gap"
+        ):
+            # A retained (unpublished) gap candidate can be disambiguated by
+            # actual observed exit/re-entry brackets. No start is invented.
+            self._reopen(RallyUpdate())
+        if self.state is RallyState.ENDING and (
+            reconstructed or exit_supported or (motion_conflict and self.end_reason == "stationary")
+        ):
             self.state, self.tentative_end = RallyState.IN_PLAY, None
-        continuing = reconstructed and self.state is RallyState.IN_PLAY
+        continuing = (reconstructed or exit_supported) and self.state is RallyState.IN_PLAY
         if continuing:
             # Estimated continuity prevents accumulating absence as termination
             # evidence. It stays invisible, cannot build a start/resume motion

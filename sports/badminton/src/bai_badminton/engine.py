@@ -65,7 +65,11 @@ from bai_badminton.events.match_phase import (
 )
 from bai_badminton.events.rally_evidence import ObservationKind, RallyObservation
 from bai_badminton.events.rally_fsm import RallySegment, RallyState
-from bai_badminton.events.rally_motion import observed_participant_motion, trajectory_continuation_supported
+from bai_badminton.events.rally_motion import (
+    image_exit_return_supported,
+    observed_participant_motion,
+    trajectory_continuation_supported,
+)
 from bai_badminton.events.rally_outcome import CourtImageGeometry, Outcome
 from bai_badminton.events.scene import SceneSegment, SceneSegmenter
 from bai_badminton.events.stroke import (
@@ -1533,13 +1537,23 @@ class BadmintonMatchEngine:
                     frame=f,
                     kind=kind,
                     speed=float(spd[i]) if observed[i] and np.isfinite(spd[i]) else None,
-                    shuttle_support=float(t.conf[i]) if np.isfinite(t.conf[i]) else None,
+                    shuttle_support=float(t.conf[i]) if observed[i] and np.isfinite(t.conf[i]) else None,
                     player_motion=observed_participant_motion(episode_window, frames, i),
                     context_valid=context_valid,
                     replay=bool(w.replay[i]),
                     continuation_supported=(
                         kind is ObservationKind.RECONSTRUCTED
                         and trajectory_continuation_supported(w, i, minimum_speed=self.fsm.params.start_speed)
+                    ),
+                    exit_return_supported=(
+                        kind in {ObservationKind.MISSING, ObservationKind.RECONSTRUCTED}
+                        and image_exit_return_supported(
+                            w,
+                            i,
+                            frame_height=self.cfg.frame_height,
+                            raw_xy=self._raw_xy,
+                            minimum_speed=self.fsm.params.start_speed,
+                        )
                     ),
                 )
                 update = self.fsm.step_evidence(observation)

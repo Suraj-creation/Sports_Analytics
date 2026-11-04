@@ -7,6 +7,7 @@ available lookahead; interpolation remains reconstructed, never observed.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from math import ceil, isfinite
 
 import numpy as np
@@ -182,4 +183,78 @@ def trajectory_continuation_supported(window: WindowObs, index: int, *, minimum_
             return False
     left, right = brackets[0][-1], brackets[1][0]
     implied_speed = float(np.hypot(track.x[right] - track.x[left], track.y[right] - track.y[left])) / int(right - left)
+    return implied_speed <= MAX_FILL_SPEED
+
+
+def image_exit_return_supported(
+    window: WindowObs,
+    index: int,
+    *,
+    frame_height: float,
+    raw_xy: Callable[[int, tuple[float, float]], tuple[float, float]] | None = None,
+    max_gap_s: float = 2.0,
+    top_fraction: float = 0.1,
+    minimum_speed: float = 3.0,
+) -> bool:
+    """Bounded uncertainty support for an observed top exit and observed return.
+
+    Both observed moving brackets must exist in the available temporal segment.
+    Exit/reentry endpoints lie in the top image band, with upward motion before
+    and downward motion afterwards. ``raw_xy`` maps stabilized anchor positions
+    back to their own absolute image frames; without it, coordinates must already
+    be image coordinates. Missing/reconstructed positions are never filled or
+    promoted to observed. This exploratory cue does not itself establish play.
+    """
+    if not 0 <= index < window.n:
+        raise ValueError("trajectory index must lie in the observation window")
+    if not isfinite(frame_height) or frame_height <= 0 or not isfinite(window.fps) or window.fps <= 0:
+        raise ValueError("image height and FPS must be positive and finite")
+    if not isfinite(max_gap_s) or max_gap_s <= 0 or not isfinite(top_fraction) or not 0 < top_fraction < 1:
+        raise ValueError("gap duration and top-image fraction must be finite and valid")
+    if not isfinite(minimum_speed) or not 0 < minimum_speed <= MAX_FILL_SPEED:
+        raise ValueError("minimum motion speed must be finite and within the fill-speed bound")
+    track = window.shuttle
+    observed = track.vis & ~track.interp & np.isfinite(track.x) & np.isfinite(track.y) & ~window.replay
+    if observed[index] or window.replay[index]:
+        return False
+    lo, hi = window.segment_bounds(index)
+    start, end = index, index + 1
+    while start > lo and not observed[start - 1]:
+        start -= 1
+    while end < hi and not observed[end]:
+        end += 1
+    if (end - start) / window.fps > max_gap_s:
+        return False
+    brackets = (
+        np.flatnonzero(observed[max(lo, start - ANCHOR) : start]) + max(lo, start - ANCHOR),
+        np.flatnonzero(observed[end : min(hi, end + ANCHOR)]) + end,
+    )
+    coordinates: dict[int, NDArray[np.float64]] = {}
+    for points in brackets:
+        if len(points) < 2:
+            return False
+        for point in points:
+            xy = (float(track.x[point]), float(track.y[point]))
+            try:
+                mapped = np.asarray(raw_xy(window.frame0 + int(point), xy) if raw_xy else xy, dtype=np.float64)
+            except (TypeError, ValueError, ArithmeticError):
+                return False
+            if mapped.shape != (2,) or not np.isfinite(mapped).all() or not 0 <= mapped[1] <= frame_height:
+                return False
+            coordinates[int(point)] = mapped
+        positions = np.asarray([coordinates[int(point)] for point in points])
+        adjacent = np.diff(points) == 1
+        steps = np.linalg.norm(np.diff(positions, axis=0)[adjacent], axis=1)
+        speed = float(np.linalg.norm(positions[-1] - positions[0])) / int(points[-1] - points[0])
+        if not minimum_speed <= speed <= MAX_FILL_SPEED or not np.any(steps >= minimum_speed):
+            return False
+        if np.any(steps > MAX_FILL_SPEED):
+            return False
+    before, after = brackets
+    exit_xy, return_xy = coordinates[int(before[-1])], coordinates[int(after[0])]
+    if max(exit_xy[1], return_xy[1]) > frame_height * top_fraction:
+        return False
+    if exit_xy[1] >= coordinates[int(before[0])][1] or coordinates[int(after[-1])][1] <= return_xy[1]:
+        return False
+    implied_speed = float(np.linalg.norm(return_xy - exit_xy)) / int(after[0] - before[-1])
     return implied_speed <= MAX_FILL_SPEED

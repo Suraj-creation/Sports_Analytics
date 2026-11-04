@@ -5,7 +5,11 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
-from bai_badminton.events.rally_motion import observed_participant_motion, trajectory_continuation_supported
+from bai_badminton.events.rally_motion import (
+    image_exit_return_supported,
+    observed_participant_motion,
+    trajectory_continuation_supported,
+)
 from bai_badminton.observations import WindowObs
 from bai_badminton.participant_contact import ParticipantSnapshot, participant_window
 from bai_badminton.perception.shuttle_post import Track
@@ -203,3 +207,87 @@ def test_one_moving_step_with_stationary_overall_bracket_is_not_enough():
     window = reconstructed_gap()
     window.shuttle.x[:5] = [0, 0, 10, 0, 0]
     assert not trajectory_continuation_supported(window, 8)
+
+
+def top_exit_gap(gap=45, *, reconstructed=False):
+    n = gap + 10
+    x = np.full(n, np.nan)
+    y = np.full(n, np.nan)
+    x[:5], x[-5:] = 500.0, 501.0
+    y[:5], y[-5:] = [85.0, 75.0, 65.0, 55.0, 45.0], [45.0, 55.0, 65.0, 75.0, 85.0]
+    visible = np.isfinite(x)
+    track = Track.from_arrays(x, y, visible)
+    if reconstructed:
+        track.x[5:-5], track.y[5:-5] = 500.0, -30.0
+        track.vis[5:-5], track.interp[5:-5] = True, True
+    return WindowObs(100, 30, track, {})
+
+
+@pytest.mark.parametrize("gap", [30, 45, 53])
+@pytest.mark.parametrize("reconstructed", [False, True])
+def test_observed_top_exit_and_return_can_support_bounded_loss(gap, reconstructed):
+    window = top_exit_gap(gap, reconstructed=reconstructed)
+    before = [x.copy() for x in (window.shuttle.x, window.shuttle.y, window.shuttle.vis, window.shuttle.interp)]
+    assert image_exit_return_supported(window, 8, frame_height=720.0)
+    for old, new in zip(
+        before, (window.shuttle.x, window.shuttle.y, window.shuttle.vis, window.shuttle.interp), strict=True
+    ):
+        assert np.array_equal(old, new, equal_nan=True)
+    assert not image_exit_return_supported(window, 4, frame_height=720.0)
+
+
+@pytest.mark.parametrize("side", ["before", "after"])
+def test_image_exit_rejects_stationary_pickup_or_wrong_direction(side):
+    window = top_exit_gap()
+    target = slice(0, 5) if side == "before" else slice(-5, None)
+    window.shuttle.y[target] = 45.0
+    assert not image_exit_return_supported(window, 8, frame_height=720.0)
+    window = top_exit_gap()
+    window.shuttle.y[target] = [5.0, 15.0, 25.0, 35.0, 45.0] if side == "before" else [45.0, 35.0, 25.0, 15.0, 5.0]
+    assert not image_exit_return_supported(window, 8, frame_height=720.0)
+
+
+def test_missing_bracket_and_long_or_mid_image_loss_are_not_exit_recovery():
+    window = top_exit_gap()
+    window.shuttle.vis[-4:] = False
+    assert not image_exit_return_supported(window, 8, frame_height=720.0)
+    window = top_exit_gap()
+    window.shuttle.vis[-5:] = False
+    assert not image_exit_return_supported(window, 8, frame_height=720.0)
+    assert not image_exit_return_supported(top_exit_gap(61), 8, frame_height=720.0)
+    window = top_exit_gap()
+    window.shuttle.y[window.shuttle.vis] += 300.0
+    assert not image_exit_return_supported(window, 8, frame_height=720.0)
+
+
+def test_exit_recovery_does_not_cross_a_cut_or_replay():
+    window = top_exit_gap()
+    window.break_before[15] = True
+    assert not image_exit_return_supported(window, 8, frame_height=720.0)
+    window = top_exit_gap()
+    window.replay[8] = True
+    assert not image_exit_return_supported(window, 8, frame_height=720.0)
+
+
+def test_image_mapping_uses_absolute_frame_and_actual_image_band():
+    window = top_exit_gap()
+    window.shuttle.y[window.shuttle.vis] += 300.0
+    called = []
+
+    def undo_camera(frame, xy):
+        called.append(frame)
+        return xy[0], xy[1] - 300.0
+
+    assert image_exit_return_supported(window, 8, frame_height=720.0, raw_xy=undo_camera)
+    assert min(called) >= window.frame0 and max(called) < window.frame0 + window.n
+    window = top_exit_gap()
+    assert not image_exit_return_supported(
+        window, 8, frame_height=720.0, raw_xy=lambda frame, xy: (xy[0], xy[1] + 300.0)
+    )
+    assert not image_exit_return_supported(window, 8, frame_height=720.0, raw_xy=lambda frame, xy: (np.nan, xy[1]))
+
+
+@pytest.mark.parametrize("height", [0.0, -1.0, np.nan, np.inf])
+def test_invalid_image_height_is_rejected(height):
+    with pytest.raises(ValueError):
+        image_exit_return_supported(top_exit_gap(), 8, frame_height=height)

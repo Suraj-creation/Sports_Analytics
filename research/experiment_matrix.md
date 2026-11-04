@@ -33,6 +33,37 @@ checkpoint bytes. Nothing below `outputs/benchmarking/test1` may be written.
 The final matrix will record actual executed configurations and ablations after
 the audits. Candidate names are hypotheses, not preselected fixes.
 
+## Recorded exploratory decisions and next prespecified intervention
+
+Fixed-input correctness controls: original49/30TP/F1.7059; contact-history-only
+49/30TP/.7059 with slightly worse MAE; recovery-clock-only48/31TP/.7381;
+combined48/31TP/.7381. Correctness and accuracy claims remain separate.
+
+Paired actual TrackNet step8/4 on2160fixed frames:20.355/29.722seconds,
+1582/1567 accepted detections, physical top gap0/17both. No detector replacement
+is selected. Frozen-background/context differences are not attributed to step.
+
+A generic interpolation pilot was rejected: F1 rose to.80 but a stationary/pickup
+bridge joined adjacent labels33/34. The pilot also overlapped input-validation
+hardening and is explicitly excluded from acceptance; its files remain preserved.
+Strict moving-bracket support fixes that particular quality failure. A frozen
+factorial comparison still rejects motion guarding: disabled F1.7381,
+reconstruction-only.80, motion-only.6506, combined.7089. Higher matched IoU did
+not outweigh missed rallies. No activity-only rule is promoted.
+
+Next intervention, specified before its measurement: observed image-exit/return
+support. Missing or reconstructed samples may support an already active exchange
+only if independently observed moving brackets leave upward and return downward
+within the top10%of the actual analysis image, remain in one coordinate/scene
+context, and span at most2seconds. Existing5-frame anchor and3..120px/frame
+motion bounds are retained. No XY values are filled or exposed as observations.
+Camera transforms must map stabilized anchors back to their actual image frame.
+No cue is supplied without available after-anchors; no extra lookahead is silently
+introduced. A retained CLOSED gap candidate can recover before final publication,
+but IDLE cannot start from this cue. The new switch defaults off. Test this cue
+alone, then with strict short-gap reconstruction, using the same recorded inputs
+and unchanged thresholds/matcher. Any full-video gain remains developmental.
+
 ## Acceptance and regression gates
 
 Use the frozen maximum-cardinality one-to-one matching at IoU >=0.5. Retain all

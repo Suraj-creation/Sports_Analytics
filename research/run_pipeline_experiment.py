@@ -25,7 +25,7 @@ from scripts.benchmarking.production_inference import digest, dump  # noqa: E402
 
 
 def worker(video, output):
-    import psutil
+    import resource
 
     from bai_engine.bus import LocalBus
     from bai_engine.config import Settings
@@ -37,17 +37,23 @@ def worker(video, output):
     stages = collections.defaultdict(float)
     samples = []
     stop = threading.Event()
-    process = psutil.Process()
-    process.cpu_percent()
+
+    def cpu_seconds():
+        usage = resource.getrusage(resource.RUSAGE_SELF)
+        return usage.ru_utime + usage.ru_stime
 
     def sample():
+        previous_cpu, previous_wall = cpu_seconds(), time.monotonic()
         with (output / "resources.jsonl").open("x") as stream:
             while not stop.is_set():
+                now, cpu = time.monotonic(), cpu_seconds()
+                rss = int(Path("/proc/self/statm").read_text().split()[1]) * os.sysconf("SC_PAGE_SIZE")
                 row = {
-                    "elapsed_s": time.monotonic() - started,
-                    "process_cpu_percent": process.cpu_percent(),
-                    "process_rss_bytes": process.memory_info().rss,
+                    "elapsed_s": now - started,
+                    "process_cpu_percent": 100 * (cpu - previous_cpu) / max(now - previous_wall, 1e-6),
+                    "process_rss_bytes": rss,
                 }
+                previous_cpu, previous_wall = cpu, now
                 try:
                     result = subprocess.check_output(
                         ["nvidia-smi", "--query-compute-apps=pid,used_memory", "--format=csv,noheader,nounits"],

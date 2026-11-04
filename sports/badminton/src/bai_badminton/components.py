@@ -321,13 +321,29 @@ class _Rally(_BaselineTemporalState, RallyFSM):
 
 
 class _EvidenceRally(_BaselineTemporalState, EvidenceRallyFSM):
-    def __init__(self, params: RallyParams, *, use_reconstruction: bool = True, motion_guard: bool = False) -> None:
+    def __init__(
+        self,
+        params: RallyParams,
+        *,
+        use_reconstruction: bool = True,
+        motion_guard: bool = False,
+        use_exit_recovery: bool = False,
+    ) -> None:
         self._checkpoint_owner = str(uuid4())
-        super().__init__(params, use_reconstruction=use_reconstruction, motion_guard=motion_guard)
+        super().__init__(
+            params,
+            use_reconstruction=use_reconstruction,
+            motion_guard=motion_guard,
+            use_exit_recovery=use_exit_recovery,
+        )
 
     def reset(self) -> None:
         EvidenceRallyFSM.__init__(
-            self, self.params, use_reconstruction=self.use_reconstruction, motion_guard=self.motion_guard
+            self,
+            self.params,
+            use_reconstruction=self.use_reconstruction,
+            motion_guard=self.motion_guard,
+            use_exit_recovery=self.use_exit_recovery,
         )
 
     def close(self) -> None:
@@ -467,15 +483,19 @@ def register_domain_components(registry: ComponentRegistry) -> None:
         params = dict(configuration.get("params", configuration))
         reconstruction = params.pop("use_reconstruction", True)
         motion_guard = params.pop("motion_guard", False)
+        exit_recovery = params.pop("use_exit_recovery", False)
         return _EvidenceRally(
-            RallyParams(fps=context.fps, **params), use_reconstruction=reconstruction, motion_guard=motion_guard
+            RallyParams(fps=context.fps, **params),
+            use_reconstruction=reconstruction,
+            motion_guard=motion_guard,
+            use_exit_recovery=exit_recovery,
         )
 
     registry.register(
         ComponentContract(
             kind="rally",
             implementation="rally-evidence-v2",
-            version="1",
+            version="2",
             input_schema="badminton-rally-evidence:v2",
             output_schema="badminton-rally-output:v1",
             interface=EvidenceRallySegmentation,
@@ -486,7 +506,13 @@ def register_domain_components(registry: ComponentRegistry) -> None:
             declaration={
                 **CONTRACT_DETAILS["rally"],
                 "required_evidence": ["typed_frame_aligned_observation_quality"],
-                "optional_evidence": ["bounded_estimated_trajectory", "independently_observed_body_motion"],
+                "optional_evidence": [
+                    "bounded_estimated_trajectory",
+                    "independently_observed_body_motion",
+                    "observed_image_top_exit_reentry",
+                ],
+                "image_exit_max_gap_s": 2.0,
+                "image_top_fraction": 0.1,
                 "promotion": "exploratory_opt_in;not_validated_on_held_out_matches",
             },
         ),

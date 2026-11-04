@@ -46,7 +46,10 @@ def replay(baseline: Path, output: Path, overrides: dict, *, implementation="ral
     }
     metadata = json.loads((baseline / "benchmark_metadata.json").read_text())
     inference = json.loads((baseline / "inference.json").read_text())
-    original_events = [json.loads(line) for line in (baseline / "raw_events.jsonl").open()]
+    event_file = baseline / "raw_events.jsonl"
+    if not event_file.exists():
+        event_file = baseline / "events.jsonl"
+    original_events = [json.loads(line) for line in event_file.open()]
     calibration = next(e for e in original_events if e["type"] == "calibration")["payload"]
     format_changes = {e["frame_start"]: e["payload"] for e in original_events if e["type"] == "format_decision"}
     trace = []
@@ -148,7 +151,7 @@ def replay(baseline: Path, output: Path, overrides: dict, *, implementation="ral
         TracedRally.step_evidence = traced_evidence
     configured = dict(overrides)
     evidence_options = {}
-    for key in ("use_reconstruction", "motion_guard"):
+    for key in ("use_reconstruction", "motion_guard", "use_exit_recovery"):
         if key in configured:
             evidence_options[key] = configured.pop(key)
     params = RallyParams(fps=metadata["video_fps"], **configured)
@@ -171,7 +174,10 @@ def replay(baseline: Path, output: Path, overrides: dict, *, implementation="ral
         extra=calibration,
     )
     started = time.monotonic()
-    cache_paths = sorted((baseline / "runtime/sessions/BenchmarkTest1/perception").glob("*.msgpack"))
+    cache_roots = list((baseline / "runtime/sessions").glob("*/perception"))
+    if len(cache_roots) != 1:
+        raise ValueError("one unambiguous recorded session is required")
+    cache_paths = sorted(cache_roots[0].glob("*.msgpack"))
     for path in cache_paths:
         data = path.read_bytes()
         recorded = msgpack.unpackb(data, raw=False)
@@ -229,8 +235,8 @@ def replay(baseline: Path, output: Path, overrides: dict, *, implementation="ral
             "cache_sha256": {path.name: digest(path) for path in cache_paths},
             "source_sha256": source_before,
             "source_unchanged": all(digest(ROOT / name) == value for name, value in source_before.items()),
-            "checkpoint_identifiers": metadata["models"],
-            "runtime_versions": metadata["runtime_dependencies"],
+            "checkpoint_identifiers": metadata.get("models", inference.get("models", [])),
+            "runtime_versions": metadata.get("runtime_dependencies", metadata.get("runtime_versions", {})),
             "profile": inference["effective_profile"],
             "trace_sha256": digest(output / "fsm_trace.jsonl"),
         },
