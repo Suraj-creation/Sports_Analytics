@@ -21,6 +21,7 @@ from __future__ import annotations
 from collections import deque
 from dataclasses import dataclass, field
 from enum import StrEnum
+from math import isfinite
 
 
 class RallyState(StrEnum):
@@ -43,6 +44,14 @@ class RallyParams:
     min_duration_s: float = 2.0
     merge_gap_s: float = 0.75
     resume_speed: float = 6.0
+
+    def __post_init__(self) -> None:
+        if not isfinite(self.fps) or self.fps <= 0:
+            raise ValueError("rally FPS must be positive and finite")
+        if type(self.stationary_window) is not int or self.stationary_window < 1:
+            raise ValueError("stationary_window must be a positive integer")
+        if type(self.stationary_count) is not int or not 1 <= self.stationary_count <= self.stationary_window:
+            raise ValueError("stationary_count must fit the stationary window")
 
     @property
     def min_frames(self) -> int:
@@ -90,6 +99,9 @@ class RallyFSM:
     _last_in_play_frame: int | None = None
     _last_contact_frame: int | None = None
 
+    def __post_init__(self) -> None:
+        self._recent = deque(self._recent, maxlen=self.params.stationary_window)
+
     def on_contact(self, frame: int) -> RallyUpdate:
         """A detected hit: start or keep an exchange alive, subject to merge time."""
         upd = RallyUpdate()
@@ -106,6 +118,10 @@ class RallyFSM:
                 self._open(frame, upd)
         if self.serve is None and self.state is RallyState.IN_PLAY:
             self.serve = frame
+        # An accepted new hit contradicts pre-contact rest. Terminal stationary
+        # support must be rebuilt from observations after this contact, rather
+        # than immediately undoing the resume with the old history.
+        self._recent.clear()
         self._last_contact_frame = frame
         return upd
 
@@ -153,9 +169,14 @@ class RallyFSM:
                 self._close(self.tentative_end, self.end_reason, upd)
         elif self.state is RallyState.CLOSED:
             assert self.closed is not None
-            if self._run_visible >= p.start_visible and frame - self.closed.end <= p.merge_frames:
+            recovery_started_in_time = (
+                self._run_visible > 0
+                and self._run_start is not None
+                and self._run_start - self.closed.end <= p.merge_frames
+            )
+            if recovery_started_in_time and self._run_visible >= p.start_visible:
                 self._reopen(upd)
-            elif frame - self.closed.end > p.merge_frames:
+            elif frame - self.closed.end > p.merge_frames and not recovery_started_in_time:
                 self._finalize(upd)
                 if self._run_visible >= p.start_visible and self._run_start is not None:
                     self._open(self._run_start, upd)

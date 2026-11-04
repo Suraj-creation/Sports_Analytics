@@ -427,7 +427,7 @@ def register_domain_components(registry: ComponentRegistry) -> None:
             ComponentContract(
                 kind=kind,
                 implementation=BASELINE_IMPLEMENTATIONS[kind],
-                version="1",
+                version="2" if kind == "rally" else "1",
                 input_schema=f"badminton-{kind}-input:v1",
                 output_schema=f"badminton-{kind}-output:v1",
                 interface=interface,
