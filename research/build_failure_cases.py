@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -15,6 +16,73 @@ from scripts.benchmarking.production_inference import digest, dump  # noqa: E402
 
 BASELINE = ROOT / "outputs/benchmarking/test1"
 BASELINE_TRACE = ROOT / "artifacts/benchmarking/investigation/baseline_semantic_replay/fsm_trace.jsonl"
+
+
+def positive_overlap(start, end, other_start, other_end):
+    """Diagnostic interval overlap follows the evaluator's half-open contract."""
+    return min(end, other_end) > max(start, other_start)
+
+
+def verify_trace_binding(inputs, predictions, traces, cache_hashes, trace_sha256, source_video_sha256):
+    """Bind new-run state decisions to exactly the observations supplied here.
+
+    Only the frozen original baseline retains the historical interval-only
+    compatibility check. A new run can never inherit that exception merely by
+    using the same interval coordinates or borrowing the baseline trace.
+    """
+    finalized = [row["update"]["finalized"] for row in traces if row.get("update", {}).get("finalized") is not None]
+    cache_manifest_sha256 = hashlib.sha256(
+        json.dumps(cache_hashes, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    evidence = {
+        "state_trace_sha256": trace_sha256,
+        "observation_cache_manifest_sha256": cache_manifest_sha256,
+        "observation_cache_file_count": len(cache_hashes),
+        "trace_finalization_count": len(finalized),
+        "prediction_count": len(predictions),
+    }
+    if inputs["run"] == BASELINE.resolve():
+        # Preserve the explicit historical evidence path. Its legacy package
+        # contract checked interval coordinates, without claiming hash binding
+        # or reason/multiplicity verification. New-run packages are stricter.
+        intervals = {(row["start"], row["end"]) for row in finalized}
+        if sorted(intervals) != sorted((pred["start"], pred["end"]) for pred in predictions):
+            raise ValueError("supplied FSM trace intervals differ from the selected run's predictions")
+        return {
+            **evidence,
+            "trace_binding_policy": "historical_frozen_baseline_interval_only_compatibility",
+            "trace_interval_parity_verified": True,
+            "cache_trace_hash_binding_verified": False,
+            "end_reason_and_multiplicity_verified": False,
+        }
+
+    replay_metadata_path = inputs["trace"].parent / "replay_metadata.json"
+    if not replay_metadata_path.is_file():
+        raise ValueError("non-baseline evidence requires replay_metadata.json beside the supplied trace")
+    metadata_bytes = replay_metadata_path.read_bytes()
+    replay_metadata = json.loads(metadata_bytes)
+    if replay_metadata.get("trace_sha256") != trace_sha256:
+        raise ValueError("supplied FSM trace SHA256 differs from replay metadata")
+    if replay_metadata.get("cache_sha256") != cache_hashes or not cache_hashes:
+        raise ValueError("supplied full observation cache SHA256 manifest differs from replay metadata")
+    if replay_metadata.get("video_sha256") != source_video_sha256:
+        raise ValueError("supplied FSM replay belongs to a different source video")
+    try:
+        actual = sorted((row["start"], row["end"], row["reason"]) for row in finalized)
+        expected = sorted((pred["start"], pred["end"], pred["end_reason"]) for pred in predictions)
+    except KeyError as exc:
+        raise ValueError("non-baseline finalizations require explicit start/end/end-reason evidence") from exc
+    if actual != expected:
+        raise ValueError("supplied FSM trace interval/end-reason list differs, including finalization multiplicity")
+    return {
+        **evidence,
+        "trace_binding_policy": "complete_cache_and_trace_sha256_plus_exact_finalization_list_v1",
+        "replay_metadata_source": str(replay_metadata_path),
+        "replay_metadata_sha256": hashlib.sha256(metadata_bytes).hexdigest(),
+        "trace_interval_parity_verified": True,
+        "cache_trace_hash_binding_verified": True,
+        "end_reason_and_multiplicity_verified": True,
+    }
 
 
 def resolve_inputs(run=BASELINE, cache_source=None, trace_path=None):
@@ -66,6 +134,9 @@ def build(output, trace_path=None, overlays=False, *, run=BASELINE, cache_source
     output = Path(output).resolve()
     if output.is_relative_to(BASELINE.resolve()):
         raise ValueError("failure-case output cannot modify the frozen baseline directory")
+    packager_source = Path(__file__).resolve()
+    packager_bytes = packager_source.read_bytes()
+    packager_sha256 = hashlib.sha256(packager_bytes).hexdigest()
     metadata = json.loads((run / "benchmark_metadata.json").read_text())
     metrics = json.loads((run / "metrics.json").read_text())
     inference = json.loads((run / "inference.json").read_text())
@@ -82,36 +153,47 @@ def build(output, trace_path=None, overlays=False, *, run=BASELINE, cache_source
         recorded = json.loads(cache_metadata.read_text())
         if recorded["source_video_sha256"] != metadata["source_video_sha256"]:
             raise ValueError("observation cache belongs to a different source video")
-    observations = {}
+    observations, cache_hashes = {}, {}
     for path in sorted(inputs["cache"].glob("*.msgpack")):
-        record = msgpack.unpackb(path.read_bytes(), raw=False)
-        observations.update({f["f"]: f for f in record["frames"]})
+        data = path.read_bytes()
+        cache_hashes[path.name] = hashlib.sha256(data).hexdigest()
+        record = msgpack.unpackb(data, raw=False)
+        for frame in record["frames"]:
+            if frame["f"] in observations:
+                raise ValueError("observation cache contains duplicate source frame identities")
+            observations[frame["f"]] = frame
     if set(observations) != set(range(metadata["frame_count"])):
         raise ValueError("observation cache must cover every original frame without gaps")
     events = [json.loads(line) for line in inputs["events"].open()]
-    traces = [json.loads(line) for line in trace_path.open()]
-    traced_intervals = {
-        (row["update"]["finalized"]["start"], row["update"]["finalized"]["end"])
-        for row in traces
-        if row.get("update", {}).get("finalized") is not None
-    }
-    if sorted(traced_intervals) != sorted((pred["start"], pred["end"]) for pred in predictions):
-        raise ValueError("supplied FSM trace intervals differ from the selected run's predictions")
+    trace_bytes = trace_path.read_bytes()
+    traces = [json.loads(line) for line in trace_bytes.splitlines()]
+    trace_binding = verify_trace_binding(
+        inputs,
+        predictions,
+        traces,
+        cache_hashes,
+        hashlib.sha256(trace_bytes).hexdigest(),
+        metadata["source_video_sha256"],
+    )
     evidence = {
         "run_directory": str(run),
         "observation_cache_directory": str(inputs["cache"]),
         "observation_mode": inputs["observation_mode"],
         "conditional_observation_replay": inputs["conditional"],
         "state_trace_source": str(trace_path),
-        "state_trace_sha256": digest(trace_path),
-        "trace_interval_parity_verified": True,
+        **trace_binding,
         "event_source": str(inputs["events"]),
+        "packager_source": str(packager_source),
+        "packager_source_sha256": packager_sha256,
+        "packager_source_snapshot": str(output / "executed_build_failure_cases.py"),
     }
     matched = [r for r in comparisons if r["matching_status"] == "matched"]
     worst_starts = {int(r["gt_rally"]) for r in sorted(matched, key=lambda r: -abs(float(r["start_frame_error"])))[:5]}
     worst_ends = {int(r["gt_rally"]) for r in sorted(matched, key=lambda r: -abs(float(r["end_frame_error"])))[:5]}
     controls = {int(r["gt_rally"]) for r in sorted(matched, key=lambda r: -float(r["interval_iou"]))[:4]}
     output.mkdir(parents=True, exist_ok=False)
+    with (output / "executed_build_failure_cases.py").open("xb") as stream:
+        stream.write(packager_bytes)
     source = ROOT / "data/benchmarking/test1/Test1_Full_rev.mp4"
     media = inference["media"]
     width, height = media["width"], media["height"]
@@ -127,7 +209,7 @@ def build(output, trace_path=None, overlays=False, *, run=BASELINE, cache_source
         overlapping = [
             pred
             for pred in predictions
-            if pred["start"] <= int(label["End_Frame"]) and pred["end"] >= int(label["Start_Frame"])
+            if positive_overlap(pred["start"], pred["end"], int(label["Start_Frame"]), int(label["End_Frame"]))
         ]
         if len(overlapping) > 1:
             tags.append("multiple_segments")
@@ -155,8 +237,10 @@ def build(output, trace_path=None, overlays=False, *, run=BASELINE, cache_source
         folder = output / name
         folder.mkdir()
         lo, hi = max(0, start - 60), min(metadata["frame_count"] - 1, end + 60)
-        relevant = [e for e in predictions if e["start"] <= hi and e["end"] >= lo]
-        nearby_labels = [r for r in labels if int(r["Start_Frame"]) <= hi and int(r["End_Frame"]) >= lo]
+        # Frame-extraction windows are inclusive [lo,hi]; interval comparisons
+        # use their equivalent half-open [lo,hi+1) span.
+        relevant = [e for e in predictions if positive_overlap(e["start"], e["end"], lo, hi + 1)]
+        nearby_labels = [r for r in labels if positive_overlap(int(r["Start_Frame"]), int(r["End_Frame"]), lo, hi + 1)]
         case = {
             "case_id": name,
             "tags": tags,
@@ -172,7 +256,7 @@ def build(output, trace_path=None, overlays=False, *, run=BASELINE, cache_source
             "evidence_provenance": evidence,
             "observation_file": "observations.msgpack",
             "observations": f"raw production proxy pixels ({width}x{height})",
-            "state_trace": "fsm_trace.jsonl; exact interval-parity production semantic replay",
+            "state_trace": f"fsm_trace.jsonl; {trace_binding['trace_binding_policy']}",
             "contacts": (
                 "events.jsonl includes inferred contact candidates/provenance; these are not manually verified contacts"
             ),

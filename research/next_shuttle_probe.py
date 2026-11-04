@@ -73,6 +73,15 @@ def run(args):
     run = args.run.resolve()
     metadata = json.loads((run / "benchmark_metadata.json").read_text())
     inference = json.loads((run / "inference.json").read_text())
+    variants_requested = list(args.variants)
+    if "rolling" not in variants_requested or len(set(variants_requested)) != len(variants_requested):
+        raise ValueError("component variants must be unique and include the paired rolling control")
+    flight_region = (
+        metadata.get("configuration", {})
+        .get("shuttle", {})
+        .get("params", {})
+        .get("flight_region", "bounded_upward_sweep_v1")
+    )
     if (
         metadata["frame_count"] != 17268
         or metadata["video_fps"] != 30
@@ -131,7 +140,7 @@ def run(args):
         )
     model.bg.seed(0, seed_images)
     manifest = {
-        "schema": "controlled-shuttle-diagnostics:v1",
+        "schema": "controlled-shuttle-diagnostics:v2",
         "status": "running",
         "execution_date": datetime.now(UTC).isoformat(),
         "executor": executor,
@@ -140,7 +149,8 @@ def run(args):
             "ranges": args.ranges,
             "step": 8,
             "chunk": "recorded canonical 60-frame chunks",
-            "variants": ["rolling", "fixed_startup", "zero_background"],
+            "variants": variants_requested,
+            "flight_region": flight_region,
             "candidate_floor": 0.1,
             "top_k": 5,
         },
@@ -183,12 +193,12 @@ def run(args):
                 if row["v"] == "main" and row["g"] is not None:
                     g = np.asarray(row["g"], np.float64).reshape(3, 3)
                     poly = cv2.perspectiveTransform(polygon.reshape(-1, 1, 2), g).reshape(-1, 2)
-                    masks.append(flight_mask(poly, (1280, 720), (WIDTH, HEIGHT)))
+                    masks.append(flight_mask(poly, (1280, 720), (WIDTH, HEIGHT), region=flight_region))
                 else:
                     masks.append(np.zeros((HEIGHT, WIDTH), np.uint8))
             pre_background = copy.deepcopy(model.bg)
             rolling_after = None
-            variants = ["rolling", "fixed_startup", "zero_background"]
+            variants = list(variants_requested)
             if first // 60 % 2:
                 variants.reverse()
             for variant in variants:
@@ -272,4 +282,10 @@ if __name__ == "__main__":
     parser.add_argument("--run", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--ranges", type=json.loads, required=True)
+    parser.add_argument(
+        "--variants",
+        nargs="+",
+        choices=["rolling", "fixed_startup", "zero_background"],
+        default=["rolling", "fixed_startup", "zero_background"],
+    )
     run(parser.parse_args())
