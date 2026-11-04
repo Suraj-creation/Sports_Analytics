@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { ErrorNote } from "@/components/ui";
 import { useAnalysisQueryKey } from "@/lib/analysisQuery";
 import { api } from "@/lib/api";
 import type { Session } from "@/lib/types";
@@ -10,6 +11,13 @@ export function IndividualAnalytics({ session }: { session: Session }) {
     enabled: Boolean(session.media),
     refetchInterval: 15000,
   });
+  if (query.error)
+    return (
+      <section className="analysis-panel mt-5">
+        <h2>Individual player analytics</h2>
+        <ErrorNote error={query.error} />
+      </section>
+    );
   if (!session.media || !query.data?.available) return null;
   const data = query.data;
   return (

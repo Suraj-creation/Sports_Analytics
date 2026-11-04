@@ -127,6 +127,26 @@ class ChunkPerception:
             raise ValueError("chunk frames out of order")
 
 
+@dataclass(frozen=True)
+class ScoreObservationContext:
+    """Source-image eligibility, separate from court-analysis exclusion."""
+
+    view: str
+    analysis_excluded: bool
+    actual_replay_status: str
+    acquisition_policy: str
+
+    def __post_init__(self) -> None:
+        if self.view not in {"main", "alt", "none", "unknown"}:
+            raise ValueError("invalid scoreboard view context")
+        if type(self.analysis_excluded) is not bool:
+            raise ValueError("invalid scoreboard analysis context")
+        if self.actual_replay_status not in {"unknown", "live", "replay"}:
+            raise ValueError("invalid scoreboard replay context")
+        if self.acquisition_policy not in {"main_camera", "all_image_broadcast_overlay"}:
+            raise ValueError("invalid scoreboard acquisition policy")
+
+
 @dataclass
 class ScoreReading:
     """A scoreboard OCR reading (broadcast score bug)."""
@@ -135,3 +155,4 @@ class ScoreReading:
     rows: tuple[tuple[str, int], tuple[str, int]]  # (name, points) top row, bottom row
     games: tuple[int, int] | None = None
     conf: float = 0.0
+    context: ScoreObservationContext | None = None

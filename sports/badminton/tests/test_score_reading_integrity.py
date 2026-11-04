@@ -50,8 +50,12 @@ def test_midgame_seed_uses_the_row_order_of_the_historic_reading(tmp_path):
             engine.ocr.add(ScoreReading(frame, (("A", 8), ("B", 3)), conf=0.9))
         for frame in (110, 111):
             engine.ocr.add(ScoreReading(frame, (("B", 4), ("A", 8)), conf=0.9))
-        engine._rallies = [SimpleNamespace(record=SimpleNamespace(official=True, start=30))]
+        engine._rallies = [SimpleNamespace(
+            record=SimpleNamespace(official=True, start=30), rally_end=SimpleNamespace(payload={}),
+        )]
         engine._refold = lambda *args, **kwargs: None
         engine._maybe_seed_from_board()
         assert engine._base_state.score == {"P1": 8, "P2": 3}
-        assert store.query(types=["match_phase"])[0].payload["base_state"]["score"] == {"P1": 8, "P2": 3}
+        seed = store.query(types=["match_phase"])[0]
+        assert seed.payload["base_state"]["score"] == {"P1": 8, "P2": 3}
+        assert seed.payload["state_after"] == engine._base_state.to_public(engine.match_cfg)

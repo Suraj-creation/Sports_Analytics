@@ -1,0 +1,9 @@
+# Additive support for the existing Python 3.12/Pascal GPU environment.
+# Source ../gpu-env.sh first. These pins do not replace Torch/CUDA/ORT.
+# Inspect a dry run, then use uv pip install --python <existing .venv/bin/python>
+# --no-deps -r config/runtime/onnx-export-pascal.txt.
+# ONNX, ONNX IR, ml-dtypes: Apache-2.0; ONNX Script: MIT.
+onnx==1.23.2
+onnxscript==0.7.2
+onnx-ir==1.1.0
+ml-dtypes==0.6.0

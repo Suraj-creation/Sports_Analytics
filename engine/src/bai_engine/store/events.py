@@ -13,14 +13,17 @@ Design notes
 from __future__ import annotations
 
 import json
+import logging
 import sqlite3
 import threading
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from contextlib import closing, contextmanager
 from pathlib import Path
 
-from bai_engine.schema.events import Event, EventStatus, current_view
+from bai_engine.schema.events import Event, EventStatus
 from bai_engine.schema.state import StateSnapshot
+
+log = logging.getLogger(__name__)
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS events (
@@ -60,6 +63,7 @@ class EventStore:
         self.session_id = session_id
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.RLock()
+        self._commit_callbacks: list[list[Callable[[], None]]] = []
         self._conn = sqlite3.connect(self.path, check_same_thread=False, isolation_level=None, timeout=30)
         self._conn.row_factory = sqlite3.Row
         with self._lock:
@@ -88,16 +92,81 @@ class EventStore:
         self.close()
 
     @contextmanager
-    def _tx(self) -> Iterator[sqlite3.Connection]:
+    def read_snapshot(self) -> Iterator[None]:
+        """Read related projections from one committed SQLite revision.
+
+        The connection lock excludes same-connection writers; the deferred WAL
+        transaction also keeps separate connections' commits out of this read.
+        Nested readers and readers inside a write transaction share its snapshot.
+        """
         with self._lock:
-            self._conn.execute("BEGIN IMMEDIATE")
+            outer = not self._conn.in_transaction
+            if outer:
+                self._conn.execute("BEGIN")
             try:
-                yield self._conn
+                yield
+            finally:
+                if outer:
+                    self._conn.execute("ROLLBACK")
+
+    @contextmanager
+    def transaction(self) -> Iterator[None]:
+        """Commit one logical mutation, including nested event/snapshot writes.
+
+        The writer lock covers the whole mutation. Nested callers use savepoints,
+        so a rejected inner write cannot leak records or delivery callbacks into
+        a successful outer transaction. Other SQLite connections see only the
+        complete committed decision.
+        """
+        callbacks: list[Callable[[], None]] = []
+        with self._lock:
+            depth = len(self._commit_callbacks)
+            if depth == 0 and self._conn.in_transaction:
+                raise RuntimeError("Cannot write inside an event read snapshot")
+            savepoint = f"event_store_{depth}"
+            self._conn.execute("BEGIN IMMEDIATE" if depth == 0 else f"SAVEPOINT {savepoint}")
+            self._commit_callbacks.append(callbacks)
+            try:
+                yield
+                self._conn.execute("COMMIT" if depth == 0 else f"RELEASE SAVEPOINT {savepoint}")
             except BaseException:
-                self._conn.execute("ROLLBACK")
+                if self._conn.in_transaction:
+                    if depth == 0:
+                        self._conn.execute("ROLLBACK")
+                    else:
+                        self._conn.execute(f"ROLLBACK TO SAVEPOINT {savepoint}")
+                        self._conn.execute(f"RELEASE SAVEPOINT {savepoint}")
                 raise
             else:
-                self._conn.execute("COMMIT")
+                if depth:
+                    self._commit_callbacks[-2].extend(callbacks)
+            finally:
+                self._commit_callbacks.pop()
+        if depth == 0:
+            for callback in callbacks:
+                self._deliver(callback)
+
+    @contextmanager
+    def _tx(self) -> Iterator[sqlite3.Connection]:
+        with self.transaction():
+            yield self._conn
+
+    def after_commit(self, callback: Callable[[], None]) -> None:
+        """Notify only after durable publication; transport failure is retryable by replay."""
+        with self._lock:
+            if self._commit_callbacks:
+                self._commit_callbacks[-1].append(callback)
+                return
+        self._deliver(callback)
+
+    @staticmethod
+    def _deliver(callback: Callable[[], None]) -> None:
+        try:
+            callback()
+        except Exception:
+            # The decision is already durable. Reporting persistence failure here
+            # would invite a caller to award it again; the gateway replays the log.
+            log.exception("event notification failed after commit; recover from the durable log")
 
     # ------------------------------------------------------------------ writes
     def append(self, event: Event) -> Event:
@@ -109,11 +178,17 @@ class EventStore:
             for ev in events:
                 if ev.session_id != self.session_id:
                     raise ValueError(f"event for session {ev.session_id} appended to {self.session_id}")
+                body = ev.model_dump_json(exclude={"seq"})
+                existing = conn.execute("SELECT seq, body FROM events WHERE event_id=?", (ev.event_id,)).fetchone()
+                if existing is not None:
+                    if json.loads(existing["body"]) != json.loads(body):
+                        raise ValueError(f"event identity conflict: {ev.event_id}")
+                    out.append(ev.with_seq(int(existing["seq"])))
+                    continue
                 if ev.supersedes is not None:
                     row = conn.execute("SELECT 1 FROM events WHERE event_id=?", (ev.supersedes,)).fetchone()
                     if row is None:
                         raise KeyError(f"supersedes unknown event {ev.supersedes}")
-                body = ev.model_dump_json(exclude={"seq"})
                 cur = conn.execute(
                     "INSERT INTO events(event_id,type,frame_start,frame_end,status,supersedes,player_id,body)"
                     " VALUES (?,?,?,?,?,?,?,?)",
@@ -134,6 +209,8 @@ class EventStore:
         return out
 
     def put_state(self, snap: StateSnapshot) -> None:
+        if snap.session_id != self.session_id:
+            raise ValueError(f"state for session {snap.session_id} appended to {self.session_id}")
         with self._tx() as conn:
             conn.execute(
                 "INSERT INTO states(frame_idx,kind,event_seq,body) VALUES (?,?,?,?)",
@@ -200,28 +277,24 @@ class EventStore:
         if frame_to is not None:
             clauses.append("frame_start <= ?")
             params.append(frame_to)
+        if live_only:
+            # Fold against the same SQLite snapshot that selects these rows.
+            # A second superseder query can otherwise observe a newer correction
+            # and discard the old row without having selected its replacement.
+            clauses.extend(
+                [
+                    "status != ?",
+                    "NOT EXISTS (SELECT 1 FROM events AS successor WHERE successor.supersedes=events.event_id)",
+                ]
+            )
+            params.append(EventStatus.RETRACTED.value)
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         with self._lock:
             rows = self._conn.execute(f"SELECT seq, body FROM events {where} ORDER BY seq", params).fetchall()  # noqa: S608
         events = [self._row_to_event(r) for r in rows]
-        if live_only:
-            events = self._fold(events)
         if player_id is not None:
             events = [e for e in events if e.actors.player_id == player_id]
         return sorted(events, key=lambda e: (e.frame_start, e.seq or 0))
-
-    def _fold(self, events: list[Event]) -> list[Event]:
-        # A superseding event may fall outside the filtered window; look up successors globally.
-        if not events:
-            return events
-        ids = [e.event_id for e in events]
-        with self._lock:
-            succ_rows = self._conn.execute(
-                f"SELECT supersedes FROM events WHERE supersedes IN ({','.join('?' * len(ids))})",  # noqa: S608 - placeholders only
-                ids,
-            ).fetchall()
-        superseded = {r["supersedes"] for r in succ_rows}
-        return [e for e in current_view(events) if e.event_id not in superseded and e.status != EventStatus.RETRACTED]
 
     def all_live(self) -> list[Event]:
         return self.query()
@@ -247,7 +320,8 @@ class EventStore:
     def states(self, kind: str = "match") -> list[StateSnapshot]:
         with self._lock:
             rows = self._conn.execute(
-                "SELECT frame_idx, kind, event_seq, body FROM states WHERE kind=? ORDER BY frame_idx, id", (kind,)
+                "SELECT frame_idx, kind, event_seq, body FROM states "
+                "WHERE id IN (SELECT MAX(id) FROM states WHERE kind=? GROUP BY frame_idx) ORDER BY frame_idx", (kind,)
             ).fetchall()
         return [
             StateSnapshot(

@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { decode } from "@msgpack/msgpack";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 test("four-person review, measured pair positions, rackets, service setup and revocation", async ({
   page,

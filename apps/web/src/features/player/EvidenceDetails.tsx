@@ -50,7 +50,7 @@ export function EvidenceDetails({ session }: { session: Session }) {
           <p className="mt-1 text-sm text-line-2">
             {selection ? (
               <>
-                Selected moment · {clock(selection.start, session.media, true)} · source frame{" "}
+                Selected moment · {clock(selection.start, session.media, true)} · Analysis proxy frame{" "}
                 {selection.start.toLocaleString()}
               </>
             ) : (

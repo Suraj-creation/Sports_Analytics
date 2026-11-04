@@ -45,7 +45,7 @@ class ServiceBody(ReviewVersion):
 def _snapshot(
     session: Session, repo: Repo, revision: int | None = None
 ) -> Iterator[tuple[Session, EventStore, IdentityReviewLedger]]:
-    with repo.analysis_snapshot(session.session_id) as (current, store, _):
+    with repo.analysis_snapshot(session.session_id, writable=revision is not None) as (current, store, _):
         if current.media is None or current.media.n_frames < 1 or current.roster is None:
             raise HTTPException(409, "A video timeline and participant roster are required")
         if revision is not None:

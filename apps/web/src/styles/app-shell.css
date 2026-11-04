@@ -287,7 +287,7 @@
     bottom: 0;
     inset-inline: 0;
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     padding: 4px 6px calc(4px + env(safe-area-inset-bottom));
     background: var(--c-surface);
     border-top: 1px solid var(--c-edge);
@@ -301,7 +301,7 @@
     padding: 5px 2px;
     border: 0;
     border-radius: 6px;
-    font-size: 12px;
+    font-size: 11px;
   }
   .rally-bottom-nav .rally-nav-item svg {
     width: 19px;

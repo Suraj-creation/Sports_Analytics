@@ -15,10 +15,18 @@ Model definition vendored from qaz812345/TrackNetV3 (MIT License, Copyright (c) 
 
 from __future__ import annotations
 
+import hashlib
+import json
+import marshal
+import sys
+import tempfile
 from collections import deque
+from collections.abc import Callable
+from contextlib import nullcontext
 from dataclasses import dataclass, field
 from itertools import pairwise
 from pathlib import Path
+from typing import Any, BinaryIO
 
 import cv2
 import numpy as np
@@ -30,6 +38,45 @@ from bai_engine.runtime.device import ort_runtime
 log = get_logger(__name__)
 
 WIDTH, HEIGHT = 512, 288
+# Bump for export-contract changes not represented by the other inputs. This
+# is not a TensorRT engine-cache or complete dependency/toolchain fingerprint.
+ONNX_EXPORT_CONTRACT = "tracknetv3-onnx-opset17-embedded-v3"
+
+
+def _sha256_stream(stream: BinaryIO) -> str:
+    """Hash a seekable binary stream without retaining checkpoint bytes in RAM."""
+    stream.seek(0)
+    digest = hashlib.sha256()
+    for block in iter(lambda: stream.read(1024 * 1024), b""):
+        digest.update(block)
+    return digest.hexdigest()
+
+
+def _onnx_cache_key(checkpoint_digest: str, torch_version: str) -> str:
+    """Key an exported graph by its checkpoint and loaded export implementation.
+
+    The executing code-object digest includes nested builder code. Including it
+    avoids conflating an already-running process's old code with new source on
+    disk after an edit. It does not fingerprint every exporter dependency.
+    """
+    with Path(__file__).open("rb") as stream:
+        source_digest = _sha256_stream(stream)
+    digest = hashlib.sha256()
+    components = (
+        ONNX_EXPORT_CONTRACT,
+        checkpoint_digest,
+        source_digest,
+        torch_version,
+        str(sys.version_info[:3]),
+        str(WIDTH),
+        str(HEIGHT),
+    )
+    for value in components:
+        digest.update(value.encode("utf-8"))
+        digest.update(b"\0")
+    for function in (_build_torch_model, TrackNetV3.export_onnx):
+        digest.update(marshal.dumps(function.__code__))
+    return digest.hexdigest()
 
 
 def _build_torch_model(in_dim: int, out_dim: int):  # type: ignore[no-untyped-def]
@@ -124,6 +171,17 @@ class BackgroundModel:
     def get(self, shot: int, fallback: NDArray[np.uint8]) -> NDArray[np.uint8]:
         return self._median.get(shot, fallback)
 
+    def retain(self, shots: set[int]) -> None:
+        """Keep backgrounds needed by the current sequential inference call.
+
+        Camera-shot IDs advance on cuts, so completed shots absent from the
+        current call cannot resume. Retain all current IDs until their windows
+        have been built, including both sides of a cut within one chunk.
+        """
+        for history in (self._samples, self._median, self._since, self._count):
+            for shot in history.keys() - shots:
+                del history[shot]
+
 
 @dataclass(frozen=True)
 class ShuttleDetection:
@@ -168,6 +226,10 @@ class TrackNetV3:
         providers: list[object] | None = None,
         batch: int = 1,
         precision: str = "fp32",
+        *,
+        checkpoint_stream: BinaryIO | None = None,
+        expected_sha256: str | None = None,
+        provider_factory: Callable[[str], list[object]] | None = None,
     ) -> None:
         import torch
 
@@ -175,7 +237,28 @@ class TrackNetV3:
             raise ValueError(f"unsupported TrackNet backend {backend!r}")
         if precision not in ("fp32", "fp16"):
             raise ValueError(f"unsupported TrackNet precision {precision!r}")
-        ckpt = torch.load(weights, map_location="cpu", weights_only=False)
+        # Registry callers supply their verified private snapshot. Direct callers
+        # retain the legacy path API and may require an expected integrity pin.
+        # Hashing is not publisher authentication or protection from unsafe pickle
+        # contents; only previously trusted checkpoints may be deserialized.
+        checkpoint_digest = None
+        cache_key = None
+        graph_digest = None
+        onnx_path = None
+        if checkpoint_stream is not None or expected_sha256 is not None or backend in (
+            "onnx-cpu", "onnx-cuda", "tensorrt"
+        ):
+            context = nullcontext(checkpoint_stream) if checkpoint_stream is not None else weights.open("rb")
+            with context as stream:
+                checkpoint_digest = _sha256_stream(stream)
+                if expected_sha256 is not None and checkpoint_digest != expected_sha256:
+                    raise ValueError("TrackNet checkpoint sha256 mismatch; refusing to deserialize")
+                stream.seek(0)
+                ckpt = torch.load(stream, map_location="cpu", weights_only=False)
+                if _sha256_stream(stream) != checkpoint_digest:
+                    raise ValueError("TrackNet checkpoint changed during loading")
+        else:
+            ckpt = torch.load(weights, map_location="cpu", weights_only=False)
         p = ckpt.get("param_dict", {})
         self.seq_len = int(p.get("seq_len", 8))
         self.bg_mode = str(p.get("bg_mode", "concat"))
@@ -198,12 +281,17 @@ class TrackNetV3:
         if backend == "torch-cuda" and torch.cuda.is_available():
             self._torch = model.cuda().half() if precision == "fp16" else model.cuda().float()
         elif backend in ("onnx-cpu", "onnx-cuda", "tensorrt"):
-            onnx_path = (onnx_dir or weights.parent) / f"tracknetv3_seq{self.seq_len}_{self.bg_mode}.onnx"
-            if not onnx_path.exists():
-                self.export_onnx(onnx_path)
+            if checkpoint_digest is None:
+                raise RuntimeError("TrackNet ONNX export requires a checkpoint digest")
+            cache_key = _onnx_cache_key(checkpoint_digest, str(torch.__version__))
+            base = (onnx_dir or weights.parent) / f"tracknetv3_seq{self.seq_len}_{self.bg_mode}_{cache_key}.onnx"
+            cached = self._cached_onnx(base, cache_key)
+            onnx_path, graph_digest = cached if cached is not None else self._publish_onnx(base, cache_key)
             import onnxruntime as ort
 
-            self._ort = ort.InferenceSession(str(onnx_path), providers=providers or ["CPUExecutionProvider"])
+            selected = provider_factory(graph_digest) if provider_factory is not None else providers
+            self._ort = ort.InferenceSession(str(onnx_path), providers=selected or ["CPUExecutionProvider"])
+            self._validate_onnx_contract(self._ort)
         if self._ort is not None:
             self.runtime = ort_runtime(backend, self._ort)
         else:
@@ -215,6 +303,13 @@ class TrackNetV3:
                 "backend_fallback": actual != backend,
             }
         self.runtime["requested_precision"] = precision
+        if checkpoint_digest is not None:
+            self.runtime["checkpoint_sha256"] = checkpoint_digest
+        if cache_key is not None:
+            self.runtime["onnx_cache_key"] = cache_key
+            self.runtime["onnx_sha256"] = graph_digest
+            self.runtime["onnx_path"] = str(onnx_path)
+            self.runtime["onnx_export_contract"] = ONNX_EXPORT_CONTRACT
         if self.runtime["backend_fallback"]:
             log.warning("tracknet.backend_fallback", **self.runtime)
         log.info("tracknet.loaded", seq_len=self.seq_len, **self.runtime)
@@ -222,6 +317,119 @@ class TrackNetV3:
     @property
     def model_ref(self) -> str:
         return "tracknetv3@3.0"
+
+    def _validate_onnx_contract(self, session: Any) -> None:
+        """Validate the baseline tensor names, float32 type and NCHW dimensions."""
+        for values, name, channels in (
+            (session.get_inputs(), "frames", self.in_dim),
+            (session.get_outputs(), "heatmaps", self.seq_len),
+        ):
+            if len(values) != 1:
+                raise ValueError("TrackNet ONNX tensor contract requires one input and one output")
+            value = values[0]
+            shape = value.shape
+            if (
+                value.name != name
+                or value.type != "tensor(float)"
+                or len(shape) != 4
+                or shape[1:] != [channels, HEIGHT, WIDTH]
+                or isinstance(shape[0], int)
+            ):
+                raise ValueError(f"TrackNet ONNX tensor contract mismatch for {name}")
+
+    def _validate_onnx(self, path: Path) -> str:
+        """Load serialized graph bytes with CPU ORT; external tensor files fail closed.
+
+        Loading bytes, rather than a model path, prevents resolving untracked
+        external weight files. This is graph/IO validation, not model accuracy.
+        """
+        import onnxruntime as ort
+
+        data = path.read_bytes()
+        if not data:
+            raise ValueError("TrackNet ONNX contract requires a nonempty graph")
+        options = ort.SessionOptions()
+        options.intra_op_num_threads = 1
+        options.inter_op_num_threads = 1
+        try:
+            session = ort.InferenceSession(data, sess_options=options, providers=["CPUExecutionProvider"])
+            self._validate_onnx_contract(session)
+        except Exception as error:
+            raise ValueError(f"TrackNet ONNX contract validation failed: {error}") from error
+        return hashlib.sha256(data).hexdigest()
+
+    def _cached_onnx(self, base: Path, cache_key: str) -> tuple[Path, str] | None:
+        """A manifest commits a content-addressed single-file graph.
+
+        These are application-owned cache paths. Verification does not protect
+        against an independent hostile writer changing a graph between validation
+        and the final ORT path open; registry checkpoint snapshots close that
+        distinct checkpoint-to-deserialization race.
+        """
+        manifest_path = base.with_suffix(".json")
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            graph_digest = manifest["graph_sha256"]
+            if (
+                manifest["schema"] != 1
+                or manifest["cache_key"] != cache_key
+                or manifest["export_contract"] != ONNX_EXPORT_CONTRACT
+                or not isinstance(graph_digest, str)
+                or len(graph_digest) != 64
+                or any(char not in "0123456789abcdef" for char in graph_digest)
+            ):
+                raise ValueError("invalid graph cache manifest contract")
+            path = base.with_name(f"{base.stem}_{graph_digest}.onnx")
+            if manifest["filename"] != path.name:
+                raise ValueError("invalid graph cache manifest filename")
+            with path.open("rb") as stream:
+                if _sha256_stream(stream) != graph_digest:
+                    raise ValueError("cached graph sha256 mismatch")
+            if self._validate_onnx(path) != graph_digest:
+                raise ValueError("cached graph changed during validation")
+            return path, graph_digest
+        except FileNotFoundError:
+            return None
+        except (OSError, ValueError, KeyError, TypeError) as error:
+            log.warning("tracknet.onnx_cache_invalid", path=str(manifest_path), error=str(error))
+            return None
+
+    def _publish_onnx(self, path: Path, cache_key: str) -> tuple[Path, str]:
+        """Atomically commit a verified graph through a manifest publication marker.
+
+        Concurrent exports never pair one export's digest with another graph:
+        filenames include the graph content hash, then the manifest is replaced
+        atomically. An interrupted writer leaves no reusable partial manifest.
+        Legacy graph files and complete unreferenced exports are preserved.
+        """
+        path.parent.mkdir(parents=True, exist_ok=True)
+        cache_root = path.parent.resolve()
+        # The unique directory confines this export's graph and any unexpected
+        # auxiliary files. It is removed after success, rejection or failure.
+        with tempfile.TemporaryDirectory(prefix=".tracknet-", dir=cache_root) as tmp:
+            temporary_dir = Path(tmp).resolve()
+            if temporary_dir.parent != cache_root:
+                raise RuntimeError("TrackNet temporary export directory is outside the cache")
+            temporary = temporary_dir / "model.onnx"
+            self.export_onnx(temporary)
+            if not temporary.is_file() or any(entry != temporary for entry in temporary_dir.iterdir()):
+                raise ValueError("TrackNet ONNX export produced unexpected auxiliary files")
+            if temporary.stat().st_size == 0:
+                raise ValueError("TrackNet ONNX export produced an empty file")
+            graph_digest = self._validate_onnx(temporary)
+            published = path.with_name(f"{path.stem}_{graph_digest}.onnx")
+            manifest = {
+                "schema": 1,
+                "cache_key": cache_key,
+                "export_contract": ONNX_EXPORT_CONTRACT,
+                "graph_sha256": graph_digest,
+                "filename": published.name,
+            }
+            marker = temporary_dir / "manifest.json"
+            marker.write_text(json.dumps(manifest, sort_keys=True), encoding="utf-8")
+            temporary.replace(published)
+            marker.replace(path.with_suffix(".json"))
+            return published, graph_digest
 
     def export_onnx(self, path: Path) -> None:
         import torch
@@ -236,6 +444,7 @@ class TrackNetV3:
             output_names=["heatmaps"],
             dynamic_axes={"frames": {0: "batch"}, "heatmaps": {0: "batch"}},
             opset_version=17,
+            external_data=False,
         )
         log.info("tracknet.onnx_exported", path=str(path))
 
@@ -284,6 +493,7 @@ class TrackNetV3:
         shots = shots or [0] * len(frames_bgr)
         h, w = frames_bgr[0].shape[:2]
         sx, sy = w / WIDTH, h / HEIGHT
+        self.bg.retain(set(shots))
         small = self._prep(frames_bgr, shots)
         n = len(small)
         acc = np.zeros((n, HEIGHT, WIDTH), np.float32)

@@ -2,9 +2,11 @@ import { clsx } from "clsx";
 import { useMemo } from "react";
 import { stateAt } from "@/features/session/derive";
 import { shortName } from "@/lib/format";
-import type { PlayerId, Session } from "@/lib/types";
+import type { BaiEvent, PlayerId, Session } from "@/lib/types";
 import { usePlayback } from "@/stores/playback";
 import { useSession } from "@/stores/session";
+
+type BroadcastRows = [{ name: string; points: number }, { name: string; points: number }];
 
 /** Broadcast-style score bug. State is derived for the *presented* frame — no spoilers. */
 export function ScoreBug({ session }: { session: Session }) {
@@ -13,35 +15,22 @@ export function ScoreBug({ session }: { session: Session }) {
   const eventsVersion = useSession((s) => s.eventsVersion);
   const status = useSession((s) => s.session?.status);
   // biome-ignore lint/correctness/useExhaustiveDependencies: eventsVersion signals mutation of the log
-  const { state, known } = useMemo(() => stateAt(events, frame), [events, eventsVersion, frame]);
+  const { state, known, evidence } = useMemo(() => stateAt(events, frame), [events, eventsVersion, frame]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: eventsVersion signals mutation of the log
+  const broadcasts = useMemo(() => events.ofType("broadcast_score"), [events, eventsVersion]);
 
   const observed = events.latestBefore("broadcast_score", frame);
-  const rows = observed?.payload.rows as { name: string; points: number }[] | undefined;
-  const point = events.latestBefore("point", frame);
+  const rows = observed?.payload.rows;
   // An accepted backend point advances the score even when OCR has not read
   // the changed board yet. Compare video frames, not packet arrival order.
   const acceptedScore =
     known &&
-    point &&
-    (point.status === "confirmed" || point.status === "corrected" || point.status === "human_verified") &&
-    (point.frame_start > (observed?.frame_start ?? -1) ||
-      (point.frame_start === observed?.frame_start && (point.seq ?? 0) >= (observed.seq ?? 0)));
-  const broadcast =
-    !acceptedScore &&
-    Array.isArray(rows) &&
-    rows.length === 2 &&
-    rows.every(
-      (row) =>
-        row !== null &&
-        typeof row === "object" &&
-        typeof row.name === "string" &&
-        row.name.trim() &&
-        Number.isInteger(row.points) &&
-        row.points >= 0 &&
-        row.points <= 30,
-    )
-      ? rows
-      : null;
+    evidence &&
+    (evidence.frame_start > (observed?.frame_start ?? -1) ||
+      (evidence.frame_start === observed?.frame_start && (evidence.seq ?? 0) >= (observed.seq ?? 0)));
+  const broadcast = !acceptedScore && validBroadcastRows(rows) ? rows : null;
+  const observedIndex = observed ? broadcasts.findIndex((event) => event.event_id === observed.event_id) : -1;
+  const incrementName = sourceIncrementName(observed, broadcasts[observedIndex - 1], broadcast);
   const fps = session.media ? session.media.fps_num / session.media.fps_den : 30;
   const age = observed ? Math.max(0, Math.floor((frame - observed.frame_start) / fps)) : 0;
 
@@ -102,8 +91,68 @@ export function ScoreBug({ session }: { session: Session }) {
           <span className="rounded bg-mat-deep/80 px-1.5 py-0.5 text-line-3">score pending</span>
         )}
       </div>
+      {incrementName && (
+        <div
+          role="status"
+          aria-label="Observed broadcast increment"
+          className="mt-1 max-w-72 rounded bg-mat-deep/90 px-2 py-1 text-[11px] text-shuttle"
+        >
+          <span className="font-semibold">{incrementName} +1</span>
+          <span className="text-line-2"> · Observed broadcast</span>
+        </div>
+      )}
     </div>
   );
+}
+
+function validBroadcastRows(rows: unknown): rows is BroadcastRows {
+  return (
+    Array.isArray(rows) &&
+    rows.length === 2 &&
+    rows.every(
+      (row) =>
+        row !== null &&
+        typeof row === "object" &&
+        typeof row.name === "string" &&
+        row.name.trim().length > 0 &&
+        Number.isInteger(row.points) &&
+        row.points >= 0 &&
+        row.points <= 30,
+    )
+  );
+}
+
+function sourceIncrementName(
+  current: BaiEvent | undefined,
+  previous: BaiEvent | undefined,
+  rows: BroadcastRows | null,
+): string | null {
+  if (
+    !current ||
+    !previous ||
+    !rows ||
+    previous.frame_start >= current.frame_start ||
+    [previous, current].some(
+      (event) =>
+        event.status !== "confirmed" ||
+        event.payload.source !== "broadcast_ocr" ||
+        event.payload.confirmation !== "two_distinct_observations",
+    )
+  )
+    return null;
+  const prior = previous.payload.rows;
+  if (!validBroadcastRows(prior)) return null;
+  const names = rows.map((row) => row.name.trim().toUpperCase());
+  if (
+    names[0] === names[1] ||
+    names.some((name, index) => !/\p{L}/u.test(name) || name !== prior[index]?.name.trim().toUpperCase())
+  )
+    return null;
+  const first = rows[0].points - prior[0].points;
+  const second = rows[1].points - prior[1].points;
+  if (first === 1 && second === 0) return rows[0].name.trim();
+  if (first === 0 && second === 1) return rows[1].name.trim();
+  return null;
 }
 
 function Row(props: {

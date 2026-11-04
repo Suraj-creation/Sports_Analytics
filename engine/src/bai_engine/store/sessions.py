@@ -100,6 +100,8 @@ class SessionRepository:
             )
         self._event_stores: dict[str, EventStore] = {}
         self._track_stores: dict[str, TrackStore] = {}
+        self._store_generations: dict[str, str] = {}
+        self._snapshot_generations: dict[str, str] = {}
 
     # ------------------------------------------------------------------ paths
     def paths(self, session_id: str) -> SessionPaths:
@@ -242,6 +244,7 @@ class SessionRepository:
             if es:
                 es.close()
             self._track_stores.pop(session_id, None)
+            self._store_generations.pop(session_id, None)
             self._conn.execute("DELETE FROM sessions WHERE session_id=?", (session_id,))
         shutil.rmtree(self.paths(session_id).root, ignore_errors=True)
 
@@ -281,8 +284,9 @@ class SessionRepository:
             if es:
                 es.close()
             self._track_stores.pop(session_id, None)
-            # Keep replacement handles, deletion and generation publication atomic.
-            # Otherwise a reader can open a new SQLite file just before it is unlinked.
+            # Serialize replacement and publication for this repository's readers.
+            # Other processes detect a completed reset through the generation token;
+            # this RLock does not provide cross-process reset fencing.
             p = self.paths(session_id)
             for f in (p.events_db, Path(f"{p.events_db}-wal"), Path(f"{p.events_db}-shm")):
                 f.unlink(missing_ok=True)
@@ -299,29 +303,69 @@ class SessionRepository:
 
     # ------------------------------------------------------------------ stores
     @contextmanager
-    def analysis_snapshot(self, session_id: str) -> Iterator[tuple[Session, EventStore, TrackStore]]:
-        """Hold a consistent generation for synchronous reads; never await in this context."""
+    def analysis_snapshot(
+        self, session_id: str, *, writable: bool = False
+    ) -> Iterator[tuple[Session, EventStore, TrackStore]]:
+        """Hold one generation and event revision; never await in this context.
+
+        Review writers explicitly request a transaction so their read/modify/write
+        operation commits together. Ordinary projections use a WAL read snapshot.
+        """
         with self._lock:
             session = self.get(session_id)
             if session is None:
                 raise KeyError(session_id)
-            yield session, self.events(session_id), self.tracks(session_id)
+            generation = str(session.meta.get("analysis_generation") or "")
+            pinned = self._snapshot_generations.get(session_id)
+            if pinned is not None and pinned != generation:
+                raise RuntimeError("Analysis generation changed during a snapshot; retry the request")
+            self._snapshot_generations[session_id] = generation
+            try:
+                store = self.events(session_id)
+                with store.transaction() if writable else store.read_snapshot():
+                    yield session, store, self.tracks(session_id)
+            finally:
+                if pinned is None:
+                    self._snapshot_generations.pop(session_id, None)
 
     def events(self, session_id: str) -> EventStore:
         with self._lock:
+            self._refresh_store_generation(session_id)
             if session_id not in self._event_stores:
                 self._event_stores[session_id] = EventStore(self.paths(session_id).events_db, session_id)
             return self._event_stores[session_id]
 
     def tracks(self, session_id: str) -> TrackStore:
         with self._lock:
+            self._refresh_store_generation(session_id)
             if session_id not in self._track_stores:
                 self._track_stores[session_id] = TrackStore(self.paths(session_id).tracks)
             return self._track_stores[session_id]
+
+    def _refresh_store_generation(self, session_id: str) -> None:
+        """Discard handles to files replaced by another repository/worker's reset.
+
+        Called with the repository lock held. This follows completed resets; it
+        is not an acknowledgement or a cross-process lock for concurrent reset.
+        """
+        session = self.get(session_id)
+        generation = str(session.meta.get("analysis_generation") or "") if session else ""
+        pinned = self._snapshot_generations.get(session_id)
+        if pinned is not None and pinned != generation:
+            # Never close a handle owned by an active/nested read transaction.
+            raise RuntimeError("Analysis generation changed during a snapshot; retry the request")
+        if self._store_generations.get(session_id, generation) != generation:
+            previous = self._event_stores.pop(session_id, None)
+            if previous is not None:
+                previous.close()
+            self._track_stores.pop(session_id, None)
+        self._store_generations[session_id] = generation
 
     def close(self) -> None:
         with self._lock:
             for es in self._event_stores.values():
                 es.close()
             self._event_stores.clear()
+            self._track_stores.clear()
+            self._store_generations.clear()
             self._conn.close()

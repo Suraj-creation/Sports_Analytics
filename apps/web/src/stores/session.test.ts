@@ -1,13 +1,23 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/lib/api";
 import type { ServerMsg } from "@/lib/socket";
-import { ev, SESSION, state } from "@/test/fixtures";
 import { usePlayback } from "@/stores/playback";
+import { ev, SESSION, state } from "@/test/fixtures";
 
-const sockets: { onMessage: (m: ServerMsg) => void; lastSeq: () => number; generation: () => string | undefined }[] = [];
+const sockets: {
+  onMessage: (m: ServerMsg) => void;
+  lastSeq: () => number;
+  generation: () => string | undefined;
+}[] = [];
 vi.mock("@/lib/socket", () => ({
   SessionSocket: class {
-    constructor(_id: string, onMessage: (m: ServerMsg) => void, lastSeq: () => number, _onState: unknown, generation: () => string | undefined = () => undefined) {
+    constructor(
+      _id: string,
+      onMessage: (m: ServerMsg) => void,
+      lastSeq: () => number,
+      _onState: unknown,
+      generation: () => string | undefined = () => undefined,
+    ) {
       sockets.push({ onMessage, lastSeq, generation });
     }
     close() {}
@@ -67,16 +77,98 @@ describe("session store", () => {
     expect(useSession.getState().session?.frontier_frame).toBe(120);
   });
 
+  it("fills missing media without replacing metadata saved while the fetch was pending", async () => {
+    let resolve: (session: typeof SESSION) => void = () => {
+      throw new Error("Media request is not pending");
+    };
+    const pending = new Promise<typeof SESSION>((done) => {
+      resolve = done;
+    });
+    vi.spyOn(api, "session").mockReturnValue(pending);
+    useSession.getState().open("s1");
+    const socket = sockets[0]!;
+    socket.onMessage({
+      type: "hello",
+      session: { ...SESSION, media: null, meta: { analysis_revision: 1 } },
+    });
+    socket.onMessage({ type: "status", status: "ready_to_play", frontier_frame: 0, analysis_revision: 1 });
+    const roster = {
+      match_format: "singles" as const,
+      teams: [
+        { team_id: "T1", score_slot: "P1" as const },
+        { team_id: "T2", score_slot: "P2" as const },
+      ],
+      participants: [
+        { participant_id: "person-a", name: "Alice", team_id: "T1" },
+        { participant_id: "person-b", name: "Bob", team_id: "T2" },
+      ],
+    };
+    useSession.setState((current) => ({
+      session: current.session && {
+        ...current.session,
+        title: "Reviewed title",
+        players: [
+          { player_id: "P1", name: "Alice" },
+          { player_id: "P2", name: "Bob" },
+        ],
+        roster,
+      },
+    }));
+    socket.onMessage({ type: "status", status: "analysing", frontier_frame: 10, analysis_revision: 2 });
+    resolve({ ...SESSION, roster: null, meta: { analysis_revision: 1 } });
+    await vi.waitFor(() => expect(useSession.getState().session?.media).toEqual(SESSION.media));
+    expect(useSession.getState().session).toMatchObject({
+      title: "Reviewed title",
+      players: [
+        { player_id: "P1", name: "Alice" },
+        { player_id: "P2", name: "Bob" },
+      ],
+      roster,
+      frontier_frame: 10,
+      meta: { analysis_revision: 2 },
+    });
+  });
+
+  it("retains an ingestion-provided title when it was not edited during the media fetch", async () => {
+    vi.spyOn(api, "session").mockResolvedValue({ ...SESSION, title: "Downloaded recording" });
+    useSession.getState().open("s1");
+    const socket = sockets[0]!;
+    socket.onMessage({ type: "hello", session: { ...SESSION, title: "YouTube video", media: null } });
+    socket.onMessage({ type: "status", status: "ready_to_play", frontier_frame: 0 });
+    await vi.waitFor(() => expect(useSession.getState().session?.title).toBe("Downloaded recording"));
+    expect(useSession.getState().session?.media).toEqual(SESSION.media);
+  });
+
   it("replaces old live results on analysis_reset while retaining media and the supplied manual court", () => {
     useSession.getState().open("s1");
     const sock = sockets[0]!;
-    const manual = { H: [[1, 0, 20], [0, 1, 30], [0, 0, 1]], reprojection_error_px: 0, n_points: 4, source: "human" };
-    sock.onMessage({ type: "hello", session: { ...SESSION, status: "analysed", meta: { analysis_generation: "old-run" } }, last_seq: 100 });
-    sock.onMessage({ type: "events", generation: "old-run", events: [
-      ev("stroke", 30, { event_id: "old-shot", seq: 100 }),
-      ev("point", 20, { seq: 99, payload: { state_after: state(2, 1) } }),
-    ] });
-    sock.onMessage({ type: "tracks", window: { v: 1, from: 0, to: 40, shuttle: { f: [30], x: [10], y: [20], c: [0.9] }, players: {} } });
+    const manual = {
+      H: [
+        [1, 0, 20],
+        [0, 1, 30],
+        [0, 0, 1],
+      ],
+      reprojection_error_px: 0,
+      n_points: 4,
+      source: "human",
+    };
+    sock.onMessage({
+      type: "hello",
+      session: { ...SESSION, status: "analysed", meta: { analysis_generation: "old-run" } },
+      last_seq: 100,
+    });
+    sock.onMessage({
+      type: "events",
+      generation: "old-run",
+      events: [
+        ev("stroke", 30, { event_id: "old-shot", seq: 100 }),
+        ev("point", 20, { seq: 99, payload: { state_after: state(2, 1) } }),
+      ],
+    });
+    sock.onMessage({
+      type: "tracks",
+      window: { v: 1, from: 0, to: 40, shuttle: { f: [30], x: [10], y: [20], c: [0.9] }, players: {} },
+    });
     usePlayback.setState({ selection: { start: 30, end: 30, label: "Old shot" } });
     sock.onMessage({ type: "analysis_reset", session_id: "s1", generation: "new-run", calibration: manual });
     const current = useSession.getState();
@@ -92,19 +184,40 @@ describe("session store", () => {
     expect(usePlayback.getState().selection).toBeNull();
     expect(sock.lastSeq()).toBe(0);
     expect(sock.generation()).toBe("new-run");
-    sock.onMessage({ type: "events", generation: "new-run", events: [ev("stroke", 30, { event_id: "new-shot", seq: 1 })] });
+    sock.onMessage({
+      type: "events",
+      generation: "new-run",
+      events: [ev("stroke", 30, { event_id: "new-shot", seq: 1 })],
+    });
     expect(current.events.ofType("stroke").map((event) => event.event_id)).toEqual(["new-shot"]);
   });
 
   it("clears an obsolete generation on reconnect even when the new log sequence is higher", () => {
     useSession.getState().open("s1");
     const sock = sockets[0]!;
-    sock.onMessage({ type: "hello", session: { ...SESSION, meta: { analysis_generation: "old-run" } }, last_seq: 100 });
+    sock.onMessage({
+      type: "hello",
+      session: { ...SESSION, meta: { analysis_generation: "old-run" } },
+      last_seq: 100,
+    });
     sock.onMessage({ type: "events", events: [ev("stroke", 30, { event_id: "old-shot", seq: 100 })] });
-    sock.onMessage({ type: "hello", session: { ...SESSION, meta: { analysis_generation: "new-run" } }, last_seq: 200 });
+    sock.onMessage({
+      type: "hello",
+      session: { ...SESSION, meta: { analysis_generation: "new-run" } },
+      last_seq: 200,
+    });
     expect(useSession.getState().events.size).toBe(0);
-    sock.onMessage({ type: "events", backlog: true, events: [ev("stroke", 30, { event_id: "new-shot", seq: 1 })] });
-    expect(useSession.getState().events.ofType("stroke").map((event) => event.event_id)).toEqual(["new-shot"]);
+    sock.onMessage({
+      type: "events",
+      backlog: true,
+      events: [ev("stroke", 30, { event_id: "new-shot", seq: 1 })],
+    });
+    expect(
+      useSession
+        .getState()
+        .events.ofType("stroke")
+        .map((event) => event.event_id),
+    ).toEqual(["new-shot"]);
   });
 
   it("clears legacy results when the server hello sequence rolls back", () => {
@@ -121,21 +234,42 @@ describe("session store", () => {
     const control = vi.spyOn(api, "control");
     useSession.getState().open("s1");
     const sock = sockets[0]!;
-    sock.onMessage({ type: "hello", session: { ...SESSION, meta: { analysis_generation: "old-run" } }, last_seq: 100 });
+    sock.onMessage({
+      type: "hello",
+      session: { ...SESSION, meta: { analysis_generation: "old-run" } },
+      last_seq: 100,
+    });
     sock.onMessage({ type: "events", events: [ev("stroke", 30, { event_id: "old-shot", seq: 100 })] });
-    sock.onMessage({ type: "events", generation: "new-run", events: [ev("stroke", 60, { event_id: "latest-shot", seq: 42 })] });
+    sock.onMessage({
+      type: "events",
+      generation: "new-run",
+      events: [ev("stroke", 60, { event_id: "latest-shot", seq: 42 })],
+    });
     expect(sockets).toHaveLength(2);
     const replay = sockets[1]!;
     expect(replay.lastSeq()).toBe(0);
     expect(replay.generation()).toBe("new-run");
     expect(useSession.getState().events.size).toBe(0);
     expect(useSession.getState().session?.media).toEqual(SESSION.media);
-    replay.onMessage({ type: "hello", session: { ...SESSION, meta: { analysis_generation: "new-run" } }, last_seq: 42 });
-    replay.onMessage({ type: "events", backlog: true, events: [
-      ev("stroke", 30, { event_id: "first-shot", seq: 1 }),
-      ev("stroke", 60, { event_id: "latest-shot", seq: 42 }),
-    ] });
-    expect(useSession.getState().events.ofType("stroke").map((event) => event.event_id)).toEqual(["first-shot", "latest-shot"]);
+    replay.onMessage({
+      type: "hello",
+      session: { ...SESSION, meta: { analysis_generation: "new-run" } },
+      last_seq: 42,
+    });
+    replay.onMessage({
+      type: "events",
+      backlog: true,
+      events: [
+        ev("stroke", 30, { event_id: "first-shot", seq: 1 }),
+        ev("stroke", 60, { event_id: "latest-shot", seq: 42 }),
+      ],
+    });
+    expect(
+      useSession
+        .getState()
+        .events.ofType("stroke")
+        .map((event) => event.event_id),
+    ).toEqual(["first-shot", "latest-shot"]);
     expect(control).not.toHaveBeenCalled();
   });
 
@@ -151,5 +285,4 @@ describe("session store", () => {
     expect(sockets[1]!.lastSeq()).toBe(0);
     expect(useSession.getState().events.size).toBe(0);
   });
-
 });

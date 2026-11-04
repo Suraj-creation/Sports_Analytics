@@ -10,6 +10,7 @@ from bai_badminton.events.contact import ContactCandidate, detect_contacts
 from bai_badminton.observations import WindowObs
 from bai_badminton.participant_contact import ParticipantSnapshot
 from bai_badminton.perception.shuttle_post import Track
+from bai_badminton.perception_types import ChunkPerception, FramePerception
 from bai_badminton.rules.bwf import MatchConfig
 from bai_engine.store import EventStore
 
@@ -32,6 +33,14 @@ def frames(*, tie=False):
             kps=None, court_xy=(0.5, -3.0), observation_id=f"birth-{i}", detector_observed=True,
         )
     return [dict(rows) for _ in range(7)]
+
+
+def classifier_timeline(engine, *, tie=False):
+    """Hold flight context valid while testing participant evidence independently."""
+    engine.ingest(ChunkPerception(0, 35, [
+        FramePerception(frame_idx=f, shuttle_xy=None, shuttle_conf=0.0) for f in range(36)
+    ]))
+    engine._participant_frames[:7] = frames(tie=tie)
 
 
 def test_advance_uses_four_episodes_for_contact_scoring_without_named_actor(tmp_path: Path):
@@ -64,7 +73,7 @@ def test_classification_uses_unique_episode_context_without_naming_hitter(tmp_pa
     store = EventStore(tmp_path / "classify.sqlite", "S1")
     engine = BadmintonMatchEngine("S1", EngineConfig(fps=30, frame_width=1280, frame_height=720,
                                                  match=MatchConfig(discipline="doubles")), store)
-    engine._participant_frames = frames()
+    classifier_timeline(engine)
     engine._post_contact_kinematics = lambda _, next_frame=None: (800.0, -30.0)
     engine._on_contact(ContactCandidate(frame=3, player_id=None, p=0.9, shuttle_xy=(100., 100.)), window())
     engine._classify(engine._open_contacts[-1], next_frame=35, is_serve=False, receiver=None)
@@ -85,7 +94,7 @@ def test_classifier_abstains_when_episode_box_has_no_detector_run(tmp_path: Path
         "S1", EngineConfig(fps=30, frame_width=1280, frame_height=720,
                            match=MatchConfig(discipline="doubles")), store,
     )
-    engine._participant_frames = frames()
+    classifier_timeline(engine)
     key = "participant-epoch-000001"
     engine._participant_frames[3][key] = replace(
         engine._participant_frames[3][key], detector_observed=detector_observed,
@@ -103,7 +112,7 @@ def test_ambiguous_episode_never_supplies_classifier_context(tmp_path: Path):
     store = EventStore(tmp_path / "ambiguous.sqlite", "S1")
     engine = BadmintonMatchEngine("S1", EngineConfig(fps=30, frame_width=1280, frame_height=720,
                                                  match=MatchConfig(discipline="doubles")), store)
-    engine._participant_frames = frames(tie=True)
+    classifier_timeline(engine, tie=True)
     engine._post_contact_kinematics = lambda _, next_frame=None: (800.0, -30.0)
     engine._on_contact(ContactCandidate(frame=3, player_id=None, p=0.9, shuttle_xy=(100., 100.)), window())
     engine._classify(engine._open_contacts[-1], next_frame=35, is_serve=False, receiver=None)
@@ -145,7 +154,7 @@ def test_ambiguous_singles_does_not_enable_doubles_contact_fusion(tmp_path: Path
 def test_ambiguous_singles_does_not_enable_doubles_classification_context(tmp_path: Path):
     store = EventStore(tmp_path / "single-context.sqlite", "S1")
     engine = BadmintonMatchEngine("S1", EngineConfig(fps=30, frame_width=1280, frame_height=720), store)
-    engine._participant_frames = frames()
+    classifier_timeline(engine)
     engine._post_contact_kinematics = lambda _, next_frame=None: (800.0, -30.0)
     engine._on_contact(ContactCandidate(frame=3, player_id=None, p=0.9, shuttle_xy=(100., 100.)), window())
     engine._classify(engine._open_contacts[-1], next_frame=35, is_serve=False, receiver=None)

@@ -37,7 +37,8 @@ from bai_engine.bus import Bus, topic
 from bai_engine.config import Profile, Settings, load_profile
 from bai_engine.decode import DecodedChunk, SegmentDecoder
 from bai_engine.media import MediaError, Tools, hls_status, plan_proxy, probe, transcode, validate
-from bai_engine.media.proxy import ProxyPlan, build_sprite
+from bai_engine.media.ffmpeg import FFmpegJob
+from bai_engine.media.proxy import ProxyPlan, build_sprite, media_writer_lock
 from bai_engine.obs import ANALYSIS_RATE, DEGRADED, EVENTS_TOTAL, FRONTIER_LEAD, QUEUE_DEPTH, get_logger
 from bai_engine.runtime.registry import ModelRegistry
 from bai_engine.schema import (
@@ -97,6 +98,7 @@ class SessionRunner(threading.Thread):
         self.sport: SportSession | None = None
         self.plan: ProxyPlan | None = None
         self._transcode_thread: threading.Thread | None = None
+        self._transcode_job: FFmpegJob | None = None
         self._transcode_error: str | None = None
         self._rate_t0 = time.perf_counter()
         self._rate_frames = 0
@@ -166,6 +168,16 @@ class SessionRunner(threading.Thread):
 
     def stop(self) -> None:
         self.shared.stop.set()
+        job = getattr(self, "_transcode_job", None)
+        if job is not None:
+            job.cancel()
+
+    def _run_media_job(self, job: FFmpegJob) -> None:
+        """Register each child encoder, including sprites, with this runner's stop."""
+        self._transcode_job = job
+        if self.shared.stop.is_set():
+            job.cancel()
+        job.run()
 
     # ================================================================== ingest
     def _ensure_media(self) -> None:
@@ -244,33 +256,42 @@ class SessionRunner(threading.Thread):
                 "frames_per_segment": plan.frames_per_segment,
                 "encoder": plan.encoder,
                 "source_rotation": pr.rotation,
+                "source_video_stream_index": pr.video_stream_index,
             },
         )
-        if hls_status(mp).ended:
-            return
         mp.root.mkdir(parents=True, exist_ok=True)
-        job = transcode(
-            str(src),
-            mp,
-            plan,
-            self.tools,
-            pr.duration_s,
-            on_progress=lambda f: self.bus.publish(
-                topic(self.session_id, "status"), {"type": "ingest", "progress": round(f, 3)}
-            ),
-        )
 
         def run() -> None:
             try:
-                job.run()
-                st = hls_status(mp)
-                n = sum(round(d * float(plan.fps)) for d in st.durations)
-                cur = self.session
-                if cur.media is not None and n > 0:
-                    self.repo.update(self.session_id, media=cur.media.model_copy(update={"n_frames": n}))
-                with contextlib.suppress(MediaError):
-                    build_sprite(mp.proxy, mp, self.tools, pr.duration_s)
-            except MediaError as e:
+                with media_writer_lock(mp, self.shared.stop):
+                    # Another session may have prepared these bytes while this
+                    # worker waited. Never launch a second encoder over them.
+                    if not hls_status(mp).ended:
+                        job = transcode(
+                            str(src),
+                            mp,
+                            plan,
+                            self.tools,
+                            pr.duration_s,
+                            on_progress=lambda f: self.bus.publish(
+                                topic(self.session_id, "status"),
+                                {"type": "ingest", "progress": round(f, 3)},
+                            ),
+                        )
+                        self._run_media_job(job)
+                    if self.shared.stop.is_set():
+                        return
+                    st = hls_status(mp)
+                    n = sum(round(d * float(plan.fps)) for d in st.durations)
+                    cur = self.session
+                    if cur.media is not None and n > 0:
+                        self.repo.update(self.session_id, media=cur.media.model_copy(update={"n_frames": n}))
+                    if not mp.sprite_meta.exists():
+                        with contextlib.suppress(MediaError):
+                            build_sprite(mp.proxy, mp, self.tools, pr.duration_s, run_job=self._run_media_job)
+            except Exception as e:
+                if self.shared.stop.is_set():
+                    return
                 self._transcode_error = str(e)
                 log.error("transcode.failed", session=self.session_id, error=str(e))
 
@@ -291,10 +312,15 @@ class SessionRunner(threading.Thread):
         out: list[np.ndarray] = []
         try:
             rotation = s.meta.get("source_rotation")
-            if rotation is None:
-                rotation = probe(Path(s.source.uri), self.tools, self.settings.ffprobe_timeout_s).rotation
+            stream_index = s.meta.get("source_video_stream_index")
+            if rotation is None or stream_index is None:
+                source_info = probe(Path(s.source.uri), self.tools, self.settings.ffprobe_timeout_s)
+                rotation = source_info.rotation if rotation is None else rotation
+                stream_index = source_info.video_stream_index
             with av.open(s.source.uri) as c:
-                st = c.streams.video[0]
+                st = next((stream for stream in c.streams.video if stream.index == stream_index), None)
+                if st is None:
+                    raise MediaError("validated source video stream is unavailable")
                 dur = (st.duration * st.time_base) if st.duration else Fraction(s.media.duration_us, 1_000_000)
                 for i in range(n):
                     t = float(dur) * (i + 0.5) / n
@@ -409,6 +435,28 @@ class SessionRunner(threading.Thread):
             log.exception("session.failed", session=self.session_id)
             with contextlib.suppress(Exception):
                 self._status(SessionStatus.FAILED, f"Analysis failed: {e}")
+        finally:
+            # A joined runner is the service's deletion/reanalysis fence. It must
+            # include the media writer, not just the temporal-analysis thread.
+            stop_requested = self.shared.stop.is_set()
+            # Fence jobs that have not yet registered (including sprite work),
+            # and cancel a job even if its media thread already failed.
+            self.stop()
+            worker = getattr(self, "_transcode_thread", None)
+            if worker is not None:
+                worker.join()
+            if stop_requested:
+                with contextlib.suppress(_SessionGoneError):
+                    if self.session.status not in (SessionStatus.ANALYSED, SessionStatus.FAILED):
+                        self._status(SessionStatus.FAILED, "Processing stopped. Retry to restart analysis.")
+            # Models remain available through resident command handling and are
+            # released when this runner exits, including stop and failure paths.
+            try:
+                close = getattr(self.sport, "close", None)
+                if callable(close):
+                    close()
+            except Exception as exc:
+                log.warning("session.close_failed", session=self.session_id, error=str(exc))
 
     def _analyse(self) -> None:
         s = self.session

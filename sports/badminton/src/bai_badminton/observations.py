@@ -19,6 +19,25 @@ from bai_badminton.perception_types import RacketObservation
 PLAYER_IDS = ("P1", "P2")
 
 
+def temporal_segment_bounds(break_before: NDArray[np.bool_], index: int) -> tuple[int, int]:
+    """Half-open relative bounds of the contiguous segment containing ``index``.
+
+    A true entry starts a new segment at that frame. Index zero has no preceding
+    frame inside the supplied window, so its marker is ignored. Ordinary missing
+    observations do not create a temporal boundary by themselves.
+    """
+    boundaries = np.asarray(break_before)
+    if boundaries.ndim != 1 or boundaries.dtype != np.bool_:
+        raise ValueError("break_before must contain one boolean per frame")
+    if not 0 <= index < len(boundaries):
+        raise IndexError("segment index is outside the window")
+    starts = np.flatnonzero(boundaries[1:]) + 1
+    position = int(np.searchsorted(starts, index, side="right"))
+    lo = int(starts[position - 1]) if position else 0
+    hi = int(starts[position]) if position < len(starts) else len(boundaries)
+    return lo, hi
+
+
 @dataclass
 class PlayerSeries:
     """Per-frame observations of one *identified* player (``player_id``) over a window."""
@@ -58,11 +77,25 @@ class WindowObs:
     players: dict[str, PlayerSeries]
     replay: NDArray[np.bool_] = field(default_factory=lambda: np.zeros(0, bool))
     pose_stride: NDArray[np.int64] | None = None  # -1 unknown; 0 disabled; >0 actual schedule
+    # True at an index whose preceding frame belongs to another temporal context.
+    break_before: NDArray[np.bool_] | None = None
 
     def __post_init__(self) -> None:
         n = len(self.shuttle)
         if self.replay.shape[0] == 0:
             self.replay = np.zeros(n, bool)
+        elif self.replay.shape != (n,):
+            raise ValueError("replay must contain one value per frame")
+        if self.break_before is None:
+            self.break_before = np.zeros(n, dtype=bool)
+        else:
+            boundaries = np.asarray(self.break_before)
+            if boundaries.shape != (n,) or boundaries.dtype != np.bool_:
+                raise ValueError("break_before must contain one boolean per frame")
+            self.break_before = boundaries.copy()
+        if n:
+            self.break_before[0] = False  # no predecessor inside this window
+            self.break_before[1:] |= self.replay[1:] != self.replay[:-1]
         if self.pose_stride is None:
             self.pose_stride = np.full(n, -1, dtype=np.int64)
         elif (
@@ -85,3 +118,8 @@ class WindowObs:
 
     def idx(self, frame: int) -> int:
         return frame - self.frame0
+
+    def segment_bounds(self, index: int) -> tuple[int, int]:
+        """Contiguous temporal context for a relative frame index, half-open."""
+        assert self.break_before is not None
+        return temporal_segment_bounds(self.break_before, index)

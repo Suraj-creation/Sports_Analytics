@@ -42,6 +42,12 @@ export function useInsights(id: string) {
 /** A zero default distance is not a measurement unless court-position samples exist. */
 export function useMeasuredMovement(session: Session, player: PlayerId) {
   const calibrated = useSession((s) => s.calibration !== null);
+  const version = useSession((s) => s.analyticsVersion);
+  const qc = useQueryClient();
+  useEffect(() => {
+    if (version > 0)
+      void qc.invalidateQueries({ queryKey: ["movement-evidence", session.session_id, player] });
+  }, [session.session_id, player, qc, version]);
   return useQuery({
     queryKey: useAnalysisQueryKey("movement-evidence", session, player),
     queryFn: () => api.heatmap(session.session_id, player, "presence"),

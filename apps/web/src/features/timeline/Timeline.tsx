@@ -219,7 +219,7 @@ function Overview({ session }: { session: Session }) {
           {data.rallies.length} rally {data.rallies.length === 1 ? "candidate" : "candidates"} · select a
           moment to seek
         </p>
-        <p>{Math.round((analysedTo / n) * 100)}% of source frames processed</p>
+        <p>{Math.round((analysedTo / n) * 100)}% of analysis proxy frames processed</p>
       </div>
       {hover != null && (
         <div
@@ -445,7 +445,7 @@ function Detail({ session }: { session: Session }) {
         {pending && (
           <span className="flex items-center gap-1.5">
             <span className="inline-block h-2 w-3 rounded-sm bg-mat-deep ring-1 ring-seam" aria-hidden />{" "}
-            Source frames awaiting analysis
+            Proxy frames awaiting analysis
           </span>
         )}
       </div>

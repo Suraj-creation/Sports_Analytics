@@ -107,12 +107,30 @@ def detected_context(events: list[Event], strokes: list[Event]) -> dict[str, tup
     return neighbors
 
 
+def require_singles_format(session: Session) -> str:
+    """Gate this two-player component on explicit format evidence.
+
+    The current session schema records confirmed configuration in its typed
+    roster. Untyped metadata and temporary two-person visibility do not resolve
+    format. A future format-understanding component needs its own supported
+    evidence contract before this helper can consume its result.
+    """
+    match_format = session.roster.match_format if session.roster is not None else None
+    if match_format == "doubles":
+        raise ValueError("BST-CG-AP is unsupported for doubles; use a classifier with four-player support")
+    if match_format != "singles":
+        raise ValueError(
+            "BST-CG-AP match format is unknown; configure the session's actual match format "
+            "before running this singles-only component"
+        )
+    return match_format
+
+
 def infer_strokes(session: Session, events: list[Event], frames: dict[int, BSTFrame], classifier: BSTClassifier):
     """The same label-free inference policy for a session and a benchmark."""
     if session.media is None:
         raise ValueError("session media required")
-    if session.roster is not None and session.roster.match_format != "singles":
-        raise ValueError("BST-CG-AP supports singles only")
+    match_format = require_singles_format(session)
     strokes = sorted(
         (e for e in events if e.type == "stroke" and e.status == EventStatus.CONFIRMED), key=lambda e: e.frame_start
     )
@@ -137,7 +155,7 @@ def infer_strokes(session: Session, events: list[Event], frames: dict[int, BSTFr
             sequence = prepare_sequence(
                 [frames[index] for index in range(start, end)],
                 (session.media.width, session.media.height),
-                match_format="singles",
+                match_format=match_format,
             )
             started = time.perf_counter()
             result = classifier.predict_sequence(sequence)
@@ -176,6 +194,7 @@ def run(snapshot: Path, output: Path, models: Path) -> dict:
     session = Session.model_validate_json(catalogue)
     if session.status != SessionStatus.ANALYSED or session.media is None:
         raise ValueError("completed snapshot required")
+    require_singles_format(session)
     # This initial development script cannot inspect the reserved test recording.
     if any(r["source_reference"]["split"] != "development" for r in base["rallies"]):
         raise ValueError("development-only BST comparison; held-out protocol needs a frozen policy")
@@ -278,7 +297,10 @@ def main() -> None:
     parser.add_argument("--models", type=Path, default=Path("models"))
     args = parser.parse_args()
     torch.set_num_threads(2)
-    report = run(args.snapshot, args.output, args.models)
+    try:
+        report = run(args.snapshot, args.output, args.models)
+    except ValueError as error:
+        parser.error(str(error))
     print(
         json.dumps(
             {

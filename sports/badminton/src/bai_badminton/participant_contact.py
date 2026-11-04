@@ -90,6 +90,7 @@ def participant_window(
         players=series,
         replay=window.replay,
         pose_stride=window.pose_stride,
+        break_before=window.break_before,
     )
 
 

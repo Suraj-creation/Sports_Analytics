@@ -16,6 +16,7 @@ from typing import Protocol
 import numpy as np
 
 from bai_badminton.court import HALF_LEN
+from bai_badminton.observations import temporal_segment_bounds
 from bai_badminton.ontology import get_ontology
 
 
@@ -76,6 +77,7 @@ def post_contact_motion(
     frame_height_px: float,
     *,
     next_contact_idx: int | None = None,
+    break_before: np.ndarray | None = None,
 ) -> tuple[float | None, float | None]:
     """Estimate image-space speed from observed shuttle positions after a hit.
 
@@ -87,15 +89,24 @@ def post_contact_motion(
     not a calibrated prediction confidence or a guarantee of correct tracking.
     When the next contact is known, only observations strictly before it are used;
     the next hit can change shuttle velocity and cannot describe this flight.
+    A ``break_before`` marker likewise ends the contact's temporal segment;
+    observations on or beyond that boundary belong to another context.
     """
     if not (math.isfinite(fps) and fps > 0 and math.isfinite(frame_height_px) and frame_height_px > 0):
         return None, None
     n = min(len(x), len(y), len(visible), len(interpolated))
+    if break_before is not None:
+        boundaries = np.asarray(break_before)
+        if boundaries.shape != (n,) or boundaries.dtype != np.bool_:
+            raise ValueError("break_before must contain one boolean per frame")
     if contact_idx < 0 or contact_idx >= n:
         return None, None
     if next_contact_idx is not None and next_contact_idx <= contact_idx:
         return None, None
     end = min(n, contact_idx + 6, next_contact_idx if next_contact_idx is not None else n)
+    if break_before is not None:
+        _, segment_hi = temporal_segment_bounds(boundaries, contact_idx)
+        end = min(end, segment_hi)
     indices = [
         j
         for j in range(contact_idx + 1, end)

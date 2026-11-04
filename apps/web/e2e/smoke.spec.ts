@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 const CLIP = fileURLToPath(new URL("./.tmp/clip.mp4", import.meta.url));
 

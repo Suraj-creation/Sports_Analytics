@@ -22,7 +22,7 @@ from bai_engine.runtime.registry import ModelRegistry
 from bai_engine.schema.events import Event, current_view
 from bai_engine.schema.session import Session, SessionStatus
 from research.evaluation.benchmark_reference_session import _catalogue, _event_rows
-from research.evaluation.bst_shadow import digest, extract_frames, infer_strokes
+from research.evaluation.bst_shadow import digest, extract_frames, infer_strokes, require_singles_format
 
 
 def run_session(data: Path, session_id: str, output: Path, models: Path) -> dict:
@@ -36,8 +36,7 @@ def run_session(data: Path, session_id: str, output: Path, models: Path) -> dict
     session = Session.model_validate_json(catalogue)
     if session.status != SessionStatus.ANALYSED or session.media is None or not session.source.sha256:
         raise ValueError("completed source-bound session required")
-    if session.roster and session.roster.match_format != "singles":
-        raise ValueError("BST-CG-AP supports singles only")
+    require_singles_format(session)
     media = data / "media" / session.source.sha256
     media_hashes = {name: digest(media / name) for name in ("source.mp4", "proxy.mp4")}
     if media_hashes["source.mp4"] != session.source.sha256:
@@ -100,7 +99,10 @@ def main() -> None:
     parser.add_argument("--models", type=Path, default=Path("models"))
     args = parser.parse_args()
     torch.set_num_threads(2)
-    result = run_session(args.data_dir.resolve(), args.session, args.output, args.models)
+    try:
+        result = run_session(args.data_dir.resolve(), args.session, args.output, args.models)
+    except ValueError as error:
+        parser.error(str(error))
     print(json.dumps({"output": str(args.output.resolve()), "coverage": result["coverage"], "session_modified": False}))
 
 

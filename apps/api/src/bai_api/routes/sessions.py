@@ -14,6 +14,7 @@ from bai_api.deps import BusDep, Repo, SessionDep, SettingsDep, User
 from bai_api.public import public_session
 from bai_badminton.analytics.individual import build_individual_analytics
 from bai_badminton.identity_review import TRACKER_IDENTITY_EVIDENCE_TYPES
+from bai_badminton.rules import SCORE_REVIEW_EVENT_TYPES
 from bai_engine.bus import topic
 from bai_engine.config import load_profile
 from bai_engine.schema import PlayerInfo, Session, Source, SourceKind, TrackObject, table_to_samples
@@ -211,7 +212,11 @@ def delete(session: SessionDep, r: Repo, b: BusDep, request: Request) -> Respons
                 "The recording is still processing. Wait for its worker to stop, then retry deletion.",
             ) from error
     else:
-        b.send_command({"cmd": "stop", "session_id": session.session_id})
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Deletion requires an acknowledged worker stop. Use embedded engine mode; "
+            "external worker deletion is not supported.",
+        )
     r.delete(session.session_id)
     return Response(status_code=204)
 
@@ -490,6 +495,11 @@ def correct(session: SessionDep, body: Correction, b: BusDep, r: Repo) -> dict[s
         if not body.event_id:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "event_id is required")
         event = r.events(sid).get(body.event_id)
+        if event is not None and event.type in SCORE_REVIEW_EVENT_TYPES:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                "Score evidence must be changed through winner, official-play or match-phase corrections",
+            )
         if event is not None and event.type in TRACKER_IDENTITY_EVIDENCE_TYPES:
             raise HTTPException(
                 status.HTTP_422_UNPROCESSABLE_ENTITY,

@@ -36,6 +36,7 @@ class ProbeResult:
     n_frames: int | None
     has_audio: bool
     rotation: int = 0
+    video_stream_index: int = 0  # global source stream index selected by validation
 
     @property
     def variable_frame_rate(self) -> bool:
@@ -95,6 +96,7 @@ def probe(path: Path, tools: Tools, timeout: float = 30.0) -> ProbeResult:
         n_frames=int(nb) if nb and str(nb).isdigit() else None,
         has_audio=any(s.get("codec_type") == "audio" for s in streams),
         rotation=rotation,
+        video_stream_index=int(video.get("index", 0)),
     )
 
 

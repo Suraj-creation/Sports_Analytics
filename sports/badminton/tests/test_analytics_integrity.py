@@ -220,6 +220,7 @@ def test_canonical_point_marks_rally_score_as_available(tmp_path: Path) -> None:
                 "point",
                 parent_id=parent.event_id,
                 payload={
+                    "winner": "P1",
                     "state_before": {"game_no": 1},
                     "state_after": {"score": {"P1": 1, "P2": 0}},
                 },

@@ -150,7 +150,7 @@ class RedisBus(Bus):
         self._sync.rpush(self.COMMAND_KEY, self._pack(command))
 
     def next_command(self, timeout: float | None = None) -> Message | None:
-        res = self._sync.blpop([self.COMMAND_KEY], timeout=int(timeout) if timeout else 0)
+        res = self._sync.blpop([self.COMMAND_KEY], timeout=timeout if timeout is not None else 0)
         if res is None:
             return None
         return self._unpack(res[1])

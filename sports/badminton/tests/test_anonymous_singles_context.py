@@ -12,7 +12,7 @@ from bai_badminton.events.contact import ContactCandidate
 from bai_badminton.observations import WindowObs
 from bai_badminton.perception.calibration_state import CalibrationState
 from bai_badminton.perception.shuttle_post import Track
-from bai_badminton.perception_types import FramePerception, PersonObs
+from bai_badminton.perception_types import ChunkPerception, FramePerception, PersonObs
 from bai_badminton.testing.synth import broadcast_homography
 from bai_engine.schema import Event, EventStatus, Provenance
 from bai_engine.schema.session import ParticipantInfo, ParticipantRoster
@@ -63,6 +63,12 @@ def setup(tmp_path, *, new_people=0):
 
 
 def contact(engine, window):
+    # Retain compatible future frames in every classifier case, so negative
+    # person-evidence tests cannot pass merely because flight context is absent.
+    engine._last_frame = 6
+    engine.ingest(ChunkPerception(7, 35, [
+        FramePerception(frame_idx=f, shuttle_xy=None, shuttle_conf=0.0, shot_id=1) for f in range(7, 36)
+    ]))
     engine._on_contact(
         ContactCandidate(
             frame=3, player_id=None, p=0.9, shuttle_xy=(100.0, 100.0), attribution_reason="no_player_observation"

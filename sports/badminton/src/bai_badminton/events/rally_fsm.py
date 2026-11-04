@@ -1,16 +1,16 @@
 """Streaming rally segmentation.
 
 States: ``IDLE → IN_PLAY → ENDING → (CLOSED, mergeable) → IDLE``.  Thresholds follow the
-validated legacy ``detect_rallies.py`` (start: 3 consecutive visible frames moving > 3 px/frame;
-end: 10 consecutive invisible frames or ≥7 of the last 10 visible frames slower than 3 px/frame;
+validated legacy ``detect_rallies.py`` (start: 3 consecutive observed frames moving > 3 px/frame;
+end: 10 consecutive unobserved frames or ≥7 of the last 10 observed frames slower than 3 px/frame;
 15-frame look-ahead cancels a false end; rallies < 2 s are dropped; gaps ≤ 0.75 s are merged).
 
 Two upgrades over the legacy detector:
 
 * **contact-driven start** — a detected contact while IDLE starts an exchange at that contact;
   the separate classifier checks service evidence rather than assuming it is a serve;
-* **replay/cut suppression** — while ``replay`` is true the FSM is frozen and any open rally is
-  ended at the last in-play frame (a broadcast cut ends the live view of the rally).
+* **replay/cut suppression** — a discontinuity closes the visible exchange without declaring a
+  sporting outcome, and clears motion history before the next scene can start another exchange.
 
 The FSM is fed one frame at a time and is fully deterministic; it never needs to look back
 further than its own buffers, and look-ahead is expressed as delayed confirmation.
@@ -110,18 +110,19 @@ class RallyFSM:
         return upd
 
     def step(self, frame: int, visible: bool, speed: float, replay: bool = False) -> RallyUpdate:
+        """Consume observed shuttle evidence from one temporal coordinate segment.
+
+        ``visible`` means an independently observed shuttle location, not the
+        availability of an interpolated position. ``speed`` must use compatible
+        observed positions; NaN represents unavailable motion. Callers signal
+        non-replay context changes with ``on_discontinuity`` before any current
+        frame contact. Ordinary missing samples retain the gap/look-ahead policy.
+        """
+        if replay:
+            return self.on_discontinuity(frame)
         p = self.params
         upd = RallyUpdate()
         self._recent.append((visible, speed))
-
-        if replay:
-            if self.state in (RallyState.IN_PLAY, RallyState.ENDING):
-                end = self._last_in_play_frame if self._last_in_play_frame is not None else frame
-                self._close(end, "cut", upd)
-            if self.state is RallyState.CLOSED:
-                self._finalize(upd)
-            self._run_visible, self._invisible = 0, 0
-            return upd
 
         if visible:
             self._invisible = 0
@@ -158,6 +159,37 @@ class RallyFSM:
                 self._finalize(upd)
                 if self._run_visible >= p.start_visible and self._run_start is not None:
                     self._open(self._run_start, upd)
+        return upd
+
+    def on_discontinuity(self, frame: int) -> RallyUpdate:
+        """Finish pre-boundary evidence and prevent history/merges across a cut.
+
+        Call before handling contacts or observations at ``frame``. An open
+        exchange ends no later than ``frame - 1`` (or its earlier tentative end)
+        with reason ``cut``. An already closed exchange retains its existing
+        end/reason. Minimum-duration cancellation still applies. A new scene
+        requires its own contact or observed-motion evidence to start again.
+        """
+        upd = RallyUpdate()
+        if self.state in (RallyState.IN_PLAY, RallyState.ENDING):
+            assert self.start is not None
+            if self.start >= frame:
+                # No sample in this exchange precedes the boundary. In
+                # particular, never emit a segment containing replay evidence.
+                upd.cancelled_start = self.start
+            else:
+                last = self._last_in_play_frame if self._last_in_play_frame is not None else frame - 1
+                end = min(frame - 1, last)
+                if self.tentative_end is not None:
+                    end = min(end, self.tentative_end)
+                self._close(end, "cut", upd)
+        if self.state is RallyState.CLOSED:
+            self._finalize(upd)
+        self.state, self.start, self.serve, self.tentative_end = RallyState.IDLE, None, None, None
+        self.closed, self.end_reason = None, ""
+        self._recent.clear()
+        self._run_visible, self._run_start, self._invisible = 0, None, 0
+        self._last_in_play_frame, self._last_contact_frame = None, None
         return upd
 
     def flush(self, frame: int) -> RallyUpdate:

@@ -33,6 +33,13 @@ export function useHls(video: HTMLVideoElement | null, sessionId: string, enable
       hls.on(Hls.Events.ERROR, (_e, data) => {
         if (!data.fatal) return;
         if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+          if (retry) clearTimeout(retry);
+          retry = null;
+          if (data.response?.code === 401 || data.response?.code === 403) {
+            hls.stopLoad();
+            setState("error");
+            return;
+          }
           // not ready yet (404) or a dropped connection: try again shortly
           setState("waiting");
           retry = setTimeout(() => {

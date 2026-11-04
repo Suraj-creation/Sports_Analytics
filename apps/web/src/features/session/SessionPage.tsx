@@ -20,6 +20,7 @@ import { playEvidence } from "@/features/player/clip";
 import { EvidenceDetails } from "@/features/player/EvidenceDetails";
 import { VideoStage } from "@/features/player/VideoStage";
 import { Timeline } from "@/features/timeline/Timeline";
+import { analysisRevision } from "@/lib/analysisQuery";
 import { api } from "@/lib/api";
 import { clock, fps as fpsOf, STATUS_LABEL, shortName } from "@/lib/format";
 import { frameClock } from "@/lib/frameClock";
@@ -266,7 +267,7 @@ function SessionWorkspace({ session, search }: { session: Session; search: Analy
             </p>
             <p className="match-subtitle">
               {STATUS_LABEL[session.status] ?? session.status}
-              {busy && progress !== null ? ` · ${progress.toFixed(0)}% of source frames reached` : ""}
+              {busy && progress !== null ? ` · ${progress.toFixed(0)}% of analysis proxy frames reached` : ""}
               {connection !== "open" ? " · reconnecting to analysis" : ""}
             </p>
           </div>
@@ -338,7 +339,7 @@ function SessionWorkspace({ session, search }: { session: Session; search: Analy
             <h2 id="recording-quality-heading">What this recording can tell us</h2>
             <dl className="mt-4 grid grid-cols-2 gap-4 text-sm">
               <div>
-                <dt className="text-line-2">Source frames</dt>
+                <dt className="text-line-2">Analysis proxy frames</dt>
                 <dd>{nFrames ? nFrames.toLocaleString() : "Media not prepared"}</dd>
               </div>
               <div>
@@ -355,7 +356,8 @@ function SessionWorkspace({ session, search }: { session: Session; search: Analy
               </div>
             </dl>
             <p className="analysis-panel-hint mt-4">
-              Frame processing is not rally coverage or labelled detection accuracy. Shot labels are
+              Frame numbers use the fixed-rate analysis proxy timeline. Frame processing is not rally
+              coverage or labelled detection accuracy. Shot labels are
               heuristic; placement uses receiver positions; measured distance can contain tracking jitter.
               Four-player doubles attribution requires additional identity evidence.
             </p>
@@ -462,7 +464,7 @@ function SessionWorkspace({ session, search }: { session: Session; search: Analy
           </div>
           <footer className="video-workspace-footer">
             <p>
-              Source frame <span className="tabular">{frame.toLocaleString()}</span> · Select a moment to
+              Analysis proxy frame <span className="tabular">{frame.toLocaleString()}</span> · Select a moment to
               inspect its evidence
             </p>
             <button type="button" onClick={() => setShortcuts(true)}>
@@ -555,7 +557,15 @@ function MetadataDialog({
     mutationFn: () =>
       api.patchSession(session.session_id, { title: title.trim(), player1: p1.trim(), player2: p2.trim() }),
     onSuccess: (updated) => {
-      useSession.setState({ session: updated });
+      useSession.setState((state) => {
+        const current = state.session;
+        if (
+          current?.session_id !== updated.session_id ||
+          analysisRevision(updated) < analysisRevision(current)
+        )
+          return {};
+        return { session: { ...current, title: updated.title, players: updated.players } };
+      });
       void qc.invalidateQueries();
       onOpenChange(false);
     },

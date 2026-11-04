@@ -1,0 +1,24 @@
+{
+  "source_url": "https://www.youtube.com/watch?v=u1214klm42s",
+  "source_title": "Men\u2019s doubles showdown as Rankireddy/Shetty contest Kedren/Puavaranukroh",
+  "channel": "BWF TV",
+  "source_interval_s": [
+    60,
+    75
+  ],
+  "downloaded_clip_sha256": "fb51eae2db75f554c0521e726dd6c8bc8e81f514ff531733dffc9ecd44d7018b",
+  "clip_frames": 375,
+  "fps_num": 25,
+  "fps_den": 1,
+  "width": 1280,
+  "height": 720,
+  "sampled_frames": [
+    0,
+    125,
+    250,
+    350
+  ],
+  "selection": "Fixed1-second overview inspected before inference; continuous4-player rally. Evaluation frames chosen at0,5,10,14 seconds before seeing predictions.",
+  "review_status": "AI-draft; not human-reviewed independent accuracy ground truth",
+  "identity_policy": "per-frame localization only; no durable person labels"
+}

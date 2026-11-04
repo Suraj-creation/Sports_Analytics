@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { clsx } from "clsx";
 import { CircleAlert, Trash2, Upload, Youtube } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button, Empty, ErrorNote, Field, inputClass, Meter, Spinner } from "@/components/ui";
 import { Page } from "@/features/product/ui";
 import { api, uploadVideo } from "@/lib/api";
@@ -79,6 +79,16 @@ function UploadCard({ maxMb }: { maxMb?: number }) {
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<unknown>(null);
   const abortRef = useRef<(() => void) | null>(null);
+  const lifetime = useRef(0);
+
+  useEffect(
+    () => () => {
+      lifetime.current += 1;
+      abortRef.current?.();
+      abortRef.current = null;
+    },
+    [],
+  );
 
   const pick = (f: File | undefined) => {
     if (!f) return;
@@ -95,6 +105,7 @@ function UploadCard({ maxMb }: { maxMb?: number }) {
 
   const start = async () => {
     if (!file) return;
+    const startedIn = lifetime.current;
     const form = new FormData();
     form.append("file", file);
     if (title) form.append("title", title);
@@ -103,17 +114,22 @@ function UploadCard({ maxMb }: { maxMb?: number }) {
     if (p2) form.append("player2", p2);
     setProgress(0);
     setError(null);
-    const up = uploadVideo(form, setProgress);
+    const up = uploadVideo(form, (value) => {
+      if (lifetime.current === startedIn) setProgress(value);
+    });
     abortRef.current = up.abort;
     try {
       const s = await up.promise;
+      if (lifetime.current !== startedIn) return;
       await qc.invalidateQueries({ queryKey: ["sessions"] });
+      if (lifetime.current !== startedIn) return;
       navigate({ to: "/sessions/$sessionId", params: { sessionId: s.session_id } });
     } catch (e) {
+      if (lifetime.current !== startedIn) return;
       setError(e);
       setProgress(null);
     } finally {
-      abortRef.current = null;
+      if (lifetime.current === startedIn) abortRef.current = null;
     }
   };
 

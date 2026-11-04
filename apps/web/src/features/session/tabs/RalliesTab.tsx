@@ -128,7 +128,10 @@ function RallyRow({ rally: r, session, open }: { rally: EvidenceRally; session: 
     ) => {
       if (action.kind === "winner") return api.correctWinner(session.session_id, r.id, action.player);
       if (action.kind === "official") return api.setRallyOfficial(session.session_id, r.id, !r.official);
-      if (action.kind === "verify") return api.verifyEvent(session.session_id, r.id);
+      if (action.kind === "verify") {
+        if (!r.winner) throw new Error("This rally has no established winner to confirm.");
+        return api.correctWinner(session.session_id, r.id, r.winner);
+      }
       return api.setMatchStart(session.session_id, r.start);
     },
     onSuccess: () => {
@@ -240,7 +243,7 @@ function RallyRow({ rally: r, session, open }: { rally: EvidenceRally; session: 
           <ErrorNote error={fix.error} />
           {fix.isSuccess && (
             <p role="status" className="mt-3">
-              Correction saved to the server. The score and analytics are refreshing.
+              Correction requested. The score and analytics will update after it is applied.
             </p>
           )}
         </div>

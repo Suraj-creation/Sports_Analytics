@@ -3,7 +3,7 @@ the profiles but never run, so rally winners relied on landing geometry alone).
 
 Cost is the constraint: PP-OCR on CPU takes seconds per full 720p frame.  So the reader
 
-* only runs between rallies (the score cannot change during one) at ``every`` frames;
+* reads at configured ``every`` frames on eligible main views, independently of rally state;
 * searches the four frame corners for the bug, one corner per call, and then *locks* onto the
   region where a two-row "name … points" board was read (later calls OCR only that crop);
 * drops the lock after repeated misses (graphics change, close-ups) and searches again.
@@ -38,41 +38,156 @@ CORNERS: tuple[tuple[float, float, float, float], ...] = (
 )
 
 
+@dataclass(frozen=True)
+class _ScoreText:
+    index: int
+    pts: NDArray[np.float64]
+    text: str
+    name: str
+    numbers: tuple[int, ...]
+    conf: float
+    x0: float
+    y0: float
+    x1: float
+    y1: float
+
+    @property
+    def height(self) -> float:
+        return self.y1 - self.y0
+
+    @property
+    def centre(self) -> float:
+        return (self.y0 + self.y1) / 2
+
+
+@dataclass(frozen=True)
+class _ScoreRow:
+    name: str
+    points: int
+    conf: float
+    members: frozenset[int]
+    pts: NDArray[np.float64]
+    name_left: float
+    name_right: float
+    score_right: float
+    centre: float
+    height: float
+
+
+def _same_baseline(left: _ScoreText, right: _ScoreText) -> bool:
+    # Font/geometry gates are conservative uncalibrated layout checks.
+    small, large = min(left.height, right.height), max(left.height, right.height)
+    return large <= 1.8 * small and abs(left.centre - right.centre) <= 0.6 * small
+
+
+def _score_rows(items: list[_ScoreText]) -> list[_ScoreRow]:
+    names = [item for item in items if item.name]
+    groups: list[list[_ScoreText]] = []
+    # Join adjacent name fragments only. A distant sponsor on the same scanline
+    # must not become part of a competitor's name; a number separates fields.
+    remaining = {item.index: item for item in names}
+    while remaining:
+        seed = remaining.pop(min(remaining))
+        group, pending = [seed], [seed]
+        while pending:
+            anchor = pending.pop()
+            for key, other in list(remaining.items()):
+                left, right = sorted((anchor, other), key=lambda item: item.x0)
+                gap = right.x0 - left.x1
+                separated = any(not item.name and item.numbers and left.x1 <= item.x0 < right.x0
+                                and _same_baseline(left, item) for item in items)
+                if (_same_baseline(left, right) and not left.numbers and not separated
+                        and -0.25 * min(left.height, right.height) <= gap <= 1.5 * min(left.height, right.height)):
+                    group.append(other)
+                    pending.append(other)
+                    del remaining[key]
+        groups.append(sorted(group, key=lambda item: (item.x0, item.index)))
+    rows = []
+    for group in groups:
+        name_left, name_right = min(item.x0 for item in group), max(item.x1 for item in group)
+        height = float(np.median([item.height for item in group]))
+        centre = float(np.median([item.centre for item in group]))
+        anchor = group[0]
+        numbers: list[_ScoreText] = []
+        for item in group:
+            name_matches = list(_NAME.finditer(item.text))
+            number_matches = list(_NUM.finditer(item.text))
+            if item.numbers and name_matches and number_matches and number_matches[-1].start() >= name_matches[-1].end():
+                numbers.append(item)
+        numbers.extend(item for item in items if not item.name and item.numbers and ':' not in item.text
+                       and item.x0 >= name_right - 0.25 * height and _same_baseline(anchor, item))
+        if not numbers:
+            continue
+        numbers.sort(key=lambda item: (item.x1, item.x0, item.index))
+        current = numbers[-1]
+        if current.numbers[-1] > 30:
+            continue
+        # A close clock/text field to the right of an old game value is not
+        # permission to treat that completed-game value as the current score.
+        if any(item.index not in {part.index for part in group + numbers}
+               and item.x0 > current.x0 and item.x0 - current.x1 <= 2 * height
+               and _same_baseline(anchor, item) for item in items):
+            continue
+        used = {item.index: item for item in group + numbers}
+        pts = np.concatenate([item.pts for item in used.values()])
+        rows.append(_ScoreRow(
+            name=' '.join(item.name for item in group), points=current.numbers[-1],
+            conf=min(item.conf for item in used.values()), members=frozenset(used), pts=pts,
+            name_left=name_left, name_right=name_right, score_right=current.x1,
+            centre=centre, height=height,
+        ))
+    return sorted(rows, key=lambda row: (row.centre, row.name_left))
+
+
 def parse_scoreboard(
     boxes: Sequence[Any], txts: Sequence[str], scores: Sequence[float], frame_idx: int
 ) -> tuple[ScoreReading, tuple[float, float, float, float]] | None:
-    """Two text rows, each with a name and a current-game score (the last 1–2 digit number; bugs
-    often also list finished games before it). Returns the reading and its pixel bounding box."""
+    """Find one coherent two-row name-left/score-right board among OCR boxes.
+
+    The returned names and points remain model observations. Layout support is
+    uncalibrated and does not establish identity or an accepted point. Preserve
+    the rightmost current-game number and abstain on multiple plausible boards,
+    including three aligned competitor rows. Unrelated corner text is excluded
+    from the board bounds so a subsequent locked crop does not retain sponsors.
+    """
     items = []
-    for box, t, sc in zip(boxes, txts, scores, strict=False):
-        pts = np.asarray(box, dtype=float).reshape(-1, 2)
-        y0, y1 = pts[:, 1].min(), pts[:, 1].max()
-        items.append((pts[:, 0].min(), (y0 + y1) / 2, y1 - y0, str(t).strip(), float(sc), pts))
-    items.sort(key=lambda i: i[1])
-    rows: list[list[Any]] = []
-    for it in items:  # group boxes into text rows by vertical centre
-        if rows and abs(rows[-1][-1][1] - it[1]) <= 0.6 * max(it[2], rows[-1][-1][2]):
-            rows[-1].append(it)
-        else:
-            rows.append([it])
-    parsed = []
-    for row in rows:
-        row.sort(key=lambda i: i[0])
-        text = " ".join(i[3] for i in row)
-        name = " ".join(_NAME.findall(text))
-        nums = [int(n) for n in _NUM.findall(text)]
-        if name and nums:
-            parsed.append((name, nums[-1], min(i[4] for i in row), row))
-    if len(parsed) != 2 or any(p[1] > 30 for p in parsed):
+    for index, (box, text, score) in enumerate(zip(boxes, txts, scores, strict=False)):
+        try:
+            pts = np.asarray(box, dtype=float)
+            conf = float(score)
+            if pts.shape != (4, 2) or not np.isfinite(pts).all() or not np.isfinite(conf) or not 0 <= conf <= 1:
+                return None
+            x0, y0 = pts.min(axis=0)
+            x1, y1 = pts.max(axis=0)
+            if x1 <= x0 or y1 <= y0:
+                return None
+        except (TypeError, ValueError):
+            return None
+        raw = str(text).strip()
+        items.append(_ScoreText(index, pts, raw, ' '.join(_NAME.findall(raw)),
+                                tuple(int(number) for number in _NUM.findall(raw)), conf,
+                                float(x0), float(y0), float(x1), float(y1)))
+    rows = _score_rows(items)
+    pairs = []
+    for index, first in enumerate(rows):
+        for second in rows[index + 1:]:
+            low, high = min(first.height, second.height), max(first.height, second.height)
+            if (first.members & second.members or high > 1.6 * low
+                    or not 0.65 * low <= second.centre - first.centre <= 3.5 * high):
+                continue
+            align = max(2.0, 0.75 * high)
+            name_aligned = (abs(first.name_left - second.name_left) <= align
+                            or abs(first.name_right - second.name_right) <= align)
+            if name_aligned and abs(first.score_right - second.score_right) <= align:
+                pairs.append((first, second))
+    if len(pairs) != 1:
         return None
-    pts = np.concatenate([i[5] for p in parsed for i in p[3]])
-    bbox = (float(pts[:, 0].min()), float(pts[:, 1].min()), float(pts[:, 0].max()), float(pts[:, 1].max()))
-    reading = ScoreReading(
-        frame_idx=frame_idx,
-        rows=((parsed[0][0], parsed[0][1]), (parsed[1][0], parsed[1][1])),
-        conf=min(p[2] for p in parsed),
-    )
-    return reading, bbox
+    first, second = pairs[0]
+    pts = np.concatenate((first.pts, second.pts))
+    bounds = (float(pts[:, 0].min()), float(pts[:, 1].min()),
+              float(pts[:, 0].max()), float(pts[:, 1].max()))
+    return ScoreReading(frame_idx=frame_idx, rows=((first.name, first.points), (second.name, second.points)),
+                        conf=min(first.conf, second.conf)), bounds
 
 
 @dataclass

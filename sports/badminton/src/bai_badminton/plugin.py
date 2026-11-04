@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import asdict
+from hashlib import sha256
+from json import dumps, loads
 from pathlib import Path
 from typing import Any
 
@@ -11,18 +13,39 @@ import cv2
 import msgpack
 import numpy as np
 
+from bai_badminton.components import BASELINE_IMPLEMENTATIONS as DOMAIN_BASELINES
+from bai_badminton.components import CONTRACT_DETAILS, DomainContext, register_domain_components
 from bai_badminton.court import REFERENCE_POINTS, WIDTH_DOUBLES, Homography, fit_homography
 from bai_badminton.engine import BadmintonMatchEngine, EngineConfig, box_tuple, camera_sample, keypoint_rows
 from bai_badminton.events.rally_fsm import RallyState
+from bai_badminton.format_understanding import METHOD as FORMAT_METHOD
+from bai_badminton.format_understanding import (
+    FormatContext,
+    FormatDecision,
+    FormatObservation,
+    FormatPerson,
+    register_format_components,
+)
 from bai_badminton.identity_review import TRACKER_IDENTITY_EVIDENCE_TYPES
+from bai_badminton.participant_geometry import GeometryBracketPolicy
 from bai_badminton.perception.calibration_state import CalibrationState
+from bai_badminton.perception.components import register_perception_components
 from bai_badminton.perception.court_lines import METHOD as LINES_METHOD
 from bai_badminton.perception.court_lines import CourtFit, camera_pose, choose_main, detect_court, refine_court
 from bai_badminton.perception.isolation import is_fixed_camera
 from bai_badminton.perception.pipeline import BadmintonPerception, lines_ref_id
-from bai_badminton.perception_types import ChunkPerception, FramePerception, PersonObs, RacketObservation, ScoreReading
+from bai_badminton.perception_types import (
+    ChunkPerception,
+    FramePerception,
+    PersonObs,
+    RacketObservation,
+    ScoreObservationContext,
+    ScoreReading,
+)
+from bai_badminton.rules import SCORE_REVIEW_EVENT_TYPES
 from bai_badminton.rules.bwf import MatchConfig
-from bai_engine.config import Profile, get_settings
+from bai_engine.components import ComponentRegistry
+from bai_engine.config import ModelChoice, Profile, get_settings
 from bai_engine.decode import DecodedChunk
 from bai_engine.obs import get_logger
 from bai_engine.runtime.registry import ModelRegistry
@@ -33,7 +56,7 @@ from bai_engine.store import EventStore, TrackStore
 log = get_logger(__name__)
 AUTO_CALIBRATION_MIN_SCORE = 0.6
 REF_FILE = "camera_ref.png"  # the frame the calibration was made on (lossless: its id is a content hash)
-CODEC_VERSION = 12  # observed equipment geometry and bounded neural retention policy
+CODEC_VERSION = 17  # explicit source-board context and unknown physical identities
 MAX_ADJUST = 0.03  # a human calibration the court lines move by more than this (× frame width) is kept as is
 
 
@@ -67,48 +90,187 @@ class StaleCacheError(ValueError):
 
 class BadmintonSession:
     def __init__(
-        self, session: Session, store: EventStore, profile: Profile, registry: ModelRegistry, emit: EmitFn
+        self,
+        session: Session,
+        store: EventStore,
+        profile: Profile,
+        registry: ModelRegistry,
+        emit: EmitFn,
+        *,
+        component_registry: ComponentRegistry | None = None,
+        pipeline_declaration: dict[str, Any] | None = None,
     ) -> None:
         assert session.media is not None, "session media must be known before analysis starts"
         self.session = session
+        self._pipeline_declaration = loads(
+            dumps(
+                pipeline_declaration if pipeline_declaration is not None else BadmintonPlugin.describe_pipeline(),
+                allow_nan=False,
+            )
+        )
         self.store = store
         self._analytics_token: tuple[Any, ...] | None = None
         self._analytics_fold: Any = None
         m = session.media
         fps = float(m.fps)
         names = {p.player_id: p.name for p in session.players}
+        contact_choice = profile.components.get("contact", profile.contact)
+        geometry_configuration = (
+            contact_choice.params.get("participant_geometry") if contact_choice is not None else None
+        )
+        geometry_policy = None
+        if geometry_configuration is not None:
+            try:
+                if not isinstance(geometry_configuration, dict):
+                    raise ValueError("a configuration object is required")
+                geometry_policy = GeometryBracketPolicy(**geometry_configuration)
+            except (TypeError, ValueError, OverflowError) as exc:
+                raise ValueError("invalid contact participant_geometry configuration") from exc
         # Format controls the rally in/out court geometry. The rules engine still
         # exposes two score-side slots and does not implement doubles partner
         # service rotation; the roster does not imply individual scoring.
-        discipline = session.roster.match_format if session.roster else "singles"
-        self.engine = BadmintonMatchEngine(
-            session.session_id,
-            EngineConfig(
-                fps=fps,
-                frame_width=m.width,
-                frame_height=m.height,
-                profile=profile.name,
-                match=MatchConfig(discipline=discipline),
+        configured_format = session.roster.match_format if session.roster else None
+        discipline = configured_format or "singles"  # rules placeholder is gated until format is known
+        if component_registry is None:
+            component_registry = ComponentRegistry()
+            register_perception_components(component_registry)
+            register_format_components(component_registry)
+            register_domain_components(component_registry)
+        self.component_registry = component_registry
+        self._format_choice = profile.components.get(
+            "format",
+            ModelChoice(
+                model="none",
+                backend="none",
+                implementation="sustained-court-v1",
             ),
-            store,
-            emit=emit,
-            player_names=names,
-        )
-        self.perception = BadmintonPerception(
-            profile,
-            registry,
-            fps,
-            get_settings().models_dir,
-            frame_size=(m.width, m.height),
-            match_format=discipline,
-        )
-        self.calibration: Homography | None = None
-        self._fixed_camera: bool | None = None  # None: legacy or not yet sampled
-        self._emit = emit
-        self._frame_at: Callable[[int], np.ndarray] | None = None
-        self._ref_dir: Path | None = None
-        self._restored_cam_ref: int | None = None  # reference view id the restored calibration was tracked against
-        self._restore_calibration()
+        ).model_copy(deep=True)
+        try:
+            self._format_handle = component_registry.create(
+                "format",
+                self._format_choice.implementation or "sustained-court-v1",
+                context=FormatContext(fps=fps, configured_format=configured_format),
+                configuration=self._format_choice.model_dump(mode="json"),
+                match_format=configured_format or "unknown",
+                context_identity={"source": session.source.sha256, "fps": fps},
+            )
+            self.format_understanding = self._format_handle.instance
+            self._domain_component_handles = {}
+            self._domain_metadata = {}
+            self._domain_effective_choices = {}
+            domain_context = DomainContext(fps, m.width, m.height, MatchConfig(discipline=discipline), registry)
+            for kind, implementation in DOMAIN_BASELINES.items():
+                legacy = getattr(profile, kind, None)
+                params = legacy.params if legacy is not None and kind == "contact" else {}
+                choice = profile.components.get(
+                    kind,
+                    ModelChoice(
+                        model="none",
+                        backend="none",
+                        implementation=implementation,
+                        params=params,
+                    ),
+                ).model_copy(deep=True)
+                self._domain_effective_choices[kind] = choice
+                handle = component_registry.create(
+                    kind,
+                    choice.implementation or implementation,
+                    context=domain_context,
+                    configuration=choice.model_dump(mode="json"),
+                    match_format=configured_format or "unknown",
+                    context_identity={
+                        "source": session.source.sha256,
+                        "fps": fps,
+                        "frame_size": [m.width, m.height],
+                        "profile": profile.name,
+                    },
+                )
+                self._domain_component_handles[kind] = handle
+                if handle.contract.stateful and not all(
+                    callable(getattr(handle.instance, method, None)) for method in ("checkpoint", "restore")
+                ):
+                    raise ValueError(f"Stateful semantic {kind} provider requires checkpoint and restore")
+                model = getattr(handle.instance, "model_ref", None) or getattr(handle.instance, "name", None)
+                runtime = getattr(handle.instance, "runtime", {})
+                actual = {"model": model, "runtime": runtime}
+                fingerprint = sha256(
+                    dumps({"construction": handle.fingerprint, **actual}, allow_nan=False, sort_keys=True).encode()
+                ).hexdigest()
+                self._domain_metadata[kind] = loads(
+                    dumps(
+                        {
+                            "contract": handle.contract.describe(),
+                            "configuration": choice.model_dump(mode="json"),
+                            "fingerprint": fingerprint,
+                            **actual,
+                            "baseline_evidence_contract": CONTRACT_DETAILS[kind]
+                            if handle.contract.implementation == implementation
+                            else None,
+                        },
+                        allow_nan=False,
+                    )
+                )
+            self.engine = BadmintonMatchEngine(
+                session.session_id,
+                EngineConfig(
+                    fps=fps,
+                    frame_width=m.width,
+                    frame_height=m.height,
+                    profile=profile.name,
+                    match=MatchConfig(discipline=discipline),
+                    match_format_known=configured_format is not None,
+                    participant_geometry_policy=geometry_policy,
+                ),
+                store,
+                emit=emit,
+                player_names=names,
+                contact_inference=self._domain_component_handles["contact"].instance,
+                stroke_classifier=self._domain_component_handles["stroke"].instance,
+                activity_tracker=self._domain_component_handles["activity"].instance,
+                rally_segmenter=self._domain_component_handles["rally"].instance,
+                outcome_inference=self._domain_component_handles["outcome"].instance,
+                score_rules=self._domain_component_handles["scoring"].instance,
+                analytics=self._domain_component_handles["analytics"].instance,
+                identity_provider=self._domain_component_handles["identity"].instance,
+                transactional_components={
+                    kind: handle.instance
+                    for kind, handle in self._domain_component_handles.items()
+                    if handle.contract.stateful
+                },
+            )
+            self.perception = BadmintonPerception(
+                profile,
+                registry,
+                fps,
+                get_settings().models_dir,
+                frame_size=(m.width, m.height),
+                match_format=configured_format or "unknown",
+                component_registry=component_registry,
+                context_identity={"source": session.source.sha256},
+            )
+            if "stroke" not in profile.components and profile.stroke.model not in ("none", "stroke_rules_v0"):
+                self.perception._degrade(
+                    "stroke_legacy_request",
+                    f"Requested artifact {profile.stroke.model} has no active runtime provider; "
+                    "The declared stroke-rules-v0 provider is executing. "
+                    "Select components.stroke explicitly to replace it.",
+                )
+            self._format_epoch = 0
+            self._format_last_shot_id: int | None = None
+            self._applied_format = configured_format
+            self.calibration: Homography | None = None
+            self._fixed_camera: bool | None = None  # None: legacy or not yet sampled
+            self._emit = emit
+            self._frame_at: Callable[[int], np.ndarray] | None = None
+            self._ref_dir: Path | None = None
+            self._restored_cam_ref: int | None = None  # reference view id the restored calibration was tracked against
+            self._restore_calibration()
+        except BaseException:
+            try:
+                self.close()
+            except Exception as cleanup_error:
+                log.warning("pipeline.construction_cleanup_failed", error=str(cleanup_error))
+            raise
 
     # ------------------------------------------------------------------ frame access (camera tracking)
     def attach_frames(self, frame_at: Callable[[int], np.ndarray], ref_dir: Path) -> None:
@@ -177,6 +339,7 @@ class BadmintonSession:
         forces the geometry mode; by default a calibration whose frame's painted lines confirm it is followed
         by its lines in every frame (refined onto them), otherwise the camera is tracked by its background
         from ``reference``.  Returns the calibration record's extra fields."""
+        self._format_epoch = getattr(self, "_format_epoch", 0) + 1
         extra: dict[str, Any] = dict(record or {})
         extra.setdefault("fixed_camera", self._fixed_camera)
         self._fixed_camera = extra["fixed_camera"]
@@ -330,11 +493,121 @@ class BadmintonSession:
     def perceive(self, chunk: DecodedChunk) -> ChunkPerception:
         return self.perception.process(chunk, in_play=self.in_play)
 
+    def _format_observation(self, fp: FramePerception) -> FormatObservation:
+        """Fresh feet in the selected ground plane, before named-player mapping."""
+        people: list[FormatPerson] = []
+        full_court = False
+        valid = self.calibration is not None and fp.calibration_state is CalibrationState.VALID
+        valid = valid and fp.scene == "main" and not fp.cam_lost
+        if valid:
+            matrix = self.calibration.H
+            if fp.cam is not None:
+                matrix = np.asarray(fp.cam) @ matrix
+            try:
+                h = Homography(np.asarray(matrix, dtype=float), 0.0, 4)
+                if not np.isfinite(matrix).all() or np.linalg.cond(matrix) >= 1e12:
+                    raise ValueError("invalid format ground-plane transform")
+                corners = h.court_to_image(
+                    np.array([REFERENCE_POINTS[name] for name in ("far_left", "far_right", "near_right", "near_left")])
+                )
+                media = self.session.media
+                full_court = bool(
+                    media is not None
+                    and np.isfinite(corners).all()
+                    and (corners[:, 0] >= 0).all()
+                    and (corners[:, 0] < media.width).all()
+                    and (corners[:, 1] >= 0).all()
+                    and (corners[:, 1] < media.height).all()
+                )
+                for person in fp.persons:
+                    box = np.asarray(person.bbox, dtype=float)
+                    if person.detector_matched is not True or box.shape != (4,) or not np.isfinite(box).all():
+                        continue
+                    feet = h.image_to_court(np.array([[(box[0] + box[2]) / 2, box[3]]]))[0]
+                    people.append(FormatPerson(str(person.track_id), tuple(float(value) for value in feet), True))
+            except (ValueError, np.linalg.LinAlgError):
+                valid = False
+                people = []
+        cut = self._format_last_shot_id is not None and fp.shot_id != self._format_last_shot_id
+        self._format_last_shot_id = fp.shot_id
+        return FormatObservation(
+            frame_idx=fp.frame_idx,
+            persons=tuple(people),
+            detector_observed=fp.detector_observed,
+            main_view=fp.scene == "main",
+            geometry_valid=bool(valid),
+            full_court_visible=full_court,
+            epoch=str(self._format_epoch),
+            cut=cut,
+        )
+
+    @staticmethod
+    def _slice_perception(perception: ChunkPerception, start: int, end: int) -> ChunkPerception:
+        return ChunkPerception(
+            start,
+            end,
+            perception.frames[start - perception.start : end - perception.start + 1],
+            models=dict(perception.models),
+            ocr=[reading for reading in perception.ocr if start <= reading.frame_idx <= end],
+            cam_ref=perception.cam_ref,
+        )
+
+    def _apply_format_decision(self, decision: FormatDecision, frame: int) -> None:
+        selected = None if decision.match_format == "unknown" else decision.match_format
+        handles = {**self.perception.component_handles, **self._domain_component_handles}
+        for kind, handle in handles.items():
+            if decision.match_format not in handle.contract.supported_formats:
+                self.perception._degrade(kind, f"Selected provider does not support inferred {decision.match_format}")
+                selected = None
+        self.engine.set_match_format(selected, frame, Provenance(model=FORMAT_METHOD), decision=decision.to_public())
+        self._applied_format = selected
+        self.perception.match_format = selected or "unknown"
+        # Inferred singles must still observe four people to support an upgrade.
+        configured = self.session.roster.match_format if self.session.roster else None
+        self.perception.players.max_players = 2 if configured == "singles" else 4
+        self.perception.players.on_cut()
+
     def ingest(self, perception: ChunkPerception) -> None:
-        self.engine.ingest(perception)
+        boundaries: list[tuple[int, FormatDecision]] = []
+        pending = self._applied_format
+        for frame in perception.frames:
+            decision = self.format_understanding.observe(self._format_observation(frame))
+            selected = None if decision.match_format == "unknown" else decision.match_format
+            if selected != pending:
+                boundaries.append((frame.frame_idx, decision))
+                pending = selected
+        start = perception.start
+        for boundary, decision in boundaries:
+            if start < boundary:
+                self.engine.ingest(self._slice_perception(perception, start, boundary - 1))
+            self._apply_format_decision(decision, boundary)
+            start = boundary
+        self.engine.ingest(self._slice_perception(perception, start, perception.end))
 
     def flush(self) -> None:
         self.engine.flush()
+
+    def close(self) -> None:
+        """Close session-owned providers, leaving repository-owned stores open."""
+        if getattr(self, "_closed", False):
+            return
+        self._closed = True
+        failure: Exception | None = None
+        resources = (
+            getattr(self, "engine", None),
+            *getattr(self, "_domain_component_handles", {}).values(),
+            getattr(self, "_format_handle", None),
+            getattr(self, "perception", None),
+        )
+        for resource in resources:
+            close = getattr(resource, "close", None)
+            if callable(close):
+                try:
+                    close()
+                except Exception as exc:
+                    failure = failure or exc
+        if failure is not None:
+            raise failure
 
     def drain_tracks(self) -> list[TrackSample]:
         return self.engine.drain_tracks()
@@ -455,6 +728,11 @@ class BadmintonSession:
                 return {"ok": False, "error": "unknown event"}
             if ev.type in TRACKER_IDENTITY_EVIDENCE_TYPES:
                 return {"ok": False, "error": "tracker identity evidence requires its dedicated review flow"}
+            if ev.type in SCORE_REVIEW_EVENT_TYPES:
+                return {
+                    "ok": False,
+                    "error": "score evidence requires a winner, official-play or match-phase correction",
+                }
             patch = command.get("payload") or {}
             if "participant_hypothesis" in patch and (
                 "participant_hypothesis" not in ev.payload
@@ -476,7 +754,7 @@ class BadmintonSession:
 
     # ------------------------------------------------------------------ views
     def public_state(self) -> dict[str, Any]:
-        return self.engine.public_state()
+        return {**self.engine.public_state(), "format": self.format_understanding.decision.to_public()}
 
     def analytics(self) -> dict[str, Any]:
         """Publish the same canonical event/track fold used by HTTP and reports.
@@ -516,6 +794,62 @@ class BadmintonSession:
     def degraded(self) -> list[dict[str, str]]:
         return [{"stage": d.stage, "reason": d.reason} for d in self.perception.degraded]
 
+    def _format_cache_identity(self) -> dict[str, Any]:
+        decision = self.format_understanding.decision
+        return {
+            "match_format": decision.match_format,
+            "source": decision.source,
+            "revision": decision.revision,
+            "epoch": decision.epoch if decision.epoch is not None else str(self._format_epoch),
+        }
+
+    def describe_pipeline(self) -> dict[str, Any]:
+        """Detached whole-pipeline composition, selected providers and cache identity."""
+        description = loads(dumps(self._pipeline_declaration))
+        active = {
+            **self.perception.component_metadata,
+            **self._domain_metadata,
+            "format": {
+                "contract": self._format_handle.contract.describe(),
+                "fingerprint": self._format_handle.fingerprint,
+            },
+        }
+        components = {}
+        for kind, metadata in active.items():
+            contract = metadata["contract"]
+            components[kind] = {
+                "implementation": contract["implementation"],
+                "version": contract["version"],
+                "fingerprint": metadata["fingerprint"],
+                "status": "selected",
+            }
+        for kind, choice in self.perception.effective_choices.items():
+            if kind not in components:
+                components[kind] = {
+                    "implementation": choice.implementation if choice else None,
+                    "status": "unavailable" if choice and choice.model != "none" else "disabled",
+                }
+        decision = self.format_understanding.decision.to_public()
+        description.update(
+            components=components,
+            format=decision,
+            configuration={
+                "profile": self.perception.profile.name,
+                "source_sha256": self.session.source.sha256,
+                "input_transform": {
+                    key: self.session.meta[key]
+                    for key in ("source_window", "source_time_transform", "analysis_proxy_sha256")
+                    if key in self.session.meta
+                },
+                "scoring_names": {player.player_id: player.name for player in self.session.players},
+                "roster": self.session.roster.model_dump(mode="json") if self.session.roster else None,
+                "calibration": lines_ref_id(self.calibration.H) if self.calibration else None,
+            },
+        )
+        identity = {**description, "format": self._format_cache_identity()}
+        description["fingerprint"] = sha256(dumps(identity, sort_keys=True, allow_nan=False).encode()).hexdigest()
+        return description
+
     def capabilities(self) -> dict[str, dict[str, Any]]:
         """Report actual execution, separately from optional research configuration."""
         from bai_badminton.events.contact import CONTACT_MODEL
@@ -523,6 +857,25 @@ class BadmintonSession:
         profile = self.perception.profile
         loaded = self.perception.models
         out: dict[str, dict[str, Any]] = {}
+        out["named_identity"] = {
+            "status": "review_required",
+            "required": False,
+            "reason": "Scoring names and configured format do not bind visual tracks to named athletes.",
+            "review_action": (
+                "Configure participants, review identity intervals, "
+                "then confirm the hitter for each stroke."
+            ),
+            "policy": "reviewed_named_attribution_v1",
+        }
+        if hasattr(self, "format_understanding"):
+            decision = self.format_understanding.decision
+            out["format"] = {
+                "status": decision.source,
+                "required": True,
+                "reason": decision.reason,
+                "decision": decision.to_public(),
+                "active_implementation": self._format_handle.contract.implementation,
+            }
         for stage, attr, required in (
             ("shuttle", "shuttle", True),
             ("player_detector", "player_detector", True),
@@ -620,6 +973,42 @@ class BadmintonSession:
                 "required": False,
                 "reason": "InpaintNet is not integrated; temporal gap filling is explicitly inferred.",
             }
+        for kind, handle in getattr(self, "_domain_component_handles", {}).items():
+            metadata = self._domain_metadata[kind]
+            baseline = handle.contract.implementation == DOMAIN_BASELINES[kind]
+            legacy = getattr(profile, kind, None)
+            choice = self._domain_effective_choices[kind]
+            requested = choice.model if kind in profile.components else legacy.model if legacy is not None else None
+            previous = out.get(kind, {})
+            active_model = metadata["model"]
+            if baseline and kind == "contact":
+                active_model = CONTACT_MODEL
+            reason = (
+                "Versioned rule/observation estimates; uncertainty and required evidence remain explicit."
+                if baseline
+                else "Explicitly selected provider; accuracy requires separate labelled evaluation."
+            )
+            if (
+                kind == "stroke"
+                and kind not in profile.components
+                and requested not in (None, "none", "stroke_rules_v0")
+            ):
+                reason += f" Legacy requested artifact {requested} is not executed; active provider is stroke-rules-v0."
+            out[kind] = {
+                **previous,
+                "status": ("rules" if kind == "scoring" else "derived" if kind == "analytics" else "heuristic")
+                if baseline
+                else "configured",
+                "requested_model": requested,
+                "active_model": active_model,
+                "active_implementation": handle.contract.implementation,
+                "component_fingerprint": metadata["fingerprint"],
+                "contract": handle.contract.describe(),
+                "required": True,
+                "reason": reason,
+            }
+        if hasattr(self, "_pipeline_declaration"):
+            out["pipeline"] = {"status": "configured", **self.describe_pipeline()}
         return out
 
     @property
@@ -646,6 +1035,19 @@ class BadmintonSession:
         if isinstance(profile, Profile):
             policy["profile"] = profile.model_dump(mode="json")
         policy["loaded_models"] = getattr(self.perception, "models", {})
+        policy["components"] = getattr(self.perception, "component_metadata", {})
+        policy["domain_components"] = getattr(self, "_domain_metadata", {})
+        if hasattr(self, "_pipeline_declaration"):
+            policy["pipeline_fingerprint"] = self.describe_pipeline()["fingerprint"]
+        if hasattr(self, "format_understanding"):
+            policy["format_understanding"] = {
+                "method": FORMAT_METHOD,
+                "configured_format": self.session.roster.match_format if self.session.roster else None,
+                "contract": self._format_handle.contract.describe(),
+                "configuration": self._format_choice.model_dump(mode="json"),
+                "decision": self._format_cache_identity(),
+                "state_restore": "recompute_in_canonical_frame_order",
+            }
         policy["runtimes"] = getattr(self.perception, "runtimes", {})
         size = getattr(self.perception, "frame_size", None)
         policy["frame_size"] = list(size) if size else None
@@ -702,7 +1104,15 @@ class BadmintonSession:
                 "end": p.end,
                 "models": p.models,
                 "frames": frames,
-                "ocr": [{"f": r.frame_idx, "r": [list(x) for x in r.rows], "c": r.conf} for r in p.ocr],
+                "ocr": [
+                    {
+                        "f": r.frame_idx,
+                        "r": [list(x) for x in r.rows],
+                        "c": r.conf,
+                        "ctx": asdict(r.context) if r.context is not None else None,
+                    }
+                    for r in p.ocr
+                ],
             },
             use_bin_type=True,
         )
@@ -786,7 +1196,10 @@ class BadmintonSession:
         ]
         ocr = [
             ScoreReading(
-                frame_idx=o["f"], rows=((o["r"][0][0], o["r"][0][1]), (o["r"][1][0], o["r"][1][1])), conf=o["c"]
+                frame_idx=o["f"],
+                rows=((o["r"][0][0], o["r"][0][1]), (o["r"][1][0], o["r"][1][1])),
+                conf=o["c"],
+                context=ScoreObservationContext(**o["ctx"]) if o.get("ctx") is not None else None,
             )
             for o in d.get("ocr", [])
         ]
@@ -797,8 +1210,45 @@ class BadmintonSession:
 
 class BadmintonPlugin:
     name = "badminton"
+    pipeline_id = "badminton-broadcast"
+    pipeline_version = "2"
+    stages = (
+        ("perception", (), ("shuttle", "player_detector", "pose", "player_reid", "tracking", "racket", "ocr")),
+        ("format", ("perception",), ("format",)),
+        ("identity", ("perception", "format"), ("identity",)),
+        ("activity", ("perception", "identity"), ("activity",)),
+        ("contact", ("perception", "format", "identity"), ("contact",)),
+        ("rally", ("contact", "activity"), ("rally",)),
+        ("stroke", ("contact", "rally", "identity"), ("stroke",)),
+        ("outcome", ("rally", "format", "perception"), ("outcome",)),
+        ("scoring", ("format", "rally", "outcome", "perception"), ("scoring",)),
+        ("analytics", ("scoring", "stroke", "identity"), ("analytics",)),
+    )
+
+    @classmethod
+    def describe_pipeline(cls) -> dict[str, Any]:
+        return {
+            "plugin": cls.name,
+            "pipeline_id": cls.pipeline_id,
+            "pipeline_version": cls.pipeline_version,
+            "input_schema": "canonical-cfr-bgr-chunk:v1",
+            "output_schema": "events-and-observation-tracks:v1",
+            "supported_formats": ["singles", "doubles", "unknown"],
+            "configuration": "Profile.components",
+            "stages": [
+                {"id": name, "depends_on": list(dependencies), "components": list(components)}
+                for name, dependencies, components in cls.stages
+            ],
+            "lifecycle": {
+                "per_session_factory": True,
+                "ordered_ingest": True,
+                "state_restore": "recompute_perception;restore_event_fold",
+                "close": "owned_components_after_resident_commands",
+            },
+            "failure_behavior": "explicit_unavailable_or_unknown;no_fabricated_points",
+        }
 
     def create_session(
         self, session: Session, store: EventStore, profile: Profile, registry: ModelRegistry, emit: EmitFn
     ) -> BadmintonSession:
-        return BadmintonSession(session, store, profile, registry, emit)
+        return BadmintonSession(session, store, profile, registry, emit, pipeline_declaration=self.describe_pipeline())
