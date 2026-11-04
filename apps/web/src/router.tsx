@@ -86,6 +86,28 @@ const momentsRoute = createRoute({
   path: "/moments",
   component: lazyRouteComponent(() => import("@/features/product/Moments"), "MomentsPage"),
 });
+interface HighlightsSearch {
+  source?: "example" | "recordings";
+  format?: "singles" | "doubles";
+  session?: string;
+  subject?: string;
+}
+const highlightsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/highlights",
+  component: lazyRouteComponent(() => import("@/features/highlights/HighlightsPage"), "HighlightsPage"),
+  validateSearch: (search: Record<string, unknown>): HighlightsSearch => ({
+    source: search.source === "recordings" ? "recordings" : "example",
+    format: search.format === "singles" ? "singles" : "doubles",
+    session: typeof search.session === "string" && search.session.length <= 256 ? search.session : "",
+    subject:
+      typeof search.subject === "string" &&
+      /^(person|team):.+/.test(search.subject) &&
+      search.subject.length <= 512
+        ? search.subject
+        : "",
+  }),
+});
 const progressRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/progress",
@@ -130,6 +152,7 @@ const routeTree = rootRoute.addChildren([
   sessionRoute,
   matchRoute,
   momentsRoute,
+  highlightsRoute,
   progressRoute,
   peopleRoute,
   settingsRoute,

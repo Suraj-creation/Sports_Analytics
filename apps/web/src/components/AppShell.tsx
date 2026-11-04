@@ -4,6 +4,7 @@ import {
   Activity,
   ChevronRight,
   Clapperboard,
+  Film,
   HelpCircle,
   House,
   LibraryBig,
@@ -24,6 +25,7 @@ import { Spinner } from "./ui";
 const NAV = [
   { to: "/", label: "Home", icon: House },
   { to: "/matches", label: "Matches", icon: LibraryBig },
+  { to: "/highlights", label: "Highlights", icon: Film },
   { to: "/moments", label: "Moments", icon: Clapperboard },
   { to: "/progress", label: "Progress", icon: TrendingUp },
   { to: "/people", label: "People", icon: Users },
@@ -79,6 +81,9 @@ export function AppShell() {
   const [logoutError, setLogoutError] = useState("");
   const path = useRouterState({ select: (s) => s.location.pathname });
   const main = useRef<HTMLElement>(null);
+  // The synthetic Highlights collection is useful without a reachable API. A
+  // successful auth response still controls access, and all real reads stay protected.
+  const localHighlights = path === "/highlights";
   const darkTheme = theme === "dark" || (theme === "system" && systemDark);
   const pageLabel = path.includes("/calibrate")
     ? "Court calibration"
@@ -119,13 +124,13 @@ export function AppShell() {
     heading?.focus({ preventScroll: true });
   }, [path]);
 
-  if (me.isPending)
+  if (me.isPending && !localHighlights)
     return (
       <div className="grid h-full place-items-center">
         <Spinner className="size-6" />
       </div>
     );
-  if (me.isError)
+  if (me.isError && !localHighlights)
     return (
       <div className="rally-offline">
         <div>
@@ -134,10 +139,13 @@ export function AppShell() {
           <button type="button" className="rally-action mt-4" onClick={() => void me.refetch()}>
             Try again
           </button>
+          <Link to="/highlights" className="rally-action mt-4 ml-2">
+            Explore example highlights
+          </Link>
         </div>
       </div>
     );
-  if (me.data.auth_required && !me.data.authenticated) return <LoginPage onDone={() => me.refetch()} />;
+  if (me.data?.auth_required && !me.data.authenticated) return <LoginPage onDone={() => me.refetch()} />;
 
   return (
     <div className="rally-app">
@@ -205,7 +213,7 @@ export function AppShell() {
               <Settings className="size-4" aria-hidden />
               <span>Settings</span>
             </Link>
-            {me.data.auth_required && (
+            {me.data?.auth_required && (
               <button
                 type="button"
                 className="rally-header-link"
