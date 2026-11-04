@@ -201,10 +201,19 @@ def to_frames(r: SynthRally, offset: int) -> list[FramePerception]:
         for tid, pid in ((1, "P1"), (2, "P2")):
             s = r.obs.players[pid]
             if np.isfinite(s.bbox[i, 0]):
-                persons.append(PersonObs(track_id=tid, bbox=s.bbox[i].copy(), conf=0.9, kps=s.kps[i].copy()))
+                persons.append(
+                    PersonObs(track_id=tid, bbox=s.bbox[i].copy(), conf=0.9, kps=s.kps[i].copy(), detector_matched=True)
+                )
         xy = (float(t.x[i]), float(t.y[i])) if t.vis[i] else None
         out.append(
-            FramePerception(frame_idx=offset + i, shuttle_xy=xy, shuttle_conf=0.95 if xy else 0.0, persons=persons)
+            FramePerception(
+                frame_idx=offset + i,
+                shuttle_xy=xy,
+                shuttle_conf=0.95 if xy else 0.0,
+                persons=persons,
+                detector_observed=True,
+                pose_stride=1,
+            )
         )
     return out
 
@@ -228,7 +237,14 @@ def make_match(winners: list[str], fps: float = 30.0, chunk: int = 64, seed: int
         part = frames[s : s + chunk]
         chunks.append(
             ChunkPerception(
-                start=part[0].frame_idx, end=part[-1].frame_idx, frames=part, models={"synthetic": "synth@1"}
+                start=part[0].frame_idx,
+                end=part[-1].frame_idx,
+                frames=part,
+                models={
+                    "synthetic": "synth@1",
+                    "player_detector": "synthetic-person-observations@1",
+                    "pose": "synthetic-coco17@1",
+                },
             )
         )
     return SynthMatch(chunks, rallies, offsets, winners, broadcast_homography(), len(frames), fps)

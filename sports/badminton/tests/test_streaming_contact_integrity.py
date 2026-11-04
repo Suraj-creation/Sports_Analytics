@@ -4,6 +4,7 @@ from itertools import pairwise
 from pathlib import Path
 
 import pytest
+from synthetic_support import bind_labelled_synthetic_singles
 
 from bai_badminton.analytics.match import MatchAnalytics, RallyRecord
 from bai_badminton.engine import BadmintonMatchEngine, EngineConfig
@@ -28,15 +29,24 @@ def test_contextual_peaks_are_independent_of_requested_partition(size: int) -> N
     assert all(b - a > 6 for a, b in pairwise(actual))
 
 
-def run_rally(path: Path, *, chunk_size: int, lead_in: int = 30):
+def run_rally(path: Path, *, chunk_size: int, lead_in: int = 30, labelled_identity: bool = False):
     rally = make_rally(lead_in=lead_in)
     frames = to_frames(rally, 0)
     store = EventStore(path, "S1")
     engine = BadmintonMatchEngine("S1", EngineConfig(fps=30, frame_width=1280, frame_height=720), store)
+    if labelled_identity:
+        bind_labelled_synthetic_singles(engine)
     engine.set_calibration(0, rally.homography)
     for start in range(0, len(frames), chunk_size):
         selected = frames[start : start + chunk_size]
-        engine.ingest(ChunkPerception(start=start, end=selected[-1].frame_idx, frames=selected))
+        engine.ingest(
+            ChunkPerception(
+                start=start,
+                end=selected[-1].frame_idx,
+                frames=selected,
+                models={"player_detector": "synthetic-person-observations@1"},
+            )
+        )
     engine.flush()
     return engine, store
 
@@ -78,7 +88,7 @@ def test_segment_start_without_service_history_is_unknown_but_later_shots_remain
 
 
 def test_service_formation_is_estimated_and_observed_incoming_flight_is_not_serve(tmp_path: Path) -> None:
-    engine, store = run_rally(tmp_path / "serve.sqlite", chunk_size=64)
+    engine, store = run_rally(tmp_path / "serve.sqlite", chunk_size=64, labelled_identity=True)
     strokes = store.query(types=["stroke"])
     assert strokes[0].payload["is_serve"] is True
     assert strokes[0].payload["serve_evidence"]["status"] == "estimated"

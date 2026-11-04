@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import pytest
+from synthetic_support import bind_labelled_synthetic_singles
 
 from bai_badminton.analytics.rebuild import build, rally_records
 from bai_badminton.engine import BadmintonMatchEngine, EngineConfig, _PendingRally
@@ -17,6 +18,7 @@ def scored_rally(tmp_path: Path, monkeypatch):
     with EventStore(tmp_path / "score.sqlite", "S1") as store:
         cfg = EngineConfig(fps=30, frame_width=1280, frame_height=720)
         engine = BadmintonMatchEngine("S1", cfg, store)
+        bind_labelled_synthetic_singles(engine)
         monkeypatch.setattr(engine, "_outcome", lambda seg: ("winner", "far", "controlled_fixture", 0.85))
         monkeypatch.setattr(engine, "_phase_evidence", lambda seg, until: RallyEvidence(scoreboard="changed"))
         engine._pending = [_PendingRally(RallySegment(10, 20, None, "stationary"), [], None)]

@@ -1,6 +1,8 @@
+
 from pathlib import Path
 
 import pytest
+from synthetic_support import bind_labelled_synthetic_singles
 
 from bai_badminton.engine import BadmintonMatchEngine, EngineConfig
 from bai_badminton.events.match_phase import PhaseParams
@@ -20,6 +22,7 @@ def run(tmp_path: Path) -> tuple[BadmintonMatchEngine, EventStore, list[Event]]:
         "S1", EngineConfig(fps=m.fps, frame_width=1280, frame_height=720,
                            phase=PhaseParams(allow_heuristic_official=True)), store, emit=seen.extend
     )
+    bind_labelled_synthetic_singles(eng)
     eng.set_calibration(0, m.homography)
     for ch in m.chunks:
         eng.ingest(ch)
@@ -157,6 +160,7 @@ def _stroke_speeds(tmp_path: Path, name: str, *, ocr: bool) -> dict[int, float |
     m = make_match(WINNERS, fps=60.0)  # a 4 s OCR wait is 240 frames: longer than the ~150-frame window
     store = EventStore(tmp_path / f"{name}.sqlite", "S1")
     eng = BadmintonMatchEngine("S1", EngineConfig(fps=m.fps, frame_width=1280, frame_height=720), store)
+    bind_labelled_synthetic_singles(eng)
     eng.set_calibration(0, m.homography)
     if ocr:
         eng.on_ocr(ScoreReading(frame_idx=0, rows=(("A", 0), ("B", 0)), conf=0.9))
@@ -183,6 +187,7 @@ def test_missing_shuttle_kinematics_are_persisted_as_unknown(tmp_path: Path) -> 
     m = make_match(["P1", "P2"])
     store = EventStore(tmp_path / "missing-kinematics.sqlite", "S1")
     eng = BadmintonMatchEngine("S1", EngineConfig(fps=m.fps, frame_width=1280, frame_height=720), store)
+    bind_labelled_synthetic_singles(eng)
     eng.set_calibration(0, m.homography)
     eng._post_contact_kinematics = lambda frame, next_frame=None: (None, None)
     for chunk in m.chunks:
@@ -214,6 +219,7 @@ def test_contacts_and_strokes_retain_track_at_contact_frame(tmp_path: Path) -> N
     m = make_match(["P1", "P2"])
     store = EventStore(tmp_path / "track-provenance.sqlite", "S1")
     eng = BadmintonMatchEngine("S1", EngineConfig(fps=m.fps, frame_width=1280, frame_height=720), store)
+    bind_labelled_synthetic_singles(eng)
     eng.set_calibration(0, m.homography)
     tracks = {}
     for chunk in m.chunks:

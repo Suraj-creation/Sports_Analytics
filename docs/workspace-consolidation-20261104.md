@@ -1,5 +1,8 @@
 # Workspace consolidation — 2026-11-04
 
+Historical checkpoint: subsequent fixes and the green combined suite are recorded
+in [main deep validation](main-deep-validation-20261104.md).
+
 ## Preserved development
 
 The main checkout consolidates the full-pipeline reliability history through

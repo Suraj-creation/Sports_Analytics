@@ -74,7 +74,7 @@ def test_anonymous_episode_does_not_trigger_named_player_alternation(tmp_path, m
     if named:
         engine._players["P1"]["track_id"] = [0] * window.n
     monkeypatch.setattr(
-        "bai_badminton.engine.detect_contacts",
+        engine.contact_inference, "detect",
         lambda *_args, **_kw: [
             ContactCandidate(frame=3, player_id="participant-test-000000", p=0.9, scores={"proximity": 0.8}),
             ContactCandidate(frame=10, player_id="participant-test-000000", p=0.9, scores={"proximity": 0.8}),
@@ -91,7 +91,7 @@ def test_nonunique_named_track_mapping_cannot_assign_actor(tmp_path, monkeypatch
     for pid in ("P1", "P2"):
         engine._players[pid]["track_id"] = [0] * window.n
     monkeypatch.setattr(
-        "bai_badminton.engine.detect_contacts",
+        engine.contact_inference, "detect",
         lambda *_args, **_kw: [
             ContactCandidate(frame=10, player_id="participant-test-000000", p=0.9, scores={"proximity": 0.8}),
         ],
@@ -105,7 +105,7 @@ def test_nonunique_named_track_mapping_cannot_assign_actor(tmp_path, monkeypatch
 def test_body_context_eligibility_retains_raw_turns_and_ambiguous_actors(tmp_path, monkeypatch, proximity, eligible):
     engine, window, seen, store = setup(tmp_path)
     monkeypatch.setattr(
-        "bai_badminton.engine.detect_contacts",
+        engine.contact_inference, "detect",
         lambda *_args, **_kw: [
             ContactCandidate(
                 frame=10, player_id=None, p=0.7, scores={"proximity": proximity, "redirect": 1.0, "impulse": 1.0}

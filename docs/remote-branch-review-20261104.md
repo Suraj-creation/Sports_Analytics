@@ -1,5 +1,8 @@
 # Remote branch review and differential validation — 2026-11-04
 
+Historical checkpoint: subsequent fixes and the green combined suite are recorded
+in [main deep validation](main-deep-validation-20261104.md).
+
 Baseline: `09b376acf8d88144b6184e87dc25375dd8772f9f`.
 Remote heads were verified through GitHub before review:
 

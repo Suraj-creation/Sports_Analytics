@@ -101,6 +101,7 @@ def test_upload_to_playback_end_to_end(client: TestClient, tmp_path: Path) -> No
 
 def _seed_match(settings: Settings) -> str:
     """A synthetic analysed match written straight into the store (no video needed)."""
+    from apps.web.e2e.score_fixture import apply_reviewed_synthetic_labels
     from bai_badminton.engine import BadmintonMatchEngine, EngineConfig
     from bai_badminton.events.match_phase import PhaseParams
     from bai_badminton.testing.synth import make_match
@@ -141,6 +142,10 @@ def _seed_match(settings: Settings) -> str:
             if part:
                 ts.write_chunk(obj, ch.start, ch.end, samples_to_table(part))
     eng.flush()
+    apply_reviewed_synthetic_labels(eng, [
+        (winner, offset, rally.contacts)
+        for winner, offset, rally in zip(m.winners, m.offsets, m.rallies, strict=True)
+    ])
     repo.update(
         s.session_id,
         players=[PlayerInfo(player_id="P1", name="An Se Young"), PlayerInfo(player_id="P2", name="Tai Tzu Ying")],

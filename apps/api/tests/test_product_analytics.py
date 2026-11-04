@@ -107,7 +107,10 @@ def test_cache_rebuilds_same_sequence_after_analysis_reset(settings: Settings) -
     cache = AnalyticsCache(repo)
     original = cache.get(sid)
     assert len(original.rallies) == 8
-    old_events = repo.events(sid).query(live_only=False)
+    # A reviewed boundary can precede its original segment on the frame
+    # timeline. Replay the append journal by sequence so every superseded
+    # parent is installed before its correction.
+    old_events = sorted(repo.events(sid).query(live_only=False), key=lambda event: event.seq)
     repo.reset_analysis(sid)
     for event in old_events:
         # Keep sequence length identical but change the canonical winner evidence.

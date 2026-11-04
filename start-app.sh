@@ -3,6 +3,11 @@
 set -euo pipefail
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
 
+# Preserve the server's Pascal-compatible libraries and FFmpeg selection.
+if [[ -f ../gpu-env.sh ]]; then
+    source ../gpu-env.sh
+fi
+
 if [[ ! -x .venv/bin/python || ! -f apps/web/dist/index.html ]]; then
     echo "Install Python dependencies and build apps/web before starting." >&2
     exit 1

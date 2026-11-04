@@ -9,6 +9,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from synthetic_support import bind_labelled_synthetic_singles
 
 from bai_badminton.engine import BadmintonMatchEngine, EngineConfig
 from bai_badminton.events.match_phase import PhaseParams
@@ -66,6 +67,7 @@ def run(tmp_path: Path, name: str, chunks: list[ChunkPerception], m: SynthMatch,
         fps=m.fps, frame_width=1280, frame_height=720, phase=PhaseParams(allow_heuristic_official=True)
     )
     eng = BadmintonMatchEngine("S1", cfg, store)
+    bind_labelled_synthetic_singles(eng)
     eng.set_calibration(0, m.homography, cam_ref=CAM_REF if tracked else None)
     tracks = []
     for ch in chunks:

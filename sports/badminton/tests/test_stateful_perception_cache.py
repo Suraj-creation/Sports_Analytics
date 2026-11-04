@@ -110,7 +110,8 @@ def test_capabilities_distinguish_loaded_models_heuristics_and_unimplemented_res
     assert capabilities["player_detector"]["status"] == "unavailable"
     assert capabilities["stroke"]["status"] == "heuristic"
     assert capabilities["stroke"]["active_model"] == "stroke_rules_v0"
-    assert capabilities["stroke"]["requested_model"] == "bst_cg_ap_shuttleset"
+    assert capabilities["stroke"]["requested_model"] == "none"
+    assert value.perception.profile.components["stroke"].implementation == "stroke-rules-v0"
     assert capabilities["stroke_shadow"]["status"] == "shadow_only"
     assert capabilities["stroke_shadow"]["active_model"] is None
     assert capabilities["stroke_shadow"]["required"] is False

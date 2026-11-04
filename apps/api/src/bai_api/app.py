@@ -30,28 +30,37 @@ def create_app(settings: Settings | None = None, bus: Bus | None = None, start_e
         app.state.settings = settings
         app.state.auth = Auth(settings)
         app.state.repo = SessionRepository(settings.data_dir)
-        app.state.bus = bus or make_bus(settings.redis_url)
+        app.state.bus = None
         app.state.engine = None
-        if start_engine and settings.engine_mode == "embedded":
-            from bai_engine.runtime.runner import EngineService
+        try:
+            app.state.bus = bus or make_bus(settings.redis_url)
+            if start_engine and settings.engine_mode == "embedded":
+                from bai_engine.runtime.runner import EngineService
 
-            app.state.engine = EngineService(app.state.repo, app.state.bus, settings)
-            app.state.engine.start()
-        from bai_api.analytics import AnalyticsCache
+                app.state.engine = EngineService(app.state.repo, app.state.bus, settings)
+                app.state.engine.start()
+            from bai_api.analytics import AnalyticsCache
 
-        app.state.analytics = AnalyticsCache(app.state.repo)
-        log.info(
-            "api.started",
-            bind=settings.bind_host,
-            port=settings.port,
-            engine=settings.engine_mode,
-            auth=app.state.auth.enabled,
-        )
-        yield
-        if app.state.engine is not None:
-            app.state.engine.shutdown()
-        app.state.repo.close()
-        app.state.bus.close()
+            app.state.analytics = AnalyticsCache(app.state.repo)
+            log.info(
+                "api.started",
+                bind=settings.bind_host,
+                port=settings.port,
+                engine=settings.engine_mode,
+                auth=app.state.auth.enabled,
+            )
+            yield
+        finally:
+            # A partial start can already own workers. Release neither the bus
+            # nor repository unless shutdown confirms that every writer stopped.
+            # On a timeout, retain the handles for explicit cleanup/retry.
+            if app.state.engine is not None:
+                app.state.engine.shutdown()
+            try:
+                if app.state.bus is not None:
+                    app.state.bus.close()
+            finally:
+                app.state.repo.close()
 
     app = FastAPI(
         title="Badminton AI", version="0.1.0", lifespan=lifespan, docs_url="/api/docs", openapi_url="/api/openapi.json"

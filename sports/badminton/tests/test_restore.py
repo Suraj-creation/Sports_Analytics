@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+from synthetic_support import bind_labelled_synthetic_singles
+
 from bai_badminton.analytics.rebuild import rally_records
 from bai_badminton.engine import BadmintonMatchEngine, EngineConfig
 from bai_badminton.events.match_phase import PhaseParams
@@ -19,6 +21,7 @@ def _analyse(store: EventStore) -> BadmintonMatchEngine:
         fps=m.fps, frame_width=1280, frame_height=720, phase=PhaseParams(allow_heuristic_official=True)
     )
     eng = BadmintonMatchEngine("S1", cfg, store)
+    bind_labelled_synthetic_singles(eng)
     eng.set_calibration(0, m.homography)
     for ch in m.chunks:
         eng.ingest(ch)

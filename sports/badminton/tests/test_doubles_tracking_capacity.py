@@ -50,8 +50,10 @@ def test_singles_keeps_existing_four_candidate_limit():
     assert len(p.process(0, image, (1, 0))) == 4
 
 
-@pytest.mark.parametrize("match_format, expected", [(None, 2), ("singles", 2), ("doubles", 4)])
+@pytest.mark.parametrize("match_format, expected", [(None, 4), ("singles", 2), ("doubles", 4)])
 def test_session_format_reaches_perception(tmp_path, match_format, expected):
+    # Unspecified format must retain enough court candidates to infer doubles;
+    # two visible players alone are not evidence that the match is singles.
     session = make_session(tmp_path, match_format)
     assert session.perception.players.max_players == expected
 

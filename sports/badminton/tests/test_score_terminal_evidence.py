@@ -2,6 +2,8 @@
 
 from dataclasses import replace
 
+from synthetic_support import bind_labelled_synthetic_singles
+
 from bai_badminton.engine import BadmintonMatchEngine, EngineConfig
 from bai_badminton.perception_types import ChunkPerception
 from bai_badminton.testing.synth import make_rally, to_frames
@@ -32,6 +34,7 @@ def test_real_observed_stationary_terminal_still_scores_once_on_repeated_flush(t
     frames = to_frames(rally, 0)
     with EventStore(tmp_path / "supported-terminal.sqlite", "S1") as store:
         engine = BadmintonMatchEngine("S1", EngineConfig(fps=30, frame_width=1280, frame_height=720), store)
+        bind_labelled_synthetic_singles(engine)
         engine.set_calibration(0, rally.homography)
         engine.set_match_start(0, Provenance(model="human"))
         engine.ingest(ChunkPerception(0, len(frames) - 1, frames))

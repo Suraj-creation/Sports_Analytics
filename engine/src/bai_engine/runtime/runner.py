@@ -632,12 +632,22 @@ class EngineService:
 
     def shutdown(self, timeout: float = 15.0) -> None:
         self._stop.set()
+        deadline = time.monotonic() + max(0.0, timeout)
         with self._lock:
             runners = list(self.runners.values())
         for r in runners:
             r.stop()
+        # The API closes the repository and bus immediately after this fence.
+        # A consumer still returning from next_command must not dispatch a late
+        # start or access those resources after shutdown reports completion.
+        if self._thread.ident is not None and self._thread is not threading.current_thread():
+            self._thread.join(timeout=max(0.0, deadline - time.monotonic()))
+            if self._thread.is_alive():
+                raise TimeoutError("The engine command consumer did not stop")
         for r in runners:
-            r.join(timeout=timeout)
+            r.join(timeout=max(0.0, deadline - time.monotonic()))
+            if r.is_alive():
+                raise TimeoutError("A session writer did not stop")
 
     def stop_session(self, session_id: str, timeout: float = 15.0) -> None:
         """Stop a session's runner and wait for it (used before deleting a session)."""
@@ -654,6 +664,8 @@ class EngineService:
     def _loop(self) -> None:
         while not self._stop.is_set():
             cmd = self.bus.next_command(timeout=0.5)
+            if self._stop.is_set():
+                return
             if cmd is None:
                 continue
             try:
@@ -691,6 +703,8 @@ class EngineService:
             return
         name = cmd.get("cmd")
         with self._lock:
+            if self._stop.is_set():
+                return
             runner = self.runners.get(sid)
             if name in ("start", "reanalyse"):
                 session = self.repo.get(sid)
@@ -735,8 +749,14 @@ class EngineService:
                 return
             # Commands re-attach to completed results; only an explicit retry rebuilds interrupted work.
             self.dispatch({"cmd": "start", "session_id": sid})
-            runner = self.runners[sid]
-        runner.command(cmd)
+        # A start can be refused after shutdown begins or if the session was
+        # deleted. Re-read ownership under the same lock as lifecycle changes.
+        with self._lock:
+            if self._stop.is_set():
+                return
+            runner = self.runners.get(sid)
+            if runner is not None:
+                runner.command(cmd)
 
     def _prepare_start(self, sid: str) -> bool:
         """Decide how a (re)started runner begins. Returns True to re-attach to a finished

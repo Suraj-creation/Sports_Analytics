@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import pytest
+from synthetic_support import bind_labelled_synthetic_singles
 
 from bai_badminton.engine import BadmintonMatchEngine, EngineConfig
 from bai_badminton.events.match_phase import MatchPhaseTracker, Phase, PhaseParams, RallyEvidence, serve_formation
@@ -32,6 +33,7 @@ def _run(  # type: ignore[no-untyped-def,type-arg]
     store = EventStore(tmp_path / "e.sqlite", "S1")
     cfg = EngineConfig(fps=FPS, frame_width=1280, frame_height=720, phase=PhaseParams(allow_heuristic_official=legacy))
     eng = BadmintonMatchEngine("S1", cfg, store, player_names=names)
+    bind_labelled_synthetic_singles(eng)
     eng.set_calibration(0, broadcast_homography())
     pending = sorted(ocr or [], key=lambda r: r.frame_idx)
     for s in range(0, len(frames), 64):
@@ -149,6 +151,7 @@ def test_open_exchange_strokes_wait_for_official_rally_acceptance(tmp_path: Path
     frames = to_frames(rally, 0)[:190]
     store = EventStore(tmp_path / "open.sqlite", "S1")
     eng = BadmintonMatchEngine("S1", EngineConfig(fps=FPS, frame_width=1280, frame_height=720), store)
+    bind_labelled_synthetic_singles(eng)
     eng.set_calibration(0, rally.homography)
     eng.ingest(ChunkPerception(start=0, end=len(frames) - 1, frames=frames))
     assert store.query(types=["stroke"])  # physical contact candidates do exist

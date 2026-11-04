@@ -91,7 +91,11 @@ def test_contact_factory_replacement_changes_emitted_engine_events(tmp_path):
             "S1", EngineConfig(fps=30, frame_width=1280, frame_height=720), store, contact_inference=selected.instance
         )
         engine.set_calibration(0, rally.homography)
-        engine.ingest(ChunkPerception(0, frames[-1].frame_idx, frames))
+        engine.ingest(
+            ChunkPerception(
+                0, frames[-1].frame_idx, frames, models={"player_detector": "synthetic-person-observations@1"}
+            )
+        )
         engine.flush()
         assert selected.instance.calls > 0
         assert not store.query(types=["contact", "stroke"])
@@ -128,7 +132,11 @@ def test_classifier_factory_replacement_reaches_actual_stroke_events(tmp_path):
             "S1", EngineConfig(fps=30, frame_width=1280, frame_height=720), store, stroke_classifier=selected.instance
         )
         engine.set_calibration(0, rally.homography)
-        engine.ingest(ChunkPerception(0, frames[-1].frame_idx, frames))
+        engine.ingest(
+            ChunkPerception(
+                0, frames[-1].frame_idx, frames, models={"player_detector": "synthetic-person-observations@1"}
+            )
+        )
         engine.flush()
         strokes = store.query(types=["stroke"])
         assert strokes
@@ -163,16 +171,16 @@ def test_analytics_has_explicit_data_checkpoint_restore_even_after_reset():
         analytics.restore(object())
 
 
-@pytest.mark.parametrize('kind', ['activity', 'rally'])
+@pytest.mark.parametrize("kind", ["activity", "rally"])
 def test_temporal_provider_has_explicit_checkpoint_restore_for_format_transactions(kind):
     from bai_badminton.events.activity import ActivityObservation
     from bai_badminton.events.rally_fsm import RallyState
 
     api, registry, context = _setup()
     provider = _create(registry, context, kind, api.BASELINE_IMPLEMENTATIONS[kind]).instance
-    assert callable(getattr(provider, 'checkpoint', None))
-    assert callable(getattr(provider, 'restore', None))
-    if kind == 'rally':
+    assert callable(getattr(provider, "checkpoint", None))
+    assert callable(getattr(provider, "restore", None))
+    if kind == "rally":
         provider.on_contact(3)
         saved = provider.checkpoint()
         provider.reset()

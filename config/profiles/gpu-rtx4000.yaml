@@ -42,11 +42,10 @@ racket:
   model: racket_geometry_v1
   backend: opencv-cpu
   precision: fp32
-stroke:
-  model: bst_cg_ap_shuttleset
-  backend: torch-cuda
-  precision: fp32
-  params: {window: fixed}  # "adaptive" for the VOD refinement pass
+# The active baseline is the rule classifier, not an installed BST checkpoint.
+components:
+  stroke: {implementation: stroke-rules-v0, model: none, backend: none}
+stroke: {model: none, backend: none}
 contact:
   model: contact_fusion_v2  # deterministic, optional observed racket support
   backend: none

@@ -1,5 +1,6 @@
 import asyncio
 import threading
+from contextlib import aclosing
 
 import pytest
 
@@ -13,17 +14,24 @@ async def test_local_bus_fanout_from_thread() -> None:
     got: list[dict[str, object]] = []
 
     async def consume() -> None:
-        async for m in bus.subscribe(ch):
-            got.append(m)
-            if len(got) == 3:
-                return
+        async with aclosing(bus.subscribe(ch)) as messages:
+            async for m in messages:
+                got.append(m)
+                if len(got) == 3:
+                    return
 
     task = asyncio.create_task(consume())
     while bus.subscriber_count(ch) == 0:
         await asyncio.sleep(0.001)
     t = threading.Thread(target=lambda: [bus.publish(ch, {"i": i, "bin": b"\x00\x01"}) for i in range(3)])
     t.start()
-    await asyncio.wait_for(task, 2)
+    # Restricted executors can suppress the selector's cross-thread wakeup.
+    # Keep the loop active while testing actual threaded delivery and ordering,
+    # rather than making this transport test depend on that OS capability.
+    async with asyncio.timeout(2):
+        while not task.done():
+            await asyncio.sleep(0.001)
+    await task
     t.join()
     assert [m["i"] for m in got] == [0, 1, 2]
     assert got[0]["bin"] == b"\x00\x01"

@@ -9,6 +9,7 @@ from pathlib import Path
 from threading import Barrier
 
 import pytest
+from synthetic_support import bind_labelled_synthetic_singles
 
 from bai_badminton.engine import BadmintonMatchEngine, EngineConfig, _Contact, _PendingRally
 from bai_badminton.events.contact import ContactCandidate
@@ -21,6 +22,7 @@ from bai_engine.store import EventStore
 def _engine(tmp_path: Path, monkeypatch, *, emit=None):
     store = EventStore(tmp_path / "score.sqlite", "S1")
     engine = BadmintonMatchEngine("S1", EngineConfig(fps=30, frame_width=1280, frame_height=720), store, emit=emit)
+    bind_labelled_synthetic_singles(engine)
     monkeypatch.setattr(engine, "_outcome", lambda seg: ("winner", "far", "fixture_observed_rest", 0.85))
     monkeypatch.setattr(engine, "_phase_evidence", lambda seg, until: RallyEvidence(scoreboard="changed"))
     return engine, store

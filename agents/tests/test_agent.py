@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest
 
+from apps.web.e2e.score_fixture import apply_reviewed_synthetic_labels
 from bai_agents.agent import answer, text_tool_calls, validate
 from bai_agents.providers import LLMTurn, ToolCall
 from bai_agents.tools import ToolContext, run_tool
@@ -39,6 +40,12 @@ def ctx(tmp_path: Path) -> ToolContext:
     # the remaining rallies as match play; do not infer match intent from motion.
     match_start = len(to_frames(rallies[0], 0))
     eng.set_reviewed_match_intervals([(match_start, len(frames) - 1)], Provenance(model="human"))
+    offset = 0
+    labels = []
+    for rally, winner in zip(rallies, [None, "P1", "P2", "P1"], strict=True):
+        labels.append((winner, offset, rally.contacts))
+        offset += len(to_frames(rally, 0))
+    apply_reviewed_synthetic_labels(eng, labels)
     session = Session(
         title="t",
         source=Source(kind=SourceKind.UPLOAD, uri="none"),
