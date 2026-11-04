@@ -74,3 +74,6 @@ env
 # Preserve expensive evidence locally, without adding media/caches/event logs.
 /outputs/benchmarking/**/runtime/
 /outputs/benchmarking/**/raw_events.jsonl
+
+# Investigation/experiment evidence (large, source-bound, retained locally).
+/artifacts/benchmarking/

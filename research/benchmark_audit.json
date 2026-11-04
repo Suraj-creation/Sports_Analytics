@@ -1,0 +1,1163 @@
+{
+  "audit_date_utc": "2026-11-04T18:32:21.442929+00:00",
+  "audit_git_sha": "b773e20c62d1c398cddc3d23510bd4adf823325b",
+  "production_commit": "301baf08be5e989dd0ed93cb885733c3cf6f356a",
+  "baseline_commit": "b773e20c62d1c398cddc3d23510bd4adf823325b",
+  "checks": {
+    "schema": true,
+    "annotation_arithmetic": true,
+    "ordered_disjoint_inputs": true,
+    "independent_exact_assignment_matches": true,
+    "independent_metrics_match": true,
+    "production_evaluator_json_equal": true,
+    "comparison_bytes_equal": true,
+    "event_export_exact": true,
+    "all_recorded_artifact_hashes_match": true,
+    "video_hash_matches": true,
+    "ground_truth_hash_matches": true,
+    "production_commit_fingerprints_match": true,
+    "baseline_unchanged": true
+  },
+  "schema": [
+    "Start_Frame",
+    "End_Frame",
+    "Start_Time_sec",
+    "End_Time_sec",
+    "Duration_sec",
+    "Start_Time",
+    "End_Time"
+  ],
+  "detection": {
+    "ground_truth_count": 36,
+    "predicted_count": 49,
+    "matched_count": 30,
+    "true_positives": 30,
+    "false_positives": 19,
+    "false_negatives": 6,
+    "precision": 0.6122448979591837,
+    "recall": 0.8333333333333334,
+    "f1": 0.7058823529411765
+  },
+  "independent_error_metrics": {
+    "start_frame": {
+      "mae": 49.43333333333333,
+      "median_absolute_error": 23.0,
+      "rmse": 75.25312839565764,
+      "max_absolute_error": 202,
+      "p90_absolute_error": 117.60000000000008,
+      "mean_signed_error": 48.03333333333333,
+      "median_signed_error": 23.0
+    },
+    "end_frame": {
+      "mae": 40.4,
+      "median_absolute_error": 7.0,
+      "rmse": 96.46311903174878,
+      "max_absolute_error": 442,
+      "p90_absolute_error": 103.80000000000001,
+      "mean_signed_error": -33.4,
+      "median_signed_error": -4.5
+    },
+    "start_time_sec": {
+      "mae": 1.6477777777777884,
+      "median_absolute_error": 0.7666666666666799,
+      "rmse": 2.508437613188595,
+      "max_absolute_error": 6.7333333333333485,
+      "p90_absolute_error": 3.9200000000000186,
+      "mean_signed_error": 1.6011111111111225,
+      "median_signed_error": 0.7666666666666799
+    },
+    "end_time_sec": {
+      "mae": 1.3466666666666713,
+      "median_absolute_error": 0.23333333333333428,
+      "rmse": 3.215437301058293,
+      "max_absolute_error": 14.733333333333348,
+      "p90_absolute_error": 3.4600000000000053,
+      "mean_signed_error": -1.1133333333333366,
+      "median_signed_error": -0.14999999999999147
+    },
+    "duration_sec": {
+      "mae": 2.845555555555561,
+      "median_absolute_error": 1.9333333333333371,
+      "rmse": 4.346377802262481,
+      "max_absolute_error": 15.800000000000011,
+      "p90_absolute_error": 6.783333333333374,
+      "mean_signed_error": -2.7144444444444593,
+      "median_signed_error": -1.9333333333333371
+    }
+  },
+  "evidence_hashes": {
+    "rally_comparison.csv": "1fb757a9aa6f0a0fc8777b4bd1e0b5ff3e71b8b30a9ccd603fdb95d432f20891",
+    "benchmark_metadata.json": "201a096128de6e9ab3bf986b77cf8321a2d512fcbfbe9331b571fc89c650d6a7",
+    "metrics.md": "d68e50b9e977313e2225c2bd84a89a0f7c4dadc62e5c88e929cbdd1af9dca847",
+    "predicted_rallies.csv": "0df3afe420eb1737a32df7d442f8203d8e13428745856e18b183e7197d7dd555",
+    "source_probe.json": "bf33bb0595d0823aa0a14f35eee8d9ae126556ea312987e6afb545631517375e",
+    "source_timeline_audit.json": "67c874d3cc32321fe631cfdce8d24dbfabafb322d2df54e4f8e7919ec959d0da",
+    "boundary_diagnostics.json": "077c92f6aa55cf6479ba11c6ab57db7eaab1371f0557619d9505ef05d28979e8",
+    "gpu_runtime.csv": "261cf10202885d47ef26e1dfd53bf4dfcf4e71819c34012220349efe286f0faf",
+    "annotation_audit.json": "33ba76ec30c066bad98ea3d112fd3fc203eb23bb692b213e25011b0c53ed6936",
+    "metrics.json": "d91f25414a41d4221b08d568910c665810d0d19129f39490e46fd289f039e2c9",
+    "runtime_dependencies.json": "2a3f77fd9f40691a5577252e843b82fa8fafd5f951f01dcc1743a2674c004bcb",
+    "raw_events.jsonl": "c26349e4043c71eeabeddd1a74d222c09ed79a62e3db658a077fe0e64c9396d7",
+    "model_registry_before.json": "9441cd8fcba046d44357639f642df5c44652eb8f3c6aa320d457e7801f6467bf",
+    "execution.log": "64888782858f890700e8f0b2010bed9a84fd9db4a86cee9c9302a7cffbf3f6ae",
+    "inference.json": "41cc64a31b77668e61636ecbdcafa6616e93a789d65a14e2f2cd32a2c443ca9e",
+    "source_provenance.json": "13f57acc4b3b37f1689b53543ba74c94cfb750047d0cf3a85d4d2957a6c47423",
+    "BENCHMARK_REPORT.md": "b7f77954c763d757472ceea0bc554327f8866dfbc7042149bd14427fb2360da3"
+  },
+  "ground_truth_sha256": "30651cf7238924d6a5072b1dd71d34ca5839cd5b842f696e745229033ae4f887",
+  "source_sha256": "877c6d39d34ccfb302865ed44f7e08949b0f72be2833f71777066f837e6b8bd6",
+  "per_rally": [
+    {
+      "gt_rally": 1,
+      "gt_start": 243,
+      "gt_end": 715,
+      "matched_pred_rally": 1,
+      "overlapping_prediction_ids": [
+        1
+      ],
+      "positive_overlap_segment_count": 1,
+      "best_single_prediction_iou": 0.7932489451476793,
+      "union_coverage_fraction": 0.7966101694915254,
+      "earliest_overlapping_start_error_frames": 96,
+      "latest_overlapping_end_error_frames": 2,
+      "start_error_frames": 96,
+      "end_error_frames": 2,
+      "duration_error_seconds": -3.1333333333333346
+    },
+    {
+      "gt_rally": 2,
+      "gt_start": 887,
+      "gt_end": 1262,
+      "matched_pred_rally": 3,
+      "overlapping_prediction_ids": [
+        2,
+        3
+      ],
+      "positive_overlap_segment_count": 2,
+      "best_single_prediction_iou": 0.504,
+      "union_coverage_fraction": 0.856,
+      "earliest_overlapping_start_error_frames": 4,
+      "latest_overlapping_end_error_frames": -7,
+      "start_error_frames": 179,
+      "end_error_frames": -7,
+      "duration_error_seconds": -6.199999999999999
+    },
+    {
+      "gt_rally": 3,
+      "gt_start": 1398,
+      "gt_end": 1664,
+      "matched_pred_rally": 4,
+      "overlapping_prediction_ids": [
+        4,
+        5
+      ],
+      "positive_overlap_segment_count": 2,
+      "best_single_prediction_iou": 0.5977443609022557,
+      "union_coverage_fraction": 0.8571428571428571,
+      "earliest_overlapping_start_error_frames": 4,
+      "latest_overlapping_end_error_frames": -10,
+      "start_error_frames": 4,
+      "end_error_frames": -103,
+      "duration_error_seconds": -3.56666666666667
+    },
+    {
+      "gt_rally": 4,
+      "gt_start": 1874,
+      "gt_end": 2161,
+      "matched_pred_rally": 6,
+      "overlapping_prediction_ids": [
+        6
+      ],
+      "positive_overlap_segment_count": 1,
+      "best_single_prediction_iou": 0.9283276450511946,
+      "union_coverage_fraction": 0.9477351916376306,
+      "earliest_overlapping_start_error_frames": 15,
+      "latest_overlapping_end_error_frames": 6,
+      "start_error_frames": 15,
+      "end_error_frames": 6,
+      "duration_error_seconds": -0.29999999999999716
+    },
+    {
+      "gt_rally": 5,
+      "gt_start": 2210,
+      "gt_end": 2500,
+      "matched_pred_rally": null,
+      "overlapping_prediction_ids": [
+        7
+      ],
+      "positive_overlap_segment_count": 1,
+      "best_single_prediction_iou": 0.3931034482758621,
+      "union_coverage_fraction": 0.3931034482758621,
+      "earliest_overlapping_start_error_frames": 99,
+      "latest_overlapping_end_error_frames": -77,
+      "start_error_frames": null,
+      "end_error_frames": null,
+      "duration_error_seconds": null
+    },
+    {
+      "gt_rally": 6,
+      "gt_start": 2558,
+      "gt_end": 2806,
+      "matched_pred_rally": 8,
+      "overlapping_prediction_ids": [
+        8
+      ],
+      "positive_overlap_segment_count": 1,
+      "best_single_prediction_iou": 0.5564516129032258,
+      "union_coverage_fraction": 0.5564516129032258,
+      "earliest_overlapping_start_error_frames": 103,
+      "latest_overlapping_end_error_frames": -7,
+      "start_error_frames": 103,
+      "end_error_frames": -7,
+      "duration_error_seconds": -3.6666666666666714
+    },
+    {
+      "gt_rally": 7,
+      "gt_start": 2976,
+      "gt_end": 3377,
+      "matched_pred_rally": 9,
+      "overlapping_prediction_ids": [
+        9
+      ],
+      "positive_overlap_segment_count": 1,
+      "best_single_prediction_iou": 0.9825436408977556,
+      "union_coverage_fraction": 0.9825436408977556,
+      "earliest_overlapping_start_error_frames": 7,
+      "latest_overlapping_end_error_frames": 0,
+      "start_error_frames": 7,
+      "end_error_frames": 0,
+      "duration_error_seconds": -0.23333333333333428
+    },
+    {
+      "gt_rally": 8,
+      "gt_start": 3451,
+      "gt_end": 3695,
+      "matched_pred_rally": 10,
+      "overlapping_prediction_ids": [
+        10
+      ],
+      "positive_overlap_segment_count": 1,
+      "best_single_prediction_iou": 0.6963562753036437,
+      "union_coverage_fraction": 0.7049180327868853,
+      "earliest_overlapping_start_error_frames": 72,
+      "latest_overlapping_end_error_frames": 3,
+      "start_error_frames": 72,
+      "end_error_frames": 3,
+      "duration_error_seconds": -2.3000000000000114
+    },
+    {
+      "gt_rally": 9,
+      "gt_start": 3751,
+      "gt_end": 4073,
+      "matched_pred_rally": 11,
+      "overlapping_prediction_ids": [
+        11
+      ],
+      "positive_overlap_segment_count": 1,
+      "best_single_prediction_iou": 0.6086956521739131,
+      "union_coverage_fraction": 0.6086956521739131,
+      "earliest_overlapping_start_error_frames": 112,
+      "latest_overlapping_end_error_frames": -14,
+      "start_error_frames": 112,
+      "end_error_frames": -14,
+      "duration_error_seconds": -4.200000000000017
+    },
+    {
+      "gt_rally": 10,
+      "gt_start": 4247,
+      "gt_end": 4839,
+      "matched_pred_rally": 12,
+      "overlapping_prediction_ids": [
+        12
+      ],
+      "positive_overlap_segment_count": 1,
+      "best_single_prediction_iou": 0.6486486486486487,
+      "union_coverage_fraction": 0.6486486486486487,
+      "earliest_overlapping_start_error_frames": 97,
+      "latest_overlapping_end_error_frames": -111,
+      "start_error_frames": 97,
+      "end_error_frames": -111,
+      "duration_error_seconds": -6.9333333333333655
+    },
+    {
+      "gt_rally": 11,
+      "gt_start": 4872,
+      "gt_end": 5045,
+      "matched_pred_rally": 13,
+      "overlapping_prediction_ids": [
+        13
+      ],
+      "positive_overlap_segment_count": 1,
+      "best_single_prediction_iou": 0.7283236994219653,
+      "union_coverage_fraction": 0.7283236994219653,
+      "earliest_overlapping_start_error_frames": 29,
+      "latest_overlapping_end_error_frames": -18,
+      "start_error_frames": 29,
+      "end_error_frames": -18,
+      "duration_error_seconds": -1.5666666666666629
+    },
+    {
+      "gt_rally": 12,
+      "gt_start": 5430,
+      "gt_end": 5871,
+      "matched_pred_rally": 14,
+      "overlapping_prediction_ids": [
+        14
+      ],
+      "positive_overlap_segment_count": 1,
+      "best_single_prediction_iou": 0.9102844638949672,
+      "union_coverage_fraction": 0.9433106575963719,
+      "earliest_overlapping_start_error_frames": 25,
+      "latest_overlapping_end_error_frames": 16,
+      "start_error_frames": 25,
+      "end_error_frames": 16,
+      "duration_error_seconds": -0.30000000000001137
+    },
+    {
+      "gt_rally": 13,
+      "gt_start": 5958,
+      "gt_end": 6312,
+      "matched_pred_rally": 15,
+      "overlapping_prediction_ids": [
+        15
+      ],
+      "positive_overlap_segment_count": 1,
+      "best_single_prediction_iou": 0.9350282485875706,
+      "union_coverage_fraction": 0.9350282485875706,
+      "earliest_overlapping_start_error_frames": 21,
+      "latest_overlapping_end_error_frames": -2,
+      "start_error_frames": 21,
+      "end_error_frames": -2,
+      "duration_error_seconds": -0.7666666666666799
+    },
+    {
+      "gt_rally": 14,
+      "gt_start": 6382,
+      "gt_end": 6656,
+      "matched_pred_rally": 16,
+      "overlapping_prediction_ids": [
+        16
+      ],
+      "positive_overlap_segment_count": 1,
+      "best_single_prediction_iou": 0.6861313868613139,
+      "union_coverage_fraction": 0.6861313868613139,
+      "earliest_overlapping_start_error_frames": 69,
+      "latest_overlapping_end_error_frames": -17,
+      "start_error_frames": 69,
+      "end_error_frames": -17,
+      "duration_error_seconds": -2.8666666666666742
+    },
+    {
+      "gt_rally": 15,
+      "gt_start": 6716,
+      "gt_end": 6913,
+      "matched_pred_rally": 17,
+      "overlapping_prediction_ids": [
+        17
+      ],
+      "positive_overlap_segment_count": 1,
+      "best_single_prediction_iou": 0.5329949238578681,
+      "union_coverage_fraction": 0.5329949238578681,
+      "earliest_overlapping_start_error_frames": 87,
+      "latest_overlapping_end_error_frames": -5,
+      "start_error_frames": 87,
+      "end_error_frames": -5,
+      "duration_error_seconds": -3.066666666666663
+    },
+    {
+      "gt_rally": 16,
+      "gt_start": 6976,
+      "gt_end": 7458,
+      "matched_pred_rally": 18,
+      "overlapping_prediction_ids": [
+        18
+      ],
+      "positive_overlap_segment_count": 1,
+      "best_single_prediction_iou": 0.8675623800383877,
+      "union_coverage_fraction": 0.9377593360995851,
+      "earliest_overlapping_start_error_frames": 30,
+      "latest_overlapping_end_error_frames": 39,
+      "start_error_frames": 30,
+      "end_error_frames": 39,
+      "duration_error_seconds": 0.30000000000001137
+    },
+    {
+      "gt_rally": 17,
+      "gt_start": 7532,
+      "gt_end": 7741,
+      "matched_pred_rally": 19,
+      "overlapping_prediction_ids": [
+        19
+      ],
+      "positive_overlap_segment_count": 1,
+      "best_single_prediction_iou": 0.937799043062201,
+      "union_coverage_fraction": 0.937799043062201,
+      "earliest_overlapping_start_error_frames": 3,
+      "latest_overlapping_end_error_frames": -10,
+      "start_error_frames": 3,
+      "end_error_frames": -10,
+      "duration_error_seconds": -0.43333333333336554
+    },
+    {
+      "gt_rally": 18,
+      "gt_start": 7947,
+      "gt_end": 8053,
+      "matched_pred_rally": 20,
+      "overlapping_prediction_ids": [
+        20
+      ],
+      "positive_overlap_segment_count": 1,
+      "best_single_prediction_iou": 0.9339622641509434,
+      "union_coverage_fraction": 0.9339622641509434,
+      "earliest_overlapping_start_error_frames": 6,
+      "latest_overlapping_end_error_frames": -1,
+      "start_error_frames": 6,
+      "end_error_frames": -1,
+      "duration_error_seconds": -0.23333333333340533
+    },
+    {
+      "gt_rally": 19,
+      "gt_start": 8106,
+      "gt_end": 8628,
+      "matched_pred_rally": 22,
+      "overlapping_prediction_ids": [
+        21,
+        22
+      ],
+      "positive_overlap_segment_count": 2,
+      "best_single_prediction_iou": 0.6111111111111112,
+      "union_coverage_fraction": 0.9099616858237548,
+      "earliest_overlapping_start_error_frames": 4,
+      "latest_overlapping_end_error_frames": -1,
+      "start_error_frames": 202,
+      "end_error_frames": -1,
+      "duration_error_seconds": -6.766666666666708
+    },
+    {
+      "gt_rally": 20,
+      "gt_start": 8683,
+      "gt_end": 9967,
+      "matched_pred_rally": 23,
+      "overlapping_prediction_ids": [
+        23,
+        24,
+        25
+      ],
+      "positive_overlap_segment_count": 3,
+      "best_single_prediction_iou": 0.6308411214953271,
+      "union_coverage_fraction": 0.9112149532710281,
+      "earliest_overlapping_start_error_frames": 32,
+      "latest_overlapping_end_error_frames": -20,
+      "start_error_frames": 32,
+      "end_error_frames": -442,
+      "duration_error_seconds": -15.800000000000011
+    },
+    {
+      "gt_rally": 21,
+      "gt_start": 10245,
+      "gt_end": 10563,
+      "matched_pred_rally": 26,
+      "overlapping_prediction_ids": [
+        26
+      ],
+      "positive_overlap_segment_count": 1,
+      "best_single_prediction_iou": 0.9088050314465409,
+      "union_coverage_fraction": 0.9088050314465409,
+      "earliest_overlapping_start_error_frames": 5,
+      "latest_overlapping_end_error_frames": -24,
+      "start_error_frames": 5,
+      "end_error_frames": -24,
+      "duration_error_seconds": -0.966666666666697
+    },
+    {
+      "gt_rally": 22,
+      "gt_start": 10607,
+      "gt_end": 10708,
+      "matched_pred_rally": 27,
+      "overlapping_prediction_ids": [
+        27
+      ],
+      "positive_overlap_segment_count": 1,
+      "best_single_prediction_iou": 0.7426470588235294,
+      "union_coverage_fraction": 1.0,
+      "earliest_overlapping_start_error_frames": -6,
+      "latest_overlapping_end_error_frames": 29,
+      "start_error_frames": -6,
+      "end_error_frames": 29,
+      "duration_error_seconds": 1.1666666666666288
+    },
+    {
+      "gt_rally": 23,
+      "gt_start": 10733,
+      "gt_end": 11078,
+      "matched_pred_rally": null,
+      "overlapping_prediction_ids": [
+        27,
+        28,
+        29
+      ],
+      "positive_overlap_segment_count": 3,
+      "best_single_prediction_iou": 0.4028985507246377,
+      "union_coverage_fraction": 0.7884057971014493,
+      "earliest_overlapping_start_error_frames": -132,
+      "latest_overlapping_end_error_frames": 7,
+      "start_error_frames": null,
+      "end_error_frames": null,
+      "duration_error_seconds": null
+    },
+    {
+      "gt_rally": 24,
+      "gt_start": 11271,
+      "gt_end": 11392,
+      "matched_pred_rally": 30,
+      "overlapping_prediction_ids": [
+        30
+      ],
+      "positive_overlap_segment_count": 1,
+      "best_single_prediction_iou": 0.9365079365079365,
+      "union_coverage_fraction": 0.9752066115702479,
+      "earliest_overlapping_start_error_frames": 3,
+      "latest_overlapping_end_error_frames": 5,
+      "start_error_frames": 3,
+      "end_error_frames": 5,
+      "duration_error_seconds": 0.06666666666660603
+    },
+    {
+      "gt_rally": 25,
+      "gt_start": 11568,
+      "gt_end": 11865,
+      "matched_pred_rally": null,
+      "overlapping_prediction_ids": [
+        31,
+        32
+      ],
+      "positive_overlap_segment_count": 2,
+      "best_single_prediction_iou": 0.37373737373737376,
+      "union_coverage_fraction": 0.5892255892255892,
+      "earliest_overlapping_start_error_frames": 66,
+      "latest_overlapping_end_error_frames": 2,
+      "start_error_frames": null,
+      "end_error_frames": null,
+      "duration_error_seconds": null
+    },
+    {
+      "gt_rally": 26,
+      "gt_start": 11976,
+      "gt_end": 12197,
+      "matched_pred_rally": 33,
+      "overlapping_prediction_ids": [
+        33
+      ],
+      "positive_overlap_segment_count": 1,
+      "best_single_prediction_iou": 0.6787330316742082,
+      "union_coverage_fraction": 0.6787330316742082,
+      "earliest_overlapping_start_error_frames": 70,
+      "latest_overlapping_end_error_frames": -1,
+      "start_error_frames": 70,
+      "end_error_frames": -1,
+      "duration_error_seconds": -2.3666666666666742
+    },
+    {
+      "gt_rally": 27,
+      "gt_start": 12451,
+      "gt_end": 12966,
+      "matched_pred_rally": 34,
+      "overlapping_prediction_ids": [
+        34,
+        35
+      ],
+      "positive_overlap_segment_count": 2,
+      "best_single_prediction_iou": 0.5689320388349515,
+      "union_coverage_fraction": 0.9242718446601942,
+      "earliest_overlapping_start_error_frames": 4,
+      "latest_overlapping_end_error_frames": -12,
+      "start_error_frames": 4,
+      "end_error_frames": -218,
+      "duration_error_seconds": -7.399999999999977
+    },
+    {
+      "gt_rally": 28,
+      "gt_start": 13054,
+      "gt_end": 13442,
+      "matched_pred_rally": null,
+      "overlapping_prediction_ids": [
+        36,
+        37
+      ],
+      "positive_overlap_segment_count": 2,
+      "best_single_prediction_iou": 0.42783505154639173,
+      "union_coverage_fraction": 0.6237113402061856,
+      "earliest_overlapping_start_error_frames": 122,
+      "latest_overlapping_end_error_frames": -3,
+      "start_error_frames": null,
+      "end_error_frames": null,
+      "duration_error_seconds": null
+    },
+    {
+      "gt_rally": 29,
+      "gt_start": 13679,
+      "gt_end": 13994,
+      "matched_pred_rally": null,
+      "overlapping_prediction_ids": [
+        38,
+        39
+      ],
+      "positive_overlap_segment_count": 2,
+      "best_single_prediction_iou": 0.4984126984126984,
+      "union_coverage_fraction": 0.8126984126984127,
+      "earliest_overlapping_start_error_frames": 7,
+      "latest_overlapping_end_error_frames": -12,
+      "start_error_frames": null,
+      "end_error_frames": null,
+      "duration_error_seconds": null
+    },
+    {
+      "gt_rally": 30,
+      "gt_start": 14219,
+      "gt_end": 14335,
+      "matched_pred_rally": 40,
+      "overlapping_prediction_ids": [
+        40
+      ],
+      "positive_overlap_segment_count": 1,
+      "best_single_prediction_iou": 0.9396551724137931,
+      "union_coverage_fraction": 0.9396551724137931,
+      "earliest_overlapping_start_error_frames": 3,
+      "latest_overlapping_end_error_frames": -4,
+      "start_error_frames": 3,
+      "end_error_frames": -4,
+      "duration_error_seconds": -0.2333333333333485
+    },
+    {
+      "gt_rally": 31,
+      "gt_start": 14404,
+      "gt_end": 15151,
+      "matched_pred_rally": null,
+      "overlapping_prediction_ids": [
+        41,
+        42,
+        43
+      ],
+      "positive_overlap_segment_count": 3,
+      "best_single_prediction_iou": 0.35876840696117807,
+      "union_coverage_fraction": 0.7764390896921017,
+      "earliest_overlapping_start_error_frames": 87,
+      "latest_overlapping_end_error_frames": 20,
+      "start_error_frames": null,
+      "end_error_frames": null,
+      "duration_error_seconds": null
+    },
+    {
+      "gt_rally": 32,
+      "gt_start": 15350,
+      "gt_end": 15535,
+      "matched_pred_rally": 44,
+      "overlapping_prediction_ids": [
+        44
+      ],
+      "positive_overlap_segment_count": 1,
+      "best_single_prediction_iou": 0.9459459459459459,
+      "union_coverage_fraction": 0.9459459459459459,
+      "earliest_overlapping_start_error_frames": 4,
+      "latest_overlapping_end_error_frames": -6,
+      "start_error_frames": 4,
+      "end_error_frames": -6,
+      "duration_error_seconds": -0.33333333333337123
+    },
+    {
+      "gt_rally": 33,
+      "gt_start": 15596,
+      "gt_end": 15946,
+      "matched_pred_rally": 46,
+      "overlapping_prediction_ids": [
+        45,
+        46
+      ],
+      "positive_overlap_segment_count": 2,
+      "best_single_prediction_iou": 0.5126760563380282,
+      "union_coverage_fraction": 0.7114285714285714,
+      "earliest_overlapping_start_error_frames": 72,
+      "latest_overlapping_end_error_frames": 5,
+      "start_error_frames": 168,
+      "end_error_frames": 5,
+      "duration_error_seconds": -5.43333333333328
+    },
+    {
+      "gt_rally": 34,
+      "gt_start": 15998,
+      "gt_end": 16387,
+      "matched_pred_rally": 47,
+      "overlapping_prediction_ids": [
+        47
+      ],
+      "positive_overlap_segment_count": 1,
+      "best_single_prediction_iou": 0.9579207920792079,
+      "union_coverage_fraction": 0.9948586118251928,
+      "earliest_overlapping_start_error_frames": -15,
+      "latest_overlapping_end_error_frames": -2,
+      "start_error_frames": -15,
+      "end_error_frames": -2,
+      "duration_error_seconds": 0.4333333333332803
+    },
+    {
+      "gt_rally": 35,
+      "gt_start": 16513,
+      "gt_end": 17026,
+      "matched_pred_rally": 48,
+      "overlapping_prediction_ids": [
+        48
+      ],
+      "positive_overlap_segment_count": 1,
+      "best_single_prediction_iou": 0.8050682261208577,
+      "union_coverage_fraction": 0.8050682261208577,
+      "earliest_overlapping_start_error_frames": 8,
+      "latest_overlapping_end_error_frames": -92,
+      "start_error_frames": 8,
+      "end_error_frames": -92,
+      "duration_error_seconds": -3.3333333333333712
+    },
+    {
+      "gt_rally": 36,
+      "gt_start": 17066,
+      "gt_end": 17226,
+      "matched_pred_rally": 49,
+      "overlapping_prediction_ids": [
+        49
+      ],
+      "positive_overlap_segment_count": 1,
+      "best_single_prediction_iou": 0.8125,
+      "union_coverage_fraction": 0.8125,
+      "earliest_overlapping_start_error_frames": 8,
+      "latest_overlapping_end_error_frames": -22,
+      "start_error_frames": 8,
+      "end_error_frames": -22,
+      "duration_error_seconds": -1.0
+    }
+  ],
+  "unmatched_predictions": [
+    {
+      "pred_rally": 2,
+      "start_frame": 891,
+      "end_frame": 1023,
+      "overlapping_gt": [
+        [
+          2,
+          0.352,
+          132
+        ]
+      ],
+      "overlaps_no_gt": false
+    },
+    {
+      "pred_rally": 5,
+      "start_frame": 1585,
+      "end_frame": 1654,
+      "overlapping_gt": [
+        [
+          3,
+          0.2593984962406015,
+          69
+        ]
+      ],
+      "overlaps_no_gt": false
+    },
+    {
+      "pred_rally": 7,
+      "start_frame": 2309,
+      "end_frame": 2423,
+      "overlapping_gt": [
+        [
+          5,
+          0.3931034482758621,
+          114
+        ]
+      ],
+      "overlaps_no_gt": false
+    },
+    {
+      "pred_rally": 21,
+      "start_frame": 8110,
+      "end_frame": 8266,
+      "overlapping_gt": [
+        [
+          19,
+          0.2988505747126437,
+          156
+        ]
+      ],
+      "overlaps_no_gt": false
+    },
+    {
+      "pred_rally": 24,
+      "start_frame": 9548,
+      "end_frame": 9646,
+      "overlapping_gt": [
+        [
+          20,
+          0.0763239875389408,
+          98
+        ]
+      ],
+      "overlaps_no_gt": false
+    },
+    {
+      "pred_rally": 25,
+      "start_frame": 9685,
+      "end_frame": 9947,
+      "overlapping_gt": [
+        [
+          20,
+          0.20404984423676012,
+          262
+        ]
+      ],
+      "overlaps_no_gt": false
+    },
+    {
+      "pred_rally": 28,
+      "start_frame": 10769,
+      "end_frame": 10908,
+      "overlapping_gt": [
+        [
+          23,
+          0.4028985507246377,
+          139
+        ]
+      ],
+      "overlaps_no_gt": false
+    },
+    {
+      "pred_rally": 29,
+      "start_frame": 10949,
+      "end_frame": 11085,
+      "overlapping_gt": [
+        [
+          23,
+          0.3664772727272727,
+          129
+        ]
+      ],
+      "overlaps_no_gt": false
+    },
+    {
+      "pred_rally": 31,
+      "start_frame": 11634,
+      "end_frame": 11745,
+      "overlapping_gt": [
+        [
+          25,
+          0.37373737373737376,
+          111
+        ]
+      ],
+      "overlaps_no_gt": false
+    },
+    {
+      "pred_rally": 32,
+      "start_frame": 11801,
+      "end_frame": 11867,
+      "overlapping_gt": [
+        [
+          25,
+          0.2140468227424749,
+          64
+        ]
+      ],
+      "overlaps_no_gt": false
+    },
+    {
+      "pred_rally": 35,
+      "start_frame": 12771,
+      "end_frame": 12954,
+      "overlapping_gt": [
+        [
+          27,
+          0.3553398058252427,
+          183
+        ]
+      ],
+      "overlaps_no_gt": false
+    },
+    {
+      "pred_rally": 36,
+      "start_frame": 13176,
+      "end_frame": 13252,
+      "overlapping_gt": [
+        [
+          28,
+          0.1958762886597938,
+          76
+        ]
+      ],
+      "overlaps_no_gt": false
+    },
+    {
+      "pred_rally": 37,
+      "start_frame": 13273,
+      "end_frame": 13439,
+      "overlapping_gt": [
+        [
+          28,
+          0.42783505154639173,
+          166
+        ]
+      ],
+      "overlaps_no_gt": false
+    },
+    {
+      "pred_rally": 38,
+      "start_frame": 13686,
+      "end_frame": 13843,
+      "overlapping_gt": [
+        [
+          29,
+          0.4984126984126984,
+          157
+        ]
+      ],
+      "overlaps_no_gt": false
+    },
+    {
+      "pred_rally": 39,
+      "start_frame": 13883,
+      "end_frame": 13982,
+      "overlapping_gt": [
+        [
+          29,
+          0.3142857142857143,
+          99
+        ]
+      ],
+      "overlaps_no_gt": false
+    },
+    {
+      "pred_rally": 41,
+      "start_frame": 14491,
+      "end_frame": 14646,
+      "overlapping_gt": [
+        [
+          31,
+          0.2074966532797858,
+          155
+        ]
+      ],
+      "overlaps_no_gt": false
+    },
+    {
+      "pred_rally": 42,
+      "start_frame": 14701,
+      "end_frame": 14969,
+      "overlapping_gt": [
+        [
+          31,
+          0.35876840696117807,
+          268
+        ]
+      ],
+      "overlaps_no_gt": false
+    },
+    {
+      "pred_rally": 43,
+      "start_frame": 14994,
+      "end_frame": 15171,
+      "overlapping_gt": [
+        [
+          31,
+          0.2046936114732725,
+          157
+        ]
+      ],
+      "overlaps_no_gt": false
+    },
+    {
+      "pred_rally": 45,
+      "start_frame": 15668,
+      "end_frame": 15735,
+      "overlapping_gt": [
+        [
+          33,
+          0.19142857142857142,
+          67
+        ]
+      ],
+      "overlaps_no_gt": false
+    }
+  ],
+  "fragmentation": {
+    "gt_overlapping_multiple_predictions": [
+      2,
+      3,
+      19,
+      20,
+      23,
+      25,
+      27,
+      28,
+      29,
+      31,
+      33
+    ],
+    "unmatched_gt_with_partial_coverage": [
+      5,
+      23,
+      25,
+      28,
+      29,
+      31
+    ],
+    "predictions_with_no_positive_gt_overlap": []
+  },
+  "limitations": [
+    "No annotation tool/reviewer provenance; numerical alignment cannot prove human frame labels.",
+    "Baseline conditional boundary metrics select one eligible fragment, not earliest/latest evidence.",
+    "Ordered independent DP is valid for this disjoint input and is not a general replacement matcher.",
+    "No threshold, matching policy, prediction, ground truth or baseline artifact was changed."
+  ],
+  "findings": [
+    {
+      "id": "A01",
+      "classification": "verified calculation correctness",
+      "confidence": "high",
+      "observed_symptom": "Poor baseline scores might be caused by evaluator arithmetic or matching defects.",
+      "supporting_evidence": "Exact-rational ordered dynamic programming returns the same 30 pairs; independent arithmetic matches every recorded boundary/duration statistic and tolerance; fresh production evaluator JSON and comparison bytes match frozen artifacts.",
+      "source_functions": [
+        "scripts/benchmarking/evaluate_rallies.py:54 read_csv",
+        "scripts/benchmarking/evaluate_rallies.py:98 interval_iou",
+        "scripts/benchmarking/evaluate_rallies.py:103 match_rallies",
+        "scripts/benchmarking/evaluate_rallies.py:123 error_stats",
+        "scripts/benchmarking/evaluate_rallies.py:149 evaluate"
+      ],
+      "hypothesized_cause": "No arithmetic, assignment, sign or frame-unit defect explains this baseline.",
+      "alternative_explanations": [
+        "Annotation ambiguity or physical observation failures can exist despite correct arithmetic."
+      ],
+      "causal_experiment": "Replay exactly frozen predictions through the unchanged evaluator and independently recompute pairs and errors; completed successfully.",
+      "proposed_action": "Freeze the existing matching protocol; use supplementary diagnostics rather than changing scores.",
+      "expected_metric_effect": "None from evaluator repairs: no baseline score defect was found.",
+      "regression_risk": "Changing matching, endpoints or tolerance denominators would break baseline comparability."
+    },
+    {
+      "id": "A02",
+      "classification": "proven diagnostic interpretation issue",
+      "confidence": "high",
+      "observed_symptom": "GT2/19 matched starts are +179/+202 frames late; GT20/27 matched ends are -442/-218 frames early.",
+      "supporting_evidence": "GT2/19 first fragments start only +4 frames late. GT20/27 later fragments reach -20/-12 frames before the labeled end. The selected eligible interval excludes those other fragments.",
+      "source_functions": [
+        "scripts/benchmarking/evaluate_rallies.py:103 match_rallies",
+        "scripts/benchmarking/evaluate_rallies.py:156 per-GT comparison loop",
+        "outputs/benchmarking/test1/predicted_rallies.csv",
+        "outputs/benchmarking/test1/rally_comparison.csv"
+      ],
+      "hypothesized_cause": "One-to-one assignment correctly measures whole-interval agreement, while fragmentation makes selected-fragment errors look like first-onset/final-offset detector errors.",
+      "alternative_explanations": [
+        "Other single-fragment rallies have real multi-second onset delay; fragmentation does not explain all start errors.",
+        "Ground-truth endpoint conventions remain physically unverified."
+      ],
+      "causal_experiment": "Compare selected-match errors with earliest/latest positive-overlap boundaries without changing primary predictions; completed as supplementary diagnostics. Replay exact FSM decisions to establish why each split occurred.",
+      "proposed_action": "Prioritize continuity mechanisms for GT2/19/20/27; diagnose standalone onset delays separately.",
+      "expected_metric_effect": "Recovering a continuous supported interval can improve FP/FN, selected-boundary errors, duration and IoU together; numeric gain requires inference/replay evidence.",
+      "regression_risk": "Naively unioning all GT-overlapping predictions leaks labels and can join distinct rallies."
+    },
+    {
+      "id": "A03",
+      "classification": "proven error taxonomy",
+      "confidence": "high",
+      "observed_symptom": "Nineteen false-positive intervals may be mistaken for movement/noise between rallies.",
+      "supporting_evidence": "All 19 unmatched predictions have positive temporal overlap with at least one GT interval; zero predicted intervals have no GT overlap. All six unmatched labels have partial predicted coverage.",
+      "source_functions": [
+        "scripts/benchmarking/evaluate_rallies.py:208 TP/FP/FN counts",
+        "outputs/benchmarking/test1/predicted_rallies.csv",
+        "research/audit_a_benchmark.py:intersection"
+      ],
+      "hypothesized_cause": "Policy false positives are predominantly unmatched fragments/truncated intervals here; there is no evidence that suppressing inter-rally movement is the principal remedy.",
+      "alternative_explanations": [
+        "A false interval may overlap genuine play yet have wrong boundaries; positive overlap does not establish semantic correctness."
+      ],
+      "causal_experiment": "Trace gap/stationary closures and continuation evidence at fragment pairs; compare controlled recovery against closely spaced separate-rally controls.",
+      "proposed_action": "Retain FP=19 under the frozen protocol; add the no-overlap FP count and per-GT segment/coverage diagnostics.",
+      "expected_metric_effect": "Taxonomy improves causal targeting; it does not reduce the official FP count.",
+      "regression_risk": "Dropping unmatched fragments without restoring intervals can hide failures and worsen recall."
+    },
+    {
+      "id": "A04",
+      "classification": "proven near-threshold sensitivity",
+      "confidence": "high",
+      "observed_symptom": "GT29 is unmatched despite an almost half-length prediction.",
+      "supporting_evidence": "Best fragment is frames13686..13843 within GT13679..13994: exact boundary-span IoU157/315=0.4984126984, correctly below0.5. Adding one frame to both spans gives158/316=0.5 and would change the result.",
+      "source_functions": [
+        "scripts/benchmarking/evaluate_rallies.py:98 interval_iou",
+        "scripts/benchmarking/evaluate_rallies.py:115 eligibility",
+        "Part2/dataset/Test1_Full/Test1_Full_rally.csv:30"
+      ],
+      "hypothesized_cause": "Real fragment truncation lies immediately below the fixed eligibility threshold, not floating-point misclassification.",
+      "alternative_explanations": [
+        "A physically justified annotation correction could alter this case, but independent review is unavailable and no correction is authorized as benchmark tuning."
+      ],
+      "causal_experiment": "Exact-fraction threshold comparison completed. Inspect shuttle/segmentation evidence around13843..13883 to explain the split, not tune IoU eligibility.",
+      "proposed_action": "Preserve GT and [start,end) timestamp spans; report exact best-fragment IoU for unmatched labels.",
+      "expected_metric_effect": "No score change without a real predictive boundary improvement.",
+      "regression_risk": "An inclusive-end convention switch manufactures a TP and violates baseline semantics."
+    },
+    {
+      "id": "A05",
+      "classification": "proven cross-rally overlap caveat",
+      "confidence": "high",
+      "observed_symptom": "An earliest-overlapping-start diagnostic can suggest an unrealistically early start for GT23.",
+      "supporting_evidence": "Prediction27 spans10601..10737 and matches GT22; it overlaps only4 frames at the start of GT23(10733..11078). Thus GT23's earliest-overlapping start is-132 frames, not evidence that this rally began at10601.",
+      "source_functions": [
+        "research/audit_a_benchmark.py:per_rally overlap diagnostics",
+        "outputs/benchmarking/test1/predicted_rallies.csv",
+        "outputs/benchmarking/test1/rally_comparison.csv"
+      ],
+      "hypothesized_cause": "Any-positive-overlap fragmentation counts include minor cross-boundary spillovers.",
+      "alternative_explanations": [
+        "A true merged interval could cross rallies, but this overlap alone cannot establish one."
+      ],
+      "causal_experiment": "Review original frames and temporal evidence at10708..10769; separately tag minimal spillovers and substantive fragments in supplementary diagnostics.",
+      "proposed_action": "Use positive-overlap counts as diagnostics, never as an automatic GT-conditioned merging/backdating algorithm.",
+      "expected_metric_effect": "Prevents misleading causal conclusions; no change to primary metrics.",
+      "regression_risk": "Naive overlap-based reconstruction can merge distinct legitimate rallies."
+    },
+    {
+      "id": "A06",
+      "classification": "verified export and provenance with explicit limits",
+      "confidence": "high for arithmetic/export; unresolved for human frame semantics",
+      "observed_symptom": "Index/FPS/serialization or inclusive production duration payload might explain errors.",
+      "supporting_evidence": "Both seven-column CSVs validate; every GT timestamp equals frame/30 and duration=end-start. All49 current rally_end events from independently folded raw log match prediction frames exactly. All recorded artifact/source hashes and86 production source fingerprints match. Existing source/proxy audits report17268 CFR frames at30FPS.",
+      "source_functions": [
+        "scripts/benchmarking/production_inference.py:77 event selection",
+        "scripts/benchmarking/production_inference.py:115 export",
+        "scripts/benchmarking/evaluate_rallies.py:85 write_predictions",
+        "legacy/pipeline/analysis/detect_rallies.py:140 format_time",
+        "legacy/pipeline/analysis/detect_rallies.py:598 CSV export"
+      ],
+      "hypothesized_cause": "No serialized offset, duration-rounding or dropped-row defect explains baseline boundary errors.",
+      "alternative_explanations": [
+        "Numerical consistency does not prove the unavailable manual tool's physical frame numbering or label rationale.",
+        "Content/frame correspondence needs the independent video audit, not metadata alone."
+      ],
+      "causal_experiment": "Independent raw-event fold, hash/source verification and evaluator reproduction completed; physical boundary/frame review remains the temporal auditor's task.",
+      "proposed_action": "Preserve exact CSV bytes and annotations. Keep explicit frame conventions and separate observation-end index from interval-span duration.",
+      "expected_metric_effect": "No systematic offset correction is justified by this audit.",
+      "regression_risk": "Blind one-frame or FPS corrections can alter near-threshold matches and hide perception defects."
+    },
+    {
+      "id": "A07",
+      "classification": "verified general edge-case hardening opportunity, not baseline cause",
+      "confidence": "high",
+      "observed_symptom": "An empty GT input produces an empty comparison file with no CSV header.",
+      "supporting_evidence": "save_evaluation opens rally_comparison.csv, but writer/header creation is inside if rows. read_csv also rejects one-frame/zero-span intervals by design; no such interval exists here.",
+      "source_functions": [
+        "scripts/benchmarking/evaluate_rallies.py:265 save_evaluation"
+      ],
+      "hypothesized_cause": "Comparison schema is inferred from the first row rather than defined independently.",
+      "alternative_explanations": [
+        "A no-GT benchmark may intentionally be unsupported, but that constraint is not enforced."
+      ],
+      "causal_experiment": "Call save_evaluation in a temporary directory with empty GT and prediction inputs, then assert a header; not needed to explain the36-label baseline.",
+      "proposed_action": "Optional future evaluator hardening: fixed comparison schema/header for empty inputs, without changing matching.",
+      "expected_metric_effect": "None on Test1; improves artifact robustness only.",
+      "regression_risk": "Low if limited to empty export behavior; do not bundle with matching-policy changes."
+    }
+  ]
+}
