@@ -70,7 +70,7 @@ export function CourtMinimap({ session }: { session: Session }) {
           }
           g.globalAlpha = 1;
         }
-        const now = tracks.player(pid, frame, 6)?.court;
+        const now = tracks.player(pid, frame)?.court;
         if (now) {
           const [x, y] = view.map(now[0], now[1]);
           g.fillStyle = "#0c2620";
@@ -82,6 +82,16 @@ export function CourtMinimap({ session }: { session: Session }) {
           g.arc(x, y, 6, 0, Math.PI * 2);
           g.fill();
         }
+      }
+      for (const player of tracks.playersAt(frame)) {
+        if (player.playerId || !player.court) continue;
+        const [x, y] = view.map(...player.court);
+        g.fillStyle = "#e8c46b";
+        g.beginPath();
+        g.arc(x, y, 5, 0, Math.PI * 2);
+        g.fill();
+        g.font = "10px system-ui";
+        g.fillText(`T${player.track}`, x + 7, y + 3);
       }
     });
   }, [width, tracks, events, fps]);
@@ -105,6 +115,7 @@ export function CourtMinimap({ session }: { session: Session }) {
         aria-label="Top-down court with player positions and the shots of the current rally"
       />
       {!calibrated && <p className="text-xs text-line-3">Positions appear once the court is calibrated.</p>}
+      <p className="text-xs text-line-3">Gold markers are temporary tracks with unassigned identity.</p>
     </div>
   );
 }

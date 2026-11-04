@@ -14,12 +14,15 @@ export function ScoreBug({ session }: { session: Session }) {
   const events = useSession((s) => s.events);
   const eventsVersion = useSession((s) => s.eventsVersion);
   const status = useSession((s) => s.session?.status);
+  const frontier = useSession((s) => s.session?.frontier_frame ?? 0);
+  const withinAnalysis = status !== "analysing" || frame <= frontier;
   // biome-ignore lint/correctness/useExhaustiveDependencies: eventsVersion signals mutation of the log
-  const { state, known, evidence } = useMemo(() => stateAt(events, frame), [events, eventsVersion, frame]);
+  const { state, known: hasState, evidence } = useMemo(() => stateAt(events, frame), [events, eventsVersion, frame]);
+  const known = hasState && withinAnalysis;
   // biome-ignore lint/correctness/useExhaustiveDependencies: eventsVersion signals mutation of the log
   const broadcasts = useMemo(() => events.ofType("broadcast_score"), [events, eventsVersion]);
 
-  const observed = events.latestBefore("broadcast_score", frame);
+  const observed = withinAnalysis ? events.latestBefore("broadcast_score", frame) : undefined;
   const rows = observed?.payload.rows;
   // An accepted backend point advances the score even when OCR has not read
   // the changed board yet. Compare video frames, not packet arrival order.
@@ -34,7 +37,7 @@ export function ScoreBug({ session }: { session: Session }) {
   const fps = session.media ? session.media.fps_num / session.media.fps_den : 30;
   const age = observed ? Math.max(0, Math.floor((frame - observed.frame_start) / fps)) : 0;
 
-  const flag = broadcast
+  const flag = broadcast || !known
     ? null
     : state.winner
       ? `${shortName(session, state.winner)} wins the match`

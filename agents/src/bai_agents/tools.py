@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
+from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -41,6 +42,7 @@ class ToolContext:
     outputs: list[str] = field(default_factory=list)  # every tool result of the conversation (grounding)
     _analytics: Any = None
     _analytics_token: tuple[Any, ...] | None = None
+    read_scope: Callable[[], AbstractContextManager[None]] | None = None
 
     @property
     def names(self) -> dict[str, str]:
@@ -118,7 +120,7 @@ def match_overview(ctx: ToolContext) -> dict[str, Any]:
         "status": ctx.session.status.value,
         "official_rallies": len(official),
         "unofficial_rallies": len(unofficial),
-        "unofficial_note": "warm-up / practice / replayed exchanges: on the timeline, not in the score or stats",
+        "unofficial_note": "exchanges not established as official play; excluded from score and official statistics",
         "rallies_without_winner": sum(1 for r in official if r.winner is None),
         "current_state": state,
         "match_phase": {
@@ -147,7 +149,13 @@ def match_overview(ctx: ToolContext) -> dict[str, Any]:
             for g in games
         ],
         "score_event_id": points[-1].event_id if points else None,
-        "data_quality": {"degraded": degraded, "calibrated": bool(ctx.store.query(types=["calibration"]))},
+        "data_quality": {
+            "degraded": ctx.session.meta.get("degraded", degraded),
+            "capabilities": ctx.session.meta.get("capabilities", {}),
+            "calibration_recorded": bool(ctx.store.query(types=["calibration"])),
+            "note": "CV events are estimates unless human reviewed. Calibration validity is frame-specific; "
+            "a recorded calibration alone does not establish valid geometry throughout the clip.",
+        },
         "evidence_ids": ctx.cite(
             [g.event_id for g in games]
             + ([points[-1].event_id] if points else [])
@@ -236,6 +244,9 @@ def get_rally(ctx: ToolContext, rally_event_id: str | None = None, rally_no: int
                 "subtype": s.get("subtype"),
                 "confidence": st.confidence if st else None,
                 "band": st.band.value if st else None,
+                "status": st.status.value if st else None,
+                "evidence_kind": st.payload.get("evidence_kind", "estimated") if st else "unavailable",
+                "model": st.provenance.model if st else None,
             }
         )
     rally_ids = set(lineage_ids(ctx.store, ev))
@@ -315,6 +326,9 @@ def find_strokes(
                 "subtype": p.get("subtype"),
                 "confidence": e.confidence,
                 "band": e.band.value,
+                "status": e.status.value,
+                "evidence_kind": p.get("evidence_kind", "estimated"),
+                "model": e.provenance.model,
             }
         )
     out = out[: min(limit or 40, 100)]
@@ -431,9 +445,10 @@ def run_tool(ctx: ToolContext, name: str, args: dict[str, Any]) -> str:
         return json.dumps({"error": f"unknown tool {name}"})
     _, fn = entry
     clean = {k: v for k, v in args.items() if v is not None and not k.startswith("_")}
-    try:
-        out = json.dumps(fn(ctx, **clean), default=str)
-    except TypeError as e:
-        out = json.dumps({"error": f"bad arguments: {e}"})
+    with ctx.read_scope() if ctx.read_scope else nullcontext():
+        try:
+            out = json.dumps(fn(ctx, **clean), default=str)
+        except TypeError as e:
+            out = json.dumps({"error": f"bad arguments: {e}"})
     ctx.outputs.append(out)
     return out

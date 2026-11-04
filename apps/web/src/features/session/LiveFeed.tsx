@@ -88,7 +88,7 @@ function FeedItem({ e, session }: { e: BaiEvent; session: Session }) {
             <PlayerDot pid={w} />
             <span className="font-medium">
               {e.payload.official === false
-                ? "Warm-up exchange · not scored"
+                ? "Exchange · match status unconfirmed"
                 : `Rally ${e.payload.rally_no} · ${w ? `${shortName(session, w)} wins` : "winner unclear"}`}
             </span>
             {corrected && <span className="text-xs text-signal">corrected</span>}

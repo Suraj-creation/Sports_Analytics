@@ -39,12 +39,13 @@ export function StrokeToast({ session }: { session: Session }) {
   const emph = latest.payload.stroke === "smash";
   return (
     <Toast key={latest.event_id}>
+      {latest.status !== "human_verified" && <span className="text-xs text-line-2">Estimate</span>}
       <BandChip band={latest.band} color={playerColor(pid)}>
         <span className={emph ? "font-semibold" : undefined}>{label}</span>
       </BandChip>
       <span className="text-line-2">{shortName(session, pid)}</span>
       {latest.confidence != null && (
-        <span className="tabular text-xs text-line-3">{Math.round(latest.confidence * 100)}%</span>
+        <span className="tabular text-xs text-line-3">score {latest.confidence.toFixed(2)}</span>
       )}
     </Toast>
   );

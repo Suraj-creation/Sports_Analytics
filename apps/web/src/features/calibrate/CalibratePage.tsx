@@ -5,6 +5,7 @@ import { ArrowLeft, Check, ChevronLeft, ChevronRight, RotateCcw, Sparkles, Undo2
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, ErrorNote, Spinner } from "@/components/ui";
 import { useHls } from "@/features/player/useHls";
+import { useAnalysisQueryKey } from "@/lib/analysisQuery";
 import { api } from "@/lib/api";
 import { COURT_LINES, NET, project } from "@/lib/court";
 import { fps as fpsOf } from "@/lib/format";
@@ -35,7 +36,7 @@ export function CalibratePage() {
   const session = useQuery({ queryKey: ["session", sessionId], queryFn: () => api.session(sessionId) });
   const [segment, setSegment] = useState(0);
   const prop = useQuery({
-    queryKey: ["calibration-proposal", sessionId, segment],
+    queryKey: useAnalysisQueryKey("calibration-proposal", session.data ?? sessionId, segment),
     queryFn: () => api.calibrationProposal(sessionId, segment),
     enabled: session.data?.media != null,
   });

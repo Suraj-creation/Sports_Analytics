@@ -60,6 +60,31 @@ describe("ScoreBug", () => {
     render(<ScoreBug session={SESSION} />);
     expect(screen.getByText("Game point")).toBeInTheDocument();
   });
+
+  it("does not carry an earlier score into a frame not yet analysed", () => {
+    loadEvents([point(300, "P1", state(19, 18), state(20, 18, { game_point: "P1" }))]);
+    useSession.setState({ session: { ...SESSION, status: "analysing", frontier_frame: 350 } });
+    act(() => usePlayback.setState({ frame: 900 }));
+    render(<ScoreBug session={SESSION} />);
+    expect(screen.getByTestId("score-bug")).toHaveTextContent("Score pending");
+    expect(screen.queryByText("Game point")).not.toBeInTheDocument();
+    act(() => usePlayback.setState({ frame: 320 }));
+    expect(screen.getByTestId("score-bug")).toHaveTextContent("Game 1");
+  });
+
+  it("withholds broadcast observations beyond the analysis frontier and restores them when seeking back", () => {
+    loadEvents([ev("broadcast_score", 200, {
+      payload: { rows: [{ name: "SOURCE A", points: 7 }, { name: "SOURCE B", points: 4 }] },
+    })]);
+    useSession.setState({ session: { ...SESSION, status: "analysing", frontier_frame: 350 } });
+    act(() => usePlayback.setState({ frame: 900 }));
+    render(<ScoreBug session={SESSION} />);
+    expect(screen.getByTestId("score-bug")).toHaveTextContent("Score pending");
+    expect(screen.queryByText("Broadcast score")).not.toBeInTheDocument();
+    act(() => usePlayback.setState({ frame: 300 }));
+    expect(screen.getByTestId("score-bug")).toHaveTextContent("Broadcast score");
+    expect(screen.getByTestId("score-bug")).toHaveTextContent("SOURCE A");
+  });
 });
 
 describe("LiveFeed", () => {
