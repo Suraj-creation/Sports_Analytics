@@ -45,7 +45,7 @@ from bai_badminton.perception_types import (
 from bai_badminton.rules import SCORE_REVIEW_EVENT_TYPES
 from bai_badminton.rules.bwf import MatchConfig
 from bai_engine.components import ComponentRegistry
-from bai_engine.config import ModelChoice, Profile, get_settings
+from bai_engine.config import ModelChoice, Profile
 from bai_engine.decode import DecodedChunk
 from bai_engine.obs import get_logger
 from bai_engine.runtime.registry import ModelRegistry
@@ -242,7 +242,7 @@ class BadmintonSession:
                 profile,
                 registry,
                 fps,
-                get_settings().models_dir,
+                registry.models_dir,
                 frame_size=(m.width, m.height),
                 match_format=configured_format or "unknown",
                 component_registry=component_registry,
