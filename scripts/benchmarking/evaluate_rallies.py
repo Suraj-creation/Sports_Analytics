@@ -19,6 +19,28 @@ import numpy as np
 from scipy.optimize import linear_sum_assignment
 
 SCHEMA = ["Start_Frame", "End_Frame", "Start_Time_sec", "End_Time_sec", "Duration_sec", "Start_Time", "End_Time"]
+COMPARISON_SCHEMA = [
+    "gt_rally",
+    "pred_rally",
+    "gt_start_frame",
+    "pred_start_frame",
+    "start_frame_error",
+    "start_frame_absolute_error",
+    "start_time_error_sec",
+    "start_time_absolute_error_sec",
+    "gt_end_frame",
+    "pred_end_frame",
+    "end_frame_error",
+    "end_frame_absolute_error",
+    "end_time_error_sec",
+    "end_time_absolute_error_sec",
+    "gt_duration_sec",
+    "pred_duration_sec",
+    "duration_error_sec",
+    "duration_absolute_error_sec",
+    "interval_iou",
+    "matching_status",
+]
 POLICY = {
     "version": "rally-boundaries-v1",
     "minimum_iou": 0.5,
@@ -263,10 +285,9 @@ def save_evaluation(output, gt, pred, fps, minimum_iou=0.5, **kwargs):
     metrics, rows = evaluate(gt, pred, fps, minimum_iou, **kwargs)
     (output / "metrics.json").write_text(json.dumps(metrics, indent=2, allow_nan=False) + "\n")
     with (output / "rally_comparison.csv").open("w", newline="") as stream:
-        if rows:
-            writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
-            writer.writeheader()
-            writer.writerows(rows)
+        writer = csv.DictWriter(stream, fieldnames=COMPARISON_SCHEMA)
+        writer.writeheader()
+        writer.writerows(rows)
     lines = [
         "# Rally boundary metrics",
         "",

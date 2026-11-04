@@ -15,6 +15,11 @@ sys.path.insert(0, str(ROOT))
 from bai_badminton.events.rally_evidence import EvidenceRallyFSM, ObservationKind, RallyObservation  # noqa: E402
 from bai_badminton.events.rally_fsm import RallyParams  # noqa: E402
 from research.compare_rally_experiments import compare_experiment  # noqa: E402
+from research.next_evidence_provenance import (  # noqa: E402
+    executor_sources_unchanged,
+    snapshot_executor,
+    trace_epoch_reset_indices,
+)
 from scripts.benchmarking.evaluate_rallies import read_csv, save_evaluation, write_predictions  # noqa: E402
 from scripts.benchmarking.production_inference import digest, dump  # noqa: E402
 
@@ -33,7 +38,28 @@ def main():
     parent.mkdir(parents=True, exist_ok=False)
     rows = [json.loads(line) for line in (source / "fsm_trace.jsonl").open()]
     metadata = json.loads((source / "replay_metadata.json").read_text())
-    assert metadata["source_unchanged"]
+    if not metadata["source_unchanged"]:
+        raise ValueError("input trace was generated while its source changed")
+    if digest(source / "fsm_trace.jsonl") != metadata["trace_sha256"]:
+        raise ValueError("input trace does not match its generator metadata")
+    source_events = [json.loads(line) for line in (source / "events.jsonl").open()]
+    resets = trace_epoch_reset_indices(rows, format_events=source_events)
+    fps = float(metadata["parameters"]["fps"])
+    executor = snapshot_executor(
+        ROOT,
+        parent,
+        [
+            Path(__file__),
+            ROOT / "research/next_evidence_provenance.py",
+            ROOT / "research/compare_rally_experiments.py",
+            ROOT / "scripts/benchmarking/production_inference.py",
+            ROOT / "scripts/benchmarking/evaluate_rallies.py",
+            ROOT / "sports/badminton/src/bai_badminton/events/rally_fsm.py",
+            ROOT / "sports/badminton/src/bai_badminton/events/rally_evidence.py",
+        ],
+        Path(__file__),
+    )
+    dump(parent / "executor_metadata.json", executor)
     summary = []
     matrix = [
         ("disabled", False, False, False),
@@ -52,10 +78,10 @@ def main():
         output = parent / name
         output.mkdir()
         options = {"use_reconstruction": reconstruction, "motion_guard": motion, "use_exit_recovery": exit_recovery}
-        provider = EvidenceRallyFSM(RallyParams(fps=30), **options)
+        provider = EvidenceRallyFSM(RallyParams(fps=fps), **options)
         intervals, transitions = [], []
         started = time.perf_counter()
-        for row in rows:
+        for row_index, row in enumerate(rows):
             frame, call = row["frame"], row["call"]
             before = provider.state.value
             if call == "step":
@@ -66,8 +92,10 @@ def main():
                 update = provider.on_contact(frame)
             elif call == "discontinuity":
                 update = provider.on_discontinuity(frame)
-            else:
+            elif call == "flush":
                 update = provider.flush(frame)
+            else:
+                raise ValueError(f"unsupported recorded call: {call}")
             if update.finalized:
                 intervals.append((update.finalized.start, update.finalized.end))
             if before != provider.state.value or update.finalized or update.started is not None:
@@ -80,20 +108,31 @@ def main():
                         "update": asdict(update),
                     }
                 )
-            if call == "flush" and frame == 119:
-                provider = EvidenceRallyFSM(RallyParams(fps=30), **options)
+            if row_index in resets:
+                provider = EvidenceRallyFSM(RallyParams(fps=fps), **options)
         intervals.sort()
         elapsed = time.perf_counter() - started
-        write_predictions(output / "predicted_rallies.csv", intervals, 30)
+        if not executor_sources_unchanged(ROOT, executor):
+            raise RuntimeError("executor source changed during fixed-input experiment")
+        write_predictions(output / "predicted_rallies.csv", intervals, fps)
         if (name == "combined" and not args.include_exit) or (name == "exit_reconstruction" and args.include_exit):
-            reference = read_csv(source / "predicted_rallies.csv", 30)
+            reference = read_csv(source / "predicted_rallies.csv", fps)
             assert intervals == [(r.start_frame, r.end_frame) for r in reference]
         dump(output / "state_transitions.json", transitions)
         dump(
             output / "benchmark_metadata.json",
             {
-                **metadata,
                 "mode": "fixed recorded evidence factorial ablation; NOT fresh inference",
+                "executor": executor,
+                "executor_source_unchanged": True,
+                "git_commit": executor["git_commit"],
+                "source_sha256": executor["source_sha256"],
+                "source_unchanged": True,
+                "trace_generator": metadata,
+                "trace_generator_metadata_sha256": digest(source / "replay_metadata.json"),
+                "trace_epoch_reset_frames": [rows[index]["frame"] for index in sorted(resets)],
+                "trace_epoch_reset_basis": "recorded format_decision events aligned to nonterminal trace flushes",
+                "input_events_sha256": digest(source / "events.jsonl"),
                 "intervention": name,
                 "configuration": options,
                 "overrides": options,
@@ -101,9 +140,11 @@ def main():
                 "source_replay_elapsed_seconds": metadata["elapsed_seconds"],
                 "elapsed_seconds": elapsed,
                 "timing_scope": "FSM transition loop only, shared decoded input trace loading and evaluation excluded",
-                "parameters": asdict(RallyParams(fps=30)),
+                "parameters": asdict(RallyParams(fps=fps)),
                 "input_trace_sha256": digest(source / "fsm_trace.jsonl"),
                 "source_video_sha256": metadata["video_sha256"],
+                "ground_truth_sha256": metadata["ground_truth_sha256"],
+                "ground_truth_usage": "evaluation only; no labels provided to the FSM",
                 "exploratory": True,
                 "prediction_sha256": digest(output / "predicted_rallies.csv"),
             },
@@ -113,8 +154,8 @@ def main():
             f"Input trace: {source / 'fsm_trace.jsonl'}\nFSM loop elapsed_seconds: {elapsed}\n"
             "No fresh video/model inference. Annotation values are read only after prediction CSV export.\n"
         )
-        labels = read_csv(ROOT / "Part2/dataset/Test1_Full/Test1_Full_rally.csv", 30)
-        metrics = save_evaluation(output, labels, read_csv(output / "predicted_rallies.csv", 30), 30)
+        labels = read_csv(ROOT / "Part2/dataset/Test1_Full/Test1_Full_rally.csv", fps)
+        metrics = save_evaluation(output, labels, read_csv(output / "predicted_rallies.csv", fps), fps)
         compare_experiment(output, baseline)
         entry = {
             "experiment": name,

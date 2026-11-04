@@ -1,0 +1,81 @@
+{
+  "scope": "Evidence/evaluation tooling, immutable integrity and actual fresh-control artifact comparison; no perception/event algorithm changes by this auditor",
+  "branch": "Benchmarking",
+  "audit_start_head": "64d098b72e592998222f81bf858163b45496d799",
+  "main": "301baf08be5e989dd0ed93cb885733c3cf6f356a",
+  "baseline_files_verified": 1766,
+  "historical_production_sources_verified": 86,
+  "input_and_active_model_hashes_verified": 5,
+  "historical_experiments_fully_reevaluated": 28,
+  "fresh_case_manifests_verified": 40,
+  "benchmark_audit_hashes_verified": 17,
+  "repeat_validation_checks": 2174,
+  "benchmark_tests": {
+    "passed": 63,
+    "seconds": 0.75,
+    "scope": "tests/benchmarking; includes focused provenance, comparison and empty-GT export tests"
+  },
+  "h24": {
+    "status": "verified_fixed",
+    "matching_rules_changed": false,
+    "primary_prediction_schema_changed": false,
+    "comparison_header_fields": 20,
+    "all_reference_metrics_and_36_row_comparisons_byte_equal": true,
+    "evidence": "artifacts/benchmarking/experiments/next_20261105_audit_h24_bytes/parity.json"
+  },
+  "h25": {
+    "status": "verified_fixed_for_executor_provenance_and_recorded_format_epochs",
+    "remaining_scope": "Harness baseline/label selection intentionally remains Test1-specific; no generic dataset inference claim",
+    "executor_schema": "fixed-input-executor:v1",
+    "provenance_tests": 11,
+    "fixed_input_variants_verified": 8,
+    "all_variant_prediction_bytes_and_metrics_equal": true,
+    "evidence": "artifacts/benchmarking/experiments/next_20261105_audit_integrity/h25_event_epochs_comparison.json"
+  },
+  "fresh_repeat": {
+    "mode": "comparison of two separately completed real model-inference artifacts; comparator itself is read-only artifact analysis",
+    "frame_counts": {
+      "paired_frames": 17268,
+      "changed_frames": 0,
+      "frames_only_in_left": 0,
+      "frames_only_in_right": 0,
+      "left_raw_shuttle_observed": 11767,
+      "right_raw_shuttle_observed": 11767,
+      "shuttle_missingness_changed_frames": 0
+    },
+    "folded_events": {
+      "contact": {
+        "left_count": 447,
+        "right_count": 447,
+        "timestamps_equal": true,
+        "only_left": [],
+        "only_right": []
+      },
+      "stroke": {
+        "left_count": 447,
+        "right_count": 447,
+        "timestamps_equal": true,
+        "only_left": [],
+        "only_right": []
+      }
+    },
+    "interval_and_reason_parity": true,
+    "prediction_bytes_equal": true,
+    "actual_backend_records_equal": true,
+    "model_records_equal": true,
+    "evidence": "artifacts/benchmarking/experiments/next_20261105_audit_repeat_control/comparison.json"
+  },
+  "h19_h28_remaining": {
+    "H19": "Untriggered non-CFR mapping limitation; source unchanged",
+    "H20": "Real-browser HLS seek test remains unexecuted; existing configured Playwright browser runtime unavailable; no generic browser tool exposed",
+    "H21": "Overlapping stage timings do not establish isolated cost; growing checkpoint history remains profiling hypothesis",
+    "H22": "Additional full neural control now exact for all recorded frames/events on this source/configuration; not universal determinism",
+    "H23": "Independent reviewed matches/component labels unavailable; no generalization or real doubles accuracy claim",
+    "H26": "Historical finalizer not run; new outputs refuse existing directories; ignored evidence intact",
+    "H27": "Observed OCR empty-result warnings without established direct boundary causality",
+    "H28": "Pre-existing formatting/deprecation evidence preserved; no algorithmic defect inferred"
+  },
+  "evaluator_sha256": "faed2e8e27cef0c6851ca0dcee6669c0fcb82c9fb7ce9e662625ffc36e20bfe0",
+  "report": "research/next_evidence_tooling_review.md",
+  "initial_audit": "research/next_session_initial_audit.md"
+}

@@ -2,7 +2,7 @@ import csv
 
 import pytest
 
-from scripts.benchmarking.evaluate_rallies import SCHEMA, read_csv, write_predictions
+from scripts.benchmarking.evaluate_rallies import SCHEMA, Rally, evaluate, read_csv, save_evaluation, write_predictions
 
 
 @pytest.mark.parametrize("fps", [25, 30, 30000 / 1001, 60])
@@ -79,3 +79,16 @@ def test_mismatched_rate_rejected_instead_of_silently_rescaled(tmp_path):
     write_predictions(p, [(30, 90)], 30)
     with pytest.raises(ValueError):
         read_csv(p, 25)
+
+
+@pytest.mark.parametrize("predictions", [[], [Rally(30, 60, 1.0, 2.0)]])
+def test_empty_ground_truth_comparison_retains_export_schema(tmp_path, predictions):
+    # Empty-GT evaluation remains machine-readable even when detections exist.
+    reference = evaluate([Rally(0, 30, 0.0, 1.0)], [], 30)[1][0]
+    metrics = save_evaluation(tmp_path, [], predictions, 30)
+    with (tmp_path / "rally_comparison.csv").open() as stream:
+        reader = csv.DictReader(stream)
+        assert reader.fieldnames == list(reference)
+        assert list(reader) == []
+    assert metrics["detection"]["ground_truth_count"] == 0
+    assert metrics["detection"]["false_positives"] == len(predictions)
