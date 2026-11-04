@@ -16,6 +16,7 @@ from typing import Any, Protocol, runtime_checkable
 import numpy as np
 from numpy.typing import NDArray
 
+from bai_badminton.perception.diagnostics import DiagnosticSelection, ShuttleDiagnostic
 from bai_badminton.perception.players import CourtROI, PlayerPerception
 from bai_badminton.perception.tracknet import BackgroundModel, ShuttleDetection
 from bai_badminton.perception_types import PersonObs, RacketObservation, ScoreReading
@@ -43,6 +44,24 @@ class ShuttlePort(Protocol):
         step: int,
         masks: list[NDArray[np.uint8]] | None,
     ) -> list[ShuttleDetection | None]: ...
+
+
+@runtime_checkable
+class DiagnosticShuttlePort(ShuttlePort, Protocol):
+    """Optional summaries; legacy independent shuttle providers remain valid."""
+
+    supports_diagnostics: bool
+
+    def detect_with_diagnostics(
+        self,
+        frames_bgr: list[NDArray[np.uint8]],
+        shots: list[int],
+        *,
+        step: int,
+        masks: list[NDArray[np.uint8]] | None,
+        selection: DiagnosticSelection,
+        indices: set[int],
+    ) -> tuple[list[ShuttleDetection | None], list[ShuttleDiagnostic | None]]: ...
 
 
 @runtime_checkable
@@ -224,6 +243,15 @@ class _ShuttleAdapter:
 
     def detect(self, frames_bgr, shots, *, step, masks):  # type: ignore[no-untyped-def]
         return self.raw_model.detect(frames_bgr, shots, step=step, masks=masks)
+
+    def detect_with_diagnostics(self, frames_bgr, shots, *, step, masks, selection, indices):  # type: ignore[no-untyped-def]
+        return self.raw_model.detect_with_diagnostics(
+            frames_bgr, shots, step=step, masks=masks, selection=selection, indices=indices
+        )
+
+    @property
+    def supports_diagnostics(self) -> bool:
+        return callable(getattr(self.raw_model, "detect_with_diagnostics", None))
 
     def reset(self) -> None:
         old = self.raw_model.bg

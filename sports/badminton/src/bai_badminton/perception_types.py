@@ -8,6 +8,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from bai_badminton.perception.calibration_state import CalibrationState
+from bai_badminton.perception.diagnostics import FrameDiagnostic
 
 
 @dataclass(frozen=True)
@@ -100,6 +101,7 @@ class FramePerception:
     detector_observed: bool | None = None
     # Scheduled pose cadence, not a claim of successful keypoint observation.
     pose_stride: int | None = None  # None legacy/unknown, 0 disabled
+    diagnostic: FrameDiagnostic | None = None  # opt-in bounded values; never inference input
 
     @property
     def scene(self) -> str:

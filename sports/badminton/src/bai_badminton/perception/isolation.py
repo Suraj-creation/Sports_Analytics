@@ -28,7 +28,21 @@ def is_fixed_camera(frames: list[np.ndarray]) -> bool:
     return stationary / (len(frames) - 1) >= 0.85
 
 
-def flight_mask(polygon: np.ndarray, frame_size: tuple[int, int], size: tuple[int, int]) -> np.ndarray:
+def flight_mask(
+    polygon: np.ndarray,
+    frame_size: tuple[int, int],
+    size: tuple[int, int],
+    *,
+    region: str = "bounded_upward_sweep_v1",
+) -> np.ndarray:
+    """Image prior with an explicit optional upper-flight policy.
+
+    ``vertical_columns_to_image_top_v1`` sweeps visible court columns to the
+    image ceiling. It retains the same horizontal/floor clip and edge tolerance;
+    it does not establish physical court ownership of airborne objects.
+    """
+    if region not in {"bounded_upward_sweep_v1", "vertical_columns_to_image_top_v1"}:
+        raise ValueError("unsupported shuttle flight-region policy")
     w, h = frame_size
     mw, mh = size
     out = np.zeros((mh, mw), np.uint8)
@@ -42,7 +56,11 @@ def flight_mask(polygon: np.ndarray, frame_size: tuple[int, int], size: tuple[in
     if area <= 0 or clipped is None:
         return out
     floor = clipped.reshape(-1, 2)
-    air = floor - np.array([0, 0.35 * h], np.float32)
+    if region == "vertical_columns_to_image_top_v1":
+        air = floor.copy()
+        air[:, 1] = 0
+    else:
+        air = floor - np.array([0, 0.35 * h], np.float32)
     hull = cv2.convexHull(np.concatenate([floor, air]))
     scaled = hull * np.array([mw / w, mh / h], np.float32)
     cv2.fillConvexPoly(out, np.round(scaled).astype(np.int32), 1)

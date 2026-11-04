@@ -28,6 +28,7 @@ from bai_badminton.observations import PlayerSeries, WindowObs
 from bai_badminton.perception.keypoints import KP
 
 CONTACT_MODEL = "contact_fusion_v2"
+CONTACT_RELIABILITY_MODEL = "contact_motion_reliability_v1"
 
 # Hand-set logistic fusion weights; no fitted calibration is supplied in this repository.
 W_BIAS = -4.2
@@ -52,6 +53,7 @@ class ContactCandidate:
     scores: dict[str, float] = field(default_factory=dict)
     shuttle_xy: tuple[float, float] | None = None
     attribution_reason: str | None = None
+    model: str = CONTACT_MODEL
 
     @property
     def components(self) -> dict[str, float]:
@@ -76,6 +78,44 @@ def _seg_velocity(
     if den == 0:
         return None
     return float((tc * (x[idx] - x[idx].mean())).sum() / den), float((tc * (y[idx] - y[idx].mean())).sum() / den)
+
+
+@dataclass(frozen=True)
+class ContactMotionReliability:
+    """Declared spatial sensitivity, not calibrated shuttle-error covariance.
+
+    The caller supplies analysis-image pixels. An eight-frame TrackNet result
+    resized from 512 to 1280 pixels has a 2.5-pixel cell; 2.5/sqrt(12) is one
+    possible explicit sensitivity assumption, not a universal default.
+    """
+
+    spatial_sigma_px: float
+
+    def __post_init__(self) -> None:
+        if not math.isfinite(self.spatial_sigma_px) or self.spatial_sigma_px <= 0:
+            raise ValueError("spatial_sigma_px must be positive and finite")
+
+
+def _velocity_reliability(
+    x: NDArray[np.float64],
+    y: NDArray[np.float64],
+    ok: NDArray[np.bool_],
+    lo: int,
+    hi: int,
+    spatial_sigma_px: float,
+) -> tuple[float, int, int] | None:
+    """Slope sensitivity from same-context observed samples and LS residuals."""
+    idx = np.arange(max(lo, 0), min(hi, len(x) - 1) + 1)
+    idx = idx[ok[idx] & np.isfinite(x[idx]) & np.isfinite(y[idx])]
+    if len(idx) < 2:
+        return None
+    tc = idx.astype(np.float64) - idx.mean()
+    denominator = float((tc**2).sum())
+    values = np.column_stack((x[idx], y[idx]))
+    velocity = np.sum(tc[:, None] * (values - values.mean(axis=0)), axis=0) / denominator
+    residual = values - (values.mean(axis=0) + tc[:, None] * velocity)
+    variance = float(np.sum(residual**2)) / max(1, 2 * (len(idx) - 2))
+    return math.sqrt((spatial_sigma_px**2 + variance) / denominator), len(idx), int(idx[-1] - idx[0])
 
 
 def _player_point(s: PlayerSeries, i: int) -> list[NDArray[np.float64]]:
@@ -155,7 +195,9 @@ def _context_bounds(w: WindowObs, i: int, half: int) -> tuple[int, int]:
     return max(segment_lo, i - max(half, 4)), min(segment_hi, i + max(half, 3) + 1)
 
 
-def score_frame(w: WindowObs, i: int, half: int = 3) -> ContactCandidate | None:
+def score_frame(
+    w: WindowObs, i: int, half: int = 3, *, motion_reliability: ContactMotionReliability | None = None
+) -> ContactCandidate | None:
     t = w.shuttle
     ok = t.vis & ~t.interp
     if w.replay[i] or not ok[i]:
@@ -173,6 +215,35 @@ def score_frame(w: WindowObs, i: int, half: int = 3) -> ContactCandidate | None:
     s_redirect = float(np.clip((angle - 25.0) / 70.0, 0.0, 1.0))
     ratio = na / max(nb, 1e-6)
     s_impulse = float(np.clip((ratio - 1.2) / 1.6, 0.0, 1.0))
+
+    motion_scores: dict[str, float] = {}
+    if motion_reliability is not None:
+        before = _velocity_reliability(t.x, t.y, ok, max(lo, i - half), i, motion_reliability.spatial_sigma_px)
+        after = _velocity_reliability(t.x, t.y, ok, i, min(hi - 1, i + half), motion_reliability.spatial_sigma_px)
+        if before is None or after is None:
+            return None
+        sigma_before, count_before, span_before = before
+        sigma_after, count_after, span_after = after
+        qb = max(0.0, 1.0 - 3.0 * sigma_before / nb) if nb else 0.0
+        qa = max(0.0, 1.0 - 3.0 * sigma_after / na) if na else 0.0
+        margin = 3.0 * math.hypot(sigma_before, sigma_after)
+        motion_scores = {
+            "legacy_redirect": s_redirect,
+            "legacy_impulse": s_impulse,
+            "incoming_direction_reliability": qb,
+            "outgoing_direction_reliability": qa,
+            "incoming_slope_sigma_sensitivity": sigma_before,
+            "outgoing_slope_sigma_sensitivity": sigma_after,
+            "incoming_fit_samples": float(count_before),
+            "outgoing_fit_samples": float(count_after),
+            "incoming_fit_span_frames": float(span_before),
+            "outgoing_fit_span_frames": float(span_after),
+            "spatial_sigma_sensitivity_px": motion_reliability.spatial_sigma_px,
+            "absolute_speed_gain_px_per_frame": na - nb,
+            "speed_gain_sensitivity_margin": margin,
+        }
+        s_redirect *= min(qb, qa)
+        s_impulse = max(0.0, (na - nb - margin) / (na + nb + margin))
 
     sx, sy = t.x[i], t.y[i]
     # Rank players, not their wrists: two wrists of one person are not competitors.
@@ -259,9 +330,11 @@ def score_frame(w: WindowObs, i: int, half: int = 3) -> ContactCandidate | None:
             "speed_before": nb,
             "speed_after": na,
             "body_h": float(best_h) if best_h else 0.0,
+            **motion_scores,
         },
         shuttle_xy=(float(sx), float(sy)),
         attribution_reason=attribution_reason,
+        model=CONTACT_RELIABILITY_MODEL if motion_reliability is not None else CONTACT_MODEL,
     )
 
 
@@ -275,6 +348,7 @@ def detect_contacts(
     stop: int | None = None,
     enforce_alternation: bool = True,
     proximity_split: float | None = None,
+    motion_reliability: ContactMotionReliability | None = None,
 ) -> list[ContactCandidate]:
     """Return local score peaks in ``[start, stop)`` using observations outside it.
 
@@ -299,10 +373,16 @@ def detect_contacts(
     nms = max(1, int(round(nms_s * w.fps)))
     assert w.break_before is not None
     segments = np.cumsum(w.break_before, dtype=np.int64)
+
+    def score(i: int) -> ContactCandidate | None:
+        if motion_reliability is None:
+            return score_frame(w, i)
+        return score_frame(w, i, motion_reliability=motion_reliability)
+
     cands = [
         c
         for i in range(max(0, start - nms), min(w.n, stop + nms))
-        if not w.replay[i] and (c := score_frame(w, i)) is not None and c.p >= p_min
+        if not w.replay[i] and (c := score(i)) is not None and c.p >= p_min
     ]
     kept = [
         c

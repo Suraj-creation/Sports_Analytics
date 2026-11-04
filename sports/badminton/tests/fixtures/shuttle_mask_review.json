@@ -1,0 +1,119 @@
+{
+  "source_video_sha256": "877c6d39d34ccfb302865ed44f7e08949b0f72be2833f71777066f837e6b8bd6",
+  "checkpoint_sha256": "df867641a02712b021f04548ff4b1208ddfdb47f629ab2094ceb978667e83b1a",
+  "evidence_type": "recorded pre-mask model peaks with exact rolling-history numerical parity; not pixel ground truth",
+  "records": [
+    {
+      "frame_idx": 12769,
+      "polygon_proxy_px": [
+        [
+          415.5436090383889,
+          300.599905860345
+        ],
+        [
+          858.8585279882861,
+          299.0854007848177
+        ],
+        [
+          980.9558793477868,
+          653.9934640153183
+        ],
+        [
+          294.26696829007324,
+          656.0052919696706
+        ]
+      ],
+      "raw_model_peak_proxy_px": [
+        517.5,
+        10.0
+      ],
+      "raw_model_support": 0.67138671875,
+      "legacy_allows": false,
+      "ceiling_allows": true
+    },
+    {
+      "frame_idx": 14647,
+      "polygon_proxy_px": [
+        [
+          415.5436090383889,
+          300.599905860345
+        ],
+        [
+          858.8585279882861,
+          299.0854007848177
+        ],
+        [
+          980.9558793477868,
+          653.9934640153183
+        ],
+        [
+          294.26696829007324,
+          656.0052919696706
+        ]
+      ],
+      "raw_model_peak_proxy_px": [
+        885.0,
+        55.0
+      ],
+      "raw_model_support": 0.64599609375,
+      "legacy_allows": false,
+      "ceiling_allows": true
+    },
+    {
+      "frame_idx": 14684,
+      "polygon_proxy_px": [
+        [
+          415.5436090383889,
+          300.599905860345
+        ],
+        [
+          858.8585279882861,
+          299.0854007848177
+        ],
+        [
+          980.9558793477868,
+          653.9934640153183
+        ],
+        [
+          294.26696829007324,
+          656.0052919696706
+        ]
+      ],
+      "raw_model_peak_proxy_px": [
+        942.5,
+        25.0
+      ],
+      "raw_model_support": 0.76220703125,
+      "legacy_allows": false,
+      "ceiling_allows": true
+    },
+    {
+      "frame_idx": 14694,
+      "polygon_proxy_px": [
+        [
+          415.5436090383889,
+          300.599905860345
+        ],
+        [
+          858.8585279882861,
+          299.0854007848177
+        ],
+        [
+          980.9558793477868,
+          653.9934640153183
+        ],
+        [
+          294.26696829007324,
+          656.0052919696706
+        ]
+      ],
+      "raw_model_peak_proxy_px": [
+        937.5,
+        215.0
+      ],
+      "raw_model_support": 0.7236328125,
+      "legacy_allows": false,
+      "ceiling_allows": true
+    }
+  ]
+}

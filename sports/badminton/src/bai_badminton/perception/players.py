@@ -76,6 +76,10 @@ class CourtROI:
 
 
 class PlayerDetector:
+    def set_diagnostics(self, enabled: bool, top_k: int = 3) -> None:
+        self._diagnostic_top_k = top_k if enabled else 0
+        self.last_diagnostic = None
+
     def __init__(
         self,
         onnx_path: Path,
@@ -181,7 +185,46 @@ class PlayerDetector:
         xyxy[:, (0, 2)] = np.clip(xyxy[:, (0, 2)], 0, w)
         xyxy[:, (1, 3)] = np.clip(xyxy[:, (1, 3)], 0, h)
         valid = (xyxy[:, 2:] > xyxy[:, :2]).all(axis=1)
-        return _nms(xyxy[valid], person[keep][valid], 0.6)
+        result = _nms(xyxy[valid], person[keep][valid], 0.6)
+        top_k = getattr(self, "_diagnostic_top_k", 0)
+        if top_k:
+            rejected = []
+            for index in np.argsort(-person, kind="stable"):
+                if keep[index]:
+                    continue
+                box = boxes[0, index].astype(np.float64)
+                reason = (
+                    "invalid_query"
+                    if not np.isfinite(box).all() or not np.isfinite(logits[0, index]).all() or min(box[2:]) <= 0
+                    else "wrong_class"
+                    if best[index] != PERSON
+                    else "below_threshold"
+                )
+                rejected.append(
+                    {
+                        "query": int(index),
+                        "person_support": float(person[index]) if np.isfinite(person[index]) else None,
+                        "normalized_cxcywh": box.tolist() if np.isfinite(box).all() else None,
+                        "reason": reason,
+                    }
+                )
+                if len(rejected) == top_k:
+                    break
+            self.last_diagnostic = {
+                "schema": "player-detector-diagnostics:v1",
+                "provider": "rfdetr",
+                "coordinate_space": "normalized_cxcywh_of_detector_crop",
+                "queries": len(person),
+                "below_threshold_count": int((person < self.tool.score_thr).sum()),
+                "wrong_class_count": int((best != PERSON).sum()),
+                "query_counts_overlap": True,
+                "pre_clip_admitted": int(keep.sum()),
+                "pre_nms_admitted": int(valid.sum()),
+                "post_nms_admitted": len(result[0]),
+                "nms_suppressed_count": int(valid.sum()) - len(result[0]),
+                "rejected_queries": rejected,
+            }
+        return result
 
 
 def _nms(
@@ -284,6 +327,17 @@ class PlayerPerception:
         self._court_tracks: dict[int, tuple[int, NDArray[np.float64]]] = {}
         self._last_detection_frame: int | None = None
         self.fps = fps
+        self._diagnostic_top_k = 0
+        self.last_diagnostic: dict[str, Any] | None = None
+
+    def set_diagnostics(self, enabled: bool, top_k: int = 3) -> None:
+        if type(enabled) is not bool or type(top_k) is not int or not 1 <= top_k <= 8:
+            raise ValueError("invalid bounded player diagnostic configuration")
+        self._diagnostic_top_k = top_k if enabled else 0
+        self.last_diagnostic = None
+        configure = getattr(self.detector, "set_diagnostics", None)
+        if callable(configure):
+            configure(enabled, top_k)
 
     @property
     def identity_policy(self) -> dict[str, Any]:
@@ -303,6 +357,7 @@ class PlayerPerception:
         self.roi = roi
 
     def on_cut(self) -> None:
+        self.last_diagnostic = None
         if self.tracker is not None:
             self.tracker.reset()
         self._last = []
@@ -318,6 +373,19 @@ class PlayerPerception:
         self.last_detector_observed = False
         self.last_capacity_limited = False
         det_stride, pose_stride = strides or (self.det_stride, self.pose_stride)
+        if getattr(self, "_diagnostic_top_k", 0):
+            self.last_diagnostic = {
+                "schema": "player-tracking-diagnostics:v1",
+                "frame_idx": frame_idx,
+                "detector_stride": det_stride,
+                "pose_stride": pose_stride,
+                "detector_executed": False,
+                "reason": "provider_unavailable"
+                if self.detector is None
+                else "detector_disabled"
+                if det_stride == 0
+                else "scheduled_carry",
+            }
         if self.detector is None or det_stride == 0:
             return []
         if frame_idx % det_stride != 0:
@@ -333,6 +401,14 @@ class PlayerPerception:
         self._last_detection_frame = frame_idx
         if len(boxes):
             boxes = boxes + np.array([x0, y0, x0, y0], dtype=np.float64)
+        if self.last_diagnostic is not None:
+            self.last_diagnostic.update(
+                detector_executed=True,
+                reason="detector_ran",
+                crop_origin=[x0, y0],
+                pre_roi_count=len(boxes),
+                detector=getattr(self.detector, "last_diagnostic", None),
+            )
         self._court_tracks = {
             tid: (last, box) for tid, (last, box) in self._court_tracks.items() if frame_idx - last <= self.fps
         }
@@ -351,10 +427,24 @@ class PlayerPerception:
                     if len(matches) == 1 and overlap[:, matches[0]].sum() == 1:
                         continuing.add(history[int(matches[0])][0])
                         keep[i] = True
+            if self.last_diagnostic is not None:
+                self.last_diagnostic["roi_rejected_count"] = int((~keep).sum())
+                self.last_diagnostic["roi_rejected"] = [
+                    {
+                        "bbox": boxes[i].tolist(),
+                        "support": float(scores[i]),
+                        "reason": "outside_court_and_no_unique_continuity",
+                    }
+                    for i in np.flatnonzero(~keep)[: self._diagnostic_top_k]
+                ]
             boxes, scores = boxes[keep], scores[keep]
+        if self.last_diagnostic is not None:
+            self.last_diagnostic["post_roi_count"] = len(boxes)
         if self.tracker is None:
             self.tracker = PlayerTracker(self.fps)
         tracks = self.tracker.update(boxes, scores, frame_idx)
+        if self.last_diagnostic is not None:
+            self.last_diagnostic["tracker_count"] = len(tracks)
         self._admitted = {tid: last for tid, last in self._admitted.items() if frame_idx - last <= 2 * self.fps}
         if self.roi is not None:
             tracks = [
@@ -366,6 +456,10 @@ class PlayerPerception:
         # discard a player. Withhold all participant evidence for this frame
         # and its carried frames rather than treating the survivors as certain.
         if self.max_players >= 4 and len(tracks) > self.max_players + 2:
+            if self.last_diagnostic is not None:
+                self.last_diagnostic.update(
+                    reason="capacity_withheld", post_track_roi_count=len(tracks), returned_count=0
+                )
             self.last_capacity_limited = True
             self.last_detector_observed = False
             self._last = []
@@ -414,12 +508,20 @@ class PlayerPerception:
         ]
         self._attach(frame_idx, img, persons, pose_stride)
         self._last = persons
+        if self.last_diagnostic is not None:
+            self.last_diagnostic.update(
+                returned_count=len(persons),
+                fresh_matched_count=sum(p.detector_matched is True for p in persons),
+                pose_rows=sum(p.kps is not None for p in persons),
+            )
         return persons
 
     def _carry(self, frame_idx: int, img: NDArray[np.uint8], pose_stride: int, det_stride: int) -> list[PersonObs]:
         if self._last_detection_frame is None or frame_idx - self._last_detection_frame > det_stride:
             # Scene gating can skip process() for a long interval. Returning to
             # the main camera between detector ticks must not revive old boxes.
+            if self.last_diagnostic is not None:
+                self.last_diagnostic.update(reason="stale_carry_rejected", returned_count=0)
             return []
         persons = [
             PersonObs(
@@ -444,6 +546,12 @@ class PlayerPerception:
                 person.track_id = canonical[i]
                 person.identity_method = self._associator.last_reason[i]
         self._attach(frame_idx, img, persons, pose_stride)
+        if self.last_diagnostic is not None:
+            self.last_diagnostic.update(
+                returned_count=len(persons),
+                fresh_matched_count=0,
+                pose_rows=sum(p.kps is not None for p in persons),
+            )
         return persons
 
     def _attach(self, frame_idx: int, img: NDArray[np.uint8], persons: list[PersonObs], pose_stride: int) -> None:

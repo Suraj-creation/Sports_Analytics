@@ -7,7 +7,8 @@ use canonical CFR indices; floor coordinates never denote airborne 3D geometry.
 from __future__ import annotations
 
 import copy
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, replace
 from typing import Any, Protocol, runtime_checkable
 from uuid import uuid4
 
@@ -15,9 +16,14 @@ import numpy as np
 
 from bai_badminton.analytics.match import MatchAnalytics, RallyRecord
 from bai_badminton.events.activity import ActivityEstimate, ActivityInterval, ActivityObservation, ActivityTracker
-from bai_badminton.events.contact import ContactCandidate, detect_contacts
+from bai_badminton.events.contact import ContactCandidate, ContactMotionReliability, detect_contacts
 from bai_badminton.events.rally_evidence import EvidenceRallyFSM, RallyObservation
 from bai_badminton.events.rally_fsm import RallyFSM, RallyParams, RallySegment, RallyState, RallyUpdate
+from bai_badminton.events.rally_motion import (
+    ImageExitReturnSupport,
+    image_exit_return_curve_support,
+    image_exit_return_tracklet_support,
+)
 from bai_badminton.events.rally_outcome import CourtImageGeometry, analyze_rally_end, outcome_confidence
 from bai_badminton.events.stroke import RuleStrokeClassifier, StrokeContext, StrokePrediction
 from bai_badminton.identity import IdentityResolver
@@ -129,6 +135,20 @@ class EvidenceRallySegmentation(RallySegmentation, Protocol):
     """Optional v2 observation input; legacy independent providers stay valid."""
 
     def step_evidence(self, observation: RallyObservation) -> RallyUpdate: ...
+
+
+@runtime_checkable
+class AssociatedExitRallySegmentation(EvidenceRallySegmentation, Protocol):
+    """Optional sport-owned policy for a bounded exit association proof."""
+
+    def exit_return_support(
+        self,
+        window: WindowObs,
+        index: int,
+        *,
+        frame_height: float,
+        raw_xy: Callable[[int, tuple[float, float]], tuple[float, float] | None],
+    ) -> ImageExitReturnSupport: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -272,6 +292,18 @@ class _TemporalCheckpoint:
     state: dict[str, Any]
 
 
+class _MotionReliableContact(_Contact):
+    def __init__(self, params: dict[str, Any]) -> None:
+        params = dict(params)
+        if "spatial_sigma_px" not in params:
+            raise ValueError("motion-reliability contact requires an explicit image sensitivity scale")
+        self.policy = ContactMotionReliability(params.pop("spatial_sigma_px"))
+        super().__init__(params)
+
+    def detect(self, window: WindowObs, **kwargs: Any) -> list[ContactCandidate]:
+        return detect_contacts(window, **{**self.params, **kwargs}, motion_reliability=self.policy)
+
+
 class _BaselineTemporalState:
     """Only these baseline adapters own pure Python temporal state.
 
@@ -349,6 +381,66 @@ class _EvidenceRally(_BaselineTemporalState, EvidenceRallyFSM):
     def close(self) -> None:
         self._recent.clear()
         self._motion.clear()
+
+
+class _TrackletEvidenceRally(_EvidenceRally):
+    """Keep v2 starts; associate one singleton only for a qualified event.
+
+    Qualification uses the existing minimum duration BEFORE the loss. Waiting
+    through unknown observations cannot confirm a provisional event.
+    """
+
+    last_exit_support: ImageExitReturnSupport | None = None
+    last_exit_support_frame: int | None = None
+
+    def __init__(self, params: RallyParams, *, use_curve_exit: bool = False, **options: Any) -> None:
+        if type(use_curve_exit) is not bool:
+            raise ValueError("curve exit support requires a strict boolean")
+        self.use_curve_exit = use_curve_exit
+        super().__init__(params, **options)
+
+    def reset(self) -> None:
+        super().reset()
+        self.last_exit_support = None
+        self.last_exit_support_frame = None
+
+    def close(self) -> None:
+        super().close()
+        self.last_exit_support = None
+        self.last_exit_support_frame = None
+
+    def exit_return_support(
+        self,
+        window: WindowObs,
+        index: int,
+        *,
+        frame_height: float,
+        raw_xy: Callable[[int, tuple[float, float]], tuple[float, float] | None],
+    ) -> ImageExitReturnSupport:
+        proof = image_exit_return_tracklet_support(
+            window,
+            index,
+            frame_height=frame_height,
+            raw_xy=raw_xy,
+            minimum_speed=self.params.start_speed,
+        )
+        if self.use_curve_exit and proof.basis != "observed_top_exit_return":
+            curve = image_exit_return_curve_support(
+                window,
+                index,
+                frame_height=frame_height,
+                raw_xy=raw_xy,
+                minimum_speed=self.params.start_speed,
+            )
+            if curve.supported:
+                proof = curve
+        if proof.supported and proof.basis != "observed_top_exit_return":
+            start = self.closed.start if self.closed is not None else self.start
+            if start is None or proof.gap_start is None or proof.gap_start - start < self.params.min_frames:
+                proof = replace(proof, supported=False, reason="event_not_qualified_before_loss")
+        self.last_exit_support = proof
+        self.last_exit_support_frame = window.frame0 + index
+        return proof
 
 
 class _Outcome:
@@ -490,6 +582,64 @@ def register_domain_components(registry: ComponentRegistry) -> None:
             motion_guard=motion_guard,
             use_exit_recovery=exit_recovery,
         )
+
+    def tracklet_rally(context: DomainContext, configuration: dict[str, Any]) -> AssociatedExitRallySegmentation:
+        params = dict(configuration.get("params", configuration))
+        curve = params.pop("use_curve_exit", False)
+        options = {
+            key: params.pop(key, default)
+            for key, default in (("use_reconstruction", False), ("motion_guard", False), ("use_exit_recovery", True))
+        }
+        return _TrackletEvidenceRally(RallyParams(fps=context.fps, **params), use_curve_exit=curve, **options)
+
+    registry.register(
+        ComponentContract(
+            kind="contact",
+            implementation="contact-motion-reliability-v1",
+            version="1",
+            input_schema="badminton-contact-input:v1",
+            output_schema="badminton-contact-output:v2",
+            interface=ContactInference,
+            context_type=DomainContext,
+            supported_formats=frozenset({"singles", "doubles", "unknown"}),
+            failure_policy="abstain",
+            stateful=False,
+            declaration={
+                **CONTRACT_DETAILS["contact"],
+                "optional_evidence": ["declared_image_localization_sensitivity"],
+                "score_semantics": "uncalibrated_heuristic_support; experimental; no_contact_accuracy_claim",
+            },
+        ),
+        lambda context, configuration: _MotionReliableContact(configuration.get("params", configuration)),
+    )
+    registry.register(
+        ComponentContract(
+            kind="rally",
+            implementation="rally-evidence-tracklets-v1",
+            version="1",
+            input_schema="badminton-rally-evidence:v2",
+            output_schema="badminton-rally-output:v1",
+            interface=AssociatedExitRallySegmentation,
+            context_type=DomainContext,
+            supported_formats=frozenset({"singles", "doubles", "unknown"}),
+            failure_policy="abstain",
+            stateful=True,
+            declaration={
+                **CONTRACT_DETAILS["rally"],
+                "required_evidence": ["typed_frame_aligned_observation_quality"],
+                "optional_evidence": [
+                    "qualified_event_singleton_exit_association:v1",
+                    "optional_observed_bracket_image_curve:v1",
+                ],
+                "limitations": [
+                    "VOD_available_window_only",
+                    "no_new_coordinates_contacts_or_idle_starts",
+                    "development_validation_only",
+                ],
+            },
+        ),
+        tracklet_rally,
+    )
 
     registry.register(
         ComponentContract(

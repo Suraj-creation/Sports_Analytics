@@ -222,6 +222,7 @@ def main():
     parser.add_argument("--rally-implementation", default="rally-fsm-v1")
     parser.add_argument("--rally-params", type=json.loads, default={})
     parser.add_argument("--shuttle-step", type=int, choices=[1, 4, 8], default=8)
+    parser.add_argument("--shuttle-params", type=json.loads, default={})
     parser.add_argument("--worker", action="store_true")
     args = parser.parse_args()
     output = args.output.resolve()
@@ -241,6 +242,11 @@ def main():
         "params": args.rally_params,
     }
     profile["shuttle"]["params"]["step"] = args.shuttle_step
+    if not isinstance(args.shuttle_params, dict):
+        raise ValueError("shuttle params must be an explicit configuration mapping")
+    if "step" in args.shuttle_params and args.shuttle_params["step"] != args.shuttle_step:
+        raise ValueError("shuttle step override conflicts with the explicit step argument")
+    profile["shuttle"]["params"].update(args.shuttle_params)
     (output / "profiles").mkdir()
     (output / "profiles/experiment.yaml").write_text(yaml.safe_dump(profile, sort_keys=False))
     source_files = {

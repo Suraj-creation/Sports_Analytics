@@ -8,6 +8,7 @@ available lookahead; interpolation remains reconstructed, never observed.
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass, replace
 from math import ceil, isfinite
 
 import numpy as np
@@ -258,3 +259,260 @@ def image_exit_return_supported(
         return False
     implied_speed = float(np.linalg.norm(return_xy - exit_xy)) / int(after[0] - before[-1])
     return implied_speed <= MAX_FILL_SPEED
+
+
+@dataclass(frozen=True, slots=True)
+class ImageFlightCurve:
+    """Pixel-space fit diagnostics; neither physical 3D nor calibrated error."""
+
+    origin_frame: float
+    x_coefficients: tuple[float, float]
+    y_coefficients: tuple[float, float, float]
+    residual_rmse_px: float
+    residual_max_px: float
+    apex_frame: float | None
+    apex_y: float | None
+    apex_in_gap: bool
+
+
+@dataclass(frozen=True, slots=True)
+class ImageExitReturnSupport:
+    """Uncalibrated support proof, never a reconstructed/observed coordinate.
+
+    ``[gap_start,gap_end)`` is the association hypothesis span and can contain
+    the explicitly unassociated observation. The actual stream is unchanged.
+    All frame values use the absolute canonical timeline.
+    """
+
+    supported: bool
+    basis: str
+    reason: str
+    gap_start: int | None = None
+    gap_end: int | None = None
+    ignored_frame: int | None = None
+    before_frames: tuple[int, ...] = ()
+    after_frames: tuple[int, ...] = ()
+    curve: ImageFlightCurve | None = None
+    leave_one_out_apex_y: tuple[float, ...] = ()
+    sensitivity_semantics: str | None = None
+
+
+def image_exit_return_tracklet_support(
+    window: WindowObs,
+    index: int,
+    *,
+    frame_height: float,
+    raw_xy: Callable[[int, tuple[float, float]], tuple[float, float]] | None = None,
+    max_gap_s: float = 2.0,
+    top_fraction: float = 0.1,
+    minimum_speed: float = 3.0,
+    minimum_exit_frame: int | None = None,
+) -> ImageExitReturnSupport:
+    """Original observed exit/return proof with one bounded association option.
+
+    At most one singleton lacking observed neighbors on BOTH sides may be
+    unassociated inside a local proof. Two adjacent floor/static observations
+    are never skipped. The unchanged helper must then verify BOTH coherent
+    moving upper-image brackets with the same gap/speed/context budgets.
+
+    ``minimum_exit_frame`` optionally requires that the last pre-loss coherent
+    observation is late enough. A caller can use interval_start+min_frames-1
+    to restrict this extension to an already qualified event. Waiting through
+    missingness never earns this qualification. No new start/contact or output
+    coordinate is created, and the input window and track are never mutated.
+    """
+    if minimum_exit_frame is not None and (type(minimum_exit_frame) is not int or minimum_exit_frame < 0):
+        raise ValueError("minimum exit frame must be a nonnegative canonical integer or unavailable")
+    options = {
+        "frame_height": frame_height,
+        "raw_xy": raw_xy,
+        "max_gap_s": max_gap_s,
+        "top_fraction": top_fraction,
+        "minimum_speed": minimum_speed,
+    }
+    # Keep original validation and positive behavior in a single source.
+    original = image_exit_return_supported(window, index, **options)
+    track = window.shuttle
+    observed = track.vis & ~track.interp & np.isfinite(track.x) & np.isfinite(track.y) & ~window.replay
+    lo, hi = window.segment_bounds(index)
+    ignored = None
+    if not original:
+        if observed[index] or window.replay[index]:
+            return ImageExitReturnSupport(False, "none", "current_sample_is_observed_or_invalid")
+        left, right = index - 1, index + 1
+        while left >= lo and not observed[left]:
+            left -= 1
+        while right < hi and not observed[right]:
+            right += 1
+
+        def isolated(point: int) -> bool:
+            return lo < point < hi - 1 and observed[point] and not observed[point - 1] and not observed[point + 1]
+
+        singletons = [int(point) for point in (left, right) if isolated(point)]
+        if len(singletons) != 1:
+            return ImageExitReturnSupport(False, "none", "exactly_one_isolated_alternative_required")
+        ignored = singletons[0]
+        associated = track.vis.copy()
+        associated[ignored] = False
+        alternative = replace(window, shuttle=replace(track, vis=associated))
+        if not image_exit_return_supported(alternative, index, **options):
+            return ImageExitReturnSupport(
+                False,
+                "single_unassociated_observation",
+                "coherent_exit_return_brackets_rejected",
+                ignored_frame=window.frame0 + ignored,
+            )
+        observed = observed.copy()
+        observed[ignored] = False
+    start, end = index, index + 1
+    while start > lo and not observed[start - 1]:
+        start -= 1
+    while end < hi and not observed[end]:
+        end += 1
+    before = np.flatnonzero(observed[max(lo, start - ANCHOR) : start]) + max(lo, start - ANCHOR)
+    after = np.flatnonzero(observed[end : min(hi, end + ANCHOR)]) + end
+    proof = {
+        "gap_start": window.frame0 + start,
+        "gap_end": window.frame0 + end,
+        "ignored_frame": window.frame0 + ignored if ignored is not None else None,
+        "before_frames": tuple(window.frame0 + int(point) for point in before),
+        "after_frames": tuple(window.frame0 + int(point) for point in after),
+    }
+    basis = "observed_top_exit_return" if original else "single_unassociated_observation"
+    if minimum_exit_frame is not None and window.frame0 + int(before[-1]) < minimum_exit_frame:
+        return ImageExitReturnSupport(False, basis, "event_not_qualified_before_loss", **proof)
+    return ImageExitReturnSupport(True, basis, "coherent_observed_exit_return", **proof)
+
+
+def _fit_image_flight_curve(
+    frames: NDArray[np.float64], positions: NDArray[np.float64], exit_frame: int, return_frame: int
+) -> ImageFlightCurve:
+    origin = (exit_frame + return_frame) / 2
+    times = frames - origin
+    cx = np.polyfit(times, positions[:, 0], 1)
+    cy = np.polyfit(times, positions[:, 1], 2)
+    predicted = np.column_stack((np.polyval(cx, times), np.polyval(cy, times)))
+    residuals = np.linalg.norm(predicted - positions, axis=1)
+    apex_t = float(-cy[1] / (2 * cy[0])) if cy[0] > 0 else None
+    apex_frame = origin + apex_t if apex_t is not None else None
+    return ImageFlightCurve(
+        origin_frame=origin,
+        x_coefficients=(float(cx[0]), float(cx[1])),
+        y_coefficients=(float(cy[0]), float(cy[1]), float(cy[2])),
+        residual_rmse_px=float(np.sqrt(np.mean(residuals**2))),
+        residual_max_px=float(residuals.max()),
+        apex_frame=apex_frame,
+        apex_y=float(np.polyval(cy, apex_t)) if apex_t is not None else None,
+        apex_in_gap=bool(apex_frame is not None and exit_frame < apex_frame < return_frame),
+    )
+
+
+def image_exit_return_curve_support(
+    window: WindowObs,
+    index: int,
+    *,
+    frame_height: float,
+    raw_xy: Callable[[int, tuple[float, float]], tuple[float, float]] | None = None,
+    max_gap_s: float = 2.0,
+    top_fraction: float = 0.1,
+    minimum_speed: float = 3.0,
+    minimum_exit_frame: int | None = None,
+) -> ImageExitReturnSupport:
+    """Observed upper-flight support with explicit omission sensitivity.
+
+    Use only the supplied same-context observed moving brackets and the existing
+    anchor/gap/speed budgets. Both a joint pixel-space quadratic and EVERY
+    leave-one-anchor-out fit must place the apex outside the image, between the
+    brackets. This is an opt-in research cue, not a physical 3D model or calibrated
+    uncertainty estimate. Residuals are reported, without a fitted threshold.
+
+    The optional minimum exit frame qualifies the event BEFORE observation loss.
+    No missing position, contact, start or future observation is generated.
+    """
+    if minimum_exit_frame is not None and (type(minimum_exit_frame) is not int or minimum_exit_frame < 0):
+        raise ValueError("minimum exit frame must be a nonnegative canonical integer or unavailable")
+    # Reuse the existing parameter-validation contract; its positive decision is
+    # handled independently by the provider, preserving provisional v2 behavior.
+    image_exit_return_supported(
+        window,
+        index,
+        frame_height=frame_height,
+        raw_xy=raw_xy,
+        max_gap_s=max_gap_s,
+        top_fraction=top_fraction,
+        minimum_speed=minimum_speed,
+    )
+    track = window.shuttle
+    observed = track.vis & ~track.interp & np.isfinite(track.x) & np.isfinite(track.y) & ~window.replay
+    if observed[index] or window.replay[index]:
+        return ImageExitReturnSupport(False, "none", "current_sample_is_observed_or_invalid")
+    lo, hi = window.segment_bounds(index)
+    start, end = index, index + 1
+    while start > lo and not observed[start - 1]:
+        start -= 1
+    while end < hi and not observed[end]:
+        end += 1
+    proof = {"gap_start": window.frame0 + start, "gap_end": window.frame0 + end}
+    if (end - start) / window.fps > max_gap_s:
+        return ImageExitReturnSupport(False, "none", "existing_gap_budget_exceeded", **proof)
+    brackets = (
+        np.flatnonzero(observed[max(lo, start - ANCHOR) : start]) + max(lo, start - ANCHOR),
+        np.flatnonzero(observed[end : min(hi, end + ANCHOR)]) + end,
+    )
+    positions = []
+    for points in brackets:
+        if len(points) < 2:
+            return ImageExitReturnSupport(False, "none", "insufficient_observed_bracket", **proof)
+        mapped = []
+        for point in points:
+            xy = float(track.x[point]), float(track.y[point])
+            try:
+                value = np.asarray(raw_xy(window.frame0 + int(point), xy) if raw_xy else xy, dtype=np.float64)
+            except (TypeError, ValueError, ArithmeticError):
+                return ImageExitReturnSupport(False, "none", "image_mapping_failed", **proof)
+            if value.shape != (2,) or not np.isfinite(value).all() or not 0 <= value[1] <= frame_height:
+                return ImageExitReturnSupport(False, "none", "invalid_observed_image_point", **proof)
+            mapped.append(value)
+        xy = np.asarray(mapped)
+        adjacent = np.diff(points) == 1
+        steps = np.linalg.norm(np.diff(xy, axis=0)[adjacent], axis=1)
+        speed = float(np.linalg.norm(xy[-1] - xy[0])) / int(points[-1] - points[0])
+        if not minimum_speed <= speed <= MAX_FILL_SPEED or not np.any(steps >= minimum_speed):
+            return ImageExitReturnSupport(False, "none", "moving_bracket_unreliable", **proof)
+        if np.any(steps > MAX_FILL_SPEED):
+            return ImageExitReturnSupport(False, "none", "observed_step_exceeds_speed_budget", **proof)
+        positions.append(xy)
+    before, after = brackets
+    first, last = positions
+    proof.update(
+        before_frames=tuple(window.frame0 + int(point) for point in before),
+        after_frames=tuple(window.frame0 + int(point) for point in after),
+    )
+    if minimum_exit_frame is not None and proof["before_frames"][-1] < minimum_exit_frame:
+        return ImageExitReturnSupport(False, "observed_bracket_curve_exit", "event_not_qualified_before_loss", **proof)
+    if first[-1, 1] >= first[0, 1] or last[-1, 1] <= last[0, 1]:
+        return ImageExitReturnSupport(False, "none", "ascending_and_descending_brackets_required", **proof)
+    implied = float(np.linalg.norm(last[0] - first[-1])) / int(after[0] - before[-1])
+    if implied > MAX_FILL_SPEED:
+        return ImageExitReturnSupport(False, "none", "implied_step_exceeds_speed_budget", **proof)
+    frames = np.asarray(proof["before_frames"] + proof["after_frames"], dtype=np.float64)
+    coordinates = np.concatenate(positions)
+    exit_frame, return_frame = int(frames[len(before) - 1]), int(frames[len(before)])
+    curve = _fit_image_flight_curve(frames, coordinates, exit_frame, return_frame)
+    omissions = [
+        _fit_image_flight_curve(np.delete(frames, i), np.delete(coordinates, i, axis=0), exit_frame, return_frame)
+        for i in range(len(frames))
+    ]
+    supported = all(
+        fit.apex_in_gap and fit.apex_y is not None and isfinite(fit.apex_y) and fit.apex_y < 0
+        for fit in (curve, *omissions)
+    )
+    return ImageExitReturnSupport(
+        supported,
+        "observed_bracket_curve_exit",
+        "all_anchor_omissions_support_upper_exit" if supported else "upper_exit_unstable_under_anchor_omission",
+        **proof,
+        curve=curve,
+        leave_one_out_apex_y=tuple(fit.apex_y for fit in omissions if fit.apex_y is not None),
+        sensitivity_semantics="leave_one_anchor_out_sensitivity_not_calibrated_uncertainty",
+    )

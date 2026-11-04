@@ -20,7 +20,7 @@ from types import SimpleNamespace
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from bai_badminton.components import _EvidenceRally, _Rally  # noqa: E402
+from bai_badminton.components import _EvidenceRally, _Rally, _TrackletEvidenceRally  # noqa: E402
 from bai_badminton.court import Homography  # noqa: E402
 from bai_badminton.engine import BadmintonMatchEngine, EngineConfig  # noqa: E402
 from bai_badminton.events.rally_fsm import RallyParams  # noqa: E402
@@ -68,7 +68,11 @@ def replay(baseline: Path, output: Path, overrides: dict, *, implementation="ral
             "last_contact": fsm._last_contact_frame,
         }
 
-    base_provider = _EvidenceRally if implementation == "rally-evidence-v2" else _Rally
+    base_provider = {
+        "rally-fsm-v1": _Rally,
+        "rally-evidence-v2": _EvidenceRally,
+        "rally-evidence-tracklets-v1": _TrackletEvidenceRally,
+    }[implementation]
 
     class TracedRally(base_provider):
         def step(self, frame, visible, speed, replay=False):
@@ -123,7 +127,7 @@ def replay(baseline: Path, output: Path, overrides: dict, *, implementation="ral
             )
             return result
 
-    if implementation == "rally-evidence-v2":
+    if implementation in {"rally-evidence-v2", "rally-evidence-tracklets-v1"}:
 
         def traced_evidence(self, observation):
             before = state(self)
@@ -141,6 +145,10 @@ def replay(baseline: Path, output: Path, overrides: dict, *, implementation="ral
                     "y": finite(processed.y[idx]),
                     "interpolated": bool(processed.interp[idx]),
                     "evidence": asdict(observation),
+                    "exit_proof": asdict(self.last_exit_support)
+                    if getattr(self, "last_exit_support_frame", None) == observation.frame
+                    and getattr(self, "last_exit_support", None) is not None
+                    else None,
                     "before": before,
                     "after": state(self),
                     "update": asdict(result),
@@ -151,7 +159,7 @@ def replay(baseline: Path, output: Path, overrides: dict, *, implementation="ral
         TracedRally.step_evidence = traced_evidence
     configured = dict(overrides)
     evidence_options = {}
-    for key in ("use_reconstruction", "motion_guard", "use_exit_recovery"):
+    for key in ("use_reconstruction", "motion_guard", "use_exit_recovery", "use_curve_exit"):
         if key in configured:
             evidence_options[key] = configured.pop(key)
     params = RallyParams(fps=metadata["video_fps"], **configured)
@@ -255,7 +263,11 @@ if __name__ == "__main__":
     parser.add_argument("--baseline", type=Path, default=ROOT / "outputs/benchmarking/test1")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--rally-params", type=json.loads, default={})
-    parser.add_argument("--rally-implementation", choices=["rally-fsm-v1", "rally-evidence-v2"], default="rally-fsm-v1")
+    parser.add_argument(
+        "--rally-implementation",
+        choices=["rally-fsm-v1", "rally-evidence-v2", "rally-evidence-tracklets-v1"],
+        default="rally-fsm-v1",
+    )
     parser.add_argument("--candidate", action="store_true", help="explicit candidate run, baseline parity not required")
     args = parser.parse_args()
     replay(

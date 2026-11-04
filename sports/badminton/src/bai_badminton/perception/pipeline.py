@@ -36,11 +36,13 @@ from bai_badminton.perception.camera import CameraTracker, project
 from bai_badminton.perception.components import (
     BASELINE_IMPLEMENTATIONS,
     PERCEPTION_PORTS,
+    DiagnosticShuttlePort,
     PerceptionContext,
     TrackingContext,
     register_perception_components,
 )
 from bai_badminton.perception.court_lines import CameraRig, CourtTracker, camera_pose
+from bai_badminton.perception.diagnostics import DiagnosticSelection, FrameDiagnostic
 from bai_badminton.perception.isolation import flight_mask
 from bai_badminton.perception.players import CourtROI, PlayerDetector, PoseEstimator
 from bai_badminton.perception.scene import CourtPresence, CutDetector, small_hsv
@@ -137,6 +139,17 @@ class BadmintonPerception:
         self.effective_choices: dict[str, ModelChoice | None] = {
             kind: profile.components.get(kind, getattr(profile, kind, None)) for kind in PERCEPTION_PORTS
         }
+        shuttle_choice = self.effective_choices["shuttle"]
+        self.diagnostic_selection = DiagnosticSelection.parse(
+            shuttle_choice.params.get("diagnostics") if shuttle_choice is not None else None
+        )
+        self.flight_region = (
+            shuttle_choice.params.get("flight_region", "bounded_upward_sweep_v1")
+            if shuttle_choice
+            else "bounded_upward_sweep_v1"
+        )
+        if self.flight_region not in {"bounded_upward_sweep_v1", "vertical_columns_to_image_top_v1"}:
+            raise ValueError("unsupported shuttle flight-region policy")
         ocr_choice = self.effective_choices["ocr"]
         self.ocr_scene_policy = ocr_choice.params.get("scene_policy", "main_camera") if ocr_choice else "main_camera"
         if self.ocr_scene_policy not in ("main_camera", "all_image_broadcast_overlay"):
@@ -308,7 +321,9 @@ class BadmintonPerception:
 
     def _providers(self, choice: ModelChoice, cache: Path, *, model_digest: str | None = None) -> list[Any]:
         return ort_providers(
-            choice.backend, engine_cache=cache / choice.model, fp16=choice.precision == "fp16",
+            choice.backend,
+            engine_cache=cache / choice.model,
+            fp16=choice.precision == "fp16",
             model_digest=model_digest,
         )
 
@@ -531,6 +546,10 @@ class BadmintonPerception:
         rates_pose = p.pose_rates.in_play if in_play else p.pose_rates.idle
 
         shuttle = [None] * n
+        diagnostic_selection = getattr(self, "diagnostic_selection", DiagnosticSelection())
+        diagnostic_indices = {i for i in range(n) if diagnostic_selection.includes(chunk.start + i)}
+        shuttle_diagnostics = [None] * n
+        diagnostics_supported = isinstance(self.shuttle, DiagnosticShuttlePort) and self.shuttle.supports_diagnostics
         if self.shuttle is not None and not all(replay):
             with timed("shuttle"):
                 t0 = _now()
@@ -543,12 +562,27 @@ class BadmintonPerception:
                 masks = None
                 if self._ref_poly is not None:
                     masks = [
-                        flight_mask(poly, (img.shape[1], img.shape[0]), (WIDTH, HEIGHT))
+                        flight_mask(
+                            poly,
+                            (img.shape[1], img.shape[0]),
+                            (WIDTH, HEIGHT),
+                            region=getattr(self, "flight_region", "bounded_upward_sweep_v1"),
+                        )
                         if poly is not None and not replay[i]
                         else np.zeros((HEIGHT, WIDTH), np.uint8)
                         for i, (img, poly) in enumerate(zip(chunk.frames, polys, strict=True))
                     ]
-                shuttle = self.shuttle.detect(chunk.frames, shots, step=step, masks=masks)
+                if diagnostic_indices and diagnostics_supported:
+                    shuttle, shuttle_diagnostics = self.shuttle.detect_with_diagnostics(
+                        chunk.frames,
+                        shots,
+                        step=step,
+                        masks=masks,
+                        selection=diagnostic_selection,
+                        indices=diagnostic_indices,
+                    )
+                else:
+                    shuttle = self.shuttle.detect(chunk.frames, shots, step=step, masks=masks)
                 self._rate("shuttle", n, t0)
 
         frames: list[FramePerception] = []
@@ -556,6 +590,9 @@ class BadmintonPerception:
         with timed("players"):
             for i, img in enumerate(chunk.frames):
                 fidx = chunk.start + i
+                configure_diagnostics = getattr(self.players, "set_diagnostics", None)
+                if callable(configure_diagnostics):
+                    configure_diagnostics(i in diagnostic_indices and not replay[i], diagnostic_selection.top_k)
                 if cut_flags[i]:
                     self.players.on_cut()
                 poly = polys[i]
@@ -608,6 +645,27 @@ class BadmintonPerception:
                         detector_observed=bool(
                             not replay[i] and getattr(self.players, "last_detector_observed", False)
                         ),
+                        diagnostic=FrameDiagnostic(
+                            frame_idx=fidx,
+                            canonical_time_sec=fidx / self.fps,
+                            shot_id=shots[i],
+                            view=scene.views[i],
+                            calibration_state=states[i].value,
+                            shuttle=shuttle_diagnostics[i],
+                            acquisition_reason="view_excluded"
+                            if replay[i]
+                            else "provider_unavailable"
+                            if self.shuttle is None
+                            else "model_ran"
+                            if diagnostics_supported
+                            else "provider_diagnostics_unsupported",
+                            provider=self.models.get("shuttle", "unavailable"),
+                            players=getattr(self.players, "last_diagnostic", None)
+                            if callable(configure_diagnostics)
+                            else None,
+                        )
+                        if i in diagnostic_indices
+                        else None,
                     )
                 )
         self._rate("players", n, t0)

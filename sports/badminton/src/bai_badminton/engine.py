@@ -37,6 +37,7 @@ from bai_badminton.components import (
     DOMAIN_PORTS,
     ActivityInference,
     Analytics,
+    AssociatedExitRallySegmentation,
     ContactInference,
     DomainContext,
     EvidenceRallySegmentation,
@@ -1501,7 +1502,7 @@ class BadmintonMatchEngine:
                                 "confidence_semantics": "uncalibrated_heuristic_support",
                             },
                             evidence=(Evidence(kind=EvidenceKind.COMPONENT_SCORES, scores=c.components),),
-                            model=CONTACT_MODEL,
+                            model=c.model,
                         )
                     ]
                 )
@@ -1533,6 +1534,20 @@ class BadmintonMatchEngine:
                     if t.vis[i] and t.interp[i]
                     else ObservationKind.MISSING
                 )
+                exit_supported = False
+                if kind in {ObservationKind.MISSING, ObservationKind.RECONSTRUCTED}:
+                    if isinstance(self.fsm, AssociatedExitRallySegmentation):
+                        exit_supported = self.fsm.exit_return_support(
+                            w, i, frame_height=self.cfg.frame_height, raw_xy=self._raw_xy
+                        ).supported
+                    else:
+                        exit_supported = image_exit_return_supported(
+                            w,
+                            i,
+                            frame_height=self.cfg.frame_height,
+                            raw_xy=self._raw_xy,
+                            minimum_speed=self.fsm.params.start_speed,
+                        )
                 observation = RallyObservation(
                     frame=f,
                     kind=kind,
@@ -1545,16 +1560,7 @@ class BadmintonMatchEngine:
                         kind is ObservationKind.RECONSTRUCTED
                         and trajectory_continuation_supported(w, i, minimum_speed=self.fsm.params.start_speed)
                     ),
-                    exit_return_supported=(
-                        kind in {ObservationKind.MISSING, ObservationKind.RECONSTRUCTED}
-                        and image_exit_return_supported(
-                            w,
-                            i,
-                            frame_height=self.cfg.frame_height,
-                            raw_xy=self._raw_xy,
-                            minimum_speed=self.fsm.params.start_speed,
-                        )
-                    ),
+                    exit_return_supported=exit_supported,
                 )
                 update = self.fsm.step_evidence(observation)
             else:
@@ -1630,7 +1636,7 @@ class BadmintonMatchEngine:
             "attribution_reason": c.attribution_reason,
             "attribution_policy": ATTRIBUTION_POLICY if c.attribution_reason else None,
             "contact_status": "estimated",
-            "contact_method": CONTACT_MODEL,
+            "contact_method": c.model,
             "confidence_semantics": "uncalibrated_heuristic_support",
             "racket_contact_observed": False,
             "racket_overlap_observed": c.scores.get("racket_overlap", 0) >= 0.5,
@@ -1663,6 +1669,12 @@ class BadmintonMatchEngine:
                     restrict_target_court=self.match_cfg.discipline == "doubles",
                 )
         geometry_context = self._participant_geometry_at(c, w)
+        if c.model != CONTACT_MODEL and isinstance(payload.get("participant_hypothesis"), dict):
+            # This attribution helper is an independent legacy geometry scorer.
+            # Label its scores rather than presenting them as the selected
+            # provider's motion-reliability evidence.
+            payload["participant_hypothesis"]["components_model"] = CONTACT_MODEL
+            payload["participant_hypothesis"]["components_scope"] = "independent_participant_attribution"
         if geometry_context is not None:
             payload["participant_geometry_context"] = loads(dumps(asdict(geometry_context), allow_nan=False))
         ev = self._event(
@@ -1677,7 +1689,7 @@ class BadmintonMatchEngine:
                 Evidence(kind=EvidenceKind.COMPONENT_SCORES, scores=c.components),
                 Evidence(kind=EvidenceKind.TRACK_WINDOW, obj="shuttle", frames=(c.frame - 3, c.frame + 3)),
             ),
-            model=CONTACT_MODEL,
+            model=c.model,
         )
         self._emit([ev])
         prev = self._open_contacts[-1] if self._open_contacts else None

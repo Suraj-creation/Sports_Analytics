@@ -32,6 +32,12 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 
+from bai_badminton.perception.diagnostics import (
+    MAX_DIAGNOSTIC_FRAMES,
+    DiagnosticSelection,
+    ShuttleDiagnostic,
+    summarize_heatmap,
+)
 from bai_engine.obs import get_logger
 from bai_engine.runtime.device import ort_runtime
 
@@ -217,6 +223,8 @@ def heatmap_to_point(
 class TrackNetV3:
     """Shuttle detector over non-overlapping windows of ``seq_len`` frames."""
 
+    supports_diagnostics = True
+
     def __init__(
         self,
         weights: Path,
@@ -245,8 +253,10 @@ class TrackNetV3:
         cache_key = None
         graph_digest = None
         onnx_path = None
-        if checkpoint_stream is not None or expected_sha256 is not None or backend in (
-            "onnx-cpu", "onnx-cuda", "tensorrt"
+        if (
+            checkpoint_stream is not None
+            or expected_sha256 is not None
+            or backend in ("onnx-cpu", "onnx-cuda", "tensorrt")
         ):
             context = nullcontext(checkpoint_stream) if checkpoint_stream is not None else weights.open("rb")
             with context as stream:
@@ -298,8 +308,10 @@ class TrackNetV3:
             param = next(self._torch.parameters())
             actual = "torch-cuda" if param.device.type == "cuda" else "torch-cpu"
             self.runtime = {
-                "requested_backend": backend, "actual_backend": actual,
-                "device": str(param.device), "dtype": str(param.dtype),
+                "requested_backend": backend,
+                "actual_backend": actual,
+                "device": str(param.device),
+                "dtype": str(param.dtype),
                 "backend_fallback": actual != backend,
             }
         self.runtime["requested_precision"] = precision
@@ -476,6 +488,44 @@ class TrackNetV3:
         step: int | None = None,
         masks: list[NDArray[np.uint8]] | None = None,
     ) -> list[ShuttleDetection | None]:
+        return self._detect(frames_bgr, shots, step, masks)
+
+    def detect_with_diagnostics(
+        self,
+        frames_bgr: list[NDArray[np.uint8]],
+        shots: list[int],
+        *,
+        step: int,
+        masks: list[NDArray[np.uint8]] | None,
+        selection: DiagnosticSelection,
+        indices: set[int],
+    ) -> tuple[list[ShuttleDetection | None], list[ShuttleDiagnostic | None]]:
+        """Optional capability: bounded summaries from the same model forwards.
+
+        Indices are local to this input call. No persistent last-call tensors,
+        candidates, tracker state or callbacks survive the call.
+        """
+        if len(indices) > MAX_DIAGNOSTIC_FRAMES:
+            raise ValueError("diagnostic indices exceed the bounded frame budget")
+        if any(type(i) is not int or not 0 <= i < len(frames_bgr) for i in indices):
+            raise ValueError("diagnostic indices must lie within the current input")
+        summaries: list[ShuttleDiagnostic | None] = [None] * len(frames_bgr)
+        outputs = self._detect(
+            frames_bgr, shots, step, masks, selection=selection, indices=indices, summaries=summaries
+        )
+        return outputs, summaries
+
+    def _detect(
+        self,
+        frames_bgr: list[NDArray[np.uint8]],
+        shots: list[int] | None,
+        step: int | None,
+        masks: list[NDArray[np.uint8]] | None,
+        *,
+        selection: DiagnosticSelection | None = None,
+        indices: set[int] | None = None,
+        summaries: list[ShuttleDiagnostic | None] | None = None,
+    ) -> list[ShuttleDetection | None]:
         """Detect the shuttle in every frame.
 
         ``step`` = window stride.  ``step == seq_len`` (default) runs each frame once; a smaller
@@ -524,7 +574,25 @@ class TrackNetV3:
                     acc[i] += win[j]
                     cnt[i] += 1
         out: list[ShuttleDetection | None] = []
+        background_digests: dict[int, str] = {}
         for i in range(n):
-            pt = heatmap_to_point(acc[i] / max(cnt[i], 1.0), self.threshold, None if masks is None else masks[i])
+            heatmap = acc[i] / max(cnt[i], 1.0)
+            mask = None if masks is None else masks[i]
+            pt = heatmap_to_point(heatmap, self.threshold, mask)
             out.append(None if pt is None else ShuttleDetection(pt[0] * sx, pt[1] * sy, pt[2]))
+            if selection is not None and indices is not None and i in indices:
+                assert summaries is not None
+                shot = shots[i]
+                if shot not in background_digests:
+                    background_digests[shot] = hashlib.sha256(self.bg.get(shot, small[i]).tobytes()).hexdigest()
+                summaries[i] = summarize_heatmap(
+                    heatmap,
+                    self.threshold,
+                    mask,
+                    scale=(sx, sy),
+                    selection=selection,
+                    window_votes=int(cnt[i]),
+                    background_sha256=background_digests[shot],
+                    decoded_xy=None if pt is None else (pt[0] * sx, pt[1] * sy),
+                )
         return out

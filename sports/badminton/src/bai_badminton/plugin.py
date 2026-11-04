@@ -56,7 +56,7 @@ from bai_engine.store import EventStore, TrackStore
 log = get_logger(__name__)
 AUTO_CALIBRATION_MIN_SCORE = 0.6
 REF_FILE = "camera_ref.png"  # the frame the calibration was made on (lossless: its id is a content hash)
-CODEC_VERSION = 17  # explicit source-board context and unknown physical identities
+CODEC_VERSION = 18  # bounded optional diagnostic schema; v17 remains diagnostic-readable
 MAX_ADJUST = 0.03  # a human calibration the court lines move by more than this (× frame width) is kept as is
 
 
@@ -1079,6 +1079,7 @@ class BadmintonSession:
                     "cs": fp.calibration_state.value if fp.calibration_state is not None else None,
                     "do": fp.detector_observed,
                     "ps": fp.pose_stride,
+                    "dg": fp.diagnostic.to_dict() if fp.diagnostic is not None else None,
                     "p": [
                         {
                             "t": q.track_id,
@@ -1129,13 +1130,40 @@ class BadmintonSession:
             raise StaleCacheError("badminton requires sequential fresh perception; cache is diagnostic only")
         d = msgpack.unpackb(data, raw=False)
         ref_id = self.perception.ref_id
-        if d.get("v", 1) != CODEC_VERSION or d.get("cr") != ref_id or d.get("ci") != self._isolation_id():
+        if d.get("v", 1) not in {17, CODEC_VERSION} or d.get("cr") != ref_id or d.get("ci") != self._isolation_id():
             # A static calibration has no camera reference, but its geometry and
             # lock policy still control both player admission and shuttle peaks.
             raise StaleCacheError(
                 f"perception segment {d['start']} has stale codec/calibration policy "
                 f"(version {d.get('v', 1)} vs {CODEC_VERSION}; reference {d.get('cr')} vs {ref_id})"
             )
+        if d["v"] == CODEC_VERSION and any("dg" not in frame for frame in d["frames"]):
+            raise StaleCacheError("perception segment lacks diagnostic schema metadata")
+        from bai_badminton.perception.diagnostics import FrameDiagnostic
+
+        diagnostics = {}
+        try:
+            for frame in d["frames"]:
+                if frame.get("dg") is not None:
+                    if d["v"] != CODEC_VERSION:
+                        raise ValueError("legacy diagnostic cache cannot carry the new schema")
+                    diagnostic = FrameDiagnostic.from_dict(frame["dg"])
+                    if diagnostic.frame_idx != frame["f"] or diagnostic.shot_id != frame["sh"]:
+                        raise ValueError("diagnostic frame/context identity differs from its observation")
+                    fps = d["ci"].get("fps")
+                    if type(fps) not in (int, float) or not np.isfinite(fps) or fps <= 0:
+                        raise ValueError("diagnostic canonical FPS is unavailable")
+                    if abs(diagnostic.canonical_time_sec - frame["f"] / fps) > 1e-8:
+                        raise ValueError("diagnostic timestamp differs from the canonical frame clock")
+                    if diagnostic.view != (frame.get("v") or "unknown") or diagnostic.calibration_state != frame.get(
+                        "cs"
+                    ):
+                        raise ValueError("diagnostic view/geometry differs from its observation")
+                    if diagnostic.provider != d.get("models", {}).get("shuttle", "unavailable"):
+                        raise ValueError("diagnostic provider differs from its recorded component")
+                    diagnostics[frame["f"]] = diagnostic
+        except (TypeError, ValueError, KeyError) as exc:
+            raise StaleCacheError(f"invalid bounded perception diagnostic: {exc}") from exc
         # A cache without explicit validity is incomplete, even if its version
         # and geometry fingerprint otherwise match. Never trust it as legacy.
         valid_states = {state.value for state in CalibrationState}
@@ -1177,6 +1205,7 @@ class BadmintonSession:
                 calibration_state=CalibrationState(f["cs"]) if f.get("cs") is not None else None,
                 detector_observed=f["do"],
                 pose_stride=f["ps"],
+                diagnostic=diagnostics.get(f["f"]),
                 persons=[
                     PersonObs(
                         track_id=q["t"],
