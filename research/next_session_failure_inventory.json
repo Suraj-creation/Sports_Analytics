@@ -2795,7 +2795,7 @@
       "id": "H01",
       "priority": "P0",
       "title": "GT23 remains missed; fragmentation and an unflagged same-camera edit",
-      "status": "Measured failure; edit has strong visual evidence; intended human onset remains unknown.",
+      "status": "partially_resolved_scene_authority_open",
       "evidence": "GT10733\u201311078 has unmatched fresh pieces 10769\u201310908 and 10949\u201311085 plus preceding spillover. Original 10769\u219210770 jumps player positions; histogram correlation.9959220991>.55 leaves CutDetector false and shotID25. Label starts 37 frames before edit during preparation.",
       "owning_files": [
         "sports/badminton/src/bai_badminton/perception/scene.py",
@@ -2804,13 +2804,45 @@
         "sports/badminton/src/bai_badminton/engine.py"
       ],
       "next_action": "Review 10680\u201311090 with fresh gt_23/fp_23/fp_24 and exact transitions. Separate true break/preparation, edit detection and 10909\u201310947 loss. Test a reviewed foreground-continuity/cut cue separately from recovery; better cut detection is not automatically better rally IoU.",
-      "controls": "Preserve GT22/23 as separate labels. Do not join all overlapping pieces, fit a cut threshold to this pair, or change GT10733."
+      "controls": "Preserve GT22/23 as separate labels. Do not join all overlapping pieces, fit a cut threshold to this pair, or change GT10733.",
+      "handoff_status": "Measured failure; edit has strong visual evidence; intended human onset remains unknown.",
+      "next_session_review": {
+        "source_commit": "33d3a5b1bcfd945555b76360cc361881e5a3eb8a",
+        "conclusion": "Qualified singleton association recovers the later GT23 split while retaining GT22 as a separate interval.",
+        "limitation": "Both same-camera edits remain unflagged; the annotated GT23 onset precedes the visible edit and its convention is unknown.",
+        "next_action": "Review independent same-camera cuts and fast-play/occlusion controls before adopting a foreground continuity detector.",
+        "evidence": [
+          "research/next_session_root_cause_report.md",
+          "research/next_session_final_report.md",
+          "research/next_session_validation_matrix.md",
+          "research/next_session_experiment_results.json",
+          "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_all36_model_firsts/all36_model_temporal_firsts.json"
+        ],
+        "component_and_control_evidence": [
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_temporal_audit/gt22_23_causal_trace.jsonl",
+            "sha256": "a5739dfc574d984b82203c80c4be41615b716aea28757990030d64273c28a50e",
+            "bytes": 627205
+          },
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_mask_tracklet_semantic/rally_comparison.csv",
+            "sha256": "fb3c0ff9586b9100cb59b3617c89c7ca8f1c93bb454c176177dd40cf3fb2cf49",
+            "bytes": 8072
+          },
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_contact_scene_foreground_v1/scene_foreground_metrics.json",
+            "sha256": "d2ad52c3be1cd27964bf66a23365ee07d1d936811d237df6022a7241b3a1a4b5",
+            "bytes": 1563147
+          }
+        ],
+        "fresh_run_evidence": "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_v1"
+      }
     },
     {
       "id": "H02",
       "priority": "P0",
       "title": "GT27 ends 218 frames early; static court-line peak is a likely attractor",
-      "status": "Measured failure and proven state chain; model localization diagnosis is not pixel ground truth.",
+      "status": "interval_improved_terminal_and_contact_validity_open",
       "evidence": "GT12451\u201312966 matches 12455\u201312748; extra 12771\u201312954 remains FP. End\u2212218 frames/\u22127.2667 s; duration\u22127.4 s. Baseline points 12748\u201312768 stick near proxy(645,393), support.51\u2013.58 on painted serviceT during overhead action. Accepted contact 12771 is 23 frames beyond endpoint, outside 22 frame budget.",
       "owning_files": [
         "sports/badminton/src/bai_badminton/perception/tracknet.py",
@@ -2819,13 +2851,45 @@
         "sports/badminton/src/bai_badminton/events/rally_fsm.py"
       ],
       "next_action": "Retain top-k peak/rejection diagnostics; inspect 12735\u201312790/fullGT27. Isolate background/context and temporal candidate association. Separately inspect suspicious contact impulse and terminal stationarity validity.",
-      "controls": "Test real floor/spare shuttles, static lines, slow flight, apexes, launches and landings. Player-motion guarding failed; do not increase merge budget by one frame just for this case."
+      "controls": "Test real floor/spare shuttles, static lines, slow flight, apexes, launches and landings. Player-motion guarding failed; do not increase merge budget by one frame just for this case.",
+      "handoff_status": "Measured failure and proven state chain; model localization diagnosis is not pixel ground truth.",
+      "next_session_review": {
+        "source_commit": "33d3a5b1bcfd945555b76360cc361881e5a3eb8a",
+        "conclusion": "New upper-flight admission restores source-visible re-entry. The conditional GT27 end improves from 12748 to 12954.",
+        "limitation": "The T attractor and stationary-end proposal persist. Recovery still uses suspect legacy contact 12766; interval accuracy does not validate this contact or landing.",
+        "next_action": "Completed suppression and reliable-contact controls prove the dependency. Test richer association with reviewed floor/landing and close-rally controls; the fixed-radius cluster counterfactual failed and must not be widened to fit this case.",
+        "evidence": [
+          "research/next_session_root_cause_report.md",
+          "research/next_session_final_report.md",
+          "research/next_session_validation_matrix.md",
+          "research/next_session_experiment_results.json",
+          "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_all36_model_firsts/all36_model_temporal_firsts.json"
+        ],
+        "component_and_control_evidence": [
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_mask_ceiling_component/hybrid_integrity_validation.json",
+            "sha256": "4cb83776f8b25691e3bce1c4e5a1d7e9c8bd491502728da0f4717015a1fa2fd6",
+            "bytes": 1747
+          },
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_temporal_audit/gt27_causal_trace.jsonl",
+            "sha256": "a2b19143607d0b093caf35b4e75d9dd10ad78ccb3e2374ed0792e555abbe4e12",
+            "bytes": 629589
+          },
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_mask_tracklet_semantic/rally_comparison.csv",
+            "sha256": "fb3c0ff9586b9100cb59b3617c89c7ca8f1c93bb454c176177dd40cf3fb2cf49",
+            "bytes": 8072
+          }
+        ],
+        "fresh_run_evidence": "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_v1"
+      }
     },
     {
       "id": "H03",
       "priority": "P0",
       "title": "GT31 becomes matched but starts 297 frames/9.9 seconds late",
-      "status": "Measured severe residual; view exclusion and mixed physical/model loss evidenced.",
+      "status": "partially_resolved_demonstrated_mask_loss",
       "evidence": "GT14404\u201315151 matches 14701\u201315171 (+297,+20; duration\u22129.2333 s); extra 14430\u201314646 remains. Source 14404\u201314420 is pickup close-up; wide around 14425. Baseline provisional 14430 cancelled 14467 then 14491 starts; verify fresh history separately. Model loss 14647\u201314694 spans observed endpoints(879.22,87.84)\u2192(936.07,240.61). Source streaks visible 14648,14684/88/90 before reacquisition 14695.",
       "owning_files": [
         "sports/badminton/src/bai_badminton/perception/scene.py",
@@ -2835,13 +2899,45 @@
         "sports/badminton/src/bai_badminton/engine.py"
       ],
       "next_action": "Review 14390\u201314710, original unoverlaid top crops and fresh cancellation/recovery. Separate close-up observability from recoverable post-cut onset; test trajectory uncertainty/candidate association with independent anchors.",
-      "controls": "Do not backdate into close-up, call excluded frames verified replay, widen top band to fit 240.61, or merge every 48 frame gap."
+      "controls": "Do not backdate into close-up, call excluded frames verified replay, widen top band to fit 240.61, or merge every 48 frame gap.",
+      "handoff_status": "Measured severe residual; view exclusion and mixed physical/model loss evidenced.",
+      "next_session_review": {
+        "source_commit": "33d3a5b1bcfd945555b76360cc361881e5a3eb8a",
+        "conclusion": "Identical-context fresh inference exposes 16 strong GT31 peaks rejected by the old mask; admission restores ordinary top-exit continuity without curve support.",
+        "limitation": "Frames 14651\u201314682 remain subthreshold/physically unverified. The pickup close-up cannot justify backdating the start into unobservable footage.",
+        "next_action": "Review launch/contact onset semantics and the remaining visibility gap independently; retain missing observations rather than inventing coordinates.",
+        "evidence": [
+          "research/next_session_root_cause_report.md",
+          "research/next_session_final_report.md",
+          "research/next_session_validation_matrix.md",
+          "research/next_session_experiment_results.json",
+          "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_all36_model_firsts/all36_model_temporal_firsts.json"
+        ],
+        "component_and_control_evidence": [
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_shuttle_background_probe/comparisons.json",
+            "sha256": "b3cab80df1dd677413d3d12d15f629154eb3b5330502e1f252ef102d5a19dfbd",
+            "bytes": 19434
+          },
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_contact_scene_perception_review/frame_evidence.json",
+            "sha256": "1f2a96b12cfa0a7a7add1527ad5cc1fd5cebc59be339a7adcd444102df461016",
+            "bytes": 226151
+          },
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_mask_tracklet_semantic/rally_comparison.csv",
+            "sha256": "fb3c0ff9586b9100cb59b3617c89c7ca8f1c93bb454c176177dd40cf3fb2cf49",
+            "bytes": 8072
+          }
+        ],
+        "fresh_run_evidence": "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_v1"
+      }
     },
     {
       "id": "H04",
       "priority": "P0",
       "title": "New early starts at GT4 and GT22",
-      "status": "Measured genuine common-row regressions; exact cause still needs trace isolation.",
+      "status": "open_reproduced_and_bounded",
       "evidence": "GT4 label 1874\u20132161: baseline 1889\u20132167 becomes 1803\u20132167, start+15\u2192\u221271 frames/\u22122.3667 s. GT22 start 10607:10601\u219210578, error\u22126\u2192\u221229. These are not effects of adding new matches.",
       "owning_files": [
         "sports/badminton/src/bai_badminton/events/rally_evidence.py",
@@ -2850,13 +2946,45 @@
         "sports/badminton/src/bai_badminton/engine.py"
       ],
       "next_action": "Review source/fresh gt_04 and gt_22, early provisional starts/contacts and exact support flags. Determine which intervention retains or joins an earlier candidate; create a source-supported negative control before changing rules.",
-      "controls": "Retain recovered GT2/19/20 and legitimate short breaks. Report both baseline and fresh-v1 comparisons."
+      "controls": "Retain recovered GT2/19/20 and legitimate short breaks. Report both baseline and fresh-v1 comparisons.",
+      "handoff_status": "Measured genuine common-row regressions; exact cause still needs trace isolation.",
+      "next_session_review": {
+        "source_commit": "33d3a5b1bcfd945555b76360cc361881e5a3eb8a",
+        "conclusion": "GT4/22 early starts remain unchanged by the selected mask/association changes. GT22 contact context crosses an unflagged 10603\u219210604 edit.",
+        "limitation": "GT4's earlier high-flight/feed sequence has ambiguous sporting onset; detecting the GT22 edit alone does not prove its first weak contact will disappear.",
+        "next_action": "Obtain reviewed onset/contact/cut labels, then test independent provisional-start validation while retaining GT2/19/20.",
+        "evidence": [
+          "research/next_session_root_cause_report.md",
+          "research/next_session_final_report.md",
+          "research/next_session_validation_matrix.md",
+          "research/next_session_experiment_results.json",
+          "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_all36_model_firsts/all36_model_temporal_firsts.json"
+        ],
+        "component_and_control_evidence": [
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_temporal_audit/gt04_causal_trace.jsonl",
+            "sha256": "6041cc31c6c474d037ead00b87fa06bdd4e9bae98b8f5d58bcb44bd93d7b22f8",
+            "bytes": 449784
+          },
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_temporal_audit/gt22_23_causal_trace.jsonl",
+            "sha256": "a5739dfc574d984b82203c80c4be41615b716aea28757990030d64273c28a50e",
+            "bytes": 627205
+          },
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_mask_tracklet_semantic/comparison_original/comparison.json",
+            "sha256": "379d6f5b229041d608220c3ad038fce79a1b23eaf12a3a615c7973ad5c17b0a7",
+            "bytes": 128210
+          }
+        ],
+        "fresh_run_evidence": "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_v1"
+      }
     },
     {
       "id": "H05",
       "priority": "P1",
       "title": "Persistent multi-second starts and cancelled initial candidates",
-      "status": "Measured failures; per-case roots not all established.",
+      "status": "partially_resolved_causal_classes_recorded",
       "evidence": "Fresh starts: GT1+96,5+99,6+103,8+72,9+112,10+97,14+69,15+87,20+32,25+45,26+70,28+61,33+72,31+297 frames. GT6/8/9 have localized excluded views. Baseline GT5 detects 2210 then cancels a 45 frame candidate under 60 frame minimum. Three speed samples normally require four adjacent observed positions.",
       "owning_files": [
         "sports/badminton/src/bai_badminton/engine.py",
@@ -2866,13 +2994,40 @@
         "sports/badminton/src/bai_badminton/perception/tracknet.py"
       ],
       "next_action": "Classify every delayed row: first raw observation, adjacent processed motion, contact, provisional start, cancellation, discontinuity and surviving start. Investigate independent start evidence or event-triggered fresh pose without collapsing all into fragmentation.",
-      "controls": "Do not subtract an average delay or lower minimum duration to fit labels. Keep short genuine rallies, break noise and weak launches as separate controls."
+      "controls": "Do not subtract an average delay or lower minimum duration to fit labels. Keep short genuine rallies, break noise and weak launches as separate controls.",
+      "handoff_status": "Measured failures; per-case roots not all established.",
+      "next_session_review": {
+        "source_commit": "33d3a5b1bcfd945555b76360cc361881e5a3eb8a",
+        "conclusion": "All 36 rows have source-bound first-provider/processed/motion/contact/start/cancellation/end records; upstream admission rescues several cancelled early events.",
+        "limitation": "Late starts persist through weak motion, view exclusion, ambiguous preparation and cancellations. First provider output is not a verified sporting onset.",
+        "next_action": "Review remaining large delays by causal group, using current-frame pose/racket acquisition only where it can distinguish competing explanations.",
+        "evidence": [
+          "research/next_session_root_cause_report.md",
+          "research/next_session_final_report.md",
+          "research/next_session_validation_matrix.md",
+          "research/next_session_experiment_results.json",
+          "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_all36_model_firsts/all36_model_temporal_firsts.json"
+        ],
+        "component_and_control_evidence": [
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_temporal_audit/all_onsets_ends.json",
+            "sha256": "c73471f7066304f1003c958d8e67f2e34ad3b5c25ddec246691381e413cb40c1",
+            "bytes": 70290
+          },
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_mask_tracklet_semantic/rally_comparison.csv",
+            "sha256": "fb3c0ff9586b9100cb59b3617c89c7ca8f1c93bb454c176177dd40cf3fb2cf49",
+            "bytes": 8072
+          }
+        ],
+        "fresh_run_evidence": "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_v1"
+      }
     },
     {
       "id": "H06",
       "priority": "P1",
       "title": "Residual end errors and truncated durations",
-      "status": "Measured failures; verified general end/landing evidence absent.",
+      "status": "improved_residual_terminal_evidence_open",
       "evidence": "Fresh ends GT10\u221235,16+41,20\u221220,21\u221224,22+29,31+20,36\u221219. Genuine end regressions: GT8+3\u2192+4,13\u22122\u2192+3,16+39\u2192+41. Duration MAE1.894286 s,RMSE2.784908 s,bias\u22121.587619 s. Start/end signed biases+39.2/\u22128.4286 frames.",
       "owning_files": [
         "sports/badminton/src/bai_badminton/events/rally_fsm.py",
@@ -2882,26 +3037,80 @@
         "sports/badminton/src/bai_badminton/events/rally_outcome.py"
       ],
       "next_action": "Investigate end independently of start; separate observed terminal support, temporary missingness and ambiguous/static position. Evaluate endpoint refinement from production evidence only.",
-      "controls": "Slow position is not confirmed landing; score/winner confidence cannot validate a boundary. Preserve nearby legitimate breaks and all duration/outlier metrics."
+      "controls": "Slow position is not confirmed landing; score/winner confidence cannot validate a boundary. Preserve nearby legitimate breaks and all duration/outlier metrics.",
+      "handoff_status": "Measured failures; verified general end/landing evidence absent.",
+      "next_session_review": {
+        "source_commit": "33d3a5b1bcfd945555b76360cc361881e5a3eb8a",
+        "conclusion": "End errors are evaluated independently; the major GT27 truncation improves and every remaining end proposal stays traceable.",
+        "limitation": "Neither static coordinates nor slow players establish landing. GT10/16 and other residual end errors remain; physical terminal labels are absent.",
+        "next_action": "Review terminal contact/landing/disappearance separately and test reversible terminal validation without increasing merge gaps.",
+        "evidence": [
+          "research/next_session_root_cause_report.md",
+          "research/next_session_final_report.md",
+          "research/next_session_validation_matrix.md",
+          "research/next_session_experiment_results.json",
+          "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_all36_model_firsts/all36_model_temporal_firsts.json"
+        ],
+        "component_and_control_evidence": [
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_temporal_audit/all_onsets_ends.json",
+            "sha256": "c73471f7066304f1003c958d8e67f2e34ad3b5c25ddec246691381e413cb40c1",
+            "bytes": 70290
+          },
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_mask_tracklet_semantic/metrics.json",
+            "sha256": "43a8407644511d61b96b1481726980d0c616354bafea42f4e509a3b18b7f3bf4",
+            "bytes": 5220
+          }
+        ],
+        "fresh_run_evidence": "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_v1"
+      }
     },
     {
       "id": "H07",
       "priority": "P1",
       "title": "Fine boundary accuracy remains poor",
-      "status": "Measured quality limitation.",
+      "status": "improved_fine_localization_open",
       "evidence": "No start within\u00b11 frame; only 3/36 within\u00b13. At\u00b130 start 20/36,end 32/36. Start median worsens 23\u219229 frames and max 202\u2192297; matched-only\u00b130 falls 60%\u219257.14% as coverage increases, while all GT improves 50%\u219255.56%.",
       "owning_files": [
         "scripts/benchmarking/evaluate_rallies.py",
         "research/compare_rally_experiments.py"
       ],
       "next_action": "Track common/new matches, both tolerance denominators, signed bias and every severe error; obtain reviewed onset/offset convention evidence before one-frame claims.",
-      "controls": "Never use F1/IoU alone, replace null misses with zero, or choose easier matches to hide outliers."
+      "controls": "Never use F1/IoU alone, replace null misses with zero, or choose easier matches to hide outliers.",
+      "handoff_status": "Measured quality limitation.",
+      "next_session_review": {
+        "source_commit": "33d3a5b1bcfd945555b76360cc361881e5a3eb8a",
+        "conclusion": "Full metrics retain start/end MAE, RMSE, median, bias, P90, max and all requested tolerances with both denominators.",
+        "limitation": "High detection recall does not establish frame-level boundaries; multi-second onset outliers and early GT4/22 remain.",
+        "next_action": "Resolve annotation conventions and evaluate starts and ends independently on reviewed unseen matches.",
+        "evidence": [
+          "research/next_session_root_cause_report.md",
+          "research/next_session_final_report.md",
+          "research/next_session_validation_matrix.md",
+          "research/next_session_experiment_results.json",
+          "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_all36_model_firsts/all36_model_temporal_firsts.json"
+        ],
+        "component_and_control_evidence": [
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_mask_tracklet_semantic/metrics.json",
+            "sha256": "43a8407644511d61b96b1481726980d0c616354bafea42f4e509a3b18b7f3bf4",
+            "bytes": 5220
+          },
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_mask_tracklet_semantic/comparison_original/comparison.json",
+            "sha256": "379d6f5b229041d608220c3ad038fce79a1b23eaf12a3a615c7973ad5c17b0a7",
+            "bytes": 128210
+          }
+        ],
+        "fresh_run_evidence": "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_v1"
+      }
     },
     {
       "id": "H08",
       "priority": "P1",
       "title": "Shuttle rejection reasons/weak competing peaks are discarded",
-      "status": "Proven observability gap.",
+      "status": "fixed_bounded_opt_in_observability",
       "evidence": "heatmap_to_point/pipeline reduce distinct low peak, competing component, mask rejection and absence to(None,0). Caches lack subthreshold/top-k peaks or heatmaps. Baseline 11767/17268 accepted outputs and 107 missing runs\u226510 frames measure coverage, not visibility recall.",
       "owning_files": [
         "sports/badminton/src/bai_badminton/perception/tracknet.py",
@@ -2910,13 +3119,45 @@
         "sports/badminton/src/bai_badminton/plugin.py"
       ],
       "next_action": "Add bounded opt-in candidate/peak/mask/rejection/vote metadata with provenance. First prove numerical prediction parity; version relevant cache/schema identities.",
-      "controls": "No full-video heatmap dump, invented coordinates/confidence or broken independent shuttle provider. Keep diagnostics bounded."
+      "controls": "No full-video heatmap dump, invented coordinates/confidence or broken independent shuttle provider. Keep diagnostics bounded.",
+      "handoff_status": "Proven observability gap.",
+      "next_session_review": {
+        "source_commit": "33d3a5b1bcfd945555b76360cc361881e5a3eb8a",
+        "conclusion": "Codec 18 diagnostics retain ranked components, raw/masked peaks, selection/rejection reasons, entropy, model votes and background digest with exact frame/provider identity.",
+        "limitation": "Top-k connected components above a diagnostic floor are not every local peak or a calibrated posterior. Unrecorded historical heatmaps remain unavailable.",
+        "next_action": "Use bounded evidence for association experiments; extend the versioned schema only when a concrete missing field is required.",
+        "evidence": [
+          "research/next_session_root_cause_report.md",
+          "research/next_session_final_report.md",
+          "research/next_session_validation_matrix.md",
+          "research/next_session_experiment_results.json",
+          "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_all36_model_firsts/all36_model_temporal_firsts.json"
+        ],
+        "component_and_control_evidence": [
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_shuttle_background_probe/manifest.json",
+            "sha256": "e7c85036a963f7db78dfb2f9da1595528f1060e38fa93d608b16be98ec8bbe7b",
+            "bytes": 39561
+          },
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_mask_ceiling_component/candidates.jsonl",
+            "sha256": "b7bc4955a7967e6648d0e9d1bee4b6004abc4217ac5578ba71c5639a5aa95cf1",
+            "bytes": 2091617
+          },
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_diagnostic_hardening_tests.log",
+            "sha256": "966a0de50422c37664bd118339c54df33ade63d59e746b132d217d2051da9ced",
+            "bytes": 99
+          }
+        ],
+        "fresh_run_evidence": "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_v1"
+      }
     },
     {
       "id": "H09",
       "priority": "P1",
       "title": "Background/resize/peak selection/chunk effects remain confounded",
-      "status": "Implementation differences proven; accuracy causes unmeasured.",
+      "status": "partially_resolved_factors_isolated",
       "evidence": "INTER_AREA differs from referencePIL; rolling per-shot median differs from fixed/rally median; global-max component lacks multi-hypothesis association. VOD effective 60 differs from profile 64, causing step 8 tail overlap. Both step 8/4 remove static T accepted peaks under fixed background/180 frame context; cannot credit step 4.",
       "owning_files": [
         "sports/badminton/src/bai_badminton/perception/tracknet.py",
@@ -2925,13 +3166,45 @@
         "engine/src/bai_engine/media/proxy.py"
       ],
       "next_action": "Separate background-only, resize-only, context-only and temporal association trials; use factorials for interactions. Pin images/masks/checkpoint/precision; compare localization only with labels and downstream intervals separately.",
-      "controls": "Step 8 emits every frame; not seven-of-eight skipping. Missing an old distractor is not recovered correct shuttle localization."
+      "controls": "Step 8 emits every frame; not seven-of-eight skipping. Missing an old distractor is not recovered correct shuttle localization.",
+      "handoff_status": "Implementation differences proven; accuracy causes unmeasured.",
+      "next_session_review": {
+        "source_commit": "33d3a5b1bcfd945555b76360cc361881e5a3eb8a",
+        "conclusion": "Three background arms hold checkpoints/resize/masks/chunks fixed; rolling reproduces all 1811 observations/supports exactly. Fixed-startup removes 24/24 T outputs but does not recover the true track.",
+        "limitation": "Zero concat input is not a separately trained background-free model. Resize-only and broader background generalization remain unmeasured.",
+        "next_action": "Evaluate context/association first; use controlled interpolation/background ablations with independently reviewed localization controls.",
+        "evidence": [
+          "research/next_session_root_cause_report.md",
+          "research/next_session_final_report.md",
+          "research/next_session_validation_matrix.md",
+          "research/next_session_experiment_results.json",
+          "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_all36_model_firsts/all36_model_temporal_firsts.json"
+        ],
+        "component_and_control_evidence": [
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_shuttle_background_probe/comparisons.json",
+            "sha256": "b3cab80df1dd677413d3d12d15f629154eb3b5330502e1f252ef102d5a19dfbd",
+            "bytes": 19434
+          },
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_mask_ceiling_component/manifest.json",
+            "sha256": "59b0bac16599cb17b11e98725744c9a35e2d5c9290afe1a53943c503449d35ca",
+            "bytes": 102021
+          },
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_mask_ceiling_component/hybrid_top_level_validation.json",
+            "sha256": "ae2a080a854ce462c67aa3a32f5b15743788f6c377905c7c8d8b5a1854ef809a",
+            "bytes": 274
+          }
+        ],
+        "fresh_run_evidence": "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_v1"
+      }
     },
     {
       "id": "H10",
       "priority": "P1",
       "title": "Near-zero velocity can saturate contact impulse/redirect",
-      "status": "Proven numerical sensitivity; real contact-error rate unknown.",
+      "status": "open_numerical_defect_reproduced_alternative_not_promoted",
       "evidence": "ratio=post/max(pre,1e\u22126), rejection only if both speeds<.5. GT27 contact 12748: .0228\u21921.1602 px/frame, redirect 1,impulse 1, proximity.0656,score.7297. Controlled 2.4 px turn near 100 px body yields.977989 without pose/racket; not a human-labeled false hit.",
       "owning_files": [
         "sports/badminton/src/bai_badminton/events/contact.py",
@@ -2939,13 +3212,45 @@
         "sports/badminton/src/bai_badminton/engine.py"
       ],
       "next_action": "Expose velocity reliability; compare absolute motion/acceleration against relative ratio in opt-in contact provider. Review contact timing before calibration or weight changes; isolate from segmentation.",
-      "controls": "Blunt incoming-speed floor suppresses valid low-speed serve launches. Include apexes, quantization, occlusion and boundary hits."
+      "controls": "Blunt incoming-speed floor suppresses valid low-speed serve launches. Include apexes, quantization, occlusion and boundary hits.",
+      "handoff_status": "Proven numerical sensitivity; real contact-error rate unknown.",
+      "next_session_review": {
+        "source_commit": "33d3a5b1bcfd945555b76360cc361881e5a3eb8a",
+        "conclusion": "The optional reliable-motion provider removes unstable relative gain, exposes slope sensitivity and passes weak-launch/zero-incoming controls.",
+        "limitation": "Its old-perception semantic trial newly misses GT27. The selected candidate retains legacy scoring, and suspect 12766 still has saturated ratio cues.",
+        "next_action": "Both completed controls confirm the coupling. Validate static-to-track association and reviewed contact precision/recall before replacing the provider; the new-mask reliable trial also fragments GT27.",
+        "evidence": [
+          "research/next_session_root_cause_report.md",
+          "research/next_session_final_report.md",
+          "research/next_session_validation_matrix.md",
+          "research/next_session_experiment_results.json",
+          "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_all36_model_firsts/all36_model_temporal_firsts.json"
+        ],
+        "component_and_control_evidence": [
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_contact_scene_sensitivity/contact_sensitivity.json",
+            "sha256": "4aa7a8bdb7825bf1f2383e4e1a0c99ad349ce6c885a41314da0692c83ab7da5b",
+            "bytes": 812443
+          },
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_contact_owner_validation/focused_tests.log",
+            "sha256": "5358e8edf2e68d203e959a13d0c3f47387dcf082e2d8e279532d49b6e540d9e3",
+            "bytes": 180
+          },
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_contact_reliability_replay_v1/evaluation/metrics.json",
+            "sha256": "0c1c010201961837badb1d447b6387dcabb7365871b8582d5da425e274e808d5",
+            "bytes": 6023
+          }
+        ],
+        "fresh_run_evidence": "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_v1"
+      }
     },
     {
       "id": "H11",
       "priority": "P1",
       "title": "Sparse direct racket evidence and sparse pose cadence",
-      "status": "Measured baseline availability; causal accuracy loss unproven.",
+      "status": "open_sampling_and_label_limit",
       "evidence": "Baseline 432 contacts:83 geometric racket cues,6 ellipse overlaps,0 observed physical impacts;55 lack two same-frame poses;330 positive swing. Racket acquisition requires fresh matched player/wrist. Fresh 447 contacts are a separate stream.",
       "owning_files": [
         "sports/badminton/src/bai_badminton/perception/racket.py",
@@ -2954,13 +3259,40 @@
         "sports/badminton/src/bai_badminton/events/contact.py"
       ],
       "next_action": "Test event-triggered current-frame pose/racket around uncertain onsets; ablate trajectory/body/pose/racket coverage and reviewed timing, then rally metrics/runtime.",
-      "controls": "Do not require overlap for every real hit, invent skipped poses or call confirmed ledger entries physical impacts. Counts alone are not accuracy."
+      "controls": "Do not require overlap for every real hit, invent skipped poses or call confirmed ledger entries physical impacts. Counts alone are not accuracy.",
+      "handoff_status": "Measured baseline availability; causal accuracy loss unproven.",
+      "next_session_review": {
+        "source_commit": "33d3a5b1bcfd945555b76360cc361881e5a3eb8a",
+        "conclusion": "Fresh/carried boxes, actual pose stride, keypoint availability and racket evidence are visible in the new bounded replay.",
+        "limitation": "No event-triggered pose/racket policy was accepted, and sparse evidence has no independently measured contact-error attribution.",
+        "next_action": "Test current-frame event-triggered acquisition on reviewed uncertain contacts with compute-cost and frontier controls.",
+        "evidence": [
+          "research/next_session_root_cause_report.md",
+          "research/next_session_final_report.md",
+          "research/next_session_validation_matrix.md",
+          "research/next_session_experiment_results.json",
+          "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_all36_model_firsts/all36_model_temporal_firsts.json"
+        ],
+        "component_and_control_evidence": [
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_contact_scene_perception_review/frame_evidence.json",
+            "sha256": "1f2a96b12cfa0a7a7add1527ad5cc1fd5cebc59be339a7adcd444102df461016",
+            "bytes": 226151
+          },
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_audit_repeat_control/comparison.json",
+            "sha256": "33bb731386d6204ef1ba6b1c1be20d35aaf6e1630bbc9608dc7e7e6a831135ac",
+            "bytes": 52556
+          }
+        ],
+        "fresh_run_evidence": "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_v1"
+      }
     },
     {
       "id": "H12",
       "priority": "P2",
       "title": "Player rejection and association quality cannot be diagnosed fully from existing caches",
-      "status": "Proven telemetry/label gap.",
+      "status": "partially_fixed_telemetry_labels_missing",
       "evidence": "Baseline 19947/33550 returned rows are carried/tracker-only;126 main-view frames have no people. Rejected detector boxes/reasons absent. Raw IDs 0..10 and 37 reset events are not eleven athletes or measured identity errors.",
       "owning_files": [
         "sports/badminton/src/bai_badminton/perception/players.py",
@@ -2969,13 +3301,40 @@
         "sports/badminton/src/bai_badminton/participant_contact.py"
       ],
       "next_action": "Add compact pre/post-ROI/admission/capacity counters and provenance; obtain reviewed track episodes for association claims.",
-      "controls": "Preserve fresh-versus-carried flags, four-person retention, jumps/runoff, spectators/adjacent courts, cut epochs and unnamed actors."
+      "controls": "Preserve fresh-versus-carried flags, four-person retention, jumps/runoff, spectators/adjacent courts, cut epochs and unnamed actors.",
+      "handoff_status": "Proven telemetry/label gap.",
+      "next_session_review": {
+        "source_commit": "33d3a5b1bcfd945555b76360cc361881e5a3eb8a",
+        "conclusion": "Player diagnostics expose raw-query counters/top-k boxes, rejection/ROI reasons, carried state and tracker admission/capacity without changing decisions.",
+        "limitation": "Historical rejected boxes cannot be recreated from caches, and no reviewed detection/association/identity labels were added.",
+        "next_action": "Review ROI, carried detections and identity episodes on independent singles/four-player sequences before changing admission or association.",
+        "evidence": [
+          "research/next_session_root_cause_report.md",
+          "research/next_session_final_report.md",
+          "research/next_session_validation_matrix.md",
+          "research/next_session_experiment_results.json",
+          "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_all36_model_firsts/all36_model_temporal_firsts.json"
+        ],
+        "component_and_control_evidence": [
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_diagnostic_hardening_tests.log",
+            "sha256": "966a0de50422c37664bd118339c54df33ade63d59e746b132d217d2051da9ced",
+            "bytes": 99
+          },
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_full_regression_after_mask.log",
+            "sha256": "a13de1a76f3ed6ddac285b4cdc4a90534f5156fd478d0ae628729ac28eb600ff",
+            "bytes": 3011
+          }
+        ],
+        "fresh_run_evidence": "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_v1"
+      }
     },
     {
       "id": "H13",
       "priority": "P2",
       "title": "Geometry confidence is not independent physical accuracy",
-      "status": "Validation limit; not universal court failure.",
+      "status": "open_physical_validation_limit",
       "evidence": "Baseline 16941 valid-geometry frames/RMS\u22481.137 proxy pixels measure line agreement. GT2/5/27 full geometry still fail. Fresh 285 camera-lost frames are present frames, not dropped video. Floor homography is not airborne 3 D trajectory or contact measurement.",
       "owning_files": [
         "sports/badminton/src/bai_badminton/court.py",
@@ -2985,13 +3344,40 @@
         "sports/badminton/src/bai_badminton/participant_geometry.py"
       ],
       "next_action": "Inspect localized lost/reacquiring windows; require reviewed landmarks before geometry-quality claims. Keep image-space support separate from grounded feet and airborne physics.",
-      "controls": "Do not relax invalid-view gates globally or blame GT20 end 9525 on unrelated view loss near 8697."
+      "controls": "Do not relax invalid-view gates globally or blame GT20 end 9525 on unrelated view loss near 8697.",
+      "handoff_status": "Validation limit; not universal court failure.",
+      "next_session_review": {
+        "source_commit": "33d3a5b1bcfd945555b76360cc361881e5a3eb8a",
+        "conclusion": "Invalid/offscreen geometry and adjacent columns retain regression controls; floor and player admission rules remain unchanged.",
+        "limitation": "Full-height court columns are an image prior, not 3D airborne ownership, line-call or landing accuracy.",
+        "next_action": "Review projected court geometry and airborne multi-court overlap on authorized independent footage.",
+        "evidence": [
+          "research/next_session_root_cause_report.md",
+          "research/next_session_final_report.md",
+          "research/next_session_validation_matrix.md",
+          "research/next_session_experiment_results.json",
+          "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_all36_model_firsts/all36_model_temporal_firsts.json"
+        ],
+        "component_and_control_evidence": [
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_mask_ceiling_component/geometry_controls.json",
+            "sha256": "b2c969375ce269d22903031d7a05a75ba802b25f85e5086d750b56338eb57306",
+            "bytes": 554
+          },
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_mask_geometry_review/manifest.json",
+            "sha256": "44d129f21d7f61d65f64c005e2c55769d73df068617e35678abc9cb23ec9a2d1",
+            "bytes": 3358
+          }
+        ],
+        "fresh_run_evidence": "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_v1"
+      }
     },
     {
       "id": "H14",
       "priority": "P2",
       "title": "OSNet/ReID unavailable; named actors intentionally unknown",
-      "status": "Known degradation; not proven universal boundary cause.",
+      "status": "known_optional_provider_unavailable",
       "evidence": "Both runs explicitly record missing osnet_ain_x 0_25 and unavailable player_reid. Unknown format becomes singles at 120. Detector/pose/anonymous contacts still work; all 432 baselinecontact frames have two people. No restored-weight ablation or identity GT.",
       "owning_files": [
         "sports/badminton/src/bai_badminton/perception/pipeline.py",
@@ -3001,13 +3387,35 @@
         "sports/badminton/src/bai_badminton/format_understanding.py"
       ],
       "next_action": "Restore pinned provider only as separate justified experiment with identity labels/license/device/hash, preserving explicit failure states.",
-      "controls": "Never fabricate embeddings/names, equate track/person/team/scoring slot, silently force singles or claim restoring ReID necessarily fixes rallies."
+      "controls": "Never fabricate embeddings/names, equate track/person/team/scoring slot, silently force singles or claim restoring ReID necessarily fixes rallies.",
+      "handoff_status": "Known degradation; not proven universal boundary cause.",
+      "next_session_review": {
+        "source_commit": "33d3a5b1bcfd945555b76360cc361881e5a3eb8a",
+        "conclusion": "Actual runtime records preserve unavailable OSNet/ReID degradation and unknown named identity; no embeddings or names were fabricated.",
+        "limitation": "Tracking episodes, people, teams and scoring slots remain distinct. ReID accuracy and its boundary effect remain unknown.",
+        "next_action": "Only a separate authorized weight/license/hash/runtime/identity-labelled experiment can justify enabling ReID.",
+        "evidence": [
+          "research/next_session_root_cause_report.md",
+          "research/next_session_final_report.md",
+          "research/next_session_validation_matrix.md",
+          "research/next_session_experiment_results.json",
+          "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_all36_model_firsts/all36_model_temporal_firsts.json"
+        ],
+        "component_and_control_evidence": [
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_fresh_control/inference.json",
+            "sha256": "e707fc7f96474171d8ccfa00099480d2593a1ebaff6d5cf2f7435b1c089a8113",
+            "bytes": 28311
+          }
+        ],
+        "fresh_run_evidence": "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_v1"
+      }
     },
     {
       "id": "H15",
       "priority": "P2",
       "title": "Uncalibrated scores and requested backend labels can mislead",
-      "status": "Proven confidence semantics/measurement limitation.",
+      "status": "partially_resolved_explicit_semantics_and_runtime",
       "evidence": "894 baselinepose keypoint scores>1 (max 1.2037). Shuttle/contact support is uncalibrated. RequestedFP16/CUDA-firstORT does not prove every tensor/nodeCUDA FP16. gpu-rtx 4000 description namesRTX/TensorRT; actual server is Pascal torch/ORT CUDA.",
       "owning_files": [
         "sports/badminton/src/bai_badminton/perception/components.py",
@@ -3017,13 +3425,40 @@
         "research/run_pipeline_experiment.py"
       ],
       "next_action": "Preserve raw support; calibrate only on reviewed held-out labels. Read actual execution_backends/artifact hashes; profile per-node precision only if needed.",
-      "controls": "Do not clip scores and rename probabilities, infer active optional models from config names or replace runtime because of a misleading description."
+      "controls": "Do not clip scores and rename probabilities, infer active optional models from config names or replace runtime because of a misleading description.",
+      "handoff_status": "Proven confidence semantics/measurement limitation.",
+      "next_session_review": {
+        "source_commit": "33d3a5b1bcfd945555b76360cc361881e5a3eb8a",
+        "conclusion": "Telemetry labels raw model support, heuristic fusion and fit sensitivity explicitly. Actual runtime providers/dtypes/fallbacks/model hashes are retained.",
+        "limitation": "No score calibration was fitted. ORT provider registration alone does not establish every operator's GPU placement or precision.",
+        "next_action": "Calibrate only against independent labels; use provider profiling if node-level execution attribution is required.",
+        "evidence": [
+          "research/next_session_root_cause_report.md",
+          "research/next_session_final_report.md",
+          "research/next_session_validation_matrix.md",
+          "research/next_session_experiment_results.json",
+          "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_all36_model_firsts/all36_model_temporal_firsts.json"
+        ],
+        "component_and_control_evidence": [
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_mask_ceiling_component/manifest.json",
+            "sha256": "59b0bac16599cb17b11e98725744c9a35e2d5c9290afe1a53943c503449d35ca",
+            "bytes": 102021
+          },
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_fresh_control/inference.json",
+            "sha256": "e707fc7f96474171d8ccfa00099480d2593a1ebaff6d5cf2f7435b1c089a8113",
+            "bytes": 28311
+          }
+        ],
+        "fresh_run_evidence": "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_v1"
+      }
     },
     {
       "id": "H16",
       "priority": "P1",
       "title": "Segmentation changes upstream cadence; naive fusion reads future activity",
-      "status": "Proven dependency/synchronization risk; current aligned helper is intentional.",
+      "status": "protected_alignment_and_fresh_feedback_checked",
       "evidence": "Rally state controls later player/pose stride; fresh contacts 447 vs baseline 432. Semantic frontier trails 40 frames; current self.activity can be ahead of decision frame. Correct adapter uses episode_window/aligned snapshots.",
       "owning_files": [
         "sports/badminton/src/bai_badminton/plugin.py",
@@ -3033,13 +3468,40 @@
         "sports/badminton/src/bai_badminton/perception/pipeline.py"
       ],
       "next_action": "Keep exact frame/episode/cadence alignment; use cache replay for conditional diagnosis then fresh inference. Compare each run\u2019s own observations/contact stream.",
-      "controls": "No future activity as historical evidence, no restoring private tracker/cut/background state from diagnostic caches, no replay-as-inference claims."
+      "controls": "No future activity as historical evidence, no restoring private tracker/cut/background state from diagnostic caches, no replay-as-inference claims.",
+      "handoff_status": "Proven dependency/synchronization risk; current aligned helper is intentional.",
+      "next_session_review": {
+        "source_commit": "33d3a5b1bcfd945555b76360cc361881e5a3eb8a",
+        "conclusion": "The selected profile receives a full production run after conditional replay; frame-aligned participant and semantic-frontier contracts remain tested.",
+        "limitation": "Cached replay is not fresh perception and cannot reproduce changed cadence. VOD context may contain declared bounded lookahead.",
+        "next_action": "Compare fresh own-cache replay and publication boundaries; never substitute accumulated future activity for current-frame evidence.",
+        "evidence": [
+          "research/next_session_root_cause_report.md",
+          "research/next_session_final_report.md",
+          "research/next_session_validation_matrix.md",
+          "research/next_session_experiment_results.json",
+          "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_all36_model_firsts/all36_model_temporal_firsts.json"
+        ],
+        "component_and_control_evidence": [
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_mask_ceiling_component/hybrid_top_level_validation.json",
+            "sha256": "ae2a080a854ce462c67aa3a32f5b15743788f6c377905c7c8d8b5a1854ef809a",
+            "bytes": 274
+          },
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_mask_tracklet_semantic/replay_metadata.json",
+            "sha256": "98b8f675b5a3bf06b72343e1b2131589219351305eed8b2fcea19e590fbbb3c4",
+            "bytes": 43119
+          }
+        ],
+        "fresh_run_evidence": "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_v1"
+      }
     },
     {
       "id": "H17",
       "priority": "P1",
       "title": "Top-exit cue has designed coverage limits",
-      "status": "Conservative applicability limit; GT31 supports one false-negative mechanism.",
+      "status": "partially_resolved_association_and_admission",
       "evidence": "Requires observed moving brackets within 5 frame anchors, upward/downward motion, both endpoints in actual top 10%image, gap\u22642 s, same context and 3..120 px/frame. Needs after-anchors already available. Cannot recover stationary CLOSED/published/IDLE/cut contexts.",
       "owning_files": [
         "sports/badminton/src/bai_badminton/events/rally_motion.py",
@@ -3047,13 +3509,40 @@
         "sports/badminton/src/bai_badminton/engine.py"
       ],
       "next_action": "Evaluate uncertainty/other exit patterns or provisional retention only with supported evidence and prespecified break controls. Keep support basis/rejection reasons visible.",
-      "controls": "No GT-fitted band, hidden extra lookahead, coordinates/contacts/idle starts from interpolation or body movement."
+      "controls": "No GT-fitted band, hidden extra lookahead, coordinates/contacts/idle starts from interpolation or body movement.",
+      "handoff_status": "Conservative applicability limit; GT31 supports one false-negative mechanism.",
+      "next_session_review": {
+        "source_commit": "33d3a5b1bcfd945555b76360cc361881e5a3eb8a",
+        "conclusion": "Qualified-event singleton association handles GT23's competing observation. Corrected admission makes ordinary upper-exit proof sufficient for GT31; curve support adds no selected-run benefit.",
+        "limitation": "The conservative cue still requires coherent observed brackets and bounded same-context loss; it is not general occlusion recovery.",
+        "next_action": "Evaluate multi-hypothesis continuity with explicit ambiguity/static/floor controls; keep curve support disabled without incremental evidence.",
+        "evidence": [
+          "research/next_session_root_cause_report.md",
+          "research/next_session_final_report.md",
+          "research/next_session_validation_matrix.md",
+          "research/next_session_experiment_results.json",
+          "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_all36_model_firsts/all36_model_temporal_firsts.json"
+        ],
+        "component_and_control_evidence": [
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_mask_tracklet_semantic/replay_metadata.json",
+            "sha256": "98b8f675b5a3bf06b72343e1b2131589219351305eed8b2fcea19e590fbbb3c4",
+            "bytes": 43119
+          },
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_mask_curve_semantic/replay_metadata.json",
+            "sha256": "7086160c2265ed7b47b07d63d0538fb01320e5e154abeebb42aa54a6cf49b4cb",
+            "bytes": 43118
+          }
+        ],
+        "fresh_run_evidence": "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_v1"
+      }
     },
     {
       "id": "H18",
       "priority": "P2",
       "title": "VOD behavior is not validated as causal live behavior",
-      "status": "Mode limitation; not offline timing defect.",
+      "status": "open_vod_live_mode_limit",
       "evidence": "Background preparation observes whole chunk; semantics use 40 future/45 past frames; exit cue may use future anchors. Publication latency is not a shift of canonical event time.",
       "owning_files": [
         "sports/badminton/src/bai_badminton/perception/tracknet.py",
@@ -3062,13 +3551,40 @@
         "engine/src/bai_engine/runtime/runner.py"
       ],
       "next_action": "Declare VOD/live capabilities and causal latency; test streaming/chunk edges if exposing live mode.",
-      "controls": "No unavailable future anchors or zero-latency claim; preserve VOD benchmark and canonical times."
+      "controls": "No unavailable future anchors or zero-latency claim; preserve VOD benchmark and canonical times.",
+      "handoff_status": "Mode limitation; not offline timing defect.",
+      "next_session_review": {
+        "source_commit": "33d3a5b1bcfd945555b76360cc361881e5a3eb8a",
+        "conclusion": "Only available episode-window observations are consumed; tests preserve frontier/context barriers and no reconstructed coordinate becomes fresh evidence.",
+        "limitation": "This is buffered VOD execution, not validated causal-live contact/rally inference. Declared lookahead must not be hidden.",
+        "next_action": "Build a streaming availability/latency evaluation with frontier timestamps before making live-mode claims.",
+        "evidence": [
+          "research/next_session_root_cause_report.md",
+          "research/next_session_final_report.md",
+          "research/next_session_validation_matrix.md",
+          "research/next_session_experiment_results.json",
+          "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_all36_model_firsts/all36_model_temporal_firsts.json"
+        ],
+        "component_and_control_evidence": [
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_mask_ceiling_component/manifest.json",
+            "sha256": "59b0bac16599cb17b11e98725744c9a35e2d5c9290afe1a53943c503449d35ca",
+            "bytes": 102021
+          },
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_fresh_control/inference.json",
+            "sha256": "e707fc7f96474171d8ccfa00099480d2593a1ebaff6d5cf2f7435b1c089a8113",
+            "bytes": 28311
+          }
+        ],
+        "fresh_run_evidence": "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_v1"
+      }
     },
     {
       "id": "H19",
       "priority": "P2",
       "title": "VFR/unsupported/high-FPS generic ingestion needs explicit mappings",
-      "status": "Source-supported risk not triggered by CFR30 Test 1.",
+      "status": "open_generic_source_mapping_risk",
       "evidence": "plan_proxy maps unsupported rates to 30 and>60 to 60; VFR probe compares aggregate rates, not everyPTS. Proxy/source frame index equality need not hold for future inputs.",
       "owning_files": [
         "engine/src/bai_engine/media/probe.py",
@@ -3076,13 +3592,40 @@
         "engine/src/bai_engine/decode.py"
       ],
       "next_action": "Use synthetic VFR/high-rate fixtures and explicit original\u2194canonical mappings for justified generic hardening.",
-      "controls": "No fitted Test 1 offsets, silent FPS changes/source alteration or badminton logic in generic media."
+      "controls": "No fitted Test 1 offsets, silent FPS changes/source alteration or badminton logic in generic media.",
+      "handoff_status": "Source-supported risk not triggered by CFR30 Test 1.",
+      "next_session_review": {
+        "source_commit": "33d3a5b1bcfd945555b76360cc361881e5a3eb8a",
+        "conclusion": "Actual Test1 source/proxy alignment is verified CFR30 with zero-origin half-open export and actual recorded FPS conversion.",
+        "limitation": "No end-to-end generic VFR/unsupported/high-FPS mapping fix or new validation was established.",
+        "next_action": "Use explicit decoded-source/proxy timestamp maps and reviewed variable-rate fixtures in a separate ingestion change.",
+        "evidence": [
+          "research/next_session_root_cause_report.md",
+          "research/next_session_final_report.md",
+          "research/next_session_validation_matrix.md",
+          "research/next_session_experiment_results.json",
+          "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_all36_model_firsts/all36_model_temporal_firsts.json"
+        ],
+        "component_and_control_evidence": [
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/fresh_image_exit_v1/proxy_alignment.json",
+            "sha256": "aa605f76bbcb5ca0b034e088e25ff95abec8aa54822e112c24558f5b310abc6c",
+            "bytes": 330
+          },
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_audit_reproducible/validation.json",
+            "sha256": "7bdf5d918c13db3e65812654d251b1956ab9401e011e7742379f140b548a86ff",
+            "bytes": 1730624
+          }
+        ],
+        "fresh_run_evidence": "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_v1"
+      }
     },
     {
       "id": "H20",
       "priority": "P2",
       "title": "Browser HLS seek/callback alignment remains untested",
-      "status": "Playback hypothesis, not proven UI defect or offline root cause.",
+      "status": "open_browser_hls_validation_gap",
       "evidence": "Raw HLS origin 323/15360 s=.630859 frame. Canonical decoder correct; frameClock floors mediaTime; VideoStage seeks(frame+.5)/fps, possibly before raw PTS if browser retains origin.",
       "owning_files": [
         "apps/web/src/lib/frameClock.ts",
@@ -3090,13 +3633,36 @@
         "engine/src/bai_engine/decode.py"
       ],
       "next_action": "Run real browser HLS frame-seek/callback checks against canonical images; separately testMP4/HLS/live normalization.",
-      "controls": "Do not subtract HLS mux origin from benchmark CSVs or attribute hundred-frame errors to this untested sub-frame hypothesis."
+      "controls": "Do not subtract HLS mux origin from benchmark CSVs or attribute hundred-frame errors to this untested sub-frame hypothesis.",
+      "handoff_status": "Playback hypothesis, not proven UI defect or offline root cause.",
+      "next_session_review": {
+        "source_commit": "33d3a5b1bcfd945555b76360cc361881e5a3eb8a",
+        "conclusion": "The offline renderer records exact original PTS and passed a static Firefox smoke review.",
+        "limitation": "Static HTML playback does not validate application HLS/MSE seeking or browser callback alignment; no compatible Playwright browser was installed.",
+        "next_action": "Run the existing seek harness in an available supported browser without altering deployment or extrapolating offline errors to UI timing.",
+        "evidence": [
+          "research/next_session_root_cause_report.md",
+          "research/next_session_final_report.md",
+          "research/next_session_validation_matrix.md",
+          "research/next_session_experiment_results.json",
+          "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_all36_model_firsts/all36_model_temporal_firsts.json"
+        ],
+        "component_and_control_evidence": [
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_audit_reproducible/validation.json",
+            "sha256": "7bdf5d918c13db3e65812654d251b1956ab9401e011e7742379f140b548a86ff",
+            "bytes": 1730624
+          }
+        ],
+        "fresh_run_evidence": "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_v1",
+        "browser_runtime_evidence": "research/next_evidence_tooling_review.md"
+      }
     },
     {
       "id": "H21",
       "priority": "P2",
       "title": "Runtime cost increase and growing rollback history need isolated profiling",
-      "status": "Measured walltime difference; algorithmic cost/rollback bottleneck unproven.",
+      "status": "partially_measured_rollback_profiling_open",
       "evidence": "1509.996 s vs 1469.237 s (+2.774%); CPU regression tests overlapped fresh startup. Semantic 83.729 s, parent perception 1302.995 s,players 529.960 s,OCR345.601 s,shuttle 216.652 s have overlapping scopes. TransactionalAnalytics.checkpoint deepcopies accumulated operations: source hypothesis, not measured leak.",
       "owning_files": [
         "sports/badminton/src/bai_badminton/engine.py",
@@ -3105,13 +3671,40 @@
         "research/run_pipeline_experiment.py"
       ],
       "next_action": "Profile isolated stage/transaction cost versus operation/frame count; persist decode/init/inference/export and resource cadence before smallest justified optimization.",
-      "controls": "Never remove analytics/rollback/accepted evidence for speed. Baseline per-stage/CPU/RSS/GPUpeaks unavailable; allocator/PID/device scopes differ."
+      "controls": "Never remove analytics/rollback/accepted evidence for speed. Baseline per-stage/CPU/RSS/GPUpeaks unavailable; allocator/PID/device scopes differ.",
+      "handoff_status": "Measured walltime difference; algorithmic cost/rollback bottleneck unproven.",
+      "next_session_review": {
+        "source_commit": "33d3a5b1bcfd945555b76360cc361881e5a3eb8a",
+        "conclusion": "Full runs retain stage wall aggregates, worker CPU/RSS, sampled GPU memory and backend records; overlaps and scope are stated.",
+        "limitation": "Short diagnostic CPU work overlapped each control/final run startup. Stage aggregates overlap and rollback-history growth was not isolated.",
+        "next_action": "Profile rollback memory/latency separately and use repeated isolated runs before attributing cost to a particular algorithm.",
+        "evidence": [
+          "research/next_session_root_cause_report.md",
+          "research/next_session_final_report.md",
+          "research/next_session_validation_matrix.md",
+          "research/next_session_experiment_results.json",
+          "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_all36_model_firsts/all36_model_temporal_firsts.json"
+        ],
+        "component_and_control_evidence": [
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_fresh_control/inference.json",
+            "sha256": "e707fc7f96474171d8ccfa00099480d2593a1ebaff6d5cf2f7435b1c089a8113",
+            "bytes": 28311
+          },
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_mask_ceiling_component/manifest.json",
+            "sha256": "59b0bac16599cb17b11e98725744c9a35e2d5c9290afe1a53943c503449d35ca",
+            "bytes": 102021
+          }
+        ],
+        "fresh_run_evidence": "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_v1"
+      }
     },
     {
       "id": "H22",
       "priority": "P1",
       "title": "Only one independent fresh candidate GPU run exists",
-      "status": "Validation gap, not failed repeat.",
+      "status": "v1_repeat_verified_selected_repeat_pending",
       "evidence": "Exact 39 interval/end-reason and 447 contact parity comes from replaying new caches, not another neural-model run.1895 software passes do not establish neural accuracy/determinism.",
       "owning_files": [
         "research/run_pipeline_experiment.py",
@@ -3119,13 +3712,40 @@
         "research/component_test_report.md"
       ],
       "next_action": "Repeat frozen source/environment into a new directory under isolated load; compare hashes, observations, contacts, all boundary metrics and resources. Report actual nondeterminism if any.",
-      "controls": "Do not count semantic replay or mocked tests as new GPU inference."
+      "controls": "Do not count semantic replay or mocked tests as new GPU inference.",
+      "handoff_status": "Validation gap, not failed repeat.",
+      "next_session_review": {
+        "source_commit": "33d3a5b1bcfd945555b76360cc361881e5a3eb8a",
+        "conclusion": "An independent unchanged full-video control exactly reproduces 17268 frame records, 447 contact/stroke timestamps,39 interval/reason triples and CSV bytes from v1.",
+        "limitation": "The new selected profile has one full inference validation; semantic or component replays are not additional complete repeats.",
+        "next_action": "Repeat the selected profile and run independently reviewed validation before default or production promotion.",
+        "evidence": [
+          "research/next_session_root_cause_report.md",
+          "research/next_session_final_report.md",
+          "research/next_session_validation_matrix.md",
+          "research/next_session_experiment_results.json",
+          "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_all36_model_firsts/all36_model_temporal_firsts.json"
+        ],
+        "component_and_control_evidence": [
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_audit_repeat_control/comparison.json",
+            "sha256": "33bb731386d6204ef1ba6b1c1be20d35aaf6e1630bbc9608dc7e7e6a831135ac",
+            "bytes": 52556
+          },
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_fresh_control/benchmark_metadata.json",
+            "sha256": "ba1a1736df7158250531a4724d9efeccd4e4eb507f7e8f5b382a459998b6dfa7",
+            "bytes": 45001
+          }
+        ],
+        "fresh_run_evidence": "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_v1"
+      }
     },
     {
       "id": "H23",
       "priority": "P1",
       "title": "Independent labels/generalization and alternative-model validation are missing",
-      "status": "Dataset/adoption gap; candidate stays exploratory opt-in.",
+      "status": "open_independent_labels_and_generalization",
       "evidence": "Only 36 intervals from one exposed broadcast singles video. No reviewed pixel visibility/location, contact/hitter/identity/courtGT or real annotated doubles/amateur evaluation. Training overlap unknown. No alternative weights run.",
       "owning_files": [
         "research/shuttle_model_comparison.md",
@@ -3133,26 +3753,80 @@
         "research/implementation_roadmap.md"
       ],
       "next_action": "Collect reviewed component evidence and match-disjoint boundary videos. Screen model task-fit, compatible weights, latency/VRAM and separate code/weight/data rights. RacketVision 4 frame is not 8 frame drop-in; MS-TCN has CommonsClause; ActionFormer lacks domain labels/frame-boundary guarantees.",
-      "controls": "No generalization or calibration claim from Test 1; synthetic doubles tests are contract coverage only."
+      "controls": "No generalization or calibration claim from Test 1; synthetic doubles tests are contract coverage only.",
+      "handoff_status": "Dataset/adoption gap; candidate stays exploratory opt-in.",
+      "next_session_review": {
+        "source_commit": "33d3a5b1bcfd945555b76360cc361881e5a3eb8a",
+        "conclusion": "A match-disjoint validation matrix and primary-source alternative-method screening are recorded; no new model or unrelated footage was accessed.",
+        "limitation": "Test1 is development footage. No reviewed doubles/contact/shot/identity/localization validation set is available in scope.",
+        "next_action": "Obtain authorized independent match footage and reviewed component/onset/end labels, then freeze the profile before evaluation.",
+        "evidence": [
+          "research/next_session_root_cause_report.md",
+          "research/next_session_final_report.md",
+          "research/next_session_validation_matrix.md",
+          "research/next_session_experiment_results.json",
+          "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_all36_model_firsts/all36_model_temporal_firsts.json"
+        ],
+        "component_and_control_evidence": [
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_fresh_control/benchmark_metadata.json",
+            "sha256": "ba1a1736df7158250531a4724d9efeccd4e4eb507f7e8f5b382a459998b6dfa7",
+            "bytes": 45001
+          },
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_mask_ceiling_component/manifest.json",
+            "sha256": "59b0bac16599cb17b11e98725744c9a35e2d5c9290afe1a53943c503449d35ca",
+            "bytes": 102021
+          }
+        ],
+        "fresh_run_evidence": "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_v1"
+      }
     },
     {
       "id": "H24",
       "priority": "P2",
       "title": "Empty-GT comparison output has no CSV header",
-      "status": "Proven general export defect; no Test 1 score defect.",
+      "status": "fixed_export_contract",
       "evidence": "save_evaluation constructs comparison writer/header only inside if rows.36 row Test 1 arithmetic/matching independently verified.",
       "owning_files": [
         "scripts/benchmarking/evaluate_rallies.py",
         "tests/benchmarking/test_prediction_schema.py"
       ],
       "next_action": "If addressed, add focused empty-input schema/header test and fix export only, separately from detector work.",
-      "controls": "Keep exact primary schema/matching/IoU threshold/endpoints/tolerance denominators and frozen artifacts unchanged."
+      "controls": "Keep exact primary schema/matching/IoU threshold/endpoints/tolerance denominators and frozen artifacts unchanged.",
+      "handoff_status": "Proven general export defect; no Test 1 score defect.",
+      "next_session_review": {
+        "source_commit": "33d3a5b1bcfd945555b76360cc361881e5a3eb8a",
+        "conclusion": "Empty-GT comparison exports now retain the existing 20-column header. Red/green tests and original/v1/control byte parity pass.",
+        "limitation": "This changes no primary seven-column prediction schema, interval, matching rule or Test1 metric.",
+        "next_action": "Retain empty-input and nonempty-byte regression controls.",
+        "evidence": [
+          "research/next_session_root_cause_report.md",
+          "research/next_session_final_report.md",
+          "research/next_session_validation_matrix.md",
+          "research/next_session_experiment_results.json",
+          "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_all36_model_firsts/all36_model_temporal_firsts.json"
+        ],
+        "component_and_control_evidence": [
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_audit_h24_bytes/parity.json",
+            "sha256": "9b1c5518ea56f201fc502c2db361a749390fc672ec60d04d95285157cd1dbf4b",
+            "bytes": 514
+          },
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_audit_integrity/h24_h25_tests_green.log",
+            "sha256": "df1a0c5d741c2edf990b6812337bd89d1d402135b40b47d37fbef262f5ce2721",
+            "bytes": 99
+          }
+        ],
+        "fresh_run_evidence": "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_v1"
+      }
     },
     {
       "id": "H25",
       "priority": "P2",
       "title": "Factorial executor provenance and fixed Test 1 assumptions need hardening",
-      "status": "Confirmed source-level tooling limitation; fresh-run source provenance valid.",
+      "status": "fixed_executor_provenance_and_epoch_assumptions",
       "evidence": "run_evidence_ablations spreads replay metadata: verified repeats fix actual switches and FSM-only timing, but inherited git_commit/source identify source replay, not necessarily later executor. Older elapsed/overrides misleading. Ablation harnesses hardcode recorded format-reset at 119, not a rally label.",
       "owning_files": [
         "research/run_evidence_ablations.py",
@@ -3160,13 +3834,40 @@
         "research/replay_rally_evidence.py"
       ],
       "next_action": "New runs should record executor SHA/dirty diff/harness hash separately from trace-generator/source metadata. Derive format epochs from recorded events for other datasets; preserve historical limitations.",
-      "controls": "Inherited source_unchanged is not a fresh executor validation. Separate FSM-loop/semantic/neural timing; never edit old manifests to imply better provenance."
+      "controls": "Inherited source_unchanged is not a fresh executor validation. Separate FSM-loop/semantic/neural timing; never edit old manifests to imply better provenance.",
+      "handoff_status": "Confirmed source-level tooling limitation; fresh-run source provenance valid.",
+      "next_session_review": {
+        "source_commit": "33d3a5b1bcfd945555b76360cc361881e5a3eb8a",
+        "conclusion": "Ablations separate executor snapshots from trace-generator provenance, derive recorded format resets and refuse existing outputs; eight historical variant CSV/metric results remain exact.",
+        "limitation": "The research tools still explicitly target Test1 and are not generic independent-dataset executors.",
+        "next_action": "Preserve separate generator/executor identity and explicit dataset scope in future experiments.",
+        "evidence": [
+          "research/next_session_root_cause_report.md",
+          "research/next_session_final_report.md",
+          "research/next_session_validation_matrix.md",
+          "research/next_session_experiment_results.json",
+          "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_all36_model_firsts/all36_model_temporal_firsts.json"
+        ],
+        "component_and_control_evidence": [
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_audit_integrity/h25_event_epochs_comparison.json",
+            "sha256": "a57aa9e026ae5b77bee5bbd942d2b7f6902c1eed18e06cc37e6b3e1e359048d0",
+            "bytes": 4966
+          },
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_audit_provenance_event_epochs/executor_metadata.json",
+            "sha256": "95db80a0f4db2b24593157de9db9e82b38e84e6ec7d2ee73886fd8a531ba0c11",
+            "bytes": 1679
+          }
+        ],
+        "fresh_run_evidence": "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_v1"
+      }
     },
     {
       "id": "H26",
       "priority": "P2",
       "title": "Ignored evidence and fixed finalizers can invalidate next-session workflows",
-      "status": "Workflow risk, not prediction failure.",
+      "status": "mitigated_and_integrity_verified",
       "evidence": "artifacts/benchmarking and original media are ignored; a clone lacks caches/logs/images. finalize_pipeline_investigation is hardcoded to v1/counts/measured source and writes historical reports. Some audits have fixed output defaults; comparator refuses overwrites.",
       "owning_files": [
         "research/finalize_pipeline_investigation.py",
@@ -3176,13 +3877,40 @@
         ".gitignore"
       ],
       "next_action": "Check local evidence availability, back it up outsideGit if moving, and use new experiment/report IDs. Do not run old finalizer after source edits as generic validator.",
-      "controls": "No deleting evidence to bypass refusals, historical regeneration, or large media/checkpoint/raw cache commits."
+      "controls": "No deleting evidence to bypass refusals, historical regeneration, or large media/checkpoint/raw cache commits.",
+      "handoff_status": "Workflow risk, not prediction failure.",
+      "next_session_review": {
+        "source_commit": "33d3a5b1bcfd945555b76360cc361881e5a3eb8a",
+        "conclusion": "New outputs refuse reuse; safe audits verify1766 frozen files, 86 historical source blobs, models/inputs and all 28 historical metric objects.",
+        "limitation": "Ignored local evidence still requires preservation; historical hardcoded finalizers remain historical and were not rerun.",
+        "next_action": "Use explicit new output directories and the safe verifier; archive source-bound evidence without Git media/cache additions.",
+        "evidence": [
+          "research/next_session_root_cause_report.md",
+          "research/next_session_final_report.md",
+          "research/next_session_validation_matrix.md",
+          "research/next_session_experiment_results.json",
+          "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_all36_model_firsts/all36_model_temporal_firsts.json"
+        ],
+        "component_and_control_evidence": [
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_audit_post_tools/validation.json",
+            "sha256": "771f2ce1becbf73a91029d3e23e457a5e62a965e24f8c9c7187c3fef00acb56d",
+            "bytes": 1730624
+          },
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_audit_reproducible/validation.json",
+            "sha256": "7bdf5d918c13db3e65812654d251b1956ab9401e011e7742379f140b548a86ff",
+            "bytes": 1730624
+          }
+        ],
+        "fresh_run_evidence": "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_v1"
+      }
     },
     {
       "id": "H27",
       "priority": "P3",
       "title": "RapidOCR empty-result warnings remain",
-      "status": "Observed warning; direct boundary causality not established.",
+      "status": "unchanged_noncausal_warning",
       "evidence": "Both execution logs warn text detection result empty. OCR executes/costs time; final rally export does not require score/winner/official status.",
       "owning_files": [
         "sports/badminton/src/bai_badminton/perception/scoreboard.py",
@@ -3190,20 +3918,74 @@
         "sports/badminton/src/bai_badminton/engine.py"
       ],
       "next_action": "Preserve warnings/unknown score evidence; investigate only if real boundary dependency or separately authorized analytics work warrants it.",
-      "controls": "No invented scores or removing OCR/other analytics to improve benchmark cost/F1."
+      "controls": "No invented scores or removing OCR/other analytics to improve benchmark cost/F1.",
+      "handoff_status": "Observed warning; direct boundary causality not established.",
+      "next_session_review": {
+        "source_commit": "33d3a5b1bcfd945555b76360cc361881e5a3eb8a",
+        "conclusion": "RapidOCR empty-result warnings remain visible in preserved logs; valid installed models and actual backends are recorded.",
+        "limitation": "No direct rally-boundary causality is established; suppressing a warning would not validate OCR or scoring.",
+        "next_action": "Investigate separately with reviewed scoreboard evidence if OCR accuracy or warning handling is required.",
+        "evidence": [
+          "research/next_session_root_cause_report.md",
+          "research/next_session_final_report.md",
+          "research/next_session_validation_matrix.md",
+          "research/next_session_experiment_results.json",
+          "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_all36_model_firsts/all36_model_temporal_firsts.json"
+        ],
+        "component_and_control_evidence": [
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_fresh_control/execution.log",
+            "sha256": "92a0bde22d9c3115d5c61183cbaea81be71de468f1a5ba88bbd69948abf0120b",
+            "bytes": 5896
+          },
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_mask_ceiling_component/hybrid_top_level_validation.json",
+            "sha256": "ae2a080a854ce462c67aa3a32f5b15743788f6c377905c7c8d8b5a1854ef809a",
+            "bytes": 274
+          }
+        ],
+        "fresh_run_evidence": "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_v1"
+      }
     },
     {
       "id": "H28",
       "priority": "P3",
       "title": "Pre-existing formatting/deprecation warnings",
-      "status": "Non-causal maintenance debt.",
+      "status": "unchanged_noncausal_maintenance",
       "evidence": "Historical full suite 1895 passed/no skips/19 HTTP422 Starlette-FastAPI deprecations. Rufflint 27 files passed; format 26 passed with unchanged plugin review_action string issue also present onmain.",
       "owning_files": [
         "sports/badminton/src/bai_badminton/plugin.py",
         "research/component_test_report.md"
       ],
       "next_action": "Keep cosmetic/compatibility maintenance separate from algorithmic experiments.",
-      "controls": "Do not call warnings segmentation failures or reformat measured production source merely to change identity."
+      "controls": "Do not call warnings segmentation failures or reformat measured production source merely to change identity.",
+      "handoff_status": "Non-causal maintenance debt.",
+      "next_session_review": {
+        "source_commit": "33d3a5b1bcfd945555b76360cc361881e5a3eb8a",
+        "conclusion": "The application/engine/sport suite (1966) and benchmark suite (77) pass, totaling 2043 tests with 19 pre-existing deprecation warnings; changed Python lint passes.",
+        "limitation": "An unrelated existing plugin string-format preference and framework deprecations remain; no boundary mechanism is attributed to them.",
+        "next_action": "Handle framework/format maintenance separately without broadening the research diff.",
+        "evidence": [
+          "research/next_session_root_cause_report.md",
+          "research/next_session_final_report.md",
+          "research/next_session_validation_matrix.md",
+          "research/next_session_experiment_results.json",
+          "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_all36_model_firsts/all36_model_temporal_firsts.json"
+        ],
+        "component_and_control_evidence": [
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_full_regression_after_mask.log",
+            "sha256": "a13de1a76f3ed6ddac285b4cdc4a90534f5156fd478d0ae628729ac28eb600ff",
+            "bytes": 3011
+          },
+          {
+            "path": "/home/administrator/Desktop/sport-analytics/Sports_Analytics/artifacts/benchmarking/experiments/next_20261105_precommit_checks.log",
+            "sha256": "5a9350735803b64ff7ed4cc3d6ff9233ad16b41116f48dcbaf6c71df45040215",
+            "bytes": 99
+          }
+        ],
+        "fresh_run_evidence": "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_v1"
+      }
     }
   ],
   "source_video_sha256": "877c6d39d34ccfb302865ed44f7e08949b0f72be2833f71777066f837e6b8bd6",
@@ -3214,5 +3996,1321 @@
     "No new model inference or software-suite execution for handoff",
     "Existing baseline/fresh metrics rechecked read-only",
     "No new contact/pixel/edit/identity ground truth"
-  ]
+  ],
+  "next_session_review": {
+    "schema": "badminton-next-session-review:v1",
+    "date": "2026-11-05",
+    "source_commit": "33d3a5b1bcfd945555b76360cc361881e5a3eb8a",
+    "handoff_inventory_sha256": "20395bbe05a6aef851e5ff6d2cd9cb181a217f2ec1a6b1fa1c6bc0934d1f49c8",
+    "executor_sha256": "8c0dd46ff7bf9cb861e691d7bab3bb25b2784ab537d00b1cdeb79b7c4fa86158",
+    "fresh_run": "artifacts/benchmarking/experiments/next_20261105_fresh_air_tracklet_v1",
+    "metrics": {
+      "status": "evaluated",
+      "matching_policy": {
+        "version": "rally-boundaries-v1",
+        "minimum_iou": 0.5,
+        "assignment": "maximum cardinality, then total IoU + 1e-9/(1 + boundary distance seconds)",
+        "intervals": "[start timestamp, end timestamp); duration=end-start; no inclusive-frame addition",
+        "tolerance_denominators": "matched pairs and all ground-truth rallies reported separately",
+        "zero_denominators": "precision/recall/F1=0; unavailable conditional metrics=null"
+      },
+      "fps": 30,
+      "detection": {
+        "ground_truth_count": 36,
+        "predicted_count": 36,
+        "matched_count": 36,
+        "true_positives": 36,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      "boundary_and_duration_errors": {
+        "start_frame": {
+          "mae": 29.13888888888889,
+          "median_absolute_error": 21.0,
+          "rmse": 41.36725758374611,
+          "max_absolute_error": 106.0,
+          "p90_absolute_error": 69.5,
+          "mean_signed_error": 22.75,
+          "median_signed_error": 14.0
+        },
+        "end_frame": {
+          "mae": 10.333333333333334,
+          "median_absolute_error": 6.0,
+          "rmse": 14.300349646075091,
+          "max_absolute_error": 41.0,
+          "p90_absolute_error": 22.0,
+          "mean_signed_error": -2.2777777777777777,
+          "median_signed_error": -2.5
+        },
+        "start_time_sec": {
+          "mae": 0.9712962962963013,
+          "median_absolute_error": 0.7000000000000091,
+          "rmse": 1.3789085861248707,
+          "max_absolute_error": 3.5333333333333314,
+          "p90_absolute_error": 2.3166666666666735,
+          "mean_signed_error": 0.7583333333333397,
+          "median_signed_error": 0.4666666666667183
+        },
+        "end_time_sec": {
+          "mae": 0.3444444444444502,
+          "median_absolute_error": 0.20000000000002416,
+          "rmse": 0.47667832153583767,
+          "max_absolute_error": 1.3666666666666742,
+          "p90_absolute_error": 0.7333333333333485,
+          "mean_signed_error": -0.07592592592592862,
+          "median_signed_error": -0.08333333333337123
+        },
+        "duration_sec": {
+          "mae": 1.1324074074074078,
+          "median_absolute_error": 0.6333333333333302,
+          "rmse": 1.5477083816300448,
+          "max_absolute_error": 4.0,
+          "p90_absolute_error": 2.7000000000000064,
+          "mean_signed_error": -0.8342592592592682,
+          "median_signed_error": -0.5666666666666629
+        }
+      },
+      "overlap": {
+        "mean_iou": 0.8676224675906756,
+        "median_iou": 0.9215287865693316,
+        "minimum_iou": 0.5380710659898521,
+        "percent_strictly_exceeding": {
+          "0.5": 100.0,
+          "0.75": 80.55555555555556,
+          "0.9": 55.55555555555556,
+          "0.95": 27.77777777777778
+        }
+      },
+      "boundary_tolerances": {
+        "start": [
+          {
+            "frames": 1,
+            "seconds": 0.03333333333333333,
+            "within_count": 1,
+            "matched_accuracy": 0.027777777777777776,
+            "all_gt_accuracy": 0.027777777777777776
+          },
+          {
+            "frames": 3,
+            "seconds": 0.1,
+            "within_count": 5,
+            "matched_accuracy": 0.1388888888888889,
+            "all_gt_accuracy": 0.1388888888888889
+          },
+          {
+            "frames": 5,
+            "seconds": 0.16666666666666666,
+            "within_count": 10,
+            "matched_accuracy": 0.2777777777777778,
+            "all_gt_accuracy": 0.2777777777777778
+          },
+          {
+            "frames": 10,
+            "seconds": 0.3333333333333333,
+            "within_count": 15,
+            "matched_accuracy": 0.4166666666666667,
+            "all_gt_accuracy": 0.4166666666666667
+          },
+          {
+            "frames": 15,
+            "seconds": 0.5,
+            "within_count": 16,
+            "matched_accuracy": 0.4444444444444444,
+            "all_gt_accuracy": 0.4444444444444444
+          },
+          {
+            "frames": 30,
+            "seconds": 1.0,
+            "within_count": 25,
+            "matched_accuracy": 0.6944444444444444,
+            "all_gt_accuracy": 0.6944444444444444
+          }
+        ],
+        "end": [
+          {
+            "frames": 1,
+            "seconds": 0.03333333333333333,
+            "within_count": 4,
+            "matched_accuracy": 0.1111111111111111,
+            "all_gt_accuracy": 0.1111111111111111
+          },
+          {
+            "frames": 3,
+            "seconds": 0.1,
+            "within_count": 9,
+            "matched_accuracy": 0.25,
+            "all_gt_accuracy": 0.25
+          },
+          {
+            "frames": 5,
+            "seconds": 0.16666666666666666,
+            "within_count": 17,
+            "matched_accuracy": 0.4722222222222222,
+            "all_gt_accuracy": 0.4722222222222222
+          },
+          {
+            "frames": 10,
+            "seconds": 0.3333333333333333,
+            "within_count": 23,
+            "matched_accuracy": 0.6388888888888888,
+            "all_gt_accuracy": 0.6388888888888888
+          },
+          {
+            "frames": 15,
+            "seconds": 0.5,
+            "within_count": 26,
+            "matched_accuracy": 0.7222222222222222,
+            "all_gt_accuracy": 0.7222222222222222
+          },
+          {
+            "frames": 30,
+            "seconds": 1.0,
+            "within_count": 34,
+            "matched_accuracy": 0.9444444444444444,
+            "all_gt_accuracy": 0.9444444444444444
+          }
+        ]
+      },
+      "missed_gt_rallies": [],
+      "unmatched_predictions": [],
+      "conditional_metrics_note": "Boundary/duration/IoU metrics condition on IoU-qualified matches; misses and extras remain in detection metrics.",
+      "no_matches_reason": null
+    },
+    "per_gt_selected": [
+      {
+        "gt_rally": 1,
+        "pred_rally": 1,
+        "gt_start_frame": 243,
+        "pred_start_frame": 264,
+        "start_frame_error": 21,
+        "start_frame_absolute_error": 21,
+        "start_time_error_sec": 0.7000000000000011,
+        "start_time_absolute_error_sec": 0.7000000000000011,
+        "gt_end_frame": 715,
+        "pred_end_frame": 717,
+        "end_frame_error": 2,
+        "end_frame_absolute_error": 2,
+        "end_time_error_sec": 0.06666666666666643,
+        "end_time_absolute_error_sec": 0.06666666666666643,
+        "gt_duration_sec": 15.733333333333333,
+        "pred_duration_sec": 15.099999999999998,
+        "duration_error_sec": -0.6333333333333346,
+        "duration_absolute_error_sec": 0.6333333333333346,
+        "interval_iou": 0.9514767932489452,
+        "matching_status": "matched",
+        "positive_overlap_prediction_ids": [
+          1
+        ],
+        "positive_overlap_segment_count": 1,
+        "gt_dependent_union_coverage_seconds": 15.033333333333331,
+        "gt_dependent_union_coverage_fraction": 0.9555084745762711,
+        "gt_dependent_diagnostic_only": true,
+        "severe_boundary_error": false
+      },
+      {
+        "gt_rally": 2,
+        "pred_rally": 2,
+        "gt_start_frame": 887,
+        "pred_start_frame": 890,
+        "start_frame_error": 3,
+        "start_frame_absolute_error": 3,
+        "start_time_error_sec": 0.10000000000000142,
+        "start_time_absolute_error_sec": 0.10000000000000142,
+        "gt_end_frame": 1262,
+        "pred_end_frame": 1255,
+        "end_frame_error": -7,
+        "end_frame_absolute_error": 7,
+        "end_time_error_sec": -0.23333333333333428,
+        "end_time_absolute_error_sec": 0.23333333333333428,
+        "gt_duration_sec": 12.500000000000004,
+        "pred_duration_sec": 12.166666666666668,
+        "duration_error_sec": -0.3333333333333357,
+        "duration_absolute_error_sec": 0.3333333333333357,
+        "interval_iou": 0.9733333333333332,
+        "matching_status": "matched",
+        "positive_overlap_prediction_ids": [
+          2
+        ],
+        "positive_overlap_segment_count": 1,
+        "gt_dependent_union_coverage_seconds": 12.166666666666668,
+        "gt_dependent_union_coverage_fraction": 0.9733333333333332,
+        "gt_dependent_diagnostic_only": true,
+        "severe_boundary_error": false
+      },
+      {
+        "gt_rally": 3,
+        "pred_rally": 3,
+        "gt_start_frame": 1398,
+        "pred_start_frame": 1402,
+        "start_frame_error": 4,
+        "start_frame_absolute_error": 4,
+        "start_time_error_sec": 0.13333333333333286,
+        "start_time_absolute_error_sec": 0.13333333333333286,
+        "gt_end_frame": 1664,
+        "pred_end_frame": 1659,
+        "end_frame_error": -5,
+        "end_frame_absolute_error": 5,
+        "end_time_error_sec": -0.1666666666666714,
+        "end_time_absolute_error_sec": 0.1666666666666714,
+        "gt_duration_sec": 8.866666666666667,
+        "pred_duration_sec": 8.566666666666663,
+        "duration_error_sec": -0.30000000000000426,
+        "duration_absolute_error_sec": 0.30000000000000426,
+        "interval_iou": 0.9661654135338341,
+        "matching_status": "matched",
+        "positive_overlap_prediction_ids": [
+          3
+        ],
+        "positive_overlap_segment_count": 1,
+        "gt_dependent_union_coverage_seconds": 8.566666666666663,
+        "gt_dependent_union_coverage_fraction": 0.9661654135338341,
+        "gt_dependent_diagnostic_only": true,
+        "severe_boundary_error": false
+      },
+      {
+        "gt_rally": 4,
+        "pred_rally": 4,
+        "gt_start_frame": 1874,
+        "pred_start_frame": 1803,
+        "start_frame_error": -71,
+        "start_frame_absolute_error": 71,
+        "start_time_error_sec": -2.366666666666667,
+        "start_time_absolute_error_sec": 2.366666666666667,
+        "gt_end_frame": 2161,
+        "pred_end_frame": 2167,
+        "end_frame_error": 6,
+        "end_frame_absolute_error": 6,
+        "end_time_error_sec": 0.20000000000000284,
+        "end_time_absolute_error_sec": 0.20000000000000284,
+        "gt_duration_sec": 9.566666666666663,
+        "pred_duration_sec": 12.133333333333333,
+        "duration_error_sec": 2.56666666666667,
+        "duration_absolute_error_sec": 2.56666666666667,
+        "interval_iou": 0.7884615384615382,
+        "matching_status": "matched",
+        "positive_overlap_prediction_ids": [
+          4
+        ],
+        "positive_overlap_segment_count": 1,
+        "gt_dependent_union_coverage_seconds": 9.566666666666663,
+        "gt_dependent_union_coverage_fraction": 1.0,
+        "gt_dependent_diagnostic_only": true,
+        "severe_boundary_error": true
+      },
+      {
+        "gt_rally": 5,
+        "pred_rally": 5,
+        "gt_start_frame": 2210,
+        "pred_start_frame": 2308,
+        "start_frame_error": 98,
+        "start_frame_absolute_error": 98,
+        "start_time_error_sec": 3.2666666666666657,
+        "start_time_absolute_error_sec": 3.2666666666666657,
+        "gt_end_frame": 2500,
+        "pred_end_frame": 2496,
+        "end_frame_error": -4,
+        "end_frame_absolute_error": 4,
+        "end_time_error_sec": -0.13333333333332575,
+        "end_time_absolute_error_sec": 0.13333333333332575,
+        "gt_duration_sec": 9.666666666666657,
+        "pred_duration_sec": 6.266666666666666,
+        "duration_error_sec": -3.3999999999999915,
+        "duration_absolute_error_sec": 3.3999999999999915,
+        "interval_iou": 0.648275862068966,
+        "matching_status": "matched",
+        "positive_overlap_prediction_ids": [
+          5
+        ],
+        "positive_overlap_segment_count": 1,
+        "gt_dependent_union_coverage_seconds": 6.266666666666666,
+        "gt_dependent_union_coverage_fraction": 0.648275862068966,
+        "gt_dependent_diagnostic_only": true,
+        "severe_boundary_error": true
+      },
+      {
+        "gt_rally": 6,
+        "pred_rally": 6,
+        "gt_start_frame": 2558,
+        "pred_start_frame": 2578,
+        "start_frame_error": 20,
+        "start_frame_absolute_error": 20,
+        "start_time_error_sec": 0.6666666666666714,
+        "start_time_absolute_error_sec": 0.6666666666666714,
+        "gt_end_frame": 2806,
+        "pred_end_frame": 2799,
+        "end_frame_error": -7,
+        "end_frame_absolute_error": 7,
+        "end_time_error_sec": -0.23333333333333428,
+        "end_time_absolute_error_sec": 0.23333333333333428,
+        "gt_duration_sec": 8.266666666666666,
+        "pred_duration_sec": 7.36666666666666,
+        "duration_error_sec": -0.9000000000000057,
+        "duration_absolute_error_sec": 0.9000000000000057,
+        "interval_iou": 0.8911290322580638,
+        "matching_status": "matched",
+        "positive_overlap_prediction_ids": [
+          6
+        ],
+        "positive_overlap_segment_count": 1,
+        "gt_dependent_union_coverage_seconds": 7.36666666666666,
+        "gt_dependent_union_coverage_fraction": 0.8911290322580638,
+        "gt_dependent_diagnostic_only": true,
+        "severe_boundary_error": false
+      },
+      {
+        "gt_rally": 7,
+        "pred_rally": 7,
+        "gt_start_frame": 2976,
+        "pred_start_frame": 2977,
+        "start_frame_error": 1,
+        "start_frame_absolute_error": 1,
+        "start_time_error_sec": 0.03333333333333144,
+        "start_time_absolute_error_sec": 0.03333333333333144,
+        "gt_end_frame": 3377,
+        "pred_end_frame": 3377,
+        "end_frame_error": 0,
+        "end_frame_absolute_error": 0,
+        "end_time_error_sec": 0.0,
+        "end_time_absolute_error_sec": 0.0,
+        "gt_duration_sec": 13.36666666666666,
+        "pred_duration_sec": 13.333333333333329,
+        "duration_error_sec": -0.03333333333333144,
+        "duration_absolute_error_sec": 0.03333333333333144,
+        "interval_iou": 0.9975062344139652,
+        "matching_status": "matched",
+        "positive_overlap_prediction_ids": [
+          7
+        ],
+        "positive_overlap_segment_count": 1,
+        "gt_dependent_union_coverage_seconds": 13.333333333333329,
+        "gt_dependent_union_coverage_fraction": 0.9975062344139652,
+        "gt_dependent_diagnostic_only": true,
+        "severe_boundary_error": false
+      },
+      {
+        "gt_rally": 8,
+        "pred_rally": 8,
+        "gt_start_frame": 3451,
+        "pred_start_frame": 3519,
+        "start_frame_error": 68,
+        "start_frame_absolute_error": 68,
+        "start_time_error_sec": 2.2666666666666657,
+        "start_time_absolute_error_sec": 2.2666666666666657,
+        "gt_end_frame": 3695,
+        "pred_end_frame": 3699,
+        "end_frame_error": 4,
+        "end_frame_absolute_error": 4,
+        "end_time_error_sec": 0.13333333333332575,
+        "end_time_absolute_error_sec": 0.13333333333332575,
+        "gt_duration_sec": 8.13333333333334,
+        "pred_duration_sec": 6.0,
+        "duration_error_sec": -2.13333333333334,
+        "duration_absolute_error_sec": 2.13333333333334,
+        "interval_iou": 0.7096774193548397,
+        "matching_status": "matched",
+        "positive_overlap_prediction_ids": [
+          8
+        ],
+        "positive_overlap_segment_count": 1,
+        "gt_dependent_union_coverage_seconds": 5.866666666666674,
+        "gt_dependent_union_coverage_fraction": 0.7213114754098364,
+        "gt_dependent_diagnostic_only": true,
+        "severe_boundary_error": true
+      },
+      {
+        "gt_rally": 9,
+        "pred_rally": 9,
+        "gt_start_frame": 3751,
+        "pred_start_frame": 3857,
+        "start_frame_error": 106,
+        "start_frame_absolute_error": 106,
+        "start_time_error_sec": 3.5333333333333314,
+        "start_time_absolute_error_sec": 3.5333333333333314,
+        "gt_end_frame": 4073,
+        "pred_end_frame": 4059,
+        "end_frame_error": -14,
+        "end_frame_absolute_error": 14,
+        "end_time_error_sec": -0.46666666666666856,
+        "end_time_absolute_error_sec": 0.46666666666666856,
+        "gt_duration_sec": 10.733333333333348,
+        "pred_duration_sec": 6.7333333333333485,
+        "duration_error_sec": -4.0,
+        "duration_absolute_error_sec": 4.0,
+        "interval_iou": 0.6273291925465844,
+        "matching_status": "matched",
+        "positive_overlap_prediction_ids": [
+          9
+        ],
+        "positive_overlap_segment_count": 1,
+        "gt_dependent_union_coverage_seconds": 6.7333333333333485,
+        "gt_dependent_union_coverage_fraction": 0.6273291925465844,
+        "gt_dependent_diagnostic_only": true,
+        "severe_boundary_error": true
+      },
+      {
+        "gt_rally": 10,
+        "pred_rally": 10,
+        "gt_start_frame": 4247,
+        "pred_start_frame": 4272,
+        "start_frame_error": 25,
+        "start_frame_absolute_error": 25,
+        "start_time_error_sec": 0.8333333333333428,
+        "start_time_absolute_error_sec": 0.8333333333333428,
+        "gt_end_frame": 4839,
+        "pred_end_frame": 4804,
+        "end_frame_error": -35,
+        "end_frame_absolute_error": 35,
+        "end_time_error_sec": -1.1666666666666856,
+        "end_time_absolute_error_sec": 1.1666666666666856,
+        "gt_duration_sec": 19.73333333333335,
+        "pred_duration_sec": 17.73333333333332,
+        "duration_error_sec": -2.0000000000000284,
+        "duration_absolute_error_sec": 2.0000000000000284,
+        "interval_iou": 0.8986486486486472,
+        "matching_status": "matched",
+        "positive_overlap_prediction_ids": [
+          10
+        ],
+        "positive_overlap_segment_count": 1,
+        "gt_dependent_union_coverage_seconds": 17.73333333333332,
+        "gt_dependent_union_coverage_fraction": 0.8986486486486472,
+        "gt_dependent_diagnostic_only": true,
+        "severe_boundary_error": true
+      },
+      {
+        "gt_rally": 11,
+        "pred_rally": 11,
+        "gt_start_frame": 4872,
+        "pred_start_frame": 4901,
+        "start_frame_error": 29,
+        "start_frame_absolute_error": 29,
+        "start_time_error_sec": 0.9666666666666686,
+        "start_time_absolute_error_sec": 0.9666666666666686,
+        "gt_end_frame": 5045,
+        "pred_end_frame": 5027,
+        "end_frame_error": -18,
+        "end_frame_absolute_error": 18,
+        "end_time_error_sec": -0.5999999999999943,
+        "end_time_absolute_error_sec": 0.5999999999999943,
+        "gt_duration_sec": 5.7666666666666515,
+        "pred_duration_sec": 4.199999999999989,
+        "duration_error_sec": -1.5666666666666629,
+        "duration_absolute_error_sec": 1.5666666666666629,
+        "interval_iou": 0.7283236994219653,
+        "matching_status": "matched",
+        "positive_overlap_prediction_ids": [
+          11
+        ],
+        "positive_overlap_segment_count": 1,
+        "gt_dependent_union_coverage_seconds": 4.199999999999989,
+        "gt_dependent_union_coverage_fraction": 0.7283236994219653,
+        "gt_dependent_diagnostic_only": true,
+        "severe_boundary_error": false
+      },
+      {
+        "gt_rally": 12,
+        "pred_rally": 12,
+        "gt_start_frame": 5430,
+        "pred_start_frame": 5455,
+        "start_frame_error": 25,
+        "start_frame_absolute_error": 25,
+        "start_time_error_sec": 0.8333333333333428,
+        "start_time_absolute_error_sec": 0.8333333333333428,
+        "gt_end_frame": 5871,
+        "pred_end_frame": 5887,
+        "end_frame_error": 16,
+        "end_frame_absolute_error": 16,
+        "end_time_error_sec": 0.5333333333333314,
+        "end_time_absolute_error_sec": 0.5333333333333314,
+        "gt_duration_sec": 14.699999999999989,
+        "pred_duration_sec": 14.399999999999977,
+        "duration_error_sec": -0.30000000000001137,
+        "duration_absolute_error_sec": 0.30000000000001137,
+        "interval_iou": 0.9102844638949666,
+        "matching_status": "matched",
+        "positive_overlap_prediction_ids": [
+          12
+        ],
+        "positive_overlap_segment_count": 1,
+        "gt_dependent_union_coverage_seconds": 13.866666666666646,
+        "gt_dependent_union_coverage_fraction": 0.9433106575963712,
+        "gt_dependent_diagnostic_only": true,
+        "severe_boundary_error": false
+      },
+      {
+        "gt_rally": 13,
+        "pred_rally": 13,
+        "gt_start_frame": 5958,
+        "pred_start_frame": 5979,
+        "start_frame_error": 21,
+        "start_frame_absolute_error": 21,
+        "start_time_error_sec": 0.700000000000017,
+        "start_time_absolute_error_sec": 0.700000000000017,
+        "gt_end_frame": 6312,
+        "pred_end_frame": 6315,
+        "end_frame_error": 3,
+        "end_frame_absolute_error": 3,
+        "end_time_error_sec": 0.09999999999999432,
+        "end_time_absolute_error_sec": 0.09999999999999432,
+        "gt_duration_sec": 11.800000000000011,
+        "pred_duration_sec": 11.199999999999989,
+        "duration_error_sec": -0.6000000000000227,
+        "duration_absolute_error_sec": 0.6000000000000227,
+        "interval_iou": 0.9327731092436966,
+        "matching_status": "matched",
+        "positive_overlap_prediction_ids": [
+          13
+        ],
+        "positive_overlap_segment_count": 1,
+        "gt_dependent_union_coverage_seconds": 11.099999999999994,
+        "gt_dependent_union_coverage_fraction": 0.9406779661016935,
+        "gt_dependent_diagnostic_only": true,
+        "severe_boundary_error": false
+      },
+      {
+        "gt_rally": 14,
+        "pred_rally": 14,
+        "gt_start_frame": 6382,
+        "pred_start_frame": 6450,
+        "start_frame_error": 68,
+        "start_frame_absolute_error": 68,
+        "start_time_error_sec": 2.26666666666668,
+        "start_time_absolute_error_sec": 2.26666666666668,
+        "gt_end_frame": 6656,
+        "pred_end_frame": 6639,
+        "end_frame_error": -17,
+        "end_frame_absolute_error": 17,
+        "end_time_error_sec": -0.5666666666666629,
+        "end_time_absolute_error_sec": 0.5666666666666629,
+        "gt_duration_sec": 9.133333333333354,
+        "pred_duration_sec": 6.300000000000011,
+        "duration_error_sec": -2.833333333333343,
+        "duration_absolute_error_sec": 2.833333333333343,
+        "interval_iou": 0.6897810218978099,
+        "matching_status": "matched",
+        "positive_overlap_prediction_ids": [
+          14
+        ],
+        "positive_overlap_segment_count": 1,
+        "gt_dependent_union_coverage_seconds": 6.300000000000011,
+        "gt_dependent_union_coverage_fraction": 0.6897810218978099,
+        "gt_dependent_diagnostic_only": true,
+        "severe_boundary_error": true
+      },
+      {
+        "gt_rally": 15,
+        "pred_rally": 15,
+        "gt_start_frame": 6716,
+        "pred_start_frame": 6802,
+        "start_frame_error": 86,
+        "start_frame_absolute_error": 86,
+        "start_time_error_sec": 2.866666666666646,
+        "start_time_absolute_error_sec": 2.866666666666646,
+        "gt_end_frame": 6913,
+        "pred_end_frame": 6908,
+        "end_frame_error": -5,
+        "end_frame_absolute_error": 5,
+        "end_time_error_sec": -0.1666666666666572,
+        "end_time_absolute_error_sec": 0.1666666666666572,
+        "gt_duration_sec": 6.566666666666663,
+        "pred_duration_sec": 3.53333333333336,
+        "duration_error_sec": -3.033333333333303,
+        "duration_absolute_error_sec": 3.033333333333303,
+        "interval_iou": 0.5380710659898521,
+        "matching_status": "matched",
+        "positive_overlap_prediction_ids": [
+          15
+        ],
+        "positive_overlap_segment_count": 1,
+        "gt_dependent_union_coverage_seconds": 3.53333333333336,
+        "gt_dependent_union_coverage_fraction": 0.5380710659898521,
+        "gt_dependent_diagnostic_only": true,
+        "severe_boundary_error": true
+      },
+      {
+        "gt_rally": 16,
+        "pred_rally": 16,
+        "gt_start_frame": 6976,
+        "pred_start_frame": 7006,
+        "start_frame_error": 30,
+        "start_frame_absolute_error": 30,
+        "start_time_error_sec": 1.0,
+        "start_time_absolute_error_sec": 1.0,
+        "gt_end_frame": 7458,
+        "pred_end_frame": 7499,
+        "end_frame_error": 41,
+        "end_frame_absolute_error": 41,
+        "end_time_error_sec": 1.3666666666666742,
+        "end_time_absolute_error_sec": 1.3666666666666742,
+        "gt_duration_sec": 16.066666666666663,
+        "pred_duration_sec": 16.433333333333337,
+        "duration_error_sec": 0.36666666666667425,
+        "duration_absolute_error_sec": 0.36666666666667425,
+        "interval_iou": 0.8642447418738045,
+        "matching_status": "matched",
+        "positive_overlap_prediction_ids": [
+          16
+        ],
+        "positive_overlap_segment_count": 1,
+        "gt_dependent_union_coverage_seconds": 15.066666666666663,
+        "gt_dependent_union_coverage_fraction": 0.9377593360995851,
+        "gt_dependent_diagnostic_only": true,
+        "severe_boundary_error": true
+      },
+      {
+        "gt_rally": 17,
+        "pred_rally": 17,
+        "gt_start_frame": 7532,
+        "pred_start_frame": 7535,
+        "start_frame_error": 3,
+        "start_frame_absolute_error": 3,
+        "start_time_error_sec": 0.09999999999999432,
+        "start_time_absolute_error_sec": 0.09999999999999432,
+        "gt_end_frame": 7741,
+        "pred_end_frame": 7731,
+        "end_frame_error": -10,
+        "end_frame_absolute_error": 10,
+        "end_time_error_sec": -0.33333333333337123,
+        "end_time_absolute_error_sec": 0.33333333333337123,
+        "gt_duration_sec": 6.966666666666697,
+        "pred_duration_sec": 6.533333333333331,
+        "duration_error_sec": -0.43333333333336554,
+        "duration_absolute_error_sec": 0.43333333333336554,
+        "interval_iou": 0.9377990430621966,
+        "matching_status": "matched",
+        "positive_overlap_prediction_ids": [
+          17
+        ],
+        "positive_overlap_segment_count": 1,
+        "gt_dependent_union_coverage_seconds": 6.533333333333331,
+        "gt_dependent_union_coverage_fraction": 0.9377990430621966,
+        "gt_dependent_diagnostic_only": true,
+        "severe_boundary_error": false
+      },
+      {
+        "gt_rally": 18,
+        "pred_rally": 18,
+        "gt_start_frame": 7947,
+        "pred_start_frame": 7953,
+        "start_frame_error": 6,
+        "start_frame_absolute_error": 6,
+        "start_time_error_sec": 0.20000000000004547,
+        "start_time_absolute_error_sec": 0.20000000000004547,
+        "gt_end_frame": 8053,
+        "pred_end_frame": 8052,
+        "end_frame_error": -1,
+        "end_frame_absolute_error": 1,
+        "end_time_error_sec": -0.03333333333335986,
+        "end_time_absolute_error_sec": 0.03333333333335986,
+        "gt_duration_sec": 3.53333333333336,
+        "pred_duration_sec": 3.2999999999999545,
+        "duration_error_sec": -0.23333333333340533,
+        "duration_absolute_error_sec": 0.23333333333340533,
+        "interval_iou": 0.9339622641509235,
+        "matching_status": "matched",
+        "positive_overlap_prediction_ids": [
+          18
+        ],
+        "positive_overlap_segment_count": 1,
+        "gt_dependent_union_coverage_seconds": 3.2999999999999545,
+        "gt_dependent_union_coverage_fraction": 0.9339622641509235,
+        "gt_dependent_diagnostic_only": true,
+        "severe_boundary_error": false
+      },
+      {
+        "gt_rally": 19,
+        "pred_rally": 19,
+        "gt_start_frame": 8106,
+        "pred_start_frame": 8110,
+        "start_frame_error": 4,
+        "start_frame_absolute_error": 4,
+        "start_time_error_sec": 0.13333333333332575,
+        "start_time_absolute_error_sec": 0.13333333333332575,
+        "gt_end_frame": 8628,
+        "pred_end_frame": 8627,
+        "end_frame_error": -1,
+        "end_frame_absolute_error": 1,
+        "end_time_error_sec": -0.03333333333335986,
+        "end_time_absolute_error_sec": 0.03333333333335986,
+        "gt_duration_sec": 17.400000000000034,
+        "pred_duration_sec": 17.23333333333335,
+        "duration_error_sec": -0.16666666666668561,
+        "duration_absolute_error_sec": 0.16666666666668561,
+        "interval_iou": 0.9904214559386962,
+        "matching_status": "matched",
+        "positive_overlap_prediction_ids": [
+          19
+        ],
+        "positive_overlap_segment_count": 1,
+        "gt_dependent_union_coverage_seconds": 17.23333333333335,
+        "gt_dependent_union_coverage_fraction": 0.9904214559386962,
+        "gt_dependent_diagnostic_only": true,
+        "severe_boundary_error": false
+      },
+      {
+        "gt_rally": 20,
+        "pred_rally": 20,
+        "gt_start_frame": 8683,
+        "pred_start_frame": 8715,
+        "start_frame_error": 32,
+        "start_frame_absolute_error": 32,
+        "start_time_error_sec": 1.0666666666666629,
+        "start_time_absolute_error_sec": 1.0666666666666629,
+        "gt_end_frame": 9967,
+        "pred_end_frame": 9947,
+        "end_frame_error": -20,
+        "end_frame_absolute_error": 20,
+        "end_time_error_sec": -0.6666666666666856,
+        "end_time_absolute_error_sec": 0.6666666666666856,
+        "gt_duration_sec": 42.80000000000001,
+        "pred_duration_sec": 41.06666666666666,
+        "duration_error_sec": -1.7333333333333485,
+        "duration_absolute_error_sec": 1.7333333333333485,
+        "interval_iou": 0.9595015576323984,
+        "matching_status": "matched",
+        "positive_overlap_prediction_ids": [
+          20
+        ],
+        "positive_overlap_segment_count": 1,
+        "gt_dependent_union_coverage_seconds": 41.06666666666666,
+        "gt_dependent_union_coverage_fraction": 0.9595015576323984,
+        "gt_dependent_diagnostic_only": true,
+        "severe_boundary_error": true
+      },
+      {
+        "gt_rally": 21,
+        "pred_rally": 21,
+        "gt_start_frame": 10245,
+        "pred_start_frame": 10250,
+        "start_frame_error": 5,
+        "start_frame_absolute_error": 5,
+        "start_time_error_sec": 0.16666666666668561,
+        "start_time_absolute_error_sec": 0.16666666666668561,
+        "gt_end_frame": 10563,
+        "pred_end_frame": 10539,
+        "end_frame_error": -24,
+        "end_frame_absolute_error": 24,
+        "end_time_error_sec": -0.8000000000000114,
+        "end_time_absolute_error_sec": 0.8000000000000114,
+        "gt_duration_sec": 10.600000000000023,
+        "pred_duration_sec": 9.633333333333326,
+        "duration_error_sec": -0.966666666666697,
+        "duration_absolute_error_sec": 0.966666666666697,
+        "interval_iou": 0.9088050314465382,
+        "matching_status": "matched",
+        "positive_overlap_prediction_ids": [
+          21
+        ],
+        "positive_overlap_segment_count": 1,
+        "gt_dependent_union_coverage_seconds": 9.633333333333326,
+        "gt_dependent_union_coverage_fraction": 0.9088050314465382,
+        "gt_dependent_diagnostic_only": true,
+        "severe_boundary_error": false
+      },
+      {
+        "gt_rally": 22,
+        "pred_rally": 22,
+        "gt_start_frame": 10607,
+        "pred_start_frame": 10578,
+        "start_frame_error": -29,
+        "start_frame_absolute_error": 29,
+        "start_time_error_sec": -0.9666666666666401,
+        "start_time_absolute_error_sec": 0.9666666666666401,
+        "gt_end_frame": 10708,
+        "pred_end_frame": 10737,
+        "end_frame_error": 29,
+        "end_frame_absolute_error": 29,
+        "end_time_error_sec": 0.9666666666666401,
+        "end_time_absolute_error_sec": 0.9666666666666401,
+        "gt_duration_sec": 3.3666666666666742,
+        "pred_duration_sec": 5.2999999999999545,
+        "duration_error_sec": 1.9333333333332803,
+        "duration_absolute_error_sec": 1.9333333333332803,
+        "interval_iou": 0.6352201257861704,
+        "matching_status": "matched",
+        "positive_overlap_prediction_ids": [
+          22
+        ],
+        "positive_overlap_segment_count": 1,
+        "gt_dependent_union_coverage_seconds": 3.3666666666666742,
+        "gt_dependent_union_coverage_fraction": 1.0,
+        "gt_dependent_diagnostic_only": true,
+        "severe_boundary_error": false
+      },
+      {
+        "gt_rally": 23,
+        "pred_rally": 23,
+        "gt_start_frame": 10733,
+        "pred_start_frame": 10769,
+        "start_frame_error": 36,
+        "start_frame_absolute_error": 36,
+        "start_time_error_sec": 1.1999999999999886,
+        "start_time_absolute_error_sec": 1.1999999999999886,
+        "gt_end_frame": 11078,
+        "pred_end_frame": 11085,
+        "end_frame_error": 7,
+        "end_frame_absolute_error": 7,
+        "end_time_error_sec": 0.2333333333333485,
+        "end_time_absolute_error_sec": 0.2333333333333485,
+        "gt_duration_sec": 11.5,
+        "pred_duration_sec": 10.53333333333336,
+        "duration_error_sec": -0.9666666666666401,
+        "duration_absolute_error_sec": 0.9666666666666401,
+        "interval_iou": 0.877840909090909,
+        "matching_status": "matched",
+        "positive_overlap_prediction_ids": [
+          22,
+          23
+        ],
+        "positive_overlap_segment_count": 2,
+        "gt_dependent_union_coverage_seconds": 10.433333333333337,
+        "gt_dependent_union_coverage_fraction": 0.9072463768115945,
+        "gt_dependent_diagnostic_only": true,
+        "severe_boundary_error": true
+      },
+      {
+        "gt_rally": 24,
+        "pred_rally": 24,
+        "gt_start_frame": 11271,
+        "pred_start_frame": 11274,
+        "start_frame_error": 3,
+        "start_frame_absolute_error": 3,
+        "start_time_error_sec": 0.10000000000002274,
+        "start_time_absolute_error_sec": 0.10000000000002274,
+        "gt_end_frame": 11392,
+        "pred_end_frame": 11397,
+        "end_frame_error": 5,
+        "end_frame_absolute_error": 5,
+        "end_time_error_sec": 0.16666666666662877,
+        "end_time_absolute_error_sec": 0.16666666666662877,
+        "gt_duration_sec": 4.03333333333336,
+        "pred_duration_sec": 4.099999999999966,
+        "duration_error_sec": 0.06666666666660603,
+        "duration_absolute_error_sec": 0.06666666666660603,
+        "interval_iou": 0.93650793650794,
+        "matching_status": "matched",
+        "positive_overlap_prediction_ids": [
+          24
+        ],
+        "positive_overlap_segment_count": 1,
+        "gt_dependent_union_coverage_seconds": 3.933333333333337,
+        "gt_dependent_union_coverage_fraction": 0.9752066115702425,
+        "gt_dependent_diagnostic_only": true,
+        "severe_boundary_error": false
+      },
+      {
+        "gt_rally": 25,
+        "pred_rally": 25,
+        "gt_start_frame": 11568,
+        "pred_start_frame": 11613,
+        "start_frame_error": 45,
+        "start_frame_absolute_error": 45,
+        "start_time_error_sec": 1.5,
+        "start_time_absolute_error_sec": 1.5,
+        "gt_end_frame": 11865,
+        "pred_end_frame": 11867,
+        "end_frame_error": 2,
+        "end_frame_absolute_error": 2,
+        "end_time_error_sec": 0.06666666666666288,
+        "end_time_absolute_error_sec": 0.06666666666666288,
+        "gt_duration_sec": 9.899999999999977,
+        "pred_duration_sec": 8.46666666666664,
+        "duration_error_sec": -1.4333333333333371,
+        "duration_absolute_error_sec": 1.4333333333333371,
+        "interval_iou": 0.842809364548495,
+        "matching_status": "matched",
+        "positive_overlap_prediction_ids": [
+          25
+        ],
+        "positive_overlap_segment_count": 1,
+        "gt_dependent_union_coverage_seconds": 8.399999999999977,
+        "gt_dependent_union_coverage_fraction": 0.8484848484848482,
+        "gt_dependent_diagnostic_only": true,
+        "severe_boundary_error": true
+      },
+      {
+        "gt_rally": 26,
+        "pred_rally": 26,
+        "gt_start_frame": 11976,
+        "pred_start_frame": 11982,
+        "start_frame_error": 6,
+        "start_frame_absolute_error": 6,
+        "start_time_error_sec": 0.19999999999998863,
+        "start_time_absolute_error_sec": 0.19999999999998863,
+        "gt_end_frame": 12197,
+        "pred_end_frame": 12196,
+        "end_frame_error": -1,
+        "end_frame_absolute_error": 1,
+        "end_time_error_sec": -0.03333333333330302,
+        "end_time_absolute_error_sec": 0.03333333333330302,
+        "gt_duration_sec": 7.366666666666674,
+        "pred_duration_sec": 7.133333333333383,
+        "duration_error_sec": -0.23333333333329165,
+        "duration_absolute_error_sec": 0.23333333333329165,
+        "interval_iou": 0.9683257918552093,
+        "matching_status": "matched",
+        "positive_overlap_prediction_ids": [
+          26
+        ],
+        "positive_overlap_segment_count": 1,
+        "gt_dependent_union_coverage_seconds": 7.133333333333383,
+        "gt_dependent_union_coverage_fraction": 0.9683257918552093,
+        "gt_dependent_diagnostic_only": true,
+        "severe_boundary_error": false
+      },
+      {
+        "gt_rally": 27,
+        "pred_rally": 27,
+        "gt_start_frame": 12451,
+        "pred_start_frame": 12455,
+        "start_frame_error": 4,
+        "start_frame_absolute_error": 4,
+        "start_time_error_sec": 0.13333333333332575,
+        "start_time_absolute_error_sec": 0.13333333333332575,
+        "gt_end_frame": 12966,
+        "pred_end_frame": 12954,
+        "end_frame_error": -12,
+        "end_frame_absolute_error": 12,
+        "end_time_error_sec": -0.39999999999997726,
+        "end_time_absolute_error_sec": 0.39999999999997726,
+        "gt_duration_sec": 17.16666666666663,
+        "pred_duration_sec": 16.633333333333326,
+        "duration_error_sec": -0.533333333333303,
+        "duration_absolute_error_sec": 0.533333333333303,
+        "interval_iou": 0.9689320388349532,
+        "matching_status": "matched",
+        "positive_overlap_prediction_ids": [
+          27
+        ],
+        "positive_overlap_segment_count": 1,
+        "gt_dependent_union_coverage_seconds": 16.633333333333326,
+        "gt_dependent_union_coverage_fraction": 0.9689320388349532,
+        "gt_dependent_diagnostic_only": true,
+        "severe_boundary_error": false
+      },
+      {
+        "gt_rally": 28,
+        "pred_rally": 28,
+        "gt_start_frame": 13054,
+        "pred_start_frame": 13115,
+        "start_frame_error": 61,
+        "start_frame_absolute_error": 61,
+        "start_time_error_sec": 2.03333333333336,
+        "start_time_absolute_error_sec": 2.03333333333336,
+        "gt_end_frame": 13442,
+        "pred_end_frame": 13439,
+        "end_frame_error": -3,
+        "end_frame_absolute_error": 3,
+        "end_time_error_sec": -0.10000000000002274,
+        "end_time_absolute_error_sec": 0.10000000000002274,
+        "gt_duration_sec": 12.933333333333337,
+        "pred_duration_sec": 10.799999999999955,
+        "duration_error_sec": -2.1333333333333826,
+        "duration_absolute_error_sec": 2.1333333333333826,
+        "interval_iou": 0.8350515463917488,
+        "matching_status": "matched",
+        "positive_overlap_prediction_ids": [
+          28
+        ],
+        "positive_overlap_segment_count": 1,
+        "gt_dependent_union_coverage_seconds": 10.799999999999955,
+        "gt_dependent_union_coverage_fraction": 0.8350515463917488,
+        "gt_dependent_diagnostic_only": true,
+        "severe_boundary_error": true
+      },
+      {
+        "gt_rally": 29,
+        "pred_rally": 29,
+        "gt_start_frame": 13679,
+        "pred_start_frame": 13686,
+        "start_frame_error": 7,
+        "start_frame_absolute_error": 7,
+        "start_time_error_sec": 0.2333333333333485,
+        "start_time_absolute_error_sec": 0.2333333333333485,
+        "gt_end_frame": 13994,
+        "pred_end_frame": 13982,
+        "end_frame_error": -12,
+        "end_frame_absolute_error": 12,
+        "end_time_error_sec": -0.39999999999997726,
+        "end_time_absolute_error_sec": 0.39999999999997726,
+        "gt_duration_sec": 10.5,
+        "pred_duration_sec": 9.866666666666674,
+        "duration_error_sec": -0.6333333333333258,
+        "duration_absolute_error_sec": 0.6333333333333258,
+        "interval_iou": 0.9396825396825405,
+        "matching_status": "matched",
+        "positive_overlap_prediction_ids": [
+          29
+        ],
+        "positive_overlap_segment_count": 1,
+        "gt_dependent_union_coverage_seconds": 9.866666666666674,
+        "gt_dependent_union_coverage_fraction": 0.9396825396825405,
+        "gt_dependent_diagnostic_only": true,
+        "severe_boundary_error": false
+      },
+      {
+        "gt_rally": 30,
+        "pred_rally": 30,
+        "gt_start_frame": 14219,
+        "pred_start_frame": 14222,
+        "start_frame_error": 3,
+        "start_frame_absolute_error": 3,
+        "start_time_error_sec": 0.10000000000002274,
+        "start_time_absolute_error_sec": 0.10000000000002274,
+        "gt_end_frame": 14335,
+        "pred_end_frame": 14331,
+        "end_frame_error": -4,
+        "end_frame_absolute_error": 4,
+        "end_time_error_sec": -0.13333333333332575,
+        "end_time_absolute_error_sec": 0.13333333333332575,
+        "gt_duration_sec": 3.8666666666666742,
+        "pred_duration_sec": 3.6333333333333258,
+        "duration_error_sec": -0.2333333333333485,
+        "duration_absolute_error_sec": 0.2333333333333485,
+        "interval_iou": 0.9396551724137893,
+        "matching_status": "matched",
+        "positive_overlap_prediction_ids": [
+          30
+        ],
+        "positive_overlap_segment_count": 1,
+        "gt_dependent_union_coverage_seconds": 3.6333333333333258,
+        "gt_dependent_union_coverage_fraction": 0.9396551724137893,
+        "gt_dependent_diagnostic_only": true,
+        "severe_boundary_error": false
+      },
+      {
+        "gt_rally": 31,
+        "pred_rally": 31,
+        "gt_start_frame": 14404,
+        "pred_start_frame": 14430,
+        "start_frame_error": 26,
+        "start_frame_absolute_error": 26,
+        "start_time_error_sec": 0.8666666666666742,
+        "start_time_absolute_error_sec": 0.8666666666666742,
+        "gt_end_frame": 15151,
+        "pred_end_frame": 15171,
+        "end_frame_error": 20,
+        "end_frame_absolute_error": 20,
+        "end_time_error_sec": 0.6666666666666288,
+        "end_time_absolute_error_sec": 0.6666666666666288,
+        "gt_duration_sec": 24.900000000000034,
+        "pred_duration_sec": 24.69999999999999,
+        "duration_error_sec": -0.20000000000004547,
+        "duration_absolute_error_sec": 0.20000000000004547,
+        "interval_iou": 0.9400260756192972,
+        "matching_status": "matched",
+        "positive_overlap_prediction_ids": [
+          31
+        ],
+        "positive_overlap_segment_count": 1,
+        "gt_dependent_union_coverage_seconds": 24.03333333333336,
+        "gt_dependent_union_coverage_fraction": 0.9651941097724228,
+        "gt_dependent_diagnostic_only": true,
+        "severe_boundary_error": false
+      },
+      {
+        "gt_rally": 32,
+        "pred_rally": 32,
+        "gt_start_frame": 15350,
+        "pred_start_frame": 15354,
+        "start_frame_error": 4,
+        "start_frame_absolute_error": 4,
+        "start_time_error_sec": 0.13333333333332575,
+        "start_time_absolute_error_sec": 0.13333333333332575,
+        "gt_end_frame": 15535,
+        "pred_end_frame": 15529,
+        "end_frame_error": -6,
+        "end_frame_absolute_error": 6,
+        "end_time_error_sec": -0.20000000000004547,
+        "end_time_absolute_error_sec": 0.20000000000004547,
+        "gt_duration_sec": 6.166666666666686,
+        "pred_duration_sec": 5.833333333333314,
+        "duration_error_sec": -0.33333333333337123,
+        "duration_absolute_error_sec": 0.33333333333337123,
+        "interval_iou": 0.94594594594594,
+        "matching_status": "matched",
+        "positive_overlap_prediction_ids": [
+          32
+        ],
+        "positive_overlap_segment_count": 1,
+        "gt_dependent_union_coverage_seconds": 5.833333333333314,
+        "gt_dependent_union_coverage_fraction": 0.94594594594594,
+        "gt_dependent_diagnostic_only": true,
+        "severe_boundary_error": false
+      },
+      {
+        "gt_rally": 33,
+        "pred_rally": 33,
+        "gt_start_frame": 15596,
+        "pred_start_frame": 15664,
+        "start_frame_error": 68,
+        "start_frame_absolute_error": 68,
+        "start_time_error_sec": 2.2666666666666515,
+        "start_time_absolute_error_sec": 2.2666666666666515,
+        "gt_end_frame": 15946,
+        "pred_end_frame": 15951,
+        "end_frame_error": 5,
+        "end_frame_absolute_error": 5,
+        "end_time_error_sec": 0.16666666666674246,
+        "end_time_absolute_error_sec": 0.16666666666674246,
+        "gt_duration_sec": 11.666666666666629,
+        "pred_duration_sec": 9.56666666666672,
+        "duration_error_sec": -2.099999999999909,
+        "duration_absolute_error_sec": 2.099999999999909,
+        "interval_iou": 0.7943661971830941,
+        "matching_status": "matched",
+        "positive_overlap_prediction_ids": [
+          33
+        ],
+        "positive_overlap_segment_count": 1,
+        "gt_dependent_union_coverage_seconds": 9.399999999999977,
+        "gt_dependent_union_coverage_fraction": 0.8057142857142864,
+        "gt_dependent_diagnostic_only": true,
+        "severe_boundary_error": true
+      },
+      {
+        "gt_rally": 34,
+        "pred_rally": 34,
+        "gt_start_frame": 15998,
+        "pred_start_frame": 15983,
+        "start_frame_error": -15,
+        "start_frame_absolute_error": 15,
+        "start_time_error_sec": -0.5,
+        "start_time_absolute_error_sec": 0.5,
+        "gt_end_frame": 16387,
+        "pred_end_frame": 16385,
+        "end_frame_error": -2,
+        "end_frame_absolute_error": 2,
+        "end_time_error_sec": -0.06666666666671972,
+        "end_time_absolute_error_sec": 0.06666666666671972,
+        "gt_duration_sec": 12.966666666666697,
+        "pred_duration_sec": 13.399999999999977,
+        "duration_error_sec": 0.4333333333332803,
+        "duration_absolute_error_sec": 0.4333333333332803,
+        "interval_iou": 0.9579207920792041,
+        "matching_status": "matched",
+        "positive_overlap_prediction_ids": [
+          34
+        ],
+        "positive_overlap_segment_count": 1,
+        "gt_dependent_union_coverage_seconds": 12.899999999999977,
+        "gt_dependent_union_coverage_fraction": 0.9948586118251888,
+        "gt_dependent_diagnostic_only": true,
+        "severe_boundary_error": false
+      },
+      {
+        "gt_rally": 35,
+        "pred_rally": 35,
+        "gt_start_frame": 16513,
+        "pred_start_frame": 16521,
+        "start_frame_error": 8,
+        "start_frame_absolute_error": 8,
+        "start_time_error_sec": 0.2666666666667652,
+        "start_time_absolute_error_sec": 0.2666666666667652,
+        "gt_end_frame": 17026,
+        "pred_end_frame": 17031,
+        "end_frame_error": 5,
+        "end_frame_absolute_error": 5,
+        "end_time_error_sec": 0.16666666666674246,
+        "end_time_absolute_error_sec": 0.16666666666674246,
+        "gt_duration_sec": 17.100000000000023,
+        "pred_duration_sec": 17.0,
+        "duration_error_sec": -0.10000000000002274,
+        "duration_absolute_error_sec": 0.10000000000002274,
+        "interval_iou": 0.974903474903465,
+        "matching_status": "matched",
+        "positive_overlap_prediction_ids": [
+          35
+        ],
+        "positive_overlap_segment_count": 1,
+        "gt_dependent_union_coverage_seconds": 16.833333333333258,
+        "gt_dependent_union_coverage_fraction": 0.9844054580896628,
+        "gt_dependent_diagnostic_only": true,
+        "severe_boundary_error": false
+      },
+      {
+        "gt_rally": 36,
+        "pred_rally": 36,
+        "gt_start_frame": 17066,
+        "pred_start_frame": 17074,
+        "start_frame_error": 8,
+        "start_frame_absolute_error": 8,
+        "start_time_error_sec": 0.2666666666666515,
+        "start_time_absolute_error_sec": 0.2666666666666515,
+        "gt_end_frame": 17226,
+        "pred_end_frame": 17207,
+        "end_frame_error": -19,
+        "end_frame_absolute_error": 19,
+        "end_time_error_sec": -0.6333333333333258,
+        "end_time_absolute_error_sec": 0.6333333333333258,
+        "gt_duration_sec": 5.333333333333371,
+        "pred_duration_sec": 4.433333333333394,
+        "duration_error_sec": -0.8999999999999773,
+        "duration_absolute_error_sec": 0.8999999999999773,
+        "interval_iou": 0.8312500000000055,
+        "matching_status": "matched",
+        "positive_overlap_prediction_ids": [
+          36
+        ],
+        "positive_overlap_segment_count": 1,
+        "gt_dependent_union_coverage_seconds": 4.433333333333394,
+        "gt_dependent_union_coverage_fraction": 0.8312500000000055,
+        "gt_dependent_diagnostic_only": true,
+        "severe_boundary_error": false
+      }
+    ],
+    "selected_fragmentation": {
+      "gt_with_multiple_predictions": [
+        23
+      ],
+      "gt_with_multiple_predictions_count": 1,
+      "unmatched_gt_with_partial_coverage": [],
+      "predictions_without_gt_overlap": [],
+      "predictions_without_gt_overlap_count": 0,
+      "predicted_segments_per_gt": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        2,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ]
+    },
+    "selected_unmatched_predictions": [],
+    "promotion": "experimental opt-in only; no default promotion",
+    "historical_fields": "All handoff metrics, rows, hashes, evidence, controls and old statuses remain preserved."
+  }
 }
