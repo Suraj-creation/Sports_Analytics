@@ -20,7 +20,7 @@ checkpoint bytes. Nothing below `outputs/benchmarking/test1` may be written.
 | temporal-audit | None; source/proxy PTS, counts and visual comparisons | Rule out timebase error | No fitted offsets; investigate any mismatch rather than correcting labels |
 | failure-cases | None; recorded observations, events, transitions and source images | Review errors and controls | All six misses, eleven multi-segment labels, outliers, nineteen unmatched predictions and controls retained |
 
-## Candidate interventions awaiting specialist diagnosis
+## Prespecified candidate interventions
 
 | Candidate | Single variable / mechanism | Required control |
 | --- | --- | --- |
@@ -30,10 +30,11 @@ checkpoint bytes. Nothing below `outputs/benchmarking/test1` may be written.
 | TrackNet window overlap | Change step only, same checkpoint and precision | Full-frame outputs already exist at step8; measure cost and downstream metrics rather than assuming frame skipping |
 | temporal evidence fusion | Independently inspect observed/missing/reconstructed motion and contact evidence | Player movement alone cannot start/extend play; no invented observations |
 
-The final matrix will record actual executed configurations and ablations after
-the audits. Candidate names are hypotheses, not preselected fixes.
+This table preserves the preimplementation hypotheses. Executed configurations,
+all controlled results, rejected candidates and repeats are recorded in
+`experiment_results.json`, `final_benchmark_report.md` and `regression_report.md`.
 
-## Recorded exploratory decisions and next prespecified intervention
+## Recorded exploratory decisions and prespecified image-exit intervention
 
 Fixed-input correctness controls: original49/30TP/F1.7059; contact-history-only
 49/30TP/.7059 with slightly worse MAE; recovery-clock-only48/31TP/.7381;
@@ -51,7 +52,7 @@ factorial comparison still rejects motion guarding: disabled F1.7381,
 reconstruction-only.80, motion-only.6506, combined.7089. Higher matched IoU did
 not outweigh missed rallies. No activity-only rule is promoted.
 
-Next intervention, specified before its measurement: observed image-exit/return
+The next intervention, specified before its measurement, was observed image-exit/return
 support. Missing or reconstructed samples may support an already active exchange
 only if independently observed moving brackets leave upward and return downward
 within the top10%of the actual analysis image, remain in one coordinate/scene
@@ -63,6 +64,29 @@ introduced. A retained CLOSED gap candidate can recover before final publication
 but IDLE cannot start from this cue. The new switch defaults off. Test this cue
 alone, then with strict short-gap reconstruction, using the same recorded inputs
 and unchanged thresholds/matcher. Any full-video gain remains developmental.
+
+## Completed measurement and acceptance decision
+
+The eight-way image-exit factorial and its corrected-provenance/timing repeat
+agree byte-for-byte for every prediction/metric artifact. Exit-only and
+exit-plus-reconstruction both yield 39 predictions, 35 TP, 4 FP, 1 FN and
+F1 0.933333. Adding the motion guard loses three matches. Select the simpler
+exit-only setting; the regular production profile remains unchanged.
+
+Fresh full-video production inference at `3653b0d`, with exactly that explicit
+configuration, completed all 17,268 frames and independently reproduced the
+selected metrics. Start/end MAE are 45.771/16.314 frames versus 49.433/40.400;
+mean IoU is 0.817808 versus 0.763315. All 30 prior matches remain and five misses
+become matches. Start median and maximum worsen to 29/297 frames, GT4/22 starts
+regress, GT23 remains missed and GT27 retains its 218-frame early end. These
+limit acceptance to an exploratory opt-in implementation, not default promotion.
+
+One fresh GPU run plus exact fresh-observation semantic replay establishes
+execution and semantic reproducibility, not repeated GPU determinism or held-out
+generalization. The 1,895-test full suite passes with no skips. Original media,
+labels, evaluator and all 1,766 frozen artifacts remain hash-identical. Detailed
+runtime, all rejected experiments, repeats, tolerance metrics and every row's
+regressions are retained in the final and specialist reports.
 
 ## Acceptance and regression gates
 

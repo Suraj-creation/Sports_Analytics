@@ -65,3 +65,25 @@ explicitly versioned and opt-in until independent annotated footage establishes
 generalization. Report Test1 improvements as exploratory and include every
 outlier/regression. Do not remove broad pipeline capabilities or restore an
 unrelated optional checkpoint merely to conceal missing evidence.
+
+## Executed outcome
+
+The bounded observed image-exit/return cue was the successful intervention:
+35 TP, 4 FP, 1 FN and F1 0.933333 in a fresh complete Test1 run, compared with
+30/19/6 and 0.705882. Full numerical and per-row results are in
+`final_benchmark_report.md` and `regression_report.md`. This cue retains unknown
+shuttle coordinates and cannot create an idle start or observed contact.
+
+Generic reconstruction did not improve the selected exit-only output; the
+motion guard reduced recall. TrackNet step4 cost 1.46 times the paired component
+runtime and did not recover the tested physical visibility gap, so step8 stays.
+These negative controls reject the assumption that more signals, a larger
+temporal window or a more complicated detector necessarily improve this task.
+
+Remaining priorities follow observed failures: independently review preparation
+versus physical rally-start conventions and same-camera edits; label source
+shuttle visibility/location around early misses and static attractors; then test
+background/context and candidate association under fixed segmentation. Use
+match-disjoint annotated singles, amateur and doubles footage before promoting
+the optional mode. Do not fit residual coordinates, merge budgets or offsets to
+these exposed intervals. Severe residual and worsened boundaries remain open.

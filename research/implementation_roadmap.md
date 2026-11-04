@@ -10,12 +10,11 @@
 - Exact production semantic replay and55source-bound diagnostic packages built.
 - Existing full baseline suite:1725passed,19deprecation warnings.
 
-## Required before the first production edit
+## Completed gate before the first production edit
 
-Finish all seven specialist reviews; consolidate the ranked evidence, alternative
-explanations, confidence and risks in root_cause_analysis.md. Freeze planned
-interventions and acceptance criteria in experiment_matrix.md. Commit the
-investigation independently so later implementation can be reviewed against it.
+All seven specialist reviews and the ranked diagnosis/alternative explanations
+were consolidated and committed at `3859f83` before production edits. The initial
+experiment plan and acceptance criteria were frozen with that investigation.
 
 ## Incremental work after the diagnosis gate
 
@@ -54,3 +53,27 @@ amateur views or unannotated doubles footage.
 Main is not modified. Final branch commits contain only scoped implementation,
 tests and small evidence/reports; large runtime/caches/media stay ignored under
 `artifacts/benchmarking/` and source data management.
+
+## Completed implementation and validation
+
+| Commit | Scoped implementation and verification |
+| --- | --- |
+| `6aa79ac` | Parameter-shaped stationary history, contact rebasing and recovery-onset clocks; focused failing/green controls and independent ablations |
+| `b60f114` | Injected registry model root used for derived caches; unknown/singles/doubles constructor regression controls |
+| `af70da7` | Optional typed sport-owned evidence port/provider, frame-aligned helpers and isolated production experiment observer |
+| `7c83b00` | Bounded observed image-exit/return support with missing-anchor, cut, break and no-fabrication controls |
+| `3653b0d` | Frozen extended factorial and explicit exploratory GPU profile; full source used by the fresh production run |
+
+Phases 1–6 completed with distinct evidence classes. The final full software
+suite passed 1,895 tests, no skips. One fresh full original-video inference
+completed with 39 predictions, 35 TP, 4 FP, 1 FN, F1 0.933333; source/proxy
+timeline and complete perception coverage were verified. Fresh observations
+replay exactly to all 39 intervals/end reasons and 447 live contact timestamps.
+The 40 new diagnostic packages supplement the 55 frozen-baseline packages.
+
+The final reports and machine-readable `experiment_results.json` preserve all
+rejected pilots/ablations, row regressions, runtime scopes and remaining errors.
+The new provider remains opt-in. Held-out validation, repeated full GPU inference,
+reviewed contact/pixel labels, browser-seek validation, real doubles model quality
+and residual source-edit/start-convention decisions remain future work, not
+completed acceptance claims. No main branch or frozen artifact was changed.

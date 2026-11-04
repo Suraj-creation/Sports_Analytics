@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 from dataclasses import asdict
 from pathlib import Path
 
@@ -53,6 +54,7 @@ def main():
         options = {"use_reconstruction": reconstruction, "motion_guard": motion, "use_exit_recovery": exit_recovery}
         provider = EvidenceRallyFSM(RallyParams(fps=30), **options)
         intervals, transitions = [], []
+        started = time.perf_counter()
         for row in rows:
             frame, call = row["frame"], row["call"]
             before = provider.state.value
@@ -81,6 +83,7 @@ def main():
             if call == "flush" and frame == 119:
                 provider = EvidenceRallyFSM(RallyParams(fps=30), **options)
         intervals.sort()
+        elapsed = time.perf_counter() - started
         write_predictions(output / "predicted_rallies.csv", intervals, 30)
         if (name == "combined" and not args.include_exit) or (name == "exit_reconstruction" and args.include_exit):
             reference = read_csv(source / "predicted_rallies.csv", 30)
@@ -93,12 +96,22 @@ def main():
                 "mode": "fixed recorded evidence factorial ablation; NOT fresh inference",
                 "intervention": name,
                 "configuration": options,
+                "overrides": options,
+                "source_replay_overrides": metadata["overrides"],
+                "source_replay_elapsed_seconds": metadata["elapsed_seconds"],
+                "elapsed_seconds": elapsed,
+                "timing_scope": "FSM transition loop only, shared decoded input trace loading and evaluation excluded",
                 "parameters": asdict(RallyParams(fps=30)),
                 "input_trace_sha256": digest(source / "fsm_trace.jsonl"),
                 "source_video_sha256": metadata["video_sha256"],
                 "exploratory": True,
                 "prediction_sha256": digest(output / "predicted_rallies.csv"),
             },
+        )
+        (output / "execution.log").write_text(
+            f"Fixed-input FSM ablation {name}\nConfiguration: {json.dumps(options)}\n"
+            f"Input trace: {source / 'fsm_trace.jsonl'}\nFSM loop elapsed_seconds: {elapsed}\n"
+            "No fresh video/model inference. Annotation values are read only after prediction CSV export.\n"
         )
         labels = read_csv(ROOT / "Part2/dataset/Test1_Full/Test1_Full_rally.csv", 30)
         metrics = save_evaluation(output, labels, read_csv(output / "predicted_rallies.csv", 30), 30)

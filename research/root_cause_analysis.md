@@ -7,6 +7,12 @@ Baseline production301baf08 and benchmark b773e20 remain frozen; exact hashes ar
 in `evidence_registry.json`. The original source, labels and all1766 baseline
 files are immutable. Main remains unchanged.
 
+Implementation/validation status: the preimplementation investigation was frozen
+at `3859f83`. Targeted fixes and controlled experiments culminated in actual fresh
+production inference at `3653b0d`: 35 TP, 4 FP, 1 FN, F1 0.933333; original baseline
+30/19/6, F1 0.705882. This is exploratory Test1 evidence. See the final benchmark,
+component and regression reports for all measurements and unresolved outliers.
+
 ## Reproduction and dependency map
 
 Independent arithmetic and the production evaluator reproduce the complete
@@ -180,3 +186,42 @@ GT row IDs, a target count, fitted offsets or test-video-specific interval edits
 - **Experiment/action:**external observer records stage wall aggregates, process CPU/RSS and separately scoped GPU samples/allocator peaks. Fix injected path in the owner with a controlled temporary-root contract test; never migrate weights or replace environment.
 - **Expected effect:**reproducible isolated experiments, explicit availability and accurate runtime/cost reporting; no promised boundary gain.
 - **Risk:**per-device GPU totals include unrelated jobs; Torch peaks exclude ORT. Record scope/cadence. Avoid unrelated analytics refactors that could corrupt accepted score evidence.
+
+### R11 — Residual same-camera edit and mixed visibility losses need independent treatment
+
+- **Symptom:**GT23 remains unmatched in fixed-input exit recovery; GT31 has a severe residual start delay.
+- **Evidence:**`remaining_failure_review.md` and original-frame crops. At10769→10770 both players visibly jump into an ongoing exchange while court appearance stays similar. `CutDetector` correlation0.995922 exceeds its0.55cut threshold and recorded shotID stays25. SuppliedGT23start10733 precedes that edit during preparation. GT31starts in a pickup close-up; later its14647–14694missing run includes source pixels visible before detector reacquisition14695.
+- **Source:**`perception.scene.CutDetector`, per-frame view eligibility, TrackNet maximum-peak output, rally cancellation/reacquisition.
+- **Cause/confidence:**high confidence for why the histogram detector does not flag this transition; visual interpretation is diagnostic, not an independently reviewed cut label. Mixed physical absence and localization misses limit a cue that requires observed near-edge endpoints.
+- **Alternatives:**annotation may intentionally include preparation/close-up context; pixel streaks are not manually labeled shuttle coordinates. No annotation change is justified by agent review alone.
+- **Experiment/action:**obtain reviewed same-camera edit/visibility labels and independently test foreground temporal-discontinuity and candidate-association/background/context approaches. Preserve all36labels and outliers in the existing benchmark. Do not widen the top band to particular residual pixel coordinates or backdate mechanically into a close-up.
+- **Expected effect:**better separation of real breaks and temporary perception loss, potentially fewer residual fragments/onset cancellations; no quantified held-out gain is claimed.
+- **Risk:**fast legitimate movement can resemble a cut; the existing court/scene work remains inside badminton perception and deserves a replaceable typed adapter when evidence supports a replacement. This is documented debt, not a reason for a broad untested refactor.
+
+## Causal conclusions after controlled experiments
+
+- R1/R2: the bounded observed top-exit/return cue reduces multi-segment labels
+  from 11 to 3 and policy false positives from 19 to 4 in actual fresh inference.
+  GT2/19 starts improve +179/+202 to +4/+4; GT20 end improves −442 to −20.
+  The frozen matcher still leaves GT23 missed and GT27/31 fragmented. This is
+  evidence for recovering supported observation loss, not for merging every gap.
+- R3/R4/R5: focused tests establish the history/configuration/clock defects.
+  Contact-history-only does not improve benchmark accuracy; onset-clock-only
+  recovers GT28. Correctness fixes are not presented as sufficient segmentation
+  improvements. R10's injected root defect is similarly a reliability correction.
+- R6/R8: movement guarding reduces recall and is rejected. Player activity or
+  missing ReID is not an evidenced universal remedy for shuttle/FSM failures.
+  GT27's static peak and 218-frame early end remain unresolved.
+- R7: paired real TrackNet step4 inference costs 1.46 times step8 in the measured
+  component experiment; neither strategy recovers observations during the tested
+  17-frame visibility gap. No downstream gain or alternate-weight superiority is
+  established, and no alternate weights were adopted.
+- R9: original/proxy timelines and exact evaluator arithmetic remain valid in
+  the fresh run. No label/frame offset or matching change explains the gain.
+- R11: source edit/preparation and mixed physical/model loss remain residual
+  hypotheses needing independently reviewed labels. GT31 becomes matched but
+  starts 297 frames late; GT4/22 starts worsen. All are retained in acceptance.
+
+The selected provider is explicit and opt-in; ordinary GPU configuration is not
+promoted. Full software regression checks pass 1,895 tests, while held-out model
+quality and repeated whole-run GPU determinism remain unverified.
