@@ -232,7 +232,7 @@ class MatchAnalytics:
             self.unofficial.append(rally)
             return
         self.rallies.append(rally)
-        if rally.winner is None or rally.loser is None:
+        if not rally.score_available or rally.winner is None or rally.loser is None:
             return
         w, lo = self.players[rally.winner], self.players[rally.loser]
         w.points_won += 1

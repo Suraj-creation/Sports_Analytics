@@ -196,19 +196,21 @@ def overview(repo: SessionRepository, cache: AnalyticsCache, limit: int = 500) -
     active_record: tuple[Session, float] | None = None
     sessions = repo.list(limit + 1)
     for session in sessions[:limit]:
-        fold = cache.get(session.session_id) if session.status == SessionStatus.ANALYSED else None
-        available = availability(session, fold)
-        data = _public_analytics(fold) if fold is not None and available.analytics else None
-        # Media is delivered only through authorized /hls or /proxy.mp4 routes.
-        matches.append(
-            ProductMatch(
-                session=public_session(session),
-                analytics=data,
-                availability=available,
-                highlights=[h.to_public() for h in fold.highlights(k=10)] if fold and data is not None else [],
-                lineage=Lineage(event_seq=repo.events(session.session_id).last_seq()),
+        # Keep the fold, its metadata and its lineage on the same committed revision.
+        with repo.analysis_snapshot(session.session_id) as (session, store, _):
+            fold = cache.get(session.session_id) if session.status == SessionStatus.ANALYSED else None
+            available = availability(session, fold)
+            data = _public_analytics(fold) if fold is not None and available.analytics else None
+            # Media is delivered only through authorized /hls or /proxy.mp4 routes.
+            matches.append(
+                ProductMatch(
+                    session=public_session(session),
+                    analytics=data,
+                    availability=available,
+                    highlights=[h.to_public() for h in fold.highlights(k=10)] if fold and data is not None else [],
+                    lineage=Lineage(event_seq=store.last_seq()),
+                )
             )
-        )
         if fold is not None and data is not None:
             history.append(
                 ProgressHistory(
@@ -275,8 +277,8 @@ def _tactics(analytics: MatchAnalytics, pid: str) -> dict[str, Any]:
         and r.shots[0].get("player_id") != pid
         and r.shots[1].get("player_id") == pid
     ]
-    known_serves = [r for r in served if r.winner in ("P1", "P2")]
-    known_returns = [r for r in returned if r.winner in ("P1", "P2")]
+    known_serves = [r for r in served if r.score_available and r.winner in ("P1", "P2")]
+    known_returns = [r for r in returned if r.score_available and r.winner in ("P1", "P2")]
     stats = analytics.players.get(pid)
     strokes = stats.strokes if stats is not None else Counter()
     total = sum(strokes.values())
@@ -284,7 +286,11 @@ def _tactics(analytics: MatchAnalytics, pid: str) -> dict[str, Any]:
     return_won = sum(r.winner == pid for r in known_returns)
     buckets = []
     for label, low, high in (("1–4 shots", 1, 4), ("5–8 shots", 5, 8), ("9+ shots", 9, 10**9)):
-        rallies = [r for r in analytics.rallies if low <= r.n_shots <= high and r.winner in ("P1", "P2")]
+        rallies = [
+            r
+            for r in analytics.rallies
+            if low <= r.n_shots <= high and r.score_available and r.winner in ("P1", "P2")
+        ]
         won = sum(r.winner == pid for r in rallies)
         buckets.append(
             {
@@ -313,56 +319,54 @@ def _tactics(analytics: MatchAnalytics, pid: str) -> dict[str, Any]:
 
 
 def insights(repo: SessionRepository, cache: AnalyticsCache, session: Session) -> dict[str, Any]:
-    fold = cache.get(session.session_id)
-    available = availability(session, fold)
-    store = repo.events(session.session_id)
-    evidence = {ev.event_id: ev for ev in store.query(types=["rally_end"])}
-    rows = []
-    for rally in sorted(fold.rallies + fold.unofficial, key=lambda r: (r.start, r.end)):
-        event = evidence[rally.rally_id]
-        rows.append(
-            {
-                "rally_id": rally.rally_id,
-                "rally_no": rally.rally_no,
-                "frame_start": rally.start,
-                "frame_end": rally.end,
-                "start_s": round(rally.start / fold.fps, 3),
-                "end_s": round(rally.end / fold.fps, 3),
-                "duration_s": rally.duration_s,
-                "n_shots": rally.n_shots,
-                "winner": rally.winner,
-                "loser": rally.loser,
-                "outcome": rally.outcome,
-                "official": rally.official,
-                "game_no": rally.game_no,
-                "score_after": rally.score_after,
-                "score_available": rally.score_available,
-                "shots": rally.shots,
-                "confidence": event.confidence,
-                "band": event.band.value,
-                "status": event.status.value,
-            }
-        )
-    return {
-        "schema_version": 1,
-        "session_id": session.session_id,
-        "availability": available.model_dump(),
-        "lineage": Lineage(event_seq=store.last_seq()).model_dump(),
-        "rallies": rows,
-        "tactics": {pid: _tactics(fold, pid) for pid in ("P1", "P2")} if available.analytics else None,
-        "capabilities": Capabilities().model_dump(),
-        "definitions": {
-            "serve_win_rate": "Points won / rallies with a known winner whose first shot is this player's serve.",
-            "return_win_rate": (
-                "Points won / rallies with a known winner and this player's observed second-shot return."
-            ),
-            "rally_length": "Official rallies with a known winner, grouped by the number of observed shots.",
-            "distance_m": (
-                "Estimated court-plane path during official rallies with validated main-camera geometry. "
-                "Median-smoothed at 5 Hz; gaps over 0.25 s, identity changes, rejected observations and "
-                "implausible speeds break paths. Movement below 0.05 m per step is suppressed. "
-                "Coverage and observed seconds describe support; missing evidence yields null. "
-                "Policy thresholds are not an accuracy validation or physiological measurement."
-            ),
-        },
-    }
+    with repo.analysis_snapshot(session.session_id) as (session, store, _):
+        fold = cache.get(session.session_id)
+        available = availability(session, fold)
+        evidence = {ev.event_id: ev for ev in store.query(types=["rally_end"])}
+        rows = []
+        for rally in sorted(fold.rallies + fold.unofficial, key=lambda r: (r.start, r.end)):
+            event = evidence[rally.rally_id]
+            rows.append(
+                {
+                    "rally_id": rally.rally_id,
+                    "rally_no": rally.rally_no,
+                    "frame_start": rally.start,
+                    "frame_end": rally.end,
+                    "start_s": round(rally.start / fold.fps, 3),
+                    "end_s": round(rally.end / fold.fps, 3),
+                    "duration_s": rally.duration_s,
+                    "n_shots": rally.n_shots,
+                    "winner": rally.winner,
+                    "loser": rally.loser,
+                    "outcome": rally.outcome,
+                    "official": rally.official,
+                    "game_no": rally.game_no,
+                    "score_after": rally.score_after,
+                    "score_available": rally.score_available,
+                    "shots": rally.shots,
+                    "confidence": event.confidence,
+                    "band": event.band.value,
+                    "status": event.status.value,
+                }
+            )
+        return {
+            "schema_version": 1,
+            "session_id": session.session_id,
+            "availability": available.model_dump(),
+            "lineage": Lineage(event_seq=store.last_seq()).model_dump(),
+            "rallies": rows,
+            "tactics": {pid: _tactics(fold, pid) for pid in ("P1", "P2")} if available.analytics else None,
+            "capabilities": Capabilities().model_dump(),
+            "definitions": {
+                "serve_win_rate": "Points won / accepted points whose first shot is this player's observed serve.",
+                "return_win_rate": "Points won / accepted points with this player's observed second-shot return.",
+                "rally_length": "Official rallies with accepted points, grouped by the number of observed shots.",
+                "distance_m": (
+                    "Estimated court-plane path during official rallies with validated main-camera geometry. "
+                    "Median-smoothed at 5 Hz; gaps over 0.25 s, identity changes, rejected observations and "
+                    "implausible speeds break paths. Movement below 0.05 m per step is suppressed. "
+                    "Coverage and observed seconds describe support; missing evidence yields null. "
+                    "Policy thresholds are not an accuracy validation or physiological measurement."
+                ),
+            },
+        }

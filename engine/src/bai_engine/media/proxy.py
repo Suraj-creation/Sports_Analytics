@@ -15,10 +15,14 @@ analysis frame indices can never drift apart.
 
 from __future__ import annotations
 
+import errno
 import json
 import math
+import os
 import re
-from collections.abc import Callable
+import threading
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path
@@ -32,6 +36,58 @@ SEGMENT_SECONDS = 2.0
 _STD = [Fraction(25), Fraction(30000, 1001), Fraction(30), Fraction(50), Fraction(60000, 1001), Fraction(60)]
 
 
+@contextmanager
+def media_writer_lock(mp: MediaPaths, stop: threading.Event) -> Iterator[None]:
+    """One writer per content-addressed media directory; waiting is cancellable.
+
+    Readers may consume completed segments while the owner encodes. Keep the
+    stable lock file: unlinking it would let another process lock a new inode.
+    """
+    mp.root.mkdir(parents=True, exist_ok=True)
+    with (mp.root / ".prepare.lock").open("a+b") as stream:
+        if os.name == "nt":
+            import msvcrt
+
+            stream.seek(0)
+            if not stream.read(1):
+                stream.write(b"\0")
+                stream.flush()
+
+            def acquire() -> None:
+                stream.seek(0)
+                msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
+
+            def release() -> None:
+                stream.seek(0)
+                msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+
+            def acquire() -> None:
+                fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+            def release() -> None:
+                fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
+
+        acquired = False
+        try:
+            while not stop.is_set():
+                try:
+                    acquire()
+                    acquired = True
+                    break
+                except OSError as error:
+                    if error.errno not in (errno.EAGAIN, errno.EACCES, errno.EDEADLK):
+                        raise
+                    stop.wait(0.05)
+            if not acquired or stop.is_set():
+                raise MediaError("Media preparation cancelled while waiting for its writer")
+            yield
+        finally:
+            if acquired:
+                release()
+
+
 @dataclass(frozen=True)
 class ProxyPlan:
     fps: Fraction
@@ -39,6 +95,7 @@ class ProxyPlan:
     frames_per_segment: int
     encoder: str  # libx264 | h264_nvenc
     audio: bool
+    video_stream_index: int = 0
 
     @property
     def segment_seconds(self) -> float:
@@ -57,7 +114,10 @@ def plan_proxy(p: ProbeResult, tools: Tools, max_height: int = 720, prefer_gpu: 
     height = min(max_height, display_height - (display_height % 2))
     fps_seg = max(1, round(float(fps) * SEGMENT_SECONDS))
     encoder = "h264_nvenc" if prefer_gpu and nvenc_works(tools.ffmpeg) else "libx264"
-    return ProxyPlan(fps=fps, height=height, frames_per_segment=fps_seg, encoder=encoder, audio=p.has_audio)
+    return ProxyPlan(
+        fps=fps, height=height, frames_per_segment=fps_seg, encoder=encoder,
+        audio=p.has_audio, video_stream_index=p.video_stream_index,
+    )
 
 
 def build_command(src: str, mp: MediaPaths, plan: ProxyPlan, tools: Tools) -> list[str]:
@@ -120,7 +180,7 @@ def build_command(src: str, mp: MediaPaths, plan: ProxyPlan, tools: Tools) -> li
         "-i",
         str(Path(src).resolve()) if src != "pipe:0" else src,
         "-map",
-        "0:v:0",
+        f"0:{plan.video_stream_index}",
     ]
     if plan.audio:
         cmd += ["-map", "0:a:0?"]
@@ -190,6 +250,7 @@ def build_sprite(
     every_s: float | None = None,
     tile: int = 10,
     thumb_w: int = 192,
+    run_job: Callable[[FFmpegJob], None] | None = None,
 ) -> dict[str, object]:
     """Thumbnail sprite sheets for the scrubber (``sprite_000.jpg`` …) + ``sprite.json``."""
     every = every_s or max(2.0, duration_s / 400)
@@ -209,7 +270,11 @@ def build_sprite(
         "5",
         pattern,
     ]
-    FFmpegJob(cmd).run()
+    job = FFmpegJob(cmd)
+    if run_job is None:
+        job.run()
+    else:
+        run_job(job)
     n_thumbs = math.ceil(duration_s / every)
     width, height = probe(src, tools).display_size
     meta = {

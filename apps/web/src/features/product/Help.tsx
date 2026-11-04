@@ -7,7 +7,7 @@ const topics = [
   ],
   [
     "Shot naming",
-    "Shot types are inferred by rules from motion and contact evidence. They are a preview, not manually labelled accuracy. Select a shot or rally to check its source frames.",
+    "Shot types are inferred by rules from motion and contact evidence. They are a preview, not manually labelled accuracy. Select a shot or rally to check its analysis frames.",
   ],
   [
     "Court maps",

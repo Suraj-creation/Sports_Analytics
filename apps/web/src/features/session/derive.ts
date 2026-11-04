@@ -19,14 +19,28 @@ export const INITIAL_STATE: MatchState = {
 };
 
 /**
- * Match state as of `frame` — derived from the point events so the score bug never spoils
- * what hasn't happened yet on screen. Before the first point, the first point's
- * `state_before` carries the real opening server and ends.
+ * Match state as of `frame`, using accepted score evidence in the effective log.
+ * A seed has an explicit frame; otherwise the first accepted point's `state_before`
+ * supplies the opening state for older logs that do not contain a seed event.
  */
-export function stateAt(events: EventLog, frame: number): { state: MatchState; known: boolean } {
-  const last = events.latestBefore("point", frame);
-  if (last?.payload.state_after) return { state: last.payload.state_after as MatchState, known: true };
-  const first = events.ofType("point")[0];
+export function stateAt(
+  events: EventLog,
+  frame: number,
+): { state: MatchState; known: boolean; evidence?: BaiEvent } {
+  const accepted = events
+    .ofType("point", "match_phase")
+    .filter(
+      (event) =>
+        (event.status === "confirmed" || event.status === "corrected" || event.status === "human_verified") &&
+        event.payload.state_after &&
+        (event.type === "point" || event.payload.base_state),
+    );
+  const last = accepted.filter((event) => event.frame_start <= frame).at(-1);
+  if (last) return { state: last.payload.state_after as MatchState, known: true, evidence: last };
+  // The seed constrains when this opening state is known. A future point's
+  // state_before must not move that observation earlier in the recording.
+  if (accepted.some((event) => event.type === "match_phase")) return { state: INITIAL_STATE, known: false };
+  const first = accepted[0];
   if (first?.payload.state_before) return { state: first.payload.state_before as MatchState, known: true };
   return { state: INITIAL_STATE, known: false };
 }

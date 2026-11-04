@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { stateAt } from "@/features/session/derive";
 import { api } from "@/lib/api";
 import { EventLog } from "@/lib/events";
 import { type ServerMsg, SessionSocket } from "@/lib/socket";
@@ -80,11 +81,26 @@ export const useSession = create<SessionStore>((set, get) => ({
     let mediaFetch: Promise<void> | null = null;
     const ensureMedia = () => {
       if (mediaFetch || get().session?.media) return;
+      const requested = get().session;
       mediaFetch = api
         .session(id)
         .then((full) => {
           if (!full.media || active !== lifecycle) return;
-          set((s) => (s.session?.session_id === id ? { session: { ...full, ...pickLive(s.session) } } : {}));
+          set((s) => {
+            const current = s.session;
+            if (current?.session_id !== id) return {};
+            return {
+              session: {
+                ...full,
+                ...pickLive(current),
+                // Preserve edits made after this request began, while allowing
+                // ingestion to replace an untouched default title or source.
+                title: current.title === requested?.title ? full.title : current.title,
+                players: current.players === requested?.players ? full.players : current.players,
+                roster: current.roster === requested?.roster ? full.roster : current.roster,
+              },
+            };
+          });
         })
         .catch(() => {})
         .finally(() => {
@@ -195,12 +211,13 @@ export const useSession = create<SessionStore>((set, get) => ({
           }
           events.apply(evs);
           const cal = evs.filter((e) => e.type === "calibration").pop();
-          const point = evs.filter((e) => e.type === "point").pop();
+          const scoreChanged = evs.some((event) => event.type === "point" || event.type === "match_phase");
+          const score = scoreChanged ? stateAt(events, Number.POSITIVE_INFINITY) : null;
           set((s) => ({
             eventsVersion: events.version,
             lastEvents: m.backlog ? s.lastEvents : evs,
             calibration: cal ? (cal.payload as Calibration) : s.calibration,
-            state: point ? (point.payload.state_after as MatchState) : s.state,
+            state: score ? (score.known ? score.state : null) : s.state,
             analyticsVersion: evs.length ? s.analyticsVersion + 1 : s.analyticsVersion,
           }));
           break;
@@ -240,9 +257,18 @@ export const useSession = create<SessionStore>((set, get) => ({
         case "ingest":
           set({ ingestProgress: m.progress });
           break;
-        case "state":
-          if (m.state) set((s) => ({ state: m.state, analyticsVersion: s.analyticsVersion + 1 }));
+        case "state": {
+          if (!m.state) break;
+          // The gateway replays durable events before forwarding a state message.
+          // A queued snapshot can therefore be older than the log already received.
+          const score = stateAt(events, Number.POSITIVE_INFINITY);
+          const receivedLog = events.lastSeq > 0 || events.size > 0;
+          set((s) => ({
+            state: receivedLog ? (score.known ? score.state : null) : m.state,
+            analyticsVersion: s.analyticsVersion + 1,
+          }));
           break;
+        }
         default:
           break;
       }

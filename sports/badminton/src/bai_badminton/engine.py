@@ -20,9 +20,12 @@ Event flow::
 from __future__ import annotations
 
 from collections import deque
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from copy import deepcopy
 from dataclasses import asdict, dataclass, field, replace
 from hashlib import sha256
+from threading import RLock
 from typing import Any
 
 import numpy as np
@@ -74,6 +77,7 @@ from bai_badminton.perception.shuttle_post import Track, process
 from bai_badminton.perception_types import ChunkPerception, FramePerception, PersonObs, ScoreReading
 from bai_badminton.rules import (
     PLAYERS,
+    SCORE_REVIEW_EVENT_TYPES,
     MatchConfig,
     MatchState,
     RallyResult,
@@ -223,6 +227,7 @@ class _RallyEvents:
     observed_winner: str | None = None  # winner seen by OCR/geometry, whether or not the rally counted
     override: bool | None = None  # human official / not-official mark
     presence: dict[str, list[tuple[float, float]]] = field(default_factory=dict)
+    decision_missing: bool = False  # historical winner without an accepted point requires review
 
 
 class BadmintonMatchEngine:
@@ -239,6 +244,8 @@ class BadmintonMatchEngine:
         self.cfg = cfg
         self.store = store
         self._emit_cb = emit
+        self._score_lock = RLock()
+        self._score_transaction_depth = 0
         self.timeline = Timeline.from_rate(cfg.fps, 10**9)
         self.ont = get_ontology()
         self.stroke_clf: StrokeClassifier = stroke_classifier or RuleStrokeClassifier()
@@ -1512,15 +1519,62 @@ class BadmintonMatchEngine:
         return jump_features(ank, hips, hts, frame - lo)
 
     # ================================================================== rally end → point
+    @contextmanager
+    def _score_transaction(self) -> Iterator[None]:
+        """Commit a score decision and its projections together, including retries.
+
+        Perception buffers are outside this unit of work. Only scoring bookkeeping
+        is restored on failure; subscribers see events after the SQLite commit.
+        The engine lock also protects rollback after a failed commit.
+        """
+        with self._score_lock:
+            if self._score_transaction_depth:
+                yield
+                return
+            saved = None
+            try:
+                with self.store.transaction():
+                    saved = deepcopy({
+                        name: getattr(self, name)
+                        for name in (
+                            "state", "_base_state", "phase", "_rallies", "_pending", "analytics", "ocr",
+                            "_last_rally_end", "_seed_checked",
+                        )
+                    })
+                    self._score_transaction_depth = 1
+                    try:
+                        yield
+                    finally:
+                        self._score_transaction_depth = 0
+            except BaseException:
+                if saved is not None:
+                    for name, value in saved.items():
+                        setattr(self, name, value)
+                raise
+            finally:
+                self._score_transaction_depth = 0
+
     def _finalize_pending(self, frontier: int) -> None:
-        wait = int(self.cfg.ocr_wait_s * self.cfg.fps) if self._ocr_seen else 0
-        ready = [p for p in self._pending if frontier >= p.seg.end + wait]
-        for p in ready:
-            self._pending.remove(p)
-            self._finalize_rally(p, until=p.seg.end + wait)
-            self._maybe_seed_from_board()
+        with self._score_lock:
+            wait = int(self.cfg.ocr_wait_s * self.cfg.fps) if self._ocr_seen else 0
+            ready = sorted(
+                (p for p in self._pending if frontier >= p.seg.end + wait), key=lambda p: (p.seg.start, p.seg.end)
+            )
+            if not ready:
+                return
+            with self._score_transaction():
+                for p in ready:
+                    self._finalize_rally(p, until=p.seg.end + wait)
+                    self._maybe_seed_from_board()
+                    self._pending.remove(p)
 
     def _finalize_rally(self, p: _PendingRally, until: int) -> None:
+        with self._score_transaction():
+            if any(r.record.start == p.seg.start and r.record.end == p.seg.end for r in self._rallies):
+                return  # the same observation interval was already decided
+            self._finalize_rally_once(p, until)
+
+    def _finalize_rally_once(self, p: _PendingRally, until: int) -> None:
         seg = p.seg
         # classify the last stroke (no next contact) before deciding the rally
         if p.contacts and p.contacts[-1].stroke_event is None:
@@ -1746,6 +1800,10 @@ class BadmintonMatchEngine:
 
         Only the current game's points are known (not earlier games or the server), so the match
         state is a partial observation; the ``match_phase`` event records the basis."""
+        with self._score_transaction():
+            self._seed_from_board()
+
+    def _seed_from_board(self) -> None:
         if self._seed_checked or self.ocr.row_map is None:
             return
         first = next((r for r in self._rallies if r.record.official), None)
@@ -1777,6 +1835,7 @@ class BadmintonMatchEngine:
                         "basis": "scoreboard",
                         "reason": "video starts mid-game: starting score read from the scoreboard",
                         "base_state": self._base_state.model_dump(mode="json"),
+                        "state_after": self._base_state.to_public(cfg),
                         "server_known": False,
                     },
                     confidence=0.9,
@@ -1921,21 +1980,36 @@ class BadmintonMatchEngine:
         """Human (or OCR) correction of a rally winner: re-fold the match from that rally.
 
         Naming a winner says the rally was played for a point, so it also marks it official."""
-        idx = self._rally_index(rally_event_id)
-        r = self._rallies[idx]
-        r.observed_winner, r.override = winner, True
-        return self._refold(provenance, human={idx: {"winner_source": "human"}})
+        with self._score_transaction():
+            idx = self._rally_index(rally_event_id)
+            r = self._rallies[idx]
+            if (
+                r.rally_end.status is EventStatus.HUMAN_VERIFIED
+                and r.observed_winner == winner
+                and r.rally_end.payload.get("winner") == winner
+                and r.override is True
+                and not r.decision_missing
+            ):
+                return []
+            r.observed_winner, r.override, r.decision_missing = winner, True, False
+            return self._refold(provenance, human={idx: {"winner_source": "human"}})
 
     def set_rally_official(self, rally_event_id: str, official: bool, provenance: Provenance) -> list[Event]:
         """Reviewer decision that a rally was (or was not) official play; re-scores what follows."""
-        idx = self._rally_index(rally_event_id)
-        self._rallies[idx].override = official
-        return self._refold(provenance, human={idx: {}})
+        with self._score_transaction():
+            idx = self._rally_index(rally_event_id)
+            self._rallies[idx].override = official
+            self._rallies[idx].decision_missing = False
+            return self._refold(provenance, human={idx: {}})
 
     def set_match_start(self, frame: int | None, provenance: Provenance) -> list[Event]:
         """Reviewer marker: rallies starting at/after ``frame`` are the match, earlier ones are not
         (``None`` removes the marker). Recorded as a human-verified ``match_phase`` event so it
         survives a re-analysis."""
+        with self._score_transaction():
+            return self._set_match_start(frame, provenance)
+
+    def _set_match_start(self, frame: int | None, provenance: Provenance) -> list[Event]:
         self.phase.match_start_frame = frame
         f = max(frame or 0, 0)
         marker = self._event(
@@ -1954,6 +2028,12 @@ class BadmintonMatchEngine:
         self, intervals: list[tuple[int, int]] | None, provenance: Provenance
     ) -> list[Event]:
         """Set inclusive human-reviewed match windows; None removes this policy."""
+        with self._score_transaction():
+            return self._set_reviewed_match_intervals(intervals, provenance)
+
+    def _set_reviewed_match_intervals(
+        self, intervals: list[tuple[int, int]] | None, provenance: Provenance
+    ) -> list[Event]:
         self.phase.set_reviewed_intervals(intervals)
         value = self.phase.reviewed_intervals
         frame = value[0][0] if value else 0
@@ -1987,6 +2067,12 @@ class BadmintonMatchEngine:
 
         Rallies before the first change keep their events; from the first change on, points and
         transitions are retracted and regenerated (the score after it may differ)."""
+        with self._score_transaction():
+            return self._refold_once(provenance, human, force=force)
+
+    def _refold_once(
+        self, provenance: Provenance, human: dict[int, dict[str, Any]] | None = None, *, force: bool = False
+    ) -> list[Event]:
         human = human or {}
         cfg = self.match_cfg
         tracker = MatchPhaseTracker(
@@ -2007,7 +2093,7 @@ class BadmintonMatchEngine:
             d = tracker.decide(
                 r.record.start, r.evidence, end=r.record.end, match_finished=state.finished, override=r.override
             )
-            winner = r.observed_winner if d.official else None
+            winner = r.observed_winner if d.official and not r.decision_missing else None
             loser = other(winner) if winner in PLAYERS else None
             rally_no = state.rally_no + 1 if d.official else None
             pay = r.rally_end.payload
@@ -2016,6 +2102,7 @@ class BadmintonMatchEngine:
                 or pay.get("winner") != winner
                 or pay.get("rally_no") != rally_no
                 or pay.get("phase_override") != r.override
+                or bool(pay.get("score_decision_missing")) != r.decision_missing
             )
             if changed or i in human:
                 dirty = True
@@ -2027,6 +2114,7 @@ class BadmintonMatchEngine:
                     "loser": loser,
                     "observed_winner": r.observed_winner,
                     "rally_no": rally_no,
+                    "score_decision_missing": r.decision_missing,
                 }
                 kw: dict[str, Any] = {"payload": payload, "provenance": provenance}
                 if i in human:
@@ -2119,15 +2207,29 @@ class BadmintonMatchEngine:
         for ev, rec in zip(rallies, records, strict=True):
             pay = ev.payload
             point = next((point_by_parent[i] for i in lineage_ids(self.store, ev) if i in point_by_parent), None)
-            if rec.official and rec.winner in PLAYERS and not state.finished:
-                state = apply_rally(state, rec.winner, self.match_cfg).after
+            accepted = (
+                point is not None
+                and point.status in (EventStatus.CONFIRMED, EventStatus.CORRECTED, EventStatus.HUMAN_VERIFIED)
+                and point.payload.get("winner") in PLAYERS
+            )
+            missing = not accepted and (
+                bool(pay.get("score_decision_missing")) or (rec.official and rec.winner in PLAYERS)
+            )
+            if rec.official and accepted and not state.finished:
+                assert point is not None
+                state = apply_rally(state, point.payload["winner"], self.match_cfg).after
+            if missing:
+                rec.winner, rec.loser, rec.score_available = None, None, False
             transitions = trans_by_parent.get(point.event_id, []) if point else []
             evidence = RallyEvidence(**pay["phase_evidence"]) if pay.get("phase_evidence") else RallyEvidence()
             # logs from before match-phase gating counted every rally: keep that decision on re-fold
-            override = pay["phase_override"] if "official" in pay else True
+            override = pay.get("phase_override") if "official" in pay else True
             observed = pay.get("observed_winner", pay.get("winner"))
             self._rallies.append(
-                _RallyEvents(ev, point, transitions, rec, pay.get("winner"), rec.outcome, evidence, observed, override)
+                _RallyEvents(
+                    ev, point, transitions, rec, pay.get("winner"), rec.outcome, evidence, observed, override,
+                    decision_missing=missing,
+                )
             )
             self._last_rally_end = rec.end
         self.state = state
@@ -2142,6 +2244,10 @@ class BadmintonMatchEngine:
         """Re-apply human-verified events from an earlier analysis of the same video. Ids change
         on re-analysis, so events are matched by frames: rallies by overlap, other events by the
         nearest same-type event within a few frames. Idempotent; returns how many applied."""
+        with self._score_transaction():
+            return self._carry_over(events, provenance)
+
+    def _carry_over(self, events: list[Event], provenance: Provenance) -> int:
         applied = 0
         changed_strokes = False
         # Coalesce policy markers by their append sequence before applying them;
@@ -2198,6 +2304,11 @@ class BadmintonMatchEngine:
                     tgt.rally_end = self._emit([corr])[0]
                     tgt.record.rally_id = tgt.rally_end.event_id
                     applied += 1
+                continue
+            if h.type in SCORE_REVIEW_EVENT_TYPES:
+                # Historical generic reviews may contain hand-edited derived
+                # scores. Only the explicit rally/phase decisions above may
+                # regenerate points; copying snapshots would bypass the rules.
                 continue
             cur = self._nearest(h.type, h.frame_start, tol=3)
             if cur is None:
@@ -2312,7 +2423,8 @@ class BadmintonMatchEngine:
             return []
         appended = self.store.append_many(events)
         if self._emit_cb is not None:
-            self._emit_cb(appended)
+            callback = self._emit_cb
+            self.store.after_commit(lambda: callback(appended))
         return appended
 
     # ================================================================== public views

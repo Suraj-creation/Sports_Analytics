@@ -21,6 +21,7 @@ from bai_badminton.perception.court_lines import CourtFit, camera_pose, choose_m
 from bai_badminton.perception.isolation import is_fixed_camera
 from bai_badminton.perception.pipeline import BadmintonPerception, lines_ref_id
 from bai_badminton.perception_types import ChunkPerception, FramePerception, PersonObs, RacketObservation, ScoreReading
+from bai_badminton.rules import SCORE_REVIEW_EVENT_TYPES
 from bai_badminton.rules.bwf import MatchConfig
 from bai_engine.config import Profile, get_settings
 from bai_engine.decode import DecodedChunk
@@ -455,6 +456,11 @@ class BadmintonSession:
                 return {"ok": False, "error": "unknown event"}
             if ev.type in TRACKER_IDENTITY_EVIDENCE_TYPES:
                 return {"ok": False, "error": "tracker identity evidence requires its dedicated review flow"}
+            if ev.type in SCORE_REVIEW_EVENT_TYPES:
+                return {
+                    "ok": False,
+                    "error": "score evidence requires a winner, official-play or match-phase correction",
+                }
             patch = command.get("payload") or {}
             if "participant_hypothesis" in patch and (
                 "participant_hypothesis" not in ev.payload

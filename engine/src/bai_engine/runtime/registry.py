@@ -14,6 +14,7 @@ import hashlib
 import json
 import os
 import shutil
+import stat
 import tempfile
 import threading
 import urllib.request
@@ -21,8 +22,9 @@ import zipfile
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, BinaryIO
+from uuid import uuid4
 
 import yaml
 
@@ -237,30 +239,36 @@ class ModelRegistry:
 
     def _fetch(self, spec: ModelSpec, dest: Path) -> None:
         dest.parent.mkdir(parents=True, exist_ok=True)
-        tmp = dest.with_suffix(dest.suffix + ".part")
         src = spec.source
         log.info("model.fetch", model=spec.name, source=src)
-        if "hf" in src:
-            from huggingface_hub import hf_hub_download
+        # Independent registry instances/processes may fetch the same missing
+        # artifact. Never share a writable inode or expose it before the copy
+        # completes; another downloader could otherwise truncate pinned bytes.
+        with tempfile.TemporaryDirectory(prefix=".fetch-", dir=dest.parent) as staging:
+            tmp = Path(staging) / dest.name
+            if "hf" in src:
+                from huggingface_hub import hf_hub_download
 
-            p = hf_hub_download(repo_id=src["hf"], filename=src["file"], cache_dir=str(self.cache / ".hf"))
-            shutil.copyfile(p, tmp)
-        elif "url" in src:
-            if not src["url"].startswith("https://"):
-                raise ModelError("model URLs must be https")
-            with urllib.request.urlopen(src["url"], timeout=120) as r, tmp.open("wb") as f:  # noqa: S310
-                shutil.copyfileobj(r, f, length=1 << 20)
-        elif "gdrive_folder" in src:
-            raise ModelError(
-                f"{spec.name} is distributed via Google Drive (folder {src['gdrive_folder']}); "
-                f"download {src.get('file')} manually into {dest.parent} and re-run"
-            )
-        else:
-            raise ModelError(f"{spec.name}: unsupported source {src}")
-        if spec.size and tmp.stat().st_size != spec.size:
-            tmp.unlink(missing_ok=True)
-            raise ModelError(f"{spec.name}: size mismatch (expected {spec.size})")
-        tmp.replace(dest)
+                p = hf_hub_download(repo_id=src["hf"], filename=src["file"], cache_dir=str(self.cache / ".hf"))
+                shutil.copyfile(p, tmp)
+            elif "url" in src:
+                if not src["url"].startswith("https://"):
+                    raise ModelError("model URLs must be https")
+                with urllib.request.urlopen(src["url"], timeout=120) as r, tmp.open("wb") as f:  # noqa: S310
+                    shutil.copyfileobj(r, f, length=1 << 20)
+            elif "gdrive_folder" in src:
+                raise ModelError(
+                    f"{spec.name} is distributed via Google Drive (folder {src['gdrive_folder']}); "
+                    f"download {src.get('file')} manually into {dest.parent} and re-run"
+                )
+            else:
+                raise ModelError(f"{spec.name}: unsupported source {src}")
+            if spec.size and tmp.stat().st_size != spec.size:
+                raise ModelError(f"{spec.name}: size mismatch (expected {spec.size})")
+            # Reject conflicting downloads before they replace a good artifact.
+            # First-use compare/pin already uses the cross-process transaction.
+            self._verify(spec, tmp)
+            tmp.replace(dest)
 
     def _verify(self, spec: ModelSpec, art: Path) -> None:
         digest = _sha256(art)
@@ -284,21 +292,98 @@ class ModelRegistry:
                 raise ModelError(f"{spec.name}: sha256 mismatch ({digest} != pinned {expected}); refusing to load")
 
     def _extract_onnx(self, spec: ModelSpec, zpath: Path) -> Path:
-        out_dir = zpath.parent / "extracted"
-        existing = sorted(out_dir.rglob("*.onnx")) if out_dir.exists() else []
-        if existing:
-            return existing[0]
-        out_dir.mkdir(exist_ok=True)
-        with zipfile.ZipFile(zpath) as z:
-            for member in z.infolist():
-                target = (out_dir / member.filename).resolve()
-                if not str(target).startswith(str(out_dir.resolve())):
-                    raise ModelError("zip slip detected")
-            z.extractall(out_dir)
-        found = sorted(out_dir.rglob("*.onnx"))
-        if not found:
-            raise ModelError(f"{spec.name}: no .onnx inside archive")
-        return found[0]
+        # Extraction consumes the same private bytes that pass verification.
+        # Preserve legacy extracted/ artifacts, but never trust their provenance.
+        with tempfile.TemporaryFile(mode="w+b", prefix=".archive-", dir=zpath.parent) as snapshot:
+            digest = hashlib.sha256()
+            with zpath.open("rb") as original:
+                for block in iter(lambda: original.read(1 << 20), b""):
+                    snapshot.write(block)
+                    digest.update(block)
+            archive_digest = digest.hexdigest()
+            self._verify_digest(spec, archive_digest)
+            snapshot.seek(0)
+            cache = zpath.parent / "extracted-v1"
+            cache.mkdir(exist_ok=True)
+            for published in sorted(cache.glob(f"{archive_digest}-*")):
+                graph = self._cached_archive_graph(published, archive_digest)
+                if graph is not None:
+                    return graph
+            # Separate objects let concurrent workers publish complete bundles
+            # without replacing a directory another loader may already be using.
+            with tempfile.TemporaryDirectory(prefix=".extract-", dir=cache) as temporary:
+                staged = Path(temporary)
+                files_root = staged / "files"
+                files_root.mkdir()
+                files: dict[str, str] = {}
+                with zipfile.ZipFile(snapshot) as archive:
+                    for member in archive.infolist():
+                        target = self._archive_member_path(files_root, member.filename)
+                        mode = stat.S_IFMT(member.external_attr >> 16)
+                        if mode not in (0, stat.S_IFREG, stat.S_IFDIR):
+                            raise ModelError("archive links and special files are not supported")
+                        if member.is_dir():
+                            target.mkdir(parents=True, exist_ok=True)
+                            continue
+                        relative = target.relative_to(files_root).as_posix()
+                        if relative in files:
+                            raise ModelError("duplicate archive path")
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        with archive.open(member) as source, target.open("xb") as output:
+                            shutil.copyfileobj(source, output, length=1 << 20)
+                        files[relative] = _sha256(target)
+                graphs = sorted(name for name in files if name.endswith(".onnx"))
+                if not graphs:
+                    raise ModelError(f"{spec.name}: no .onnx inside archive")
+                record = {
+                    "schema": "verified-archive-extraction-v1",
+                    "archive_sha256": archive_digest,
+                    "graph": graphs[0],
+                    "files": files,
+                }
+                (staged / "manifest.json").write_text(json.dumps(record, sort_keys=True), encoding="utf-8")
+                published = cache / f"{archive_digest}-{uuid4().hex}"
+                staged.replace(published)
+                return published / "files" / graphs[0]
+
+    @staticmethod
+    def _archive_member_path(root: Path, name: str) -> Path:
+        path = PurePosixPath(name)
+        if (
+            not path.parts or path.is_absolute() or ".." in path.parts
+            or "\\" in name or ":" in name or "\0" in name
+        ):
+            raise ModelError("unsafe archive path")
+        target = root.joinpath(*path.parts)
+        if not target.resolve().is_relative_to(root.resolve()):
+            raise ModelError("unsafe archive path")
+        return target
+
+    @classmethod
+    def _cached_archive_graph(cls, published: Path, archive_digest: str) -> Path | None:
+        try:
+            root = published / "files"
+            if published.is_symlink() or root.is_symlink():
+                return None
+            record = json.loads((published / "manifest.json").read_text(encoding="utf-8"))
+            if record["schema"] != "verified-archive-extraction-v1" or record["archive_sha256"] != archive_digest:
+                return None
+            files, graph = record["files"], record["graph"]
+            if not isinstance(files, dict) or not isinstance(graph, str) or graph not in files:
+                return None
+            contents = list(root.rglob("*"))
+            if any(path.is_symlink() for path in contents):
+                return None
+            actual = {path.relative_to(root).as_posix() for path in contents if path.is_file()}
+            if actual != set(files):
+                return None
+            for name, expected in files.items():
+                path = cls._archive_member_path(root, name)
+                if _sha256(path) != expected:
+                    return None
+            return cls._archive_member_path(root, graph)
+        except (OSError, ValueError, KeyError, TypeError, ModelError):
+            return None
 
 
 def _sha256(path: Path) -> str:

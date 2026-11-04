@@ -181,6 +181,14 @@ def install_review_fixture(app) -> None:  # type: ignore[no-untyped-def]
         }
 
 
+def install_score_fixture(app) -> None:  # type: ignore[no-untyped-def]
+    from apps.web.e2e.score_fixture import create_score_fixture
+
+    @app.post("/__test__/score-fixture")
+    def seed_score() -> dict:
+        return create_score_fixture(app.state.repo, app.state.settings.profile, media=True)
+
+
 def main() -> None:
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8765
     root = Path(tempfile.mkdtemp(prefix="bai-e2e-"))
@@ -200,6 +208,7 @@ def main() -> None:
     try:
         app = create_app(settings)
         install_review_fixture(app)
+        install_score_fixture(app)
         uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")
     finally:
         shutil.rmtree(root, ignore_errors=True)

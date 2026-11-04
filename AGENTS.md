@@ -1,12 +1,100 @@
+# Required reading and platform contract
+
+Before every task, implementation, debugging session, review or handoff, read
+`AGENTS.md`, `CODEX.md` and `CLAUDE.md`. Treat the architecture and evidence rules
+below as requirements for all code, tests, configuration and product behavior.
+Keep the three instruction files consistent when these requirements change.
+
+We are building a reusable analytics platform. Badminton is the current domain,
+not the platform's architectural limit. Whole analysis pipelines and their
+individual components must be replaceable through explicit plugin contracts.
+Support future sports and other analytics without putting domain assumptions
+into the generic host or creating a parallel engine for each use case.
+
+## Pluggable pipelines and components
+
+- Extend the existing engine/sport-plugin interfaces as the entry point. A
+  pipeline plugin declares the stages it composes, their order/dependencies,
+  configuration, capabilities and lifecycle. The host selects a pipeline by
+  configuration/registration, not by hard-coded badminton imports or UI branches.
+- Keep acquisition, media/timebases, scheduling, generic model execution,
+  persistence, transport, generic evidence and observability in `engine/`.
+  Domain plugins own court/field geometry, format-specific interpretation,
+  contacts, action/shot semantics, rules, scoring and domain analytics.
+- Detection, perception, tracking/identity, contact inference, classification,
+  activity/rally segmentation, outcome/scoring and analytics must have explicit
+  replaceable component boundaries. A domain may compose, omit or replace stages;
+  do not assume every future pipeline has badminton's stages or event taxonomy.
+- Each component declares typed inputs/outputs, timeline/coordinate conventions,
+  configuration and artifact versions, supported formats/devices, required and
+  optional evidence, provenance, failure/unknown behavior and state reset/restore.
+  Resolve implementations through registries/factories and dependency injection.
+  Avoid global singletons, hidden model selection and speculative abstractions.
+- Cache identity includes relevant input/media, model, stage/pipeline version,
+  configuration, calibration and format decisions. Invalidate dependent results
+  when these change; preserve/back up accepted evidence and existing baselines.
+- Test the host boundary with an independent non-badminton test plugin and test
+  component replacement. A registry entry alone is not proof of pluggability.
+
+## Singles, doubles and format adaptation
+
+- Singles and four-player doubles are first-class requirements throughout the
+  pipeline, storage, evaluation and UI. Design every change against both. A
+  singles-only research component must declare that limitation and remain behind
+  an explicit capability gate; do not present its fallback as doubles support.
+- When format is unspecified, a replaceable format-understanding layer should
+  infer singles/doubles from sustained target-court observations and expose its
+  evidence and uncertainty. Respect explicit user format/roster configuration.
+  Occlusion, spectators, adjacent courts or two currently visible players must
+  not silently force singles or overwrite a confirmed doubles roster.
+- Propagate confirmed or uncertain format through stage configuration. Keep
+  physical participants, track episodes, team membership and the two scoring
+  slots distinct. Doubles contact attribution considers all four participants;
+  team scoring must not pretend a near/far track is a permanent named player.
+- If additional calibration, roster binding or service configuration is needed,
+  expose the missing requirement or a review action. Preserve unknown identity,
+  format, contact, shot and winner rather than inventing a result.
+- Format changes must reset incompatible temporal state and invalidate dependent
+  caches explicitly, with reproducibility metadata and compatible schema handling.
+
+## Accuracy, scoring and reviewable evidence
+
+- Useful end-to-end behavior is required; passing unit/runtime checks does not
+  establish contact, classification or scoring quality. Trace empty or poor
+  output through the actual perception-to-decision gates on real footage.
+- Distinguish observed scoreboard values, identity/row hypotheses, reconstructed
+  score transitions and accepted point decisions. Reconcile evidence with legal
+  rules, but never invent rally winners or pad a match to a plausible final score.
+  Do not present an unknown score as a verified 0–0 match score.
+- Make contact candidates, racket/shuttle observations, shot labels, rally
+  boundaries and point decisions visually reviewable with canonical-frame
+  evidence, provenance, uncertainty and rejection/abstention reasons. A visible
+  point/score update must identify its player/team and supporting evidence.
+- Maintain an evaluation matrix for shuttle visibility/location, contact timing,
+  hitter/team attribution, shot classes, rally boundaries, point decisions and
+  score sequences, plus latency/resources. Include singles, doubles, identity
+  uncertainty, cuts/replays, occlusion and multi-court scenes.
+- Report stage-conditional and end-to-end metrics, coverage/abstention, matching
+  tolerances, per-class confusion and errors. Use source-bound reviewed labels
+  and match-disjoint tuning/evaluation; preserve a comparable baseline. Agent
+  visual checks and model-generated outputs remain diagnostic/draft evidence.
+- Study external implementations outside this repository. Verify code, model,
+  dataset and dependency licenses separately, including noncommercial use;
+  preserve required notices and record pinned sources/artifact hashes. Adopt a
+  model or method only on comparable evidence, not README scores or novelty.
+
 # Project workspace
 
-Author code in the current local Windows checkout/worktree, following the user's
-request to keep editing fast. Preserve unrelated local changes and untracked
-folders, including `Part2/` and `SportsVideoAnalysis/`. Use Git to transfer tested
-changes to an isolated checkout on the Remote GPU Server for inference and
-end-to-end application testing. The server runtime and existing environment are
-under `/home/administrator/Desktop/sport-analytics/Sports_Analytics`.
-Do not store SSH passwords or application secrets in this repository.
+For the active GPU pipeline task, author code and run validation in the isolated
+GPU checkout `/home/administrator/Desktop/sport-analytics/event-score-integrity-20261103`
+on branch `codex/pluggable-pipeline-quality`. The user is developing a separate
+local UI branch. Do not edit or switch their Windows checkout. This task-specific
+remote authoring instruction supersedes the earlier local-authoring workflow.
+Preserve other server checkouts and jobs, original sessions and model artifacts.
+The runtime remains `/home/administrator/Desktop/sport-analytics/Sports_Analytics`.
+Never store SSH passwords or application secrets in this repository.
+The user authorized one Git checkpoint push on 2026-11-04; keep subsequent
+changes uncommitted unless further publication is requested.
 
 ## Runtime
 

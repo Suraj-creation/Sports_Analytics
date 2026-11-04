@@ -7,7 +7,7 @@ export function MomentsPage() {
   const [sessionId, setSessionId] = useState("all");
   const [personId, setPersonId] = useState("all");
   return (
-    <Catalogue title="Moments" lead="Selected rallies, linked to their source frames.">
+    <Catalogue title="Moments" lead="Selected rallies, linked to their analysis frames.">
       {(data) => {
         const moments = data.matches.flatMap((match) =>
           match.highlights.map((highlight) => ({ match, highlight })),

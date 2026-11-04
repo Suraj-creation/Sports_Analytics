@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import threading
 from collections.abc import Callable, Sequence
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -67,6 +68,7 @@ def nvenc_works(ffmpeg: str) -> bool:
     cmd = [
         ffmpeg,
         "-hide_banner",
+        "-nostdin",
         "-loglevel",
         "error",
         "-f",
@@ -106,24 +108,37 @@ class FFmpegJob:
         self._cancelled = threading.Event()
 
     def run(self) -> None:
+        if self._cancelled.is_set():
+            raise MediaError("cancelled")
         log.info("ffmpeg.start", cmd=" ".join(self.cmd[:3]) + " …")
         self._proc = subprocess.Popen(  # noqa: S603
             self.cmd, stdin=self._stdin, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=self.cwd
         )
+        # cancel() can run while Popen is constructing the process, before the
+        # handle is assigned. Apply that request even if stdout never emits data.
+        if self._cancelled.is_set():
+            self.cancel()
         t = threading.Thread(target=self._drain_stderr, daemon=True)
         t.start()
-        assert self._proc.stdout is not None
-        for raw in self._proc.stdout:
-            line = raw.decode(errors="replace").strip()
-            if line.startswith("out_time_us=") and self.on_progress is not None:
-                v = line.split("=", 1)[1]
-                if v.isdigit():
-                    self.on_progress(int(v))
-            if self._cancelled.is_set():
-                self._proc.kill()
-                break
-        rc = self._proc.wait()
-        t.join(timeout=5)
+        try:
+            assert self._proc.stdout is not None
+            for raw in self._proc.stdout:
+                line = raw.decode(errors="replace").strip()
+                if line.startswith("out_time_us=") and self.on_progress is not None:
+                    v = line.split("=", 1)[1]
+                    if v.isdigit():
+                        self.on_progress(int(v))
+                if self._cancelled.is_set():
+                    self.cancel()
+                    break
+            rc = self._proc.wait()
+        finally:
+            # A progress callback (for example a failed transport) may raise
+            # while the encoder still owns files. Always terminate and reap it.
+            if self._proc.poll() is None:
+                self.cancel()
+            self._proc.wait()
+            t.join(timeout=5)
         if self._cancelled.is_set():
             raise MediaError("cancelled")
         if rc != 0:
@@ -139,4 +154,6 @@ class FFmpegJob:
     def cancel(self) -> None:
         self._cancelled.set()
         if self._proc is not None and self._proc.poll() is None:
-            self._proc.kill()
+            # The process may exit between poll and kill.
+            with suppress(ProcessLookupError):
+                self._proc.kill()

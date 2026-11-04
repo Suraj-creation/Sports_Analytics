@@ -32,7 +32,7 @@ describe("evidence directly below the player", () => {
       .selectEvidence({ start: 100, end: 145, label: "Smash", eventId: "second" }, { from: 70, to: 145 });
     usePlayback.getState().setFrame(100);
     render(<EvidenceDetails session={SESSION} />);
-    expect(screen.getByText(/source frame 100/)).toHaveTextContent("Momota");
+    expect(screen.getByText(/Analysis proxy frame 100/)).toHaveTextContent("Momota");
     expect(screen.getByText(/Rally 3 · Not counted/)).toHaveTextContent("Winner unresolved");
     expect(screen.getByText(/frames 70–145/)).toBeVisible();
     expect(screen.getByRole("button", { name: "Next shot" })).toBeDisabled();

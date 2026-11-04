@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { ErrorNote } from "@/components/ui";
 import { useAnalysisQueryKey } from "@/lib/analysisQuery";
 import { api } from "@/lib/api";
 import type { Session } from "@/lib/types";
@@ -18,7 +19,9 @@ export function PairAnalytics({ session }: { session: Session }) {
         Link all four players in Visual track observations below, then review hitters. Pair measurements use
         reviewed intervals and validated court positions during official rallies.
       </p>
-      {!data?.pairs || !Object.values(data.pairs).some((pair) => pair.observed_frames > 0) ? (
+      {query.error ? (
+        <ErrorNote error={query.error} />
+      ) : !data?.pairs || !Object.values(data.pairs).some((pair) => pair.observed_frames > 0) ? (
         <p className="mt-4 text-sm">No pair positions have sufficient reviewed evidence yet.</p>
       ) : (
         Object.entries(data.pairs).map(([team, pair]) => (

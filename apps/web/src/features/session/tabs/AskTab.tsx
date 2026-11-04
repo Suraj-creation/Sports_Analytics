@@ -181,7 +181,7 @@ function Answer({ a, session }: { a: AskAnswer; session: Session }) {
               event
                 ? `Watch event at ${clock(event.frame_start, session.media)} · ${event.band} evidence`
                 : c?.frame != null
-                  ? `Go to ${clock(c.frame, session.media)} · timestamp only; event details unavailable`
+                  ? `Go to ${clock(c.frame, session.media)} · analysis time only; event details unavailable`
                   : "Event time unavailable"
             }
             disabled={!event && c?.frame == null}
@@ -244,13 +244,13 @@ function Answer({ a, session }: { a: AskAnswer; session: Session }) {
       })}
       <p className="text-xs text-line-3">
         {a.grounded
-          ? "Every match fact above is linked to its moment."
+          ? "References use retrieved evidence; review the answer against those sources."
           : "Some statements couldn't be linked to match data."}
         {a.provider && ` · ${a.provider}${a.model ? ` ${a.model}` : ""}`}
       </p>
       {a.citations.some((c) => c.kind === "ev" && c.frame != null && !events.get(c.ref)) && (
         <p className="text-xs text-line-3">
-          Some references have a source timestamp only. Their full event details are not available here.
+          Some references have an analysis proxy frame only. Their full event details are not available here.
         </p>
       )}
     </div>

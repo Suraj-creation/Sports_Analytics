@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { type APIRequestContext, expect, type Page, test } from "@playwright/test";
+import type { APIRequestContext, Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 const CLIP = fileURLToPath(new URL("./.tmp/clip.mp4", import.meta.url));
 const ROUTES = [
@@ -130,16 +131,41 @@ test("real upload creates playable media with range delivery and exact frame nav
       ),
     );
   await cue();
-  await expect(page.getByTestId("evidence-details")).toContainText("source frame 90");
+  await expect(page.getByTestId("evidence-details")).toContainText("Analysis proxy frame 90");
   await expect(page.getByTestId("selected-event-marker")).toBeVisible();
   await expect.poll(async () => video.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
   await expect
     .poll(async () => video.evaluate((v: HTMLVideoElement) => Math.floor(v.currentTime * 30)))
     .toBe(105);
   // Re-selecting the same event is a new playback request, not a no-op from stale query state.
-  await cue();
-  await expect.poll(async () => video.evaluate((v: HTMLVideoElement) => v.paused)).toBe(false);
+  // Capture the transition inside the browser: a 15-frame replay can finish
+  // between two remote CDP round trips, making polling paused miss it entirely.
+  const replay = await video.evaluate(
+    (v: HTMLVideoElement) =>
+      new Promise<{ paused: boolean; time: number }>((resolve, reject) => {
+        const playing = () => {
+          clearTimeout(timeout);
+          resolve({ paused: v.paused, time: v.currentTime });
+        };
+        const timeout = setTimeout(() => {
+          v.removeEventListener("playing", playing);
+          reject(new Error("Repeated evidence selection did not start playback"));
+        }, 10_000);
+        v.addEventListener("playing", playing, { once: true });
+        window.dispatchEvent(
+          new CustomEvent("bai:play-clip", {
+            detail: { start: 90, end: 105, label: "Canonical test moment" },
+          }),
+        );
+      }),
+  );
+  expect(replay.paused).toBe(false);
+  expect(replay.time).toBeGreaterThanOrEqual(90 / 30);
+  expect(replay.time).toBeLessThan(105 / 30);
   await expect.poll(async () => video.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+  await expect
+    .poll(async () => video.evaluate((v: HTMLVideoElement) => Math.floor(v.currentTime * 30)))
+    .toBe(105);
   const timeline = page.getByRole("slider", { name: "Match timeline" });
   await timeline.focus();
   await page.keyboard.press("Home");

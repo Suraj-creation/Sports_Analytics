@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, SecretStr
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -56,6 +56,12 @@ class Settings(BaseSettings):
     local_llm_model: str = "local-model"
     local_llm_key: str = "local"
 
+    @model_validator(mode="after")
+    def _shared_transport(self) -> Settings:
+        if self.engine_mode == "external" and not self.redis_url:
+            raise ValueError("external engine mode requires redis_url for shared command transport")
+        return self
+
     @property
     def is_loopback(self) -> bool:
         return self.bind_host in {"127.0.0.1", "localhost", "::1"}
@@ -71,6 +77,7 @@ class ModelChoice(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     model: str  # registry name in models/manifest.yaml, or "none"
+    implementation: str | None = None  # component provider ID, independent of its model artifact
     backend: Literal["tensorrt", "onnx-cuda", "onnx-cpu", "torch-cuda", "torch-cpu", "opencv-cpu", "none"] = "onnx-cpu"
     precision: Literal["fp32", "fp16", "int8"] = "fp32"
     batch: int = 1
@@ -98,14 +105,16 @@ class Profile(BaseModel):
     chunk_frames: int = 64
     lead_buffer_s: float = 5.0
 
-    shuttle: ModelChoice
+    components: dict[str, ModelChoice] = Field(default_factory=dict)
+
+    shuttle: ModelChoice = Field(default_factory=lambda: ModelChoice(model="none", backend="none"))
     shuttle_live: ModelChoice | None = None
     shuttle_second_opinion: ModelChoice | None = None
-    player_detector: ModelChoice
+    player_detector: ModelChoice = Field(default_factory=lambda: ModelChoice(model="none", backend="none"))
     player_reid: ModelChoice | None = None
-    pose: ModelChoice
+    pose: ModelChoice = Field(default_factory=lambda: ModelChoice(model="none", backend="none"))
     racket: ModelChoice | None = None
-    stroke: ModelChoice
+    stroke: ModelChoice = Field(default_factory=lambda: ModelChoice(model="none", backend="none"))
     contact: ModelChoice | None = None
     ocr: ModelChoice | None = None
 

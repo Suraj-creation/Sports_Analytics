@@ -21,6 +21,8 @@ Rates: detector / pose strides depend on the rally state reported by the match e
 
 from __future__ import annotations
 
+import hashlib
+import json
 import zlib
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -31,12 +33,19 @@ import numpy as np
 from bai_badminton.court import REFERENCE_POINTS, WIDTH_DOUBLES, Homography
 from bai_badminton.perception.calibration_state import CalibrationLifecycle
 from bai_badminton.perception.camera import CameraTracker, project
+from bai_badminton.perception.components import (
+    BASELINE_IMPLEMENTATIONS,
+    PERCEPTION_PORTS,
+    PerceptionContext,
+    register_perception_components,
+)
 from bai_badminton.perception.court_lines import CameraRig, CourtTracker, camera_pose
 from bai_badminton.perception.isolation import flight_mask
 from bai_badminton.perception.players import CourtROI, PlayerDetector, PlayerPerception, PoseEstimator
 from bai_badminton.perception.scene import CourtPresence, CutDetector, small_hsv
 from bai_badminton.perception.scoreboard import ScoreboardReader
 from bai_badminton.perception_types import ChunkPerception, FramePerception, ScoreReading
+from bai_engine.components import ComponentHandle, ComponentRegistry
 from bai_engine.config import ModelChoice, Profile
 from bai_engine.decode import DecodedChunk
 from bai_engine.obs import INFERENCE_FPS, get_logger, timed
@@ -89,11 +98,14 @@ class BadmintonPerception:
         frame_size: tuple[int, int] | None = None,
         *,
         match_format: str = "singles",
+        component_registry: ComponentRegistry | None = None,
+        context_identity: dict[str, Any] | None = None,
     ) -> None:
-        if match_format not in ("singles", "doubles"):
+        if match_format not in ("singles", "doubles", "unknown"):
             raise ValueError("unknown match format")
         self.match_format = match_format
-        self.profile = profile
+        self.profile = profile.model_copy(deep=True)
+        profile = self.profile
         self.fps = fps
         self.frame_size = frame_size
         self.degraded: list[Degradation] = []
@@ -113,28 +125,134 @@ class BadmintonPerception:
         self._court_samples: list[tuple[np.ndarray, tuple[int, int]]] = []  # small HSV keyframes
         self.stats = PerceptionStats()
         cache = engine_cache_dir(models_dir)
-        self.shuttle = self._load_shuttle(profile.shuttle, registry, cache)
-        det = self._load_detector(profile.player_detector, registry, cache)
-        pose = self._load_pose(profile.pose, registry, cache)
-        reid = self._load_reid(profile.player_reid, registry) if match_format == "doubles" else None
-        self.scoreboard = self._load_ocr(profile.ocr, registry, fps)
-        self.racket = self._load_racket(profile.racket)
+        cache.mkdir(parents=True, exist_ok=True)
+        if component_registry is None:
+            component_registry = ComponentRegistry()
+            register_perception_components(component_registry)
+        self.component_registry = component_registry
+        self.component_handles: dict[str, ComponentHandle] = {}
+        self._component_metadata: dict[str, dict[str, Any]] = {}
+        self.effective_choices: dict[str, ModelChoice | None] = {
+            kind: profile.components.get(kind, getattr(profile, kind, None))
+            for kind in PERCEPTION_PORTS
+        }
+        context = PerceptionContext(
+            registry=registry,
+            cache=cache,
+            fps=fps,
+            frame_size=frame_size,
+            load_shuttle=self._load_shuttle,
+            load_detector=self._load_detector,
+            load_pose=self._load_pose,
+            load_reid=self._load_reid,
+            load_racket=self._load_racket,
+            load_ocr=self._load_ocr,
+            record_model=self.models.__setitem__,
+            record_runtime=self._record_runtime,
+        )
+        identity = {
+            "session": context_identity if context_identity is not None else {},
+            "fps": fps,
+            "frame_size": list(frame_size) if frame_size is not None else None,
+            "ocr_every_s": profile.ocr_every_s,
+        }
+        self.shuttle = self._create_component("shuttle", context, identity)
+        det = self._create_component("player_detector", context, identity)
+        pose = self._create_component("pose", context, identity)
+        # Preserve the legacy singles policy. An explicit component selection can
+        # enable appearance on singles too; uncertain acquisition keeps capacity4.
+        reid = (
+            self._create_component("player_reid", context, identity)
+            if match_format != "singles" or "player_reid" in profile.components
+            else None
+        )
+        self.scoreboard = self._create_component("ocr", context, identity)
+        self.racket = self._create_component("racket", context, identity)
+        reid_choice = self.effective_choices["player_reid"]
         self.players = PlayerPerception(
             det,
             pose,
             fps,
             det_stride=profile.detector_rates.in_play,
             pose_stride=profile.pose_rates.in_play,
-            max_players=4 if match_format == "doubles" else 2,
+            max_players=2 if match_format == "singles" else 4,
             reid=reid,
-            identity_retention_s=float(profile.player_reid.params.get("retention_seconds", 1.0))
-            if profile.player_reid is not None
+            identity_retention_s=float(reid_choice.params.get("retention_seconds", 1.0))
+            if reid_choice is not None
             else 1.0,
         )
 
+    def _create_component(
+        self, kind: str, context: PerceptionContext, identity: dict[str, Any]
+    ) -> Any | None:
+        choice = self.effective_choices[kind]
+        if choice is None:
+            return None
+        # Explicit providers may be weightless; legacy artifact disable flags
+        # continue to disable the baseline rather than constructing a model.
+        if choice.implementation is None and (choice.model == "none" or choice.backend == "none"):
+            return None
+        degraded_before = len(self.degraded)
+        try:
+            handle = self.component_registry.create(
+                kind,
+                choice.implementation or BASELINE_IMPLEMENTATIONS[kind],
+                context=context,
+                configuration=choice.model_dump(mode="json"),
+                match_format=self.match_format,
+                context_identity=identity,
+            )
+        except (ModelError, OSError, ValueError, ImportError, RuntimeError, TypeError) as exc:
+            # A failed explicit provider never falls back to another method.
+            if not any(item.stage == kind for item in self.degraded[degraded_before:]):
+                self._degrade(kind, str(exc))
+            return None
+        self.component_handles[kind] = handle
+        actual = {
+            "model": self.models.get(kind),
+            "runtime": self.runtimes.get(kind, {}),
+        }
+        # The generic construction fingerprint includes configuration/context.
+        # Artifact identity can become known only inside a verified factory, so
+        # bind its actual post-load evidence into the exported cache identity.
+        fingerprint = hashlib.sha256(
+            json.dumps(
+                {"construction": handle.fingerprint, **actual},
+                allow_nan=False, sort_keys=True, separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest()
+        self._component_metadata[kind] = json.loads(
+            json.dumps(
+                {
+                    "contract": handle.contract.describe(),
+                    "configuration": choice.model_dump(mode="json"),
+                    "fingerprint": fingerprint,
+                    **actual,
+                },
+                allow_nan=False,
+            )
+        )
+        return handle.instance
+
+    @property
+    def component_metadata(self) -> dict[str, dict[str, Any]]:
+        """Detached provider/artifact evidence for session metadata and cache keys."""
+        return json.loads(json.dumps(self._component_metadata, allow_nan=False))
+
+    def reset_components(self) -> None:
+        """Clear provider-owned temporal evidence at an explicit session boundary."""
+        for handle in self.component_handles.values():
+            handle.reset()
+
+    def close(self) -> None:
+        for handle in self.component_handles.values():
+            handle.close()
+
     @property
     def identity_policy(self) -> dict[str, Any]:
-        choice = getattr(self.profile, "player_reid", None)
+        choice = getattr(self, "effective_choices", {}).get(
+            "player_reid", getattr(self.profile, "player_reid", None)
+        )
         return {
             **getattr(self.players, "identity_policy", {"state": "disabled"}),
             "requested_model": choice.model if choice is not None else None,
@@ -158,11 +276,8 @@ class BadmintonPerception:
         }
         return RacketDetector()
 
-    def _providers(self, choice: ModelChoice, cache: Path, *, model_digest: str | None = None) -> list[Any]:
-        return ort_providers(
-            choice.backend, engine_cache=cache / choice.model, fp16=choice.precision == "fp16",
-            model_digest=model_digest,
-        )
+    def _providers(self, choice: ModelChoice, cache: Path) -> list[Any]:
+        return ort_providers(choice.backend, engine_cache=cache / choice.model, fp16=choice.precision == "fp16")
 
     def _load_shuttle(self, c: ModelChoice, reg: ModelRegistry, cache: Path):  # type: ignore[no-untyped-def]
         if c.model == "none" or c.backend == "none":
@@ -170,18 +285,15 @@ class BadmintonPerception:
         try:
             from bai_badminton.perception.tracknet import TrackNetV3
 
-            with reg.open_verified(c.model) as artifact:
-                m = TrackNetV3(
-                    artifact.path,
-                    checkpoint_stream=artifact.stream,
-                    expected_sha256=artifact.sha256,
-                    backend=c.backend,
-                    threshold=float(c.params.get("threshold", 0.5)),
-                    onnx_dir=cache / c.model,
-                    provider_factory=lambda graph_sha: self._providers(c, cache, model_digest=graph_sha),
-                    batch=c.batch,
-                    precision=c.precision,
-                )
+            m = TrackNetV3(
+                reg.path(c.model),
+                backend=c.backend,
+                threshold=float(c.params.get("threshold", 0.5)),
+                onnx_dir=cache / c.model,
+                providers=self._providers(c, cache),
+                batch=c.batch,
+                precision=c.precision,
+            )
             self._record_runtime("shuttle", m.runtime)
             self.models["shuttle"] = reg.get(c.model).ref
             return m
@@ -386,7 +498,11 @@ class BadmintonPerception:
         if self.shuttle is not None and not all(replay):
             with timed("shuttle"):
                 t0 = _now()
-                step = int(p.shuttle.params.get("step", self.shuttle.seq_len))
+                choice = getattr(self, "effective_choices", {}).get("shuttle", p.shuttle)
+                step = (
+                    int(choice.params.get("step", self.shuttle.seq_len))
+                    if choice is not None else self.shuttle.seq_len
+                )
                 from bai_badminton.perception.tracknet import HEIGHT, WIDTH
 
                 masks = None
@@ -416,7 +532,8 @@ class BadmintonPerception:
                     self.players.set_roi(CourtROI(poly.astype(np.float32), homography=h_now))
                 persons = [] if replay[i] else self.players.process(fidx, img, (rates_det, rates_pose))
                 racket_detector = getattr(self, "racket", None)
-                if racket_detector is not None and persons and shuttle[i] is not None and not replay[i]:
+                # Equipment remains observable when the independent shuttle stage misses.
+                if racket_detector is not None and persons and not replay[i]:
                     observed_rackets = racket_detector.detect(img, persons)
                     for person in persons:
                         person.racket = observed_rackets.get(person.track_id)
@@ -517,7 +634,7 @@ class BadmintonPerception:
     def _read_scoreboard(self, chunk: DecodedChunk, replay: list[bool], in_play: bool) -> list[ScoreReading]:
         """Read the score bug between rallies only (it cannot change during one), on main-camera
         frames (replay graphics often hide or freeze it)."""
-        if self.scoreboard is None or in_play:
+        if self.scoreboard is None:
             return []
         out = []
         t0 = _now()

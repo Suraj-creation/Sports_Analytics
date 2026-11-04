@@ -18,8 +18,8 @@ def test_winner_row_from_board_delta_not_engine_score() -> None:
 def test_unchanged_board_and_game_reset() -> None:
     rec = ScoreReconciler(player_names={"P1": "Axelsen", "P2": "Lee"})
     _read(rec, 0, 20, 18)
-    _read(rec, 300, 0, 0)  # new game: the row that led on game point won
-    assert rec.winner_from_ocr({"P1": 20, "P2": 18}, 100, 200, 400, None, lookback=900) == ("P1", "ocr")
+    _read(rec, 300, 0, 0)  # a reset does not reveal the unobserved final point
+    assert rec.winner_from_ocr({"P1": 20, "P2": 18}, 100, 200, 400, None, lookback=900)[0] is None
     _read(rec, 600, 0, 0)
     assert rec.board_change(500, 550, 700, lookback=900) == "unchanged"
     assert rec.board_change(100, 200, 400, lookback=900) == "changed"

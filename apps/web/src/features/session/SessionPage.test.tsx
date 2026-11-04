@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import type { PropsWithChildren } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import { api } from "@/lib/api";
+import type { Session } from "@/lib/types";
 import { usePlayback } from "@/stores/playback";
 import { useSession } from "@/stores/session";
 import { SESSION } from "@/test/fixtures";
@@ -43,7 +44,11 @@ it("retains one working roster and removes player review panels across live upda
   vi.spyOn(api, "session").mockResolvedValue(session);
   const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const view = render(<QueryClientProvider client={client}><SessionPage /></QueryClientProvider>);
+  const view = render(
+    <QueryClientProvider client={client}>
+      <SessionPage />
+    </QueryClientProvider>,
+  );
 
   fireEvent.click(screen.getByRole("button", { name: /set up participants/i }));
   fireEvent.change(screen.getByLabelText("Match format"), { target: { value: "doubles" } });
@@ -68,8 +73,22 @@ it("keeps the viewport position when switching every analysis tab", () => {
   useSession.setState({ session, open: vi.fn(), close: vi.fn() });
   vi.spyOn(api, "session").mockResolvedValue(session);
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  render(<QueryClientProvider client={client}><SessionPage /></QueryClientProvider>);
-  for (const name of ["Moments", "Rallies", "Shots", "Tactics", "Court", "Movement", "Head to head", "Your pair", "Ask"]) {
+  render(
+    <QueryClientProvider client={client}>
+      <SessionPage />
+    </QueryClientProvider>,
+  );
+  for (const name of [
+    "Moments",
+    "Rallies",
+    "Shots",
+    "Tactics",
+    "Court",
+    "Movement",
+    "Head to head",
+    "Your pair",
+    "Ask",
+  ]) {
     fireEvent.click(screen.getByRole("button", { name }));
     expect(navigation).toHaveBeenLastCalledWith(expect.objectContaining({ resetScroll: false }));
   }
@@ -80,10 +99,18 @@ it("redirects a reused-source import to its saved match without mounting a new w
   useSession.setState({ session, open: vi.fn(), close: vi.fn() });
   vi.spyOn(api, "session").mockResolvedValue(session);
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  render(<QueryClientProvider client={client}><SessionPage /></QueryClientProvider>);
-  expect(navigation).toHaveBeenCalledWith(expect.objectContaining({
-    to: "/matches/$matchId", params: { matchId: "saved-match" }, replace: true,
-  }));
+  render(
+    <QueryClientProvider client={client}>
+      <SessionPage />
+    </QueryClientProvider>,
+  );
+  expect(navigation).toHaveBeenCalledWith(
+    expect.objectContaining({
+      to: "/matches/$matchId",
+      params: { matchId: "saved-match" },
+      replace: true,
+    }),
+  );
   expect(screen.queryByRole("heading", { name: "Participants" })).not.toBeInTheDocument();
 });
 
@@ -93,10 +120,15 @@ it("reanalyses a completed match only after the expanded manual action is clicke
   vi.spyOn(api, "session").mockResolvedValue(session);
   const control = vi.spyOn(api, "control").mockResolvedValue({ status: "accepted" } as never);
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  render(<QueryClientProvider client={client}><SessionPage /></QueryClientProvider>);
+  render(
+    <QueryClientProvider client={client}>
+      <SessionPage />
+    </QueryClientProvider>,
+  );
   expect(control).not.toHaveBeenCalled();
   expect(screen.queryByRole("button", { name: "Analyse again" })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Recording & quality" }));
+  expect(screen.getByText("Analysis proxy frames")).toBeVisible();
   expect(screen.getByText(/backs up saved results.*reprocesses the video/i)).toBeVisible();
   expect(control).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "Analyse again" }));
@@ -109,9 +141,80 @@ it.each(["analysing", "failed"] as const)("keeps completed-match reanalysis hidd
   vi.spyOn(api, "session").mockResolvedValue(session);
   const control = vi.spyOn(api, "control").mockResolvedValue({ status: "accepted" } as never);
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  render(<QueryClientProvider client={client}><SessionPage /></QueryClientProvider>);
+  render(
+    <QueryClientProvider client={client}>
+      <SessionPage />
+    </QueryClientProvider>,
+  );
   fireEvent.click(screen.getByRole("button", { name: "Recording & quality" }));
   expect(screen.queryByRole("button", { name: "Analyse again" })).not.toBeInTheDocument();
   if (status === "failed") expect(screen.getByRole("button", { name: "Retry analysis" })).toBeEnabled();
   expect(control).not.toHaveBeenCalled();
+});
+
+async function editWithDelayedResponse(session: Session) {
+  useSession.setState({ session, open: vi.fn(), close: vi.fn() });
+  vi.spyOn(api, "session").mockResolvedValue(session);
+  let resolve: (updated: Session) => void = () => {
+    throw new Error("Request is not pending");
+  };
+  const pending = new Promise<Session>((done) => {
+    resolve = done;
+  });
+  vi.spyOn(api, "patchSession").mockReturnValue(pending);
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(
+    <QueryClientProvider client={client}>
+      <SessionPage />
+    </QueryClientProvider>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Edit match details" }));
+  fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Edited title" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save details" }));
+  await screen.findByRole("button", { name: "Saving…" });
+  return async (updated: Session) => {
+    await act(async () => {
+      resolve(updated);
+      await pending;
+    });
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Match details" })).not.toBeInTheDocument(),
+    );
+  };
+}
+
+it("merges edited metadata without rolling back live analysis progress in the same revision", async () => {
+  const session = { ...SESSION, meta: { analysis_revision: 1 }, frontier_frame: 100 };
+  const finish = await editWithDelayedResponse(session);
+  act(() => useSession.setState({ session: { ...session, status: "analysed", frontier_frame: 200 } }));
+  await finish({ ...session, title: "Edited title" });
+  expect(useSession.getState().session).toMatchObject({
+    title: "Edited title",
+    status: "analysed",
+    frontier_frame: 200,
+    meta: { analysis_revision: 1 },
+  });
+});
+
+it("does not let a delayed metadata response restore an older analysis revision", async () => {
+  const session = { ...SESSION, meta: { analysis_revision: 1 } };
+  const finish = await editWithDelayedResponse(session);
+  act(() =>
+    useSession.setState({
+      session: { ...session, title: "Current title", frontier_frame: 10, meta: { analysis_revision: 2 } },
+    }),
+  );
+  await finish({ ...session, title: "Edited title" });
+  expect(useSession.getState().session).toMatchObject({
+    title: "Current title",
+    frontier_frame: 10,
+    meta: { analysis_revision: 2 },
+  });
+});
+
+it("does not replace another open session with a delayed metadata response", async () => {
+  const finish = await editWithDelayedResponse(SESSION);
+  act(() => useSession.setState({ session: { ...SESSION, session_id: "s2", title: "Another match" } }));
+  await finish({ ...SESSION, title: "Edited title" });
+  expect(useSession.getState().session).toMatchObject({ session_id: "s2", title: "Another match" });
 });

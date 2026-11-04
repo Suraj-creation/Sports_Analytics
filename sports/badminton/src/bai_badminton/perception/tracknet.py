@@ -171,6 +171,17 @@ class BackgroundModel:
     def get(self, shot: int, fallback: NDArray[np.uint8]) -> NDArray[np.uint8]:
         return self._median.get(shot, fallback)
 
+    def retain(self, shots: set[int]) -> None:
+        """Keep backgrounds needed by the current sequential inference call.
+
+        Camera-shot IDs advance on cuts, so completed shots absent from the
+        current call cannot resume. Retain all current IDs until their windows
+        have been built, including both sides of a cut within one chunk.
+        """
+        for history in (self._samples, self._median, self._since, self._count):
+            for shot in history.keys() - shots:
+                del history[shot]
+
 
 @dataclass(frozen=True)
 class ShuttleDetection:
@@ -482,6 +493,7 @@ class TrackNetV3:
         shots = shots or [0] * len(frames_bgr)
         h, w = frames_bgr[0].shape[:2]
         sx, sy = w / WIDTH, h / HEIGHT
+        self.bg.retain(set(shots))
         small = self._prep(frames_bgr, shots)
         n = len(small)
         acc = np.zeros((n, HEIGHT, WIDTH), np.float32)

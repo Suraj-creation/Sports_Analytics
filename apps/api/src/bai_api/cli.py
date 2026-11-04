@@ -23,10 +23,14 @@ def _serve(args: argparse.Namespace) -> None:
     from bai_engine.config import get_settings
 
     s = get_settings()
+    s = s.model_copy(update={
+        "bind_host": args.host if args.host is not None else s.bind_host,
+        "port": args.port if args.port is not None else s.port,
+    })
     uvicorn.run(
         create_app(s),
-        host=args.host or s.bind_host,
-        port=args.port or s.port,
+        host=s.bind_host,
+        port=s.port,
         log_level="info",
         proxy_headers=False,
         ws_max_size=4 * 1024 * 1024,

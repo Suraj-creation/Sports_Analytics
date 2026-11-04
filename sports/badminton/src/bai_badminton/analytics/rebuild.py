@@ -9,7 +9,8 @@ import numpy as np
 
 from bai_badminton.analytics.match import MatchAnalytics, RallyRecord
 from bai_badminton.analytics.spatial import MIN_COURT_QUALITY
-from bai_engine.schema import Event, TrackObject
+from bai_badminton.rules import PLAYERS
+from bai_engine.schema import Event, EventStatus, TrackObject
 from bai_engine.store import EventStore, TrackStore
 
 
@@ -33,7 +34,12 @@ def _current_strokes(store: EventStore) -> dict[str, Event]:
 
 def rally_records(store: EventStore) -> list[RallyRecord]:
     rallies = store.query(types=["rally_end"])
-    points = {p.parent_id: p for p in store.query(types=["point"])}
+    points = {
+        p.parent_id: p
+        for p in store.query(types=["point"])
+        if p.status in (EventStatus.CONFIRMED, EventStatus.CORRECTED, EventStatus.HUMAN_VERIFIED)
+        and p.payload.get("winner") in PLAYERS
+    }
     strokes = _current_strokes(store)
     out: list[RallyRecord] = []
     for r in rallies:
