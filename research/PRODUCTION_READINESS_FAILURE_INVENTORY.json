@@ -1,0 +1,959 @@
+{
+  "schema": "badminton-production-readiness-inventory:v2",
+  "status": "implementation_and_exposed_validation_complete_release_not_approved",
+  "release_decision": "not_production_ready",
+  "branch": "Benchmarking",
+  "historical_inventory_sha256": "9bd7a9356952bbf5db1d621bbf7c120397b5be36707a125c5e1b69ad844c7d21",
+  "historical_inventory_immutable": true,
+  "issues": [
+    {
+      "id": "H01",
+      "priority": "P0",
+      "title": "GT23 remains missed; fragmentation and an unflagged same-camera edit",
+      "historical_status": "partially_resolved_scene_authority_open",
+      "production_status": "partly_resolved_scene_onset_open",
+      "historical_inventory_reference": "research/next_session_failure_inventory.json#H01",
+      "recommendation": "Partially resolved on exposed development footage; scene/onset authority remains open",
+      "new_evidence_finding": "Fresh association keeps GT23 whole; fresh scene preserves distinct GT22/23 and has GT23 start+42 versus historical+36. Exact own-cache triples validated.",
+      "evidence": [
+        "research/PRODUCTION_BOUNDARY_REVIEW.md",
+        "research/PRODUCTION_SCENE_REPORT.md",
+        "artifacts/benchmarking/experiments/prod_20261105_boundary_fresh_audit_v1/fresh_boundary_audit.json",
+        "artifacts/benchmarking/experiments/prod_20261105_full_comparison_v2/results.json"
+      ],
+      "controls_and_remaining_gate": "GT22/23 separation; GT7 preparation; prior-only ROI, invalid/future cue rejection; fast GT27 zero scene proposals.",
+      "owning_files": [
+        "sports/badminton/src/bai_badminton/perception/scene.py",
+        "sports/badminton/src/bai_badminton/perception/pipeline.py",
+        "sports/badminton/src/bai_badminton/events/rally_evidence.py",
+        "sports/badminton/src/bai_badminton/engine.py"
+      ],
+      "next_experiment_or_external_requirement": "Review independent same-camera edits and onset conventions; separate window-only from background-only effects before scene-policy promotion.",
+      "test_evidence": [
+        "sports/badminton/tests/test_content_pipeline_integration.py",
+        "sports/badminton/tests/test_scene_continuity.py"
+      ],
+      "status_basis": "root-reviewed current source, completed tests, actual fresh own-cache results and specialist recommendations; no independent physical accuracy inferred"
+    },
+    {
+      "id": "H02",
+      "priority": "P0",
+      "title": "GT27 ends 218 frames early; static court-line peak is a likely attractor",
+      "historical_status": "interval_improved_terminal_and_contact_validity_open",
+      "production_status": "development_continuity_mitigated_physical_validity_open",
+      "historical_inventory_reference": "research/next_session_failure_inventory.json#H02",
+      "recommendation": "Development continuity improved; physical terminal/association accuracy open",
+      "new_evidence_finding": "Fresh association removes suspect12766 contact while retaining exact historical GT27 interval and all36rows; physical labels remain missing.",
+      "evidence": [
+        "research/PRODUCTION_CONTACT_SHOT_REPORT.md",
+        "research/PRODUCTION_BOUNDARY_REVIEW.md",
+        "artifacts/benchmarking/experiments/prod_20261105_boundary_fresh_audit_v1/fresh_boundary_audit.json",
+        "artifacts/benchmarking/experiments/prod_20261105_full_comparison_v2/results.json",
+        "artifacts/benchmarking/experiments/prod_20261105_contact_fresh_audit_v1/audit.json"
+      ],
+      "controls_and_remaining_gate": "Real floor/landing without upper return; weak launch; apex; static spare shuttle; witness expiry; jump and separate-rally controls.",
+      "owning_files": [
+        "sports/badminton/src/bai_badminton/perception/tracknet.py",
+        "sports/badminton/src/bai_badminton/perception/shuttle_post.py",
+        "sports/badminton/src/bai_badminton/events/contact.py",
+        "sports/badminton/src/bai_badminton/events/rally_fsm.py"
+      ],
+      "next_experiment_or_external_requirement": "Review floor/line/spare-shuttle and flight identity labels; quantify false continuity. New association removes12766 without splitting GT27, but physical terminal validity remains unproved.",
+      "test_evidence": [
+        "sports/badminton/tests/test_shuttle_association_evidence.py",
+        "sports/badminton/tests/test_production_contact_consumer.py"
+      ],
+      "status_basis": "root-reviewed current source, completed tests, actual fresh own-cache results and specialist recommendations; no independent physical accuracy inferred"
+    },
+    {
+      "id": "H03",
+      "priority": "P0",
+      "title": "GT31 becomes matched but starts 297 frames/9.9 seconds late",
+      "historical_status": "partially_resolved_demonstrated_mask_loss",
+      "production_status": "admission_fix_preserved_residual_observability_open",
+      "historical_inventory_reference": "research/next_session_failure_inventory.json#H03",
+      "recommendation": "Proven admission defect repaired; residual observability/onset limit open",
+      "new_evidence_finding": "Mask restoration preserves start14430 in both new runs; excluded close-up cannot justify14404 backdate. Actual restored top anchors require no curve.",
+      "evidence": [
+        "research/PRODUCTION_BOUNDARY_REVIEW.md",
+        "research/next_temporal_root_findings.md",
+        "artifacts/benchmarking/experiments/prod_20261105_boundary_fresh_audit_v1/fresh_boundary_audit.json",
+        "artifacts/benchmarking/experiments/prod_20261105_full_comparison_v2/results.json"
+      ],
+      "controls_and_remaining_gate": "Close-up excluded; top flight accepted with same side gates; missing coordinates remain absent; cut/context/provisional maturity controls.",
+      "owning_files": [
+        "sports/badminton/src/bai_badminton/perception/scene.py",
+        "sports/badminton/src/bai_badminton/perception/tracknet.py",
+        "sports/badminton/src/bai_badminton/events/rally_motion.py",
+        "sports/badminton/src/bai_badminton/events/rally_evidence.py",
+        "sports/badminton/src/bai_badminton/engine.py"
+      ],
+      "next_experiment_or_external_requirement": "Review first-observable onset and persistent visibility gaps independently; preserve restored image admission and exclude unobservable close-ups.",
+      "test_evidence": [
+        "sports/badminton/tests/test_shuttle_flight_region.py",
+        "sports/badminton/tests/test_rally_tracklet_provider.py"
+      ],
+      "status_basis": "root-reviewed current source, completed tests, actual fresh own-cache results and specialist recommendations; no independent physical accuracy inferred"
+    },
+    {
+      "id": "H04",
+      "priority": "P0",
+      "title": "New early starts at GT4 and GT22",
+      "historical_status": "open_reproduced_and_bounded",
+      "production_status": "gt22_improved_gt4_unresolved",
+      "historical_inventory_reference": "research/next_session_failure_inventory.json#H04",
+      "recommendation": "GT22 materially improved by explicit scene policy; GT4 unresolved",
+      "new_evidence_finding": "Fresh scene GT22start−29→−2, end+29→+30; GT4start−71 retained. Serve versus first-return convention unadjudicated.",
+      "evidence": [
+        "research/PRODUCTION_BOUNDARY_REVIEW.md",
+        "artifacts/benchmarking/experiments/prod_20261105_boundary_fresh_audit_v1/fresh_boundary_audit.json",
+        "artifacts/benchmarking/experiments/prod_20261105_full_comparison_v2/results.json"
+      ],
+      "controls_and_remaining_gate": "GT7 preparation; GT2/19/20 retained; same-camera geometry preserved; no annotation/manual-offset rule.",
+      "owning_files": [
+        "sports/badminton/src/bai_badminton/events/rally_evidence.py",
+        "sports/badminton/src/bai_badminton/events/rally_motion.py",
+        "sports/badminton/src/bai_badminton/events/rally_fsm.py",
+        "sports/badminton/src/bai_badminton/engine.py"
+      ],
+      "next_experiment_or_external_requirement": "Adjudicate GT4 held shuttle/serve/first-return convention with GT7 controls. Preserve GT22 scene improvement and all recovered rows; do not fit a row offset.",
+      "test_evidence": [
+        "sports/badminton/tests/test_rally_evidence_v2.py",
+        "sports/badminton/tests/test_content_pipeline_integration.py"
+      ],
+      "status_basis": "root-reviewed current source, completed tests, actual fresh own-cache results and specialist recommendations; no independent physical accuracy inferred"
+    },
+    {
+      "id": "H05",
+      "priority": "P1",
+      "title": "Persistent multi-second starts and cancelled initial candidates",
+      "historical_status": "partially_resolved_causal_classes_recorded",
+      "production_status": "open_onset_evidence_and_semantics",
+      "historical_inventory_reference": "research/next_session_failure_inventory.json#H05",
+      "recommendation": "Open; all36 causal classes and cancelled provisional events documented",
+      "new_evidence_finding": "GT5/9/15/25/33 initial candidates still cancel. Sparse-motion and excluded-view mechanisms remain distinct.",
+      "evidence": [
+        "research/PRODUCTION_BOUNDARY_REVIEW.md",
+        "artifacts/benchmarking/experiments/prod_20261105_boundary_fresh_audit_v1/fresh_boundary_audit.json",
+        "artifacts/benchmarking/experiments/prod_20261105_full_comparison_v2/results.json",
+        "artifacts/benchmarking/experiments/prod_20261105_test7_causal_summary_v1"
+      ],
+      "controls_and_remaining_gate": "Short legitimate rally versus preparation; no maturity by waiting through missing time; no lowered global duration/gap.",
+      "owning_files": [
+        "sports/badminton/src/bai_badminton/engine.py",
+        "sports/badminton/src/bai_badminton/events/rally_fsm.py",
+        "sports/badminton/src/bai_badminton/events/contact.py",
+        "sports/badminton/src/bai_badminton/perception/pipeline.py",
+        "sports/badminton/src/bai_badminton/perception/tracknet.py"
+      ],
+      "next_experiment_or_external_requirement": "Evaluate short play and cancelled candidates using reviewed onset/terminal evidence; Test7 reproduces49-frame short cancellation. No blind duration/gap lowering.",
+      "test_evidence": [
+        "sports/badminton/tests/test_rally_temporal_correctness.py",
+        "sports/badminton/tests/test_rally_tracklet_support.py"
+      ],
+      "status_basis": "root-reviewed current source, completed tests, actual fresh own-cache results and specialist recommendations; no independent physical accuracy inferred"
+    },
+    {
+      "id": "H06",
+      "priority": "P1",
+      "title": "Residual end errors and truncated durations",
+      "historical_status": "improved_residual_terminal_evidence_open",
+      "production_status": "open_terminal_evidence_with_recorded_regressions",
+      "historical_inventory_reference": "research/next_session_failure_inventory.json#H06",
+      "recommendation": "Open terminal reliability; regressions explicit",
+      "new_evidence_finding": "Fresh scene endMAE10.472222 versus historical10.333333; GT16+3, GT21/22+1absolute frame each; gap/stationary are software reasons, not landing labels.",
+      "evidence": [
+        "research/PRODUCTION_BOUNDARY_REVIEW.md",
+        "artifacts/benchmarking/experiments/prod_20261105_boundary_fresh_audit_v1/fresh_boundary_audit.json",
+        "artifacts/benchmarking/experiments/prod_20261105_full_comparison_v2/results.json",
+        "artifacts/benchmarking/experiments/prod_20261105_test7_causal_summary_v1"
+      ],
+      "controls_and_remaining_gate": "Moving shuttle with stationary players; true floor point; tracking loss; ambiguous/static points; EOF publication; close separate rallies.",
+      "owning_files": [
+        "sports/badminton/src/bai_badminton/events/rally_fsm.py",
+        "sports/badminton/src/bai_badminton/events/rally_evidence.py",
+        "sports/badminton/src/bai_badminton/events/rally_motion.py",
+        "sports/badminton/src/bai_badminton/engine.py",
+        "sports/badminton/src/bai_badminton/events/rally_outcome.py"
+      ],
+      "next_experiment_or_external_requirement": "Review terminal evidence separately from tracking loss/stationarity; retain GT16/21/22 regressions and Test7 gap splits.",
+      "test_evidence": [
+        "sports/badminton/tests/test_rally_evidence_segments.py",
+        "sports/badminton/tests/test_rally_image_exit_evidence.py"
+      ],
+      "status_basis": "root-reviewed current source, completed tests, actual fresh own-cache results and specialist recommendations; no independent physical accuracy inferred"
+    },
+    {
+      "id": "H07",
+      "priority": "P1",
+      "title": "Fine boundary accuracy remains poor",
+      "historical_status": "improved_fine_localization_open",
+      "production_status": "open_boundary_acceptance_and_review",
+      "historical_inventory_reference": "research/next_session_failure_inventory.json#H07",
+      "recommendation": "Open fine boundary localization; no production tolerance supplied",
+      "new_evidence_finding": "36matches do not establish frame-level sporting boundaries. All36 fresh signed errors/firsts and unmatched predictions remain visible.",
+      "evidence": [
+        "research/PRODUCTION_BOUNDARY_REVIEW.md",
+        "artifacts/benchmarking/experiments/prod_20261105_boundary_fresh_audit_v1/fresh_boundary_audit.json",
+        "artifacts/benchmarking/experiments/prod_20261105_full_comparison_v2/results.json"
+      ],
+      "controls_and_remaining_gate": "Matched and allGT denominators; common-row regressions; ±1/3/5/10/15/30 evaluator unchanged.",
+      "owning_files": [
+        "scripts/benchmarking/evaluate_rallies.py",
+        "research/compare_rally_experiments.py"
+      ],
+      "next_experiment_or_external_requirement": "Obtain agreed start/end tolerances and source-bound onset/terminal review before claiming frame-level accuracy.",
+      "test_evidence": [
+        "sports/badminton/tests/test_rally_temporal_correctness.py"
+      ],
+      "status_basis": "root-reviewed current source, completed tests, actual fresh own-cache results and specialist recommendations; no independent physical accuracy inferred"
+    },
+    {
+      "id": "H08",
+      "priority": "P1",
+      "title": "Shuttle rejection reasons/weak competing peaks are discarded",
+      "historical_status": "fixed_bounded_opt_in_observability",
+      "production_status": "fixed_bounded_opt_in_diagnostics",
+      "historical_inventory_reference": "research/next_session_failure_inventory.json#H08",
+      "recommendation": "Software diagnostic visibility fixed opt-in; sporting accuracy unproved",
+      "new_evidence_finding": "Bounded top-k components, weak/mask-rejected/selected reasons and raw support/provenance retained; historical absent diagnostics stay unknown.",
+      "evidence": [
+        "research/PRODUCTION_COMPONENT_INVENTORY.md",
+        "research/next_session_final_report.md"
+      ],
+      "controls_and_remaining_gate": "Diagnostics on/off numerical parity; bounded payloads; schema/cache invalidation; unknown legacy cache; no heatmap dump/default overhead claim.",
+      "owning_files": [
+        "sports/badminton/src/bai_badminton/perception/tracknet.py",
+        "sports/badminton/src/bai_badminton/perception/pipeline.py",
+        "sports/badminton/src/bai_badminton/perception_types.py",
+        "sports/badminton/src/bai_badminton/plugin.py"
+      ],
+      "next_experiment_or_external_requirement": "Preserve opt-in bounded candidates/rejection reasons and diagnostic parity; missing historical heatmaps remain unknown.",
+      "test_evidence": [
+        "sports/badminton/tests/test_shuttle_diagnostics.py",
+        "sports/badminton/tests/test_perception_diagnostic_provenance.py"
+      ],
+      "status_basis": "root-reviewed current source, completed tests, actual fresh own-cache results and specialist recommendations; no independent physical accuracy inferred"
+    },
+    {
+      "id": "H09",
+      "priority": "P1",
+      "title": "Background/resize/peak selection/chunk effects remain confounded",
+      "historical_status": "partially_resolved_factors_isolated",
+      "production_status": "partly_isolated_scene_window_background_interaction_open",
+      "historical_inventory_reference": "research/next_session_failure_inventory.json#H09",
+      "recommendation": "Partially isolated; new scene/window/background interaction measured",
+      "new_evidence_finding": "Fresh scene changes4354rawXY/4222support frames and60detector flags versus association. Composite content keys partition both model windows and background histories.",
+      "evidence": [
+        "research/PRODUCTION_BOUNDARY_REVIEW.md",
+        "research/PRODUCTION_COMPONENT_INVENTORY.md",
+        "artifacts/benchmarking/experiments/prod_20261105_boundary_fresh_audit_v1/fresh_boundary_audit.json",
+        "artifacts/benchmarking/experiments/prod_20261105_full_comparison_v2/results.json"
+      ],
+      "controls_and_remaining_gate": "Separate window-only/background-only intervention still needed; no credit to fewer static outputs; same checkpoint/frames/preprocessing controls.",
+      "owning_files": [
+        "sports/badminton/src/bai_badminton/perception/tracknet.py",
+        "sports/badminton/src/bai_badminton/perception/pipeline.py",
+        "engine/src/bai_engine/runtime/runner.py",
+        "engine/src/bai_engine/media/proxy.py"
+      ],
+      "next_experiment_or_external_requirement": "Run independent window-only/background-only factor controls with reviewed localization labels; composite scene keys change both.",
+      "test_evidence": [
+        "sports/badminton/tests/test_shuttle_scene_boundaries.py",
+        "sports/badminton/tests/test_content_pipeline_integration.py"
+      ],
+      "status_basis": "root-reviewed current source, completed tests, actual fresh own-cache results and specialist recommendations; no independent physical accuracy inferred"
+    },
+    {
+      "id": "H10",
+      "priority": "P1",
+      "title": "Near-zero velocity can saturate contact impulse/redirect",
+      "historical_status": "open_numerical_defect_reproduced_alternative_not_promoted",
+      "production_status": "physical_authority_separated_legacy_ratio_sensitivity_open",
+      "historical_inventory_reference": "research/next_session_failure_inventory.json#H10",
+      "recommendation": "Legacy numerical ratio preserved but authority separated; physical labels open",
+      "new_evidence_finding": "Typed contact evidence reports sensitivity/residuals and requires independent fresh cues; automatic heuristic cannot physically confirm. New provider not a calibrated probability. Existing motion-reliability selection retains Test1matches but severely reduces external contact recall; rejected. Typed physical status remains separate from finalized ledger support.",
+      "evidence": [
+        "research/PRODUCTION_CONTACT_SHOT_REPORT.md",
+        "artifacts/benchmarking/experiments/prod_20261105_contact_fresh_audit_v1/audit.json",
+        "artifacts/benchmarking/experiments/prod_20261105_existing_provider_comparison_v1/comparison.json"
+      ],
+      "controls_and_remaining_gate": "Near-zero incoming serve; quantized apex; body-only proximity; static-to-airborne switch; stale/unknown pose/racket; explicit reviewed assertions.",
+      "owning_files": [
+        "sports/badminton/src/bai_badminton/events/contact.py",
+        "sports/badminton/src/bai_badminton/participant_contact.py",
+        "sports/badminton/src/bai_badminton/engine.py"
+      ],
+      "next_experiment_or_external_requirement": "Reject uncalibrated motion-provider promotion after external recall collapse; develop independently labelled motion/pose/racket reliability rather than replacing a ratio blindly.",
+      "test_evidence": [
+        "sports/badminton/tests/test_contact_physical_evidence.py",
+        "sports/badminton/tests/test_contact_motion_reliability.py"
+      ],
+      "status_basis": "root-reviewed current source, completed tests, actual fresh own-cache results and specialist recommendations; no independent physical accuracy inferred"
+    },
+    {
+      "id": "H11",
+      "priority": "P1",
+      "title": "Sparse direct racket evidence and sparse pose cadence",
+      "historical_status": "open_sampling_and_label_limit",
+      "production_status": "fixed_source_provenance_sampling_accuracy_open",
+      "historical_inventory_reference": "research/next_session_failure_inventory.json#H11",
+      "recommendation": "Source provenance contract repaired; sampling and physical accuracy open",
+      "new_evidence_finding": "Canonical actual pose source stamps flow through TrackSample/Arrow/wirev2; legacy null, future rejected. Browser storespf but display badge still ignores physical source age.",
+      "evidence": [
+        "research/PRODUCTION_COMPONENT_INVENTORY.md",
+        "research/PRODUCTION_CONTACT_SHOT_REPORT.md",
+        "artifacts/benchmarking/experiments/prod_20261105_contact_fresh_audit_v1/audit.json"
+      ],
+      "controls_and_remaining_gate": "Two/four people with per-person dropout; actual current pose on carried detector; disabled/unscheduled/zero/invalid pose; old/new store parts; future source.",
+      "owning_files": [
+        "sports/badminton/src/bai_badminton/perception/racket.py",
+        "sports/badminton/src/bai_badminton/perception/players.py",
+        "sports/badminton/src/bai_badminton/perception/pipeline.py",
+        "sports/badminton/src/bai_badminton/events/contact.py"
+      ],
+      "next_experiment_or_external_requirement": "Evaluate event-triggered current-frame pose/racket acquisition against reviewed contacts; exact provenance is fixed, acquisition/accuracy remains open.",
+      "test_evidence": [
+        "sports/badminton/tests/test_pose_observation_provenance.py",
+        "sports/badminton/tests/test_production_contact_consumer.py"
+      ],
+      "status_basis": "root-reviewed current source, completed tests, actual fresh own-cache results and specialist recommendations; no independent physical accuracy inferred"
+    },
+    {
+      "id": "H12",
+      "priority": "P2",
+      "title": "Player rejection and association quality cannot be diagnosed fully from existing caches",
+      "historical_status": "partially_fixed_telemetry_labels_missing",
+      "production_status": "telemetry_preserved_reviewed_tracking_accuracy_open",
+      "historical_inventory_reference": "research/next_session_failure_inventory.json#H12",
+      "recommendation": "Bounded diagnostics/provenance improved; reviewed tracking/identity accuracy open",
+      "new_evidence_finding": "Detector candidates/ROI rejection, unique fresh match, carried boxes and anonymous episodes are distinct; no invented rejected-box coordinates.",
+      "evidence": [
+        "research/PRODUCTION_COMPONENT_INVENTORY.md"
+      ],
+      "controls_and_remaining_gate": "ROI admission; stale carry expiry; tracker reset/capacity; similar clothing/doubles identity require independent footage labels.",
+      "owning_files": [
+        "sports/badminton/src/bai_badminton/perception/players.py",
+        "sports/badminton/src/bai_badminton/perception/player_association.py",
+        "sports/badminton/src/bai_badminton/perception/isolation.py",
+        "sports/badminton/src/bai_badminton/participant_contact.py"
+      ],
+      "next_experiment_or_external_requirement": "Collect dense four-person box/visibility/identity labels; model coverage is not recall, track IDs may reset/reuse.",
+      "test_evidence": [
+        "sports/badminton/tests/test_doubles_tracking_capacity.py",
+        "sports/badminton/tests/test_player_identity_provenance.py"
+      ],
+      "status_basis": "root-reviewed current source, completed tests, actual fresh own-cache results and specialist recommendations; no independent physical accuracy inferred"
+    },
+    {
+      "id": "H13",
+      "priority": "P2",
+      "title": "Geometry confidence is not independent physical accuracy",
+      "historical_status": "open_physical_validation_limit",
+      "production_status": "open_independent_geometry_accuracy",
+      "historical_inventory_reference": "research/next_session_failure_inventory.json#H13",
+      "recommendation": "Physical geometry validation remains open; image validity separated",
+      "new_evidence_finding": "GT28 source13054 wide court/streak is visible while projection reacquires; image evidence does not establish metric airborne trajectory or exact onset.",
+      "evidence": [
+        "research/PRODUCTION_SCENE_REPORT.md",
+        "research/PRODUCTION_BOUNDARY_REVIEW.md"
+      ],
+      "controls_and_remaining_gate": "Invalid/degenerate geometry; main/alternate view; same-camera edit retainsH; no floor projection for airborne3D; reviewed landmarks missing.",
+      "owning_files": [
+        "sports/badminton/src/bai_badminton/court.py",
+        "sports/badminton/src/bai_badminton/perception/court_lines.py",
+        "sports/badminton/src/bai_badminton/perception/calibration_state.py",
+        "sports/badminton/src/bai_badminton/perception/camera.py",
+        "sports/badminton/src/bai_badminton/participant_geometry.py"
+      ],
+      "next_experiment_or_external_requirement": "Validate independent court landmarks and image registration; a source-visible image observation during reacquisition does not authorize stale court projection.",
+      "test_evidence": [
+        "sports/badminton/tests/test_invalid_court_projection.py",
+        "sports/badminton/tests/test_calibration_state.py"
+      ],
+      "status_basis": "root-reviewed current source, completed tests, actual fresh own-cache results and specialist recommendations; no independent physical accuracy inferred"
+    },
+    {
+      "id": "H14",
+      "priority": "P2",
+      "title": "OSNet/ReID unavailable; named actors intentionally unknown",
+      "historical_status": "known_optional_provider_unavailable",
+      "production_status": "optional_reid_unavailable_explicit_abstention",
+      "historical_inventory_reference": "research/next_session_failure_inventory.json#H14",
+      "recommendation": "Known optional model unavailable; uncertainty intentionally retained",
+      "new_evidence_finding": "OSNet file absent; explicit degradation in both new fresh runs. No embeddings, named actor or ReID accuracy manufactured.",
+      "evidence": [
+        "research/PRODUCTION_COMPONENT_INVENTORY.md"
+      ],
+      "controls_and_remaining_gate": "Missing/invalid digest must abstain; optional ReID separate verified-weight/license/runtime experiment; no identity conflation.",
+      "owning_files": [
+        "sports/badminton/src/bai_badminton/perception/pipeline.py",
+        "sports/badminton/src/bai_badminton/perception/players.py",
+        "sports/badminton/src/bai_badminton/perception/player_association.py",
+        "sports/badminton/src/bai_badminton/identity.py",
+        "sports/badminton/src/bai_badminton/format_understanding.py"
+      ],
+      "next_experiment_or_external_requirement": "Optional ReID remains unavailable. Any future experiment needs verified weights/license/runtime and reviewed anonymous identities; no fabricated embeddings or names.",
+      "test_evidence": [
+        "sports/badminton/tests/test_player_identity_provenance.py"
+      ],
+      "status_basis": "root-reviewed current source, completed tests, actual fresh own-cache results and specialist recommendations; no independent physical accuracy inferred"
+    },
+    {
+      "id": "H15",
+      "priority": "P2",
+      "title": "Uncalibrated scores and requested backend labels can mislead",
+      "historical_status": "partially_resolved_explicit_semantics_and_runtime",
+      "production_status": "runtime_measured_calibration_target_hardware_open",
+      "historical_inventory_reference": "research/next_session_failure_inventory.json#H15",
+      "recommendation": "Runtime/support semantics exposed; calibration and hardware generalization open",
+      "new_evidence_finding": "Actual Torch dtype/device and ORT node probe scopes recorded; RF-DETR758CUDA, pose185CUDA+2CPUshape nodes; YAMLFP16 is not actual ONNX dtype.",
+      "evidence": [
+        "research/GPU_PERFORMANCE_REPORT.md",
+        "research/PRODUCTION_COMPONENT_INVENTORY.md"
+      ],
+      "controls_and_remaining_gate": "Provider fallback and precision checks; no TensorRT/TF32/RTX4000Ada claim; rawscore versus probability explicit; rights declarations not legal clearance.",
+      "owning_files": [
+        "sports/badminton/src/bai_badminton/perception/components.py",
+        "sports/badminton/src/bai_badminton/perception/pipeline.py",
+        "sports/badminton/src/bai_badminton/events/contact.py",
+        "sports/badminton/src/bai_badminton/events/rally_evidence.py",
+        "research/run_pipeline_experiment.py"
+      ],
+      "next_experiment_or_external_requirement": "Validate score calibration and actual target hardware; retain measured CUDA/CPU node scopes and uncalibrated support labels.",
+      "test_evidence": [
+        "sports/badminton/tests/test_ocr_runtime_contract.py"
+      ],
+      "status_basis": "root-reviewed current source, completed tests, actual fresh own-cache results and specialist recommendations; no independent physical accuracy inferred"
+    },
+    {
+      "id": "H16",
+      "priority": "P1",
+      "title": "Segmentation changes upstream cadence; naive fusion reads future activity",
+      "historical_status": "protected_alignment_and_fresh_feedback_checked",
+      "production_status": "causal_source_contracts_verified_vod_mode_limit",
+      "historical_inventory_reference": "research/next_session_failure_inventory.json#H16",
+      "recommendation": "Software future-source/frontier guards protected; fresh feedback measured",
+      "new_evidence_finding": "Prior frame ROI and typed current-frame evidence validated before epochs/model windows; new pose source nullable/future-safe. Fresh detector cadence differs60frames across arms.",
+      "evidence": [
+        "research/PRODUCTION_SCENE_REPORT.md",
+        "research/PRODUCTION_CONTACT_SHOT_REPORT.md",
+        "research/PRODUCTION_BOUNDARY_REVIEW.md",
+        "artifacts/benchmarking/experiments/prod_20261105_boundary_fresh_audit_v1/fresh_boundary_audit.json",
+        "artifacts/benchmarking/experiments/prod_20261105_full_comparison_v2/results.json",
+        "artifacts/benchmarking/experiments/prod_20261105_contact_fresh_audit_v1/audit.json"
+      ],
+      "controls_and_remaining_gate": "Independent provider futureframe/sourcebasis rejection; per-frame detector metadata; chunk seam/seek; snapshots; provider rollback; no future pose borrowing.",
+      "owning_files": [
+        "sports/badminton/src/bai_badminton/plugin.py",
+        "sports/badminton/src/bai_badminton/engine.py",
+        "sports/badminton/src/bai_badminton/observations.py",
+        "sports/badminton/src/bai_badminton/events/rally_motion.py",
+        "sports/badminton/src/bai_badminton/perception/pipeline.py"
+      ],
+      "next_experiment_or_external_requirement": "Maintain exact source/frontier/epoch and publication guards; VOD lookahead is declared, not a true-live claim.",
+      "test_evidence": [
+        "sports/badminton/tests/test_content_continuity_provider.py",
+        "sports/badminton/tests/test_perception_source_provenance.py"
+      ],
+      "status_basis": "root-reviewed current source, completed tests, actual fresh own-cache results and specialist recommendations; no independent physical accuracy inferred"
+    },
+    {
+      "id": "H17",
+      "priority": "P1",
+      "title": "Top-exit cue has designed coverage limits",
+      "historical_status": "partially_resolved_association_and_admission",
+      "production_status": "qualified_continuity_preserved_coverage_limits_open",
+      "historical_inventory_reference": "research/next_session_failure_inventory.json#H17",
+      "recommendation": "Bounded qualified continuity validated on development; coverage limits remain",
+      "new_evidence_finding": "Singleton association retains actual raw point, uses coherent top brackets and maturity before loss. New runs keep GT23/31; curvefalse in selected profile.",
+      "evidence": [
+        "research/PRODUCTION_BOUNDARY_REVIEW.md",
+        "research/next_temporal_root_findings.md",
+        "artifacts/benchmarking/experiments/prod_20261105_boundary_fresh_audit_v1/fresh_boundary_audit.json",
+        "artifacts/benchmarking/experiments/prod_20261105_full_comparison_v2/results.json",
+        "artifacts/benchmarking/experiments/prod_20261105_test7_causal_summary_v1"
+      ],
+      "controls_and_remaining_gate": "Real landing with no coherent return; provisional prepGT7; cut/view/epoch/future anchors; original2sgap/top10%/speed budget unchanged.",
+      "owning_files": [
+        "sports/badminton/src/bai_badminton/events/rally_motion.py",
+        "sports/badminton/src/bai_badminton/events/rally_evidence.py",
+        "sports/badminton/src/bai_badminton/engine.py"
+      ],
+      "next_experiment_or_external_requirement": "Review independent landing/fresh-launch/occlusion ambiguity; retain real floor-shuttle controls such as Test7frame7705, not blanket static suppression.",
+      "test_evidence": [
+        "sports/badminton/tests/test_rally_tracklet_support.py",
+        "sports/badminton/tests/test_rally_image_exit_evidence.py"
+      ],
+      "status_basis": "root-reviewed current source, completed tests, actual fresh own-cache results and specialist recommendations; no independent physical accuracy inferred"
+    },
+    {
+      "id": "H18",
+      "priority": "P2",
+      "title": "VOD behavior is not validated as causal live behavior",
+      "historical_status": "open_vod_live_mode_limit",
+      "production_status": "open_true_live_ingestion_and_validation",
+      "historical_inventory_reference": "research/next_session_failure_inventory.json#H18",
+      "recommendation": "Open implementation/validation gate: true-live ingestion unwired",
+      "new_evidence_finding": "SourceKind/profile fields exist but RTSP/SRT/WebRTC/camera ingest has no runtime adapter; VOD chunks use background/lookahead windows.",
+      "evidence": [
+        "research/PRODUCTION_COMPONENT_INVENTORY.md"
+      ],
+      "controls_and_remaining_gate": "Prefix/frontier unit contracts do not substitute for actual live disconnect/reconnect/latency and current-frame-only execution.",
+      "owning_files": [
+        "sports/badminton/src/bai_badminton/perception/tracknet.py",
+        "sports/badminton/src/bai_badminton/perception/pipeline.py",
+        "sports/badminton/src/bai_badminton/engine.py",
+        "engine/src/bai_engine/runtime/runner.py"
+      ],
+      "next_experiment_or_external_requirement": "Implement and validate an actual causal live adapter and interruption/latency contracts; current real-time source/profile fields are not execution proof.",
+      "test_evidence": [
+        "sports/badminton/tests/test_streaming_contact_integrity.py"
+      ],
+      "status_basis": "root-reviewed current source, completed tests, actual fresh own-cache results and specialist recommendations; no independent physical accuracy inferred"
+    },
+    {
+      "id": "H19",
+      "priority": "P2",
+      "title": "VFR/unsupported/high-FPS generic ingestion needs explicit mappings",
+      "historical_status": "open_generic_source_mapping_risk",
+      "production_status": "fixed_vfr_detection_original_proxy_mapping_open",
+      "historical_inventory_reference": "research/next_session_failure_inventory.json#H19",
+      "recommendation": "VFR detection improved; generic source↔proxy map still open",
+      "new_evidence_finding": "Selected-video bounded complete packet-PTS cadence scan fixes equal-rate-header false negative; canonical CFR conversion does not persist generic original-frame correspondence.",
+      "evidence": [
+        "research/PRODUCTION_COMPONENT_INVENTORY.md",
+        "research/PRODUCTION_MEDIA_COMPATIBILITY_REPORT.md"
+      ],
+      "controls_and_remaining_gate": "Equal header rates/uneven PTS; selected stream, rotation, timeout/reorderunknown; source/proxy index inequality explicit.",
+      "owning_files": [
+        "engine/src/bai_engine/media/probe.py",
+        "engine/src/bai_engine/media/proxy.py",
+        "engine/src/bai_engine/decode.py"
+      ],
+      "next_experiment_or_external_requirement": "Persist a verified arbitrary original-source↔analysis-proxy mapping for VFR/high-FPS inputs; canonical analysis indices remain explicitly identified.",
+      "test_evidence": [
+        "engine/tests/test_media_compatibility.py",
+        "research/tests/test_production_hls_migration.py"
+      ],
+      "status_basis": "root-reviewed current source, completed tests, actual fresh own-cache results and specialist recommendations; no independent physical accuracy inferred"
+    },
+    {
+      "id": "H20",
+      "priority": "P2",
+      "title": "Browser HLS seek/callback alignment remains untested",
+      "historical_status": "open_browser_hls_validation_gap",
+      "production_status": "fixed_new_hls_origin_old_asset_routing_open",
+      "historical_inventory_reference": "research/next_session_failure_inventory.json#H20",
+      "recommendation": "Physical HLS origin defect fixed in tested new assets; migration/browser gates open",
+      "new_evidence_finding": "Firefox158 currentVideoStage/useHls:9fixtures/108seeks; growingEVENT108; video+AAC24; fractional24 all pass. OldacceptedHLS untouched; MP4bytes unchanged.",
+      "evidence": [
+        "research/PRODUCTION_MEDIA_COMPATIBILITY_REPORT.md"
+      ],
+      "controls_and_remaining_gate": "Legacy CPUbf0+AAC reproduces323/15360 origin; route/migration oldHLS, otherbrowsers, actualNVENC regeneration and human A/V review remain open.",
+      "owning_files": [
+        "apps/web/src/lib/frameClock.ts",
+        "apps/web/src/features/player/VideoStage.tsx",
+        "engine/src/bai_engine/decode.py"
+      ],
+      "next_experiment_or_external_requirement": "Review new-root migration/routing of immutable old HLS, other browsers and actual NVENC regeneration; do not silently replace deployed assets.",
+      "test_evidence": [
+        "engine/tests/test_media_compatibility.py",
+        "research/tests/test_production_hls_migration.py"
+      ],
+      "status_basis": "root-reviewed current source, completed tests, actual fresh own-cache results and specialist recommendations; no independent physical accuracy inferred"
+    },
+    {
+      "id": "H21",
+      "priority": "P2",
+      "title": "Runtime cost increase and growing rollback history need isolated profiling",
+      "historical_status": "partially_measured_rollback_profiling_open",
+      "production_status": "fixed_checkpoint_scaling_ownership_runtime_gates_open",
+      "historical_inventory_reference": "research/next_session_failure_inventory.json#H21",
+      "recommendation": "Checkpoint software defects repaired; deployment performance gate open",
+      "new_evidence_finding": "Journal aliasing/failed-append/scaling repaired; actual new concurrent offline rates10.46685/9.62346FPS below30FPS; targetRTX4000Ada unavailable.",
+      "evidence": [
+        "research/ANALYTICS_CHECKPOINT_REPORT.md",
+        "research/GPU_PERFORMANCE_REPORT.md",
+        "research/PRODUCTION_COMPONENT_INVENTORY.md"
+      ],
+      "controls_and_remaining_gate": "Caller mutation; failed append; repeatedrestore; scaling; no critical-path sum of overlapping timers; remotequota and exact target hardware unvalidated.",
+      "owning_files": [
+        "sports/badminton/src/bai_badminton/engine.py",
+        "sports/badminton/src/bai_badminton/components.py",
+        "sports/badminton/src/bai_badminton/analytics/match.py",
+        "research/run_pipeline_experiment.py"
+      ],
+      "next_experiment_or_external_requirement": "Measure long-run/concurrent deployment resources; checkpoint software defects are fixed, append/restore costs and shared-host timing remain explicit.",
+      "test_evidence": [
+        "sports/badminton/tests/test_transactional_analytics_checkpoint.py"
+      ],
+      "status_basis": "root-reviewed current source, completed tests, actual fresh own-cache results and specialist recommendations; no independent physical accuracy inferred"
+    },
+    {
+      "id": "H22",
+      "priority": "P1",
+      "title": "Only one independent fresh candidate GPU run exists",
+      "historical_status": "v1_repeat_verified_selected_repeat_pending",
+      "production_status": "fresh_pair_verified_identical_configuration_repeat_pending",
+      "historical_inventory_reference": "research/next_session_failure_inventory.json#H22",
+      "recommendation": "New actual full-run pair and own-cache reproducibility obtained; same-config repeat limits explicit",
+      "new_evidence_finding": "Two new configurations completed; exact288cache maps/traceSHA/all36triples/CSV/liveevent timestamps validated. Association CSV equals historical selected.",
+      "evidence": [
+        "research/PRODUCTION_BOUNDARY_REVIEW.md",
+        "artifacts/benchmarking/experiments/prod_20261105_boundary_fresh_audit_v1/fresh_boundary_audit.json",
+        "artifacts/benchmarking/experiments/prod_20261105_full_comparison_v2/results.json"
+      ],
+      "controls_and_remaining_gate": "Do not call semantic replay GPUrepeat; two different configs do not prove identical-config neural determinism or independent accuracy.",
+      "owning_files": [
+        "research/run_pipeline_experiment.py",
+        "research/replay_rally_evidence.py",
+        "research/component_test_report.md"
+      ],
+      "next_experiment_or_external_requirement": "Repeat the exact chosen neural configuration independently before promotion. Six complete input runs contain different profiles/recordings; cached parity is not a neural repeat.",
+      "test_evidence": [],
+      "status_basis": "root-reviewed current source, completed tests, actual fresh own-cache results and specialist recommendations; no independent physical accuracy inferred"
+    },
+    {
+      "id": "H23",
+      "priority": "P1",
+      "title": "Independent labels/generalization and alternative-model validation are missing",
+      "historical_status": "open_independent_labels_and_generalization",
+      "production_status": "open_independent_reviewed_generalization",
+      "historical_inventory_reference": "research/next_session_failure_inventory.json#H23",
+      "recommendation": "Blocked independent labels/generalization gate",
+      "new_evidence_finding": "All four exposed external inputs completed. Contact agreement F1 at±3: India73.56%, Denmark69.44%, doubles52.5%; shot accuracy/coverage poor. No prospective blind set established.",
+      "evidence": [
+        "research/GENERALIZATION_EVALUATION_REPORT.md",
+        "research/DOUBLES_VALIDATION_REPORT.md",
+        "artifacts/benchmarking/experiments/prod_20261105_external_summary_v1/summary.json"
+      ],
+      "controls_and_remaining_gate": "Explicitrights/sourcecorrespondence/matchdisjointreview; no unrelated media; publisher-human references require verified alignment and exposure disclosure.",
+      "owning_files": [
+        "research/shuttle_model_comparison.md",
+        "research/modularity_and_reliability_plan.md",
+        "research/implementation_roadmap.md"
+      ],
+      "next_experiment_or_external_requirement": "Freeze and review a prospective match-disjoint validation/test set. Exposed stress data reveal low contact/shot agreement and cannot become new blind tests.",
+      "test_evidence": [],
+      "status_basis": "root-reviewed current source, completed tests, actual fresh own-cache results and specialist recommendations; no independent physical accuracy inferred"
+    },
+    {
+      "id": "H24",
+      "priority": "P2",
+      "title": "Empty-GT comparison output has no CSV header",
+      "historical_status": "fixed_export_contract",
+      "production_status": "previously_fixed_export_contract_preserved",
+      "historical_inventory_reference": "research/next_session_failure_inventory.json#H24",
+      "recommendation": "Previously fixed; preserve unchanged evaluator/export contract",
+      "new_evidence_finding": "EmptyGT header regression has existing control; original matching/seven-column benchmark export retained. Application CSV has a distinct contract.",
+      "evidence": [
+        "research/next_session_final_report.md",
+        "research/PRODUCTION_COMPONENT_INVENTORY.md",
+        "artifacts/benchmarking/experiments/prod_20261105_final_integrity_v1/validation.json"
+      ],
+      "controls_and_remaining_gate": "EmptyGT/predictions, no matches, threshold/matching arithmetic; never modify denominator/matching to improve scores.",
+      "owning_files": [
+        "scripts/benchmarking/evaluate_rallies.py",
+        "tests/benchmarking/test_prediction_schema.py"
+      ],
+      "next_experiment_or_external_requirement": "Keep historical fixed benchmark empty-header/matching contracts unchanged; distinct application empty CSV is now separately fixed/tested.",
+      "test_evidence": [],
+      "status_basis": "root-reviewed current source, completed tests, actual fresh own-cache results and specialist recommendations; no independent physical accuracy inferred"
+    },
+    {
+      "id": "H25",
+      "priority": "P2",
+      "title": "Factorial executor provenance and fixed Test 1 assumptions need hardening",
+      "historical_status": "fixed_executor_provenance_and_epoch_assumptions",
+      "production_status": "fixed_current_executor_and_source_proof_contracts_historical_limit_bounded",
+      "historical_inventory_reference": "research/next_session_failure_inventory.json#H25",
+      "recommendation": "Current executor/source/cache provenance hardened; historical harness limits preserved",
+      "new_evidence_finding": "New runs pin actual executor/config/input/output; owncache full hash maps and traceSHA/triples independently validated, including multiplicity.",
+      "evidence": [
+        "research/PRODUCTION_BOUNDARY_REVIEW.md",
+        "artifacts/benchmarking/experiments/prod_20261105_boundary_fresh_audit_v1/fresh_boundary_audit.json",
+        "artifacts/benchmarking/experiments/prod_20261105_full_comparison_v2/results.json",
+        "artifacts/benchmarking/experiments/prod_20261105_final_integrity_v1/validation.json"
+      ],
+      "controls_and_remaining_gate": "Mismatched trace/cache/video/reasons, inheritedsourcehash deception, unsupportedfuturewireversion; do not treat old fixed reset scripts as universal.",
+      "owning_files": [
+        "research/run_evidence_ablations.py",
+        "research/run_fsm_ablations.py",
+        "research/replay_rally_evidence.py"
+      ],
+      "next_experiment_or_external_requirement": "Use exact source/runner/helper/cache proofs and future completion catalogues; historical Test7 missing at-completion catalogue remains a bounded provenance limit.",
+      "test_evidence": [],
+      "status_basis": "root-reviewed current source, completed tests, actual fresh own-cache results and specialist recommendations; no independent physical accuracy inferred"
+    },
+    {
+      "id": "H26",
+      "priority": "P2",
+      "title": "Ignored evidence and fixed finalizers can invalidate next-session workflows",
+      "historical_status": "mitigated_and_integrity_verified",
+      "production_status": "preservation_verified_ignored_evidence_backup_open",
+      "historical_inventory_reference": "research/next_session_failure_inventory.json#H26",
+      "recommendation": "Mitigated preservation/workflow risk; ignored evidence portability remains",
+      "new_evidence_finding": "Unique new directories, hashes and executed source snapshots preserved; no oldfinalizer/historical report overwritten; initial integrity verified by root.",
+      "evidence": [
+        "research/PRODUCTION_READINESS_AUDIT.md",
+        "research/PRODUCTION_BOUNDARY_REVIEW.md",
+        "artifacts/benchmarking/experiments/prod_20261105_final_integrity_v1/validation.json"
+      ],
+      "controls_and_remaining_gate": "Refuse existing output, protect ignored artifacts and original video/labels/main; cachebytes+tracebinding before failure packages.",
+      "owning_files": [
+        "research/finalize_pipeline_investigation.py",
+        "research/build_failure_cases.py",
+        "research/compare_rally_experiments.py",
+        "scripts/benchmarking/README.md",
+        ".gitignore"
+      ],
+      "next_experiment_or_external_requirement": "Back up ignored evidence independently of Git and retain all failed/rejected studies; historical files remain byte-identical.",
+      "test_evidence": [],
+      "status_basis": "root-reviewed current source, completed tests, actual fresh own-cache results and specialist recommendations; no independent physical accuracy inferred"
+    },
+    {
+      "id": "H27",
+      "priority": "P3",
+      "title": "RapidOCR empty-result warnings remain",
+      "historical_status": "unchanged_noncausal_warning",
+      "production_status": "known_noncausal_ocr_warning_accuracy_unvalidated",
+      "historical_inventory_reference": "research/next_session_failure_inventory.json#H27",
+      "recommendation": "Known noncausal OCR warning; OCR accuracy separate",
+      "new_evidence_finding": "Actual RapidOCR stages/versions/weights/providers recorded; empty text is not a rally failure. No score/winner filter removes difficult rally annotations.",
+      "evidence": [
+        "research/PRODUCTION_COMPONENT_INVENTORY.md"
+      ],
+      "controls_and_remaining_gate": "No-text frames; source-boardunknown; packagealias not versionpin; do not claim score accuracy from rallyF1.",
+      "owning_files": [
+        "sports/badminton/src/bai_badminton/perception/scoreboard.py",
+        "sports/badminton/src/bai_badminton/score_ocr.py",
+        "sports/badminton/src/bai_badminton/engine.py"
+      ],
+      "next_experiment_or_external_requirement": "Keep no-text OCR warnings distinct from sporting failures; review OCR/score labels before accuracy claims.",
+      "test_evidence": [],
+      "status_basis": "root-reviewed current source, completed tests, actual fresh own-cache results and specialist recommendations; no independent physical accuracy inferred"
+    },
+    {
+      "id": "H28",
+      "priority": "P3",
+      "title": "Pre-existing formatting/deprecation warnings",
+      "historical_status": "unchanged_noncausal_maintenance",
+      "production_status": "known_noncausal_maintenance",
+      "historical_inventory_reference": "research/next_session_failure_inventory.json#H28",
+      "recommendation": "Maintenance-only; retain final exact suite/lint warnings",
+      "new_evidence_finding": "Existing Starlette deprecations and historical formatting issues are not sporting failures; final count deferred to root completed run.",
+      "evidence": [
+        "research/PRODUCTION_READINESS_VALIDATION_MATRIX.md",
+        "artifacts/benchmarking/experiments/prod_20261105_final_integrity_v1/validation.json"
+      ],
+      "controls_and_remaining_gate": "Do not edit unrelated deployment/formatting or hide warnings; distinguish oldwarning from introduced failure.",
+      "owning_files": [
+        "sports/badminton/src/bai_badminton/plugin.py",
+        "research/component_test_report.md"
+      ],
+      "next_experiment_or_external_requirement": "Retain19 existing HTTP422 deprecations and unrelated style maintenance separately from sporting quality; changed Python files pass Ruff.",
+      "test_evidence": [],
+      "status_basis": "root-reviewed current source, completed tests, actual fresh own-cache results and specialist recommendations; no independent physical accuracy inferred"
+    }
+  ],
+  "new_issues": [
+    {
+      "id": "PR01",
+      "priority": "P0",
+      "title": "Unknown or carried pose/racket treated as fresh physical contact support",
+      "status": "fixed_source_provenance_contract_independent_accuracy_open",
+      "evidence": [
+        "research/PRODUCTION_CONTACT_SHOT_REPORT.md",
+        "sports/badminton/tests/test_pose_observation_provenance.py",
+        "engine/tests/test_pose_frame_provenance.py",
+        "apps/web/src/lib/poseProvenance.test.ts"
+      ],
+      "remaining_gate": "Browser displayPose age remains display reuse age; physical provider requires actual exact source stamps. No reviewed physical-impact accuracy."
+    },
+    {
+      "id": "PR02",
+      "priority": "P0",
+      "title": "Malformed tool arguments and ambiguous player filters could misattribute agent data",
+      "status": "fixed_fail_closed_contract",
+      "evidence": [
+        "agents/tests/test_agent.py",
+        "agents/tests/test_service_orchestration.py",
+        "research/AGENT_ORCHESTRATION_AUDIT.md"
+      ],
+      "remaining_gate": "Remote-provider costs, cancellation, outages and distributed durability are separate operational gates."
+    },
+    {
+      "id": "PR03",
+      "priority": "P0",
+      "title": "Q&A could publish evidence superseded within the same analysis generation",
+      "status": "fixed_snapshot_and_live_citation_fence",
+      "evidence": [
+        "apps/api/tests/test_agent_revision_guard.py",
+        "research/AGENT_ORCHESTRATION_AUDIT.md"
+      ],
+      "remaining_gate": "Response evidence_sequence identifies a consistent snapshot; later event changes are allowed."
+    },
+    {
+      "id": "PR04",
+      "priority": "P1",
+      "title": "Model estimates appeared confirmed in product wording",
+      "status": "fixed_estimate_and_human_review_wording",
+      "evidence": [
+        "apps/web/src/features/session/LiveFeed.test.tsx",
+        "apps/web/src/features/session/tabs/AskTab.test.tsx"
+      ],
+      "remaining_gate": "Wording is not evidence of calibrated confidence or physical accuracy."
+    },
+    {
+      "id": "PR05",
+      "priority": "P1",
+      "title": "External real-video research harness patched obsolete plugin settings hook",
+      "status": "fixed_current_registry_injection",
+      "evidence": [
+        "research/PRODUCTION_ADDITIONAL_DATA_PROVENANCE.md"
+      ],
+      "remaining_gate": "Two failed pre-NN v1 runs preserved; v2 actual inputs complete. Forty-five focused current binding controls passed."
+    },
+    {
+      "id": "PR06",
+      "priority": "P1",
+      "title": "Session LLM budget configured but not enforced",
+      "status": "fixed_durable_reported_usage_admission_strict_native_bound_unvalidated",
+      "evidence": [
+        "research/PRODUCTION_LLM_BUDGET_REPORT.md",
+        "agents/tests/test_token_budget.py",
+        "agents/tests/test_reported_token_budget.py",
+        "agents/tests/test_token_budget_envelope.py",
+        "apps/api/tests/test_agent_token_budget.py"
+      ],
+      "remaining_gate": "Default reported accounting is prospective and may overshoot by one response; strict mode requires verified provider input bounds. Native strict support, server-side billing/retry receipts and account-wide quotas are not validated."
+    },
+    {
+      "id": "PR07",
+      "priority": "P1",
+      "title": "Empty application rally CSV lost its schema",
+      "status": "fixed_stable_17_column_application_csv",
+      "evidence": [
+        "apps/api/tests/test_product_public_contract.py",
+        "research/PRODUCTION_PRODUCT_SMOKE_REPORT.md"
+      ],
+      "remaining_gate": "Distinct seven-column research CSV unchanged."
+    },
+    {
+      "id": "PR08",
+      "priority": "P1",
+      "title": "Failed upload could report100percent processed or use another session state",
+      "status": "fixed_truthful_own_session_coverage",
+      "evidence": [
+        "apps/web/src/features/session/ProductFailure.test.tsx",
+        "research/PRODUCTION_PRODUCT_SMOKE_REPORT.md"
+      ],
+      "remaining_gate": "Unknown media has unavailable coverage; partial media uses analysed_frames."
+    },
+    {
+      "id": "PR09",
+      "priority": "P2",
+      "title": "Failed export view claimed analysis was still running",
+      "status": "fixed_failed_partial_result_wording",
+      "evidence": [
+        "apps/web/src/features/session/ProductFailure.test.tsx"
+      ],
+      "remaining_gate": "No new full-analysis accuracy claim."
+    },
+    {
+      "id": "PR10",
+      "priority": "P1",
+      "title": "Public failure status leaked internal paths over HTTP and binary WebSocket",
+      "status": "fixed_shared_public_failure_projection",
+      "evidence": [
+        "apps/api/tests/test_product_public_contract.py",
+        "research/PRODUCTION_PRODUCT_SMOKE_REPORT.md"
+      ],
+      "remaining_gate": "Private source/error diagnostics retained. This is a reproduced path repair, not an exhaustive security audit."
+    },
+    {
+      "id": "PR11",
+      "priority": "P2",
+      "title": "Undecodable failed media pane retained a loading placeholder",
+      "status": "fixed_truthful_failed_media_state",
+      "evidence": [
+        "apps/web/src/features/player/VideoStage.failure.test.tsx",
+        "research/PRODUCTION_PRODUCT_SMOKE_REPORT.md"
+      ],
+      "remaining_gate": "Playable ready/partial streams and normal loading/retry controls preserved."
+    },
+    {
+      "id": "PR12",
+      "priority": "P1",
+      "title": "Calibration Save could send stale empty points before mutation options refreshed",
+      "status": "fixed_explicit_click_time_mutation_arguments",
+      "evidence": [
+        "apps/web/src/features/calibrate/CalibratePage.mutation-ordering.test.tsx",
+        "research/PRODUCTION_CALIBRATION_SAVE_REPORT.md"
+      ],
+      "remaining_gate": "Three deterministic real-hook/native-DOM controls fail before/pass after; original v4 full failure had no exact schedule telemetry. Backend rejects empty points, no geometry overwrite demonstrated."
+    },
+    {
+      "id": "PR13",
+      "priority": "P1",
+      "title": "Q&A tool projection discarded physical status and contact provenance",
+      "status": "fixed_live_frame_aligned_physical_projection",
+      "evidence": [
+        "agents/tests/test_tool_contact_provenance.py"
+      ],
+      "remaining_gate": "Analysis-proxy index explicitly labelled; no unavailable original-source mapping invented."
+    },
+    {
+      "id": "PR14",
+      "priority": "P1",
+      "title": "Cached experiment could reuse baseline after research runner/helper changed",
+      "status": "fixed_versioned_exact_runner_helper_proof",
+      "evidence": [
+        "research/tests/test_production_external_semantic_replay.py"
+      ],
+      "remaining_gate": "Completed old studies retain their unchanged executed scripts; new proofs reject legacy/missing/changed dependencies."
+    },
+    {
+      "id": "PR15",
+      "priority": "P1",
+      "title": "Full-upload executor lacked a completion-time cache-byte catalogue",
+      "status": "fixed_forward_catalogue_historical_v2_absence_bounded",
+      "evidence": [
+        "research/tests/test_production_cache_catalog.py",
+        "research/production_external_stress.py"
+      ],
+      "remaining_gate": "Future writer/parent/reader verify exact bounded population/header/frame/source/proxy/hash. Historical Test7 retains only posthoc179hashes plus full semantic parity; no backfill or new neural run."
+    }
+  ],
+  "external_gates": [
+    "reviewed match-disjoint component labels and recording provenance",
+    "human review/adjudication",
+    "explicitly agreed boundary acceptance tolerance",
+    "RTX4000Ada deployment measurements",
+    "independent four-player tracking and shot/hitter labels"
+  ],
+  "production_source_commit": "130825008eb5d39f58130d4e15c8e3c1fb6911cd",
+  "fresh_executor_commit": "85993259a3a2838881ed2b18658a07967058d191",
+  "new_evidence_index": {
+    "comparison": "artifacts/benchmarking/experiments/prod_20261105_full_comparison_v2/results.json",
+    "all36_boundaries": "research/PRODUCTION_BOUNDARY_REVIEW.md",
+    "temporal_recommendations_sha256": "0dbbd3b1a058a8a2fa08c978cd46967eddf67e6f4339e0d6fac2ece200a2b7b6",
+    "main_python": "artifacts/benchmarking/experiments/prod_20261105_full_python_v2.log",
+    "frontend": "artifacts/benchmarking/experiments/prod_20261105_frontend_release_v5/validation_receipt.json",
+    "actual_browser": "artifacts/benchmarking/experiments/prod_20261105_product_smoke_v5/results.json",
+    "neural_results_product": "artifacts/benchmarking/experiments/prod_20261105_neural_results_product_v3/results.json",
+    "source_checks": "artifacts/benchmarking/experiments/prod_20261105_final_source_checks_v1/checks.json",
+    "research_full_suite": "artifacts/benchmarking/experiments/prod_20261105_full_research_v2.log",
+    "dataset_metadata_freeze": "artifacts/benchmarking/experiments/prod_20261105_dataset_metadata_freeze_v3/freeze.json"
+  },
+  "application_hardening_commit": "f85b1df69dcab2e6a7a1394070e954e469cb522e",
+  "prospective_blind_recordings": 0,
+  "validation_counts": {
+    "main_python": 2280,
+    "frontend": 226,
+    "fresh_complete_input_runs": 6,
+    "historical_integrity_checks": 2174,
+    "research_full_suite": 458
+  }
+}

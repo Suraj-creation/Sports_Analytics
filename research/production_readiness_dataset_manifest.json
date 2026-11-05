@@ -1,0 +1,882 @@
+{
+  "schema_version": 1,
+  "protocol_id": "badminton-production-readiness-metadata-20261105-v3",
+  "status": "draft_components_and_human_gates_pending",
+  "intervals": "half_open",
+  "selection_rule": "No prospective blind holdout: retain prior exposure, group source/proxy/clip aliases by known match, quarantine unresolved identity/exposure. Relevant local project analysis is authorized by the mission; redistribution/training rights are separate. Later source and metadata discovery is explicitly recorded.",
+  "metric_policy": {
+    "rally": "unchanged scripts/benchmarking/evaluate_rallies.py IoU>=0.5 maximum-cardinality matching; all frame tolerances and per-row errors",
+    "contact": "physical-contact timing and published-anchor agreement must remain separate; existing0.20s reference tolerance cannot certify physical impact accuracy",
+    "tracking": "existing research.tracking_benchmark global identity mapping and IoU assignment; independent exhaustive frame labels required",
+    "components": "shot/hitter/point/score/shuttle protocols remain pending independent review; no invented component accuracy",
+    "published_external_stress": "Existing published-anchor matching at +/-3 and +/-6 canonical frames over all live contacts/full clips; existing draft timeline offsets preserved without fitting. Native shot mapping, unknowns and actor abstention retained. This is reference agreement, not independent physical-contact accuracy."
+  },
+  "recordings": [
+    {
+      "recording_id": "test_9.mp4",
+      "source_sha256": "f2aabeb9610c437b38b840ae45885b4b71854702a6b30dd4aee4c54d1417dd4a",
+      "expected_bytes": 2778705525,
+      "match_id": null,
+      "match_identity_reviewed": false,
+      "split": "quarantined",
+      "exposure": "unknown",
+      "media_use_authorized": true,
+      "annotation_use_authorized": true,
+      "manifest_source": "docs/testing/task2/drive-video-download-manifest.json",
+      "local_metadata_matches": [],
+      "current_content_hash_verified": false,
+      "reviewed_component_labels": "not established by filename or existing derived CSV",
+      "pending": [
+        "match identity and recording/clip linkage",
+        "source/proxy temporal mapping",
+        "independent exhaustive component labels and reviewer/adjudicator provenance"
+      ],
+      "local_analysis_authorization": "existing user production-readiness mission; no new permission gate",
+      "redistribution_training_rights": "not established by local analysis authorization",
+      "camera_setup": {
+        "value": null,
+        "review_status": "unknown",
+        "basis": "no independent camera-condition review supplied"
+      },
+      "source_media_properties": {
+        "container": null,
+        "codec": null,
+        "width": null,
+        "height": null,
+        "fps_num": null,
+        "fps_den": null,
+        "frame_count": null,
+        "duration_s": null
+      },
+      "analysis_proxy_properties": {
+        "codec": null,
+        "width": null,
+        "height": null,
+        "fps_num": null,
+        "fps_den": null,
+        "frame_count": null
+      },
+      "game_type": null,
+      "annotation_status": "not established by filename or existing derived CSV",
+      "media_property_basis": "unknown current media properties; filenames and historical downloads are insufficient"
+    },
+    {
+      "recording_id": "Test_10.mp4",
+      "source_sha256": "cf71d8e02086df5e192e3cf834804407ca5d9e0f2f6bdf26512b39b6b264214f",
+      "expected_bytes": 3112811045,
+      "match_id": null,
+      "match_identity_reviewed": false,
+      "split": "quarantined",
+      "exposure": "unknown",
+      "media_use_authorized": true,
+      "annotation_use_authorized": true,
+      "manifest_source": "docs/testing/task2/drive-video-download-manifest.json",
+      "local_metadata_matches": [],
+      "current_content_hash_verified": false,
+      "reviewed_component_labels": "not established by filename or existing derived CSV",
+      "pending": [
+        "match identity and recording/clip linkage",
+        "source/proxy temporal mapping",
+        "independent exhaustive component labels and reviewer/adjudicator provenance"
+      ],
+      "local_analysis_authorization": "existing user production-readiness mission; no new permission gate",
+      "redistribution_training_rights": "not established by local analysis authorization",
+      "camera_setup": {
+        "value": null,
+        "review_status": "unknown",
+        "basis": "no independent camera-condition review supplied"
+      },
+      "source_media_properties": {
+        "container": null,
+        "codec": null,
+        "width": null,
+        "height": null,
+        "fps_num": null,
+        "fps_den": null,
+        "frame_count": null,
+        "duration_s": null
+      },
+      "analysis_proxy_properties": {
+        "codec": null,
+        "width": null,
+        "height": null,
+        "fps_num": null,
+        "fps_den": null,
+        "frame_count": null
+      },
+      "game_type": null,
+      "annotation_status": "not established by filename or existing derived CSV",
+      "media_property_basis": "unknown current media properties; filenames and historical downloads are insufficient"
+    },
+    {
+      "recording_id": "Test1_Full_rev.mp4",
+      "source_sha256": "877c6d39d34ccfb302865ed44f7e08949b0f72be2833f71777066f837e6b8bd6",
+      "expected_bytes": 1026166541,
+      "match_id": null,
+      "match_identity_reviewed": false,
+      "split": "development",
+      "exposure": "tuning",
+      "media_use_authorized": true,
+      "annotation_use_authorized": true,
+      "manifest_source": "docs/testing/task2/drive-video-download-manifest.json",
+      "local_metadata_matches": [
+        {
+          "path": "data/benchmarking/test1/Test1_Full_rev.mp4",
+          "bytes": 1026166541,
+          "expected_size_matches": true
+        }
+      ],
+      "current_content_hash_verified": true,
+      "reviewed_component_labels": "not established by filename or existing derived CSV",
+      "pending": [
+        "match identity and recording/clip linkage",
+        "source/proxy temporal mapping",
+        "independent exhaustive component labels and reviewer/adjudicator provenance"
+      ],
+      "notes": "Exposed Test1 development recording; no new blind validation claim.",
+      "local_analysis_authorization": "existing user production-readiness mission; no new permission gate",
+      "redistribution_training_rights": "not established by local analysis authorization",
+      "camera_setup": {
+        "value": "edited broadcast with main court and close-up views",
+        "review_status": "diagnostic only",
+        "basis": "existing source-bound review; full recording identity/condition audit remains unreviewed"
+      },
+      "source_media_properties": {
+        "container": "mp4",
+        "codec": "h264",
+        "width": 1920,
+        "height": 1080,
+        "fps_num": 30,
+        "fps_den": 1,
+        "frame_count": 17268,
+        "duration_s": 575.6
+      },
+      "analysis_proxy_properties": {
+        "codec": "h264",
+        "width": 1280,
+        "height": 720,
+        "fps_num": 30,
+        "fps_den": 1,
+        "frame_count": 17268
+      },
+      "game_type": "singles",
+      "annotation_status": "not established by filename or existing derived CSV",
+      "media_property_basis": "verified original headers and completed current production inference; immutable source SHA retained"
+    },
+    {
+      "recording_id": "Test3_Full_Rev.mp4",
+      "source_sha256": "d587569affa3b4fcabab0ea6b97ecd278af15675ce5cba36c79298bb6d0db5fa",
+      "expected_bytes": 696523353,
+      "match_id": null,
+      "match_identity_reviewed": false,
+      "split": "quarantined",
+      "exposure": "unknown",
+      "media_use_authorized": true,
+      "annotation_use_authorized": true,
+      "manifest_source": "docs/testing/task2/drive-video-download-manifest.json",
+      "local_metadata_matches": [],
+      "current_content_hash_verified": false,
+      "reviewed_component_labels": "not established by filename or existing derived CSV",
+      "pending": [
+        "match identity and recording/clip linkage",
+        "source/proxy temporal mapping",
+        "independent exhaustive component labels and reviewer/adjudicator provenance"
+      ],
+      "local_analysis_authorization": "existing user production-readiness mission; no new permission gate",
+      "redistribution_training_rights": "not established by local analysis authorization",
+      "camera_setup": {
+        "value": null,
+        "review_status": "unknown",
+        "basis": "no independent camera-condition review supplied"
+      },
+      "source_media_properties": {
+        "container": null,
+        "codec": null,
+        "width": null,
+        "height": null,
+        "fps_num": null,
+        "fps_den": null,
+        "frame_count": null,
+        "duration_s": null
+      },
+      "analysis_proxy_properties": {
+        "codec": null,
+        "width": null,
+        "height": null,
+        "fps_num": null,
+        "fps_den": null,
+        "frame_count": null
+      },
+      "game_type": null,
+      "annotation_status": "not established by filename or existing derived CSV",
+      "media_property_basis": "unknown current media properties; filenames and historical downloads are insufficient"
+    },
+    {
+      "recording_id": "Test2_Full_Rev.mp4",
+      "source_sha256": "4d687b4240fd501fb723c50588ecd095b9d9863299108c9d43b77c9587ba3c0a",
+      "expected_bytes": 2453914397,
+      "match_id": null,
+      "match_identity_reviewed": false,
+      "split": "quarantined",
+      "exposure": "unknown",
+      "media_use_authorized": true,
+      "annotation_use_authorized": true,
+      "manifest_source": "docs/testing/task2/drive-video-download-manifest.json",
+      "local_metadata_matches": [],
+      "current_content_hash_verified": false,
+      "reviewed_component_labels": "not established by filename or existing derived CSV",
+      "pending": [
+        "match identity and recording/clip linkage",
+        "source/proxy temporal mapping",
+        "independent exhaustive component labels and reviewer/adjudicator provenance"
+      ],
+      "local_analysis_authorization": "existing user production-readiness mission; no new permission gate",
+      "redistribution_training_rights": "not established by local analysis authorization",
+      "camera_setup": {
+        "value": null,
+        "review_status": "unknown",
+        "basis": "no independent camera-condition review supplied"
+      },
+      "source_media_properties": {
+        "container": null,
+        "codec": null,
+        "width": null,
+        "height": null,
+        "fps_num": null,
+        "fps_den": null,
+        "frame_count": null,
+        "duration_s": null
+      },
+      "analysis_proxy_properties": {
+        "codec": null,
+        "width": null,
+        "height": null,
+        "fps_num": null,
+        "fps_den": null,
+        "frame_count": null
+      },
+      "game_type": null,
+      "annotation_status": "not established by filename or existing derived CSV",
+      "media_property_basis": "unknown current media properties; filenames and historical downloads are insufficient"
+    },
+    {
+      "recording_id": "Test4_Full_Rev.mp4",
+      "source_sha256": "adff61dad4741ea6e8220c5d3292ddb0578b3c91b9e724f49b6f6608203558ed",
+      "expected_bytes": 1296890124,
+      "match_id": null,
+      "match_identity_reviewed": false,
+      "split": "quarantined",
+      "exposure": "unknown",
+      "media_use_authorized": true,
+      "annotation_use_authorized": true,
+      "manifest_source": "docs/testing/task2/drive-video-download-manifest.json",
+      "local_metadata_matches": [],
+      "current_content_hash_verified": false,
+      "reviewed_component_labels": "not established by filename or existing derived CSV",
+      "pending": [
+        "match identity and recording/clip linkage",
+        "source/proxy temporal mapping",
+        "independent exhaustive component labels and reviewer/adjudicator provenance"
+      ],
+      "local_analysis_authorization": "existing user production-readiness mission; no new permission gate",
+      "redistribution_training_rights": "not established by local analysis authorization",
+      "camera_setup": {
+        "value": null,
+        "review_status": "unknown",
+        "basis": "no independent camera-condition review supplied"
+      },
+      "source_media_properties": {
+        "container": null,
+        "codec": null,
+        "width": null,
+        "height": null,
+        "fps_num": null,
+        "fps_den": null,
+        "frame_count": null,
+        "duration_s": null
+      },
+      "analysis_proxy_properties": {
+        "codec": null,
+        "width": null,
+        "height": null,
+        "fps_num": null,
+        "fps_den": null,
+        "frame_count": null
+      },
+      "game_type": null,
+      "annotation_status": "not established by filename or existing derived CSV",
+      "media_property_basis": "unknown current media properties; filenames and historical downloads are insufficient"
+    },
+    {
+      "recording_id": "Test6_Full.mp4",
+      "source_sha256": "45f873540649ec9d2b20e2d14edbf35ba2b2e41b150bfe07f3c995a0310fdab8",
+      "expected_bytes": 1330306904,
+      "match_id": null,
+      "match_identity_reviewed": false,
+      "split": "quarantined",
+      "exposure": "unknown",
+      "media_use_authorized": true,
+      "annotation_use_authorized": true,
+      "manifest_source": "docs/testing/task2/drive-video-download-manifest.json",
+      "local_metadata_matches": [],
+      "current_content_hash_verified": false,
+      "reviewed_component_labels": "not established by filename or existing derived CSV",
+      "pending": [
+        "match identity and recording/clip linkage",
+        "source/proxy temporal mapping",
+        "independent exhaustive component labels and reviewer/adjudicator provenance"
+      ],
+      "local_analysis_authorization": "existing user production-readiness mission; no new permission gate",
+      "redistribution_training_rights": "not established by local analysis authorization",
+      "camera_setup": {
+        "value": null,
+        "review_status": "unknown",
+        "basis": "no independent camera-condition review supplied"
+      },
+      "source_media_properties": {
+        "container": null,
+        "codec": null,
+        "width": null,
+        "height": null,
+        "fps_num": null,
+        "fps_den": null,
+        "frame_count": null,
+        "duration_s": null
+      },
+      "analysis_proxy_properties": {
+        "codec": null,
+        "width": null,
+        "height": null,
+        "fps_num": null,
+        "fps_den": null,
+        "frame_count": null
+      },
+      "game_type": null,
+      "annotation_status": "not established by filename or existing derived CSV",
+      "media_property_basis": "unknown current media properties; filenames and historical downloads are insufficient"
+    },
+    {
+      "recording_id": "Test7_Full.mp4",
+      "source_sha256": "1ad1eac44150a0a23e2bad1f3d4204bd41f2d257ff6b35156234d38cfa2b9d9c",
+      "expected_bytes": 664899136,
+      "match_id": null,
+      "match_identity_reviewed": false,
+      "split": "historical_evaluation",
+      "exposure": "previously_exposed",
+      "media_use_authorized": true,
+      "annotation_use_authorized": true,
+      "manifest_source": "docs/testing/task2/drive-video-download-manifest.json",
+      "local_metadata_matches": [
+        {
+          "path": "data/task2-review/Test7_Full.mp4",
+          "bytes": 664899136,
+          "expected_size_matches": true
+        }
+      ],
+      "current_content_hash_verified": true,
+      "reviewed_component_labels": "legacy hand-labelled coarse rally intervals; no exhaustive contact/shot/identity GT",
+      "pending": [
+        "match identity and recording/clip linkage",
+        "source/proxy temporal mapping",
+        "independent exhaustive component labels and reviewer/adjudicator provenance"
+      ],
+      "local_analysis_authorization": "existing user production-readiness mission; no new permission gate",
+      "redistribution_training_rights": "not established by local analysis authorization",
+      "local_source": "data/task2-review/Test7_Full.mp4",
+      "legacy_primary_reference": "Part2/dataset/Test7_Full/Test7_Full.csv",
+      "legacy_primary_reference_sha256": "5f1ebabcc0a66dae579bf7ad35ddc48a97e88d1277cc7afa5e7d369a3fcbd9ea",
+      "notes": "Authorized related recording stress/coarse-reference agreement; prior exposure, unknown exact onset convention and unresolved full match identity. Generated _rally.csv is not the primary reference.",
+      "camera_setup": {
+        "value": "edited broadcast with main court and close-up views",
+        "review_status": "diagnostic only",
+        "basis": "existing source-bound review; full recording identity/condition audit remains unreviewed"
+      },
+      "source_media_properties": {
+        "container": "mp4",
+        "codec": "h264",
+        "width": 1920,
+        "height": 1080,
+        "fps_num": 30,
+        "fps_den": 1,
+        "frame_count": 10725,
+        "duration_s": 357.5
+      },
+      "analysis_proxy_properties": {
+        "codec": "h264",
+        "width": 1280,
+        "height": 720,
+        "fps_num": 30,
+        "fps_den": 1,
+        "frame_count": 10725
+      },
+      "game_type": "singles",
+      "annotation_status": "legacy hand-labelled coarse rally intervals; no exhaustive contact/shot/identity GT",
+      "media_property_basis": "verified original headers and completed current production inference; immutable source SHA retained"
+    },
+    {
+      "recording_id": "Test5_Full.mp4",
+      "source_sha256": "e432dd8cac76e4d4ec5d4d328ba3c3517eecd893d7e217627100365dbc7cf85c",
+      "expected_bytes": 3454360910,
+      "match_id": null,
+      "match_identity_reviewed": false,
+      "split": "quarantined",
+      "exposure": "unknown",
+      "media_use_authorized": true,
+      "annotation_use_authorized": true,
+      "manifest_source": "docs/testing/task2/drive-video-download-manifest.json",
+      "local_metadata_matches": [],
+      "current_content_hash_verified": false,
+      "reviewed_component_labels": "not established by filename or existing derived CSV",
+      "pending": [
+        "match identity and recording/clip linkage",
+        "source/proxy temporal mapping",
+        "independent exhaustive component labels and reviewer/adjudicator provenance"
+      ],
+      "local_analysis_authorization": "existing user production-readiness mission; no new permission gate",
+      "redistribution_training_rights": "not established by local analysis authorization",
+      "camera_setup": {
+        "value": null,
+        "review_status": "unknown",
+        "basis": "no independent camera-condition review supplied"
+      },
+      "source_media_properties": {
+        "container": null,
+        "codec": null,
+        "width": null,
+        "height": null,
+        "fps_num": null,
+        "fps_den": null,
+        "frame_count": null,
+        "duration_s": null
+      },
+      "analysis_proxy_properties": {
+        "codec": null,
+        "width": null,
+        "height": null,
+        "fps_num": null,
+        "fps_den": null,
+        "frame_count": null
+      },
+      "game_type": null,
+      "annotation_status": "not established by filename or existing derived CSV",
+      "media_property_basis": "unknown current media properties; filenames and historical downloads are insufficient"
+    },
+    {
+      "recording_id": "0044.mp4",
+      "source_sha256": "1ac5999828f4d789e246d3cfce2ef0fbd7b647cd4e40326a6629157b368899e7",
+      "match_id": "finebadminton:0044:sen-teh",
+      "match_identity_reviewed": false,
+      "split": "development",
+      "exposure": "historical_predictions_seen",
+      "media_use_authorized": true,
+      "annotation_use_authorized": true,
+      "current_content_hash_verified": false,
+      "manifest_source": "research/README-finebadminton-reference.md",
+      "label_provenance": "Provider-reported human-refined published hit anchors; not independently reviewed physical contact or four-player identity truth",
+      "local_metadata_matches": [],
+      "notes": "Historical project holdout results are already exposed; cannot silently reuse as new blind data.",
+      "local_analysis_authorization": "existing user production-readiness mission; no new permission gate",
+      "redistribution_training_rights": "not established by local analysis authorization",
+      "pending": [],
+      "camera_setup": {
+        "value": null,
+        "review_status": "unknown",
+        "basis": "no independent camera-condition review supplied"
+      },
+      "source_media_properties": {
+        "container": null,
+        "codec": null,
+        "width": null,
+        "height": null,
+        "fps_num": null,
+        "fps_den": null,
+        "frame_count": null,
+        "duration_s": null
+      },
+      "analysis_proxy_properties": {
+        "codec": null,
+        "width": null,
+        "height": null,
+        "fps_num": null,
+        "fps_den": null,
+        "frame_count": null
+      },
+      "game_type": "singles",
+      "annotation_status": "Provider-reported human-refined published hit anchors; not independently reviewed physical contact or four-player identity truth",
+      "media_property_basis": "historical published-reference metadata; original media unavailable in inspected local roots"
+    },
+    {
+      "recording_id": "0046.mp4",
+      "source_sha256": "263c7456643f96f37ad5ccc7d04c01c08d201209d49f141997405325709d0a2d",
+      "match_id": "finebadminton:0046:sen-ogawa",
+      "match_identity_reviewed": false,
+      "split": "historical_evaluation",
+      "exposure": "historical_predictions_seen",
+      "media_use_authorized": true,
+      "annotation_use_authorized": true,
+      "current_content_hash_verified": false,
+      "manifest_source": "research/README-finebadminton-reference.md",
+      "label_provenance": "Provider-reported human-refined published hit anchors; not independently reviewed physical contact or four-player identity truth",
+      "local_metadata_matches": [],
+      "notes": "Historical project holdout results are already exposed; cannot silently reuse as new blind data.",
+      "local_analysis_authorization": "existing user production-readiness mission; no new permission gate",
+      "redistribution_training_rights": "not established by local analysis authorization",
+      "pending": [],
+      "camera_setup": {
+        "value": null,
+        "review_status": "unknown",
+        "basis": "no independent camera-condition review supplied"
+      },
+      "source_media_properties": {
+        "container": null,
+        "codec": null,
+        "width": null,
+        "height": null,
+        "fps_num": null,
+        "fps_den": null,
+        "frame_count": null,
+        "duration_s": null
+      },
+      "analysis_proxy_properties": {
+        "codec": null,
+        "width": null,
+        "height": null,
+        "fps_num": null,
+        "fps_den": null,
+        "frame_count": null
+      },
+      "game_type": "singles",
+      "annotation_status": "Provider-reported human-refined published hit anchors; not independently reviewed physical contact or four-player identity truth",
+      "media_property_basis": "historical published-reference metadata; original media unavailable in inspected local roots"
+    },
+    {
+      "recording_id": "task2-doubles-250-frame-excerpt",
+      "source_sha256": "e50e00223bf41468ac4c913ff5a7647d909563326d256be8037fe79fedace640",
+      "match_id": null,
+      "split": "development",
+      "exposure": "ai_draft_validation",
+      "match_identity_reviewed": false,
+      "media_use_authorized": true,
+      "annotation_use_authorized": true,
+      "current_content_hash_verified": false,
+      "reported_source_session": "01M60K38M17QTHTE7QFC1RDG0N",
+      "reported_frames": 250,
+      "label_provenance": "64 boxes on16 AI-draft source frames; no independent human-reviewed doubles accuracy claim",
+      "manifest_source": "docs/testing/task2/validation-20261028-continuity/README.md",
+      "local_analysis_authorization": "existing user production-readiness mission; no new permission gate",
+      "redistribution_training_rights": "not established by local analysis authorization",
+      "pending": [],
+      "camera_setup": {
+        "value": null,
+        "review_status": "unknown",
+        "basis": "no independent camera-condition review supplied"
+      },
+      "source_media_properties": {
+        "container": null,
+        "codec": null,
+        "width": null,
+        "height": null,
+        "fps_num": null,
+        "fps_den": null,
+        "frame_count": null,
+        "duration_s": null
+      },
+      "analysis_proxy_properties": {
+        "codec": null,
+        "width": null,
+        "height": null,
+        "fps_num": 25,
+        "fps_den": 1,
+        "frame_count": 250
+      },
+      "game_type": "doubles",
+      "annotation_status": "64 boxes on16 AI-draft source frames; no independent human-reviewed doubles accuracy claim",
+      "media_property_basis": "historical excerpt metadata, not newly header/hash verified"
+    },
+    {
+      "recording_id": "published-india-continuous-clip",
+      "source_sha256": "47bb759f8f6864c2c1c6952b743c1a4735137fe86835a6b240f3ceffd05603ca",
+      "match_id": "published:CoachAI-ShuttleSet22:india_open_2022_final",
+      "match_identity_reviewed": false,
+      "match_identity_basis": "existing publisher-bound match metadata; not a new blind split",
+      "split": "historical_evaluation",
+      "exposure": "previously_exposed",
+      "media_use_authorized": true,
+      "annotation_use_authorized": true,
+      "local_analysis_authorization": "existing relevant-project mission",
+      "redistribution_training_rights": "separate source/annotation licenses; DShuttleNet noncommercial condition recorded; no new redistribution",
+      "current_content_hash_verified": false,
+      "canonical_proxy": {
+        "path": "data/research/pluggable-pipeline-20261103/benchmarks/india/prepared-v1/proxy.mp4",
+        "bytes": 34893514,
+        "sha256": "018df5d81dbb60c692805acf558992554e4a24b29fc8e64ea28fd0857bd1ac49"
+      },
+      "canonical_proxy_hash_verified": true,
+      "source_crop": {
+        "proxy_fps_den": 1,
+        "proxy_fps_num": 30,
+        "proxy_frames": [
+          0,
+          4800
+        ],
+        "proxy_sha256": "018df5d81dbb60c692805acf558992554e4a24b29fc8e64ea28fd0857bd1ac49",
+        "source_decode_frames": [
+          12000,
+          16800
+        ],
+        "source_decode_start": 12000,
+        "source_frame_for_proxy_frame": "source_decode_start + proxy_frame",
+        "source_pts_mapping": "decode-index translation only; original source PTS not reconstructed",
+        "source_timestamps_preserved": false,
+        "source_window_s": [
+          400.0,
+          560.0
+        ]
+      },
+      "prepared_metadata": {
+        "path": "data/research/pluggable-pipeline-20261103/benchmarks/india/prepared-v1/preparation.json",
+        "bytes": 3549,
+        "sha256": "77238a0e0061ddcc2959f6e66bc90683e33d8766f4efab4dbda85a5c7f7a9c1c"
+      },
+      "match_format": "singles",
+      "annotation_source": {
+        "path": "data/research/pluggable-pipeline-20261103/benchmarks/india/set1.csv",
+        "bytes": 61845,
+        "sha256": "920f5e18885c38a00b2c0d78c84a3942272328ae3d0573bc26f21b358854e49c"
+      },
+      "annotation_mapping": {
+        "offset": -12001,
+        "status": "preserved earlier draft, no new fit; not independently reviewed"
+      },
+      "published_anchors": 85,
+      "published_rallies": 4,
+      "independent_dense_identity_or_physical_contact_labels": false,
+      "pending": [
+        "independent source/proxy timeline review",
+        "dense physical impact/shuttle/identity/court evaluation",
+        "prospective untouched match-disjoint test",
+        "label/source rights for intended deployment use"
+      ],
+      "manifest_source": "artifacts/benchmarking/experiments/prod_20261105_data_provenance_discovery_v1/additional_available_materials.json",
+      "camera_setup": {
+        "value": "published edited broadcast clip",
+        "review_status": "publisher/project metadata; not independent condition review",
+        "basis": "artifacts/benchmarking/experiments/prod_20261105_data_provenance_discovery_v1/additional_available_materials.json"
+      },
+      "source_media_properties": {
+        "container": null,
+        "codec": null,
+        "width": null,
+        "height": null,
+        "fps_num": null,
+        "fps_den": null,
+        "frame_count": null,
+        "duration_s": null
+      },
+      "analysis_proxy_properties": {
+        "codec": "h264",
+        "width": 1280,
+        "height": 720,
+        "fps_num": 30,
+        "fps_den": 1,
+        "frame_count": 4800
+      },
+      "game_type": "singles",
+      "annotation_status": "published human anchor/class origin; project source alignment draft, no independent dense physical/identity review",
+      "media_property_basis": "verified prepared CFR proxy headers/current NN input; original whole-source properties not newly measured"
+    },
+    {
+      "recording_id": "published-denmark-continuous-clip",
+      "source_sha256": "10deb446cfb77e93b36103a9e674e97be7eb0136da68357871c8667008163b41",
+      "match_id": "published:CoachAI-ShuttleSet22:denmark_open_2022_sf",
+      "match_identity_reviewed": false,
+      "match_identity_basis": "existing publisher-bound match metadata; not a new blind split",
+      "split": "historical_evaluation",
+      "exposure": "previously_exposed",
+      "media_use_authorized": true,
+      "annotation_use_authorized": true,
+      "local_analysis_authorization": "existing relevant-project mission",
+      "redistribution_training_rights": "separate source/annotation licenses; DShuttleNet noncommercial condition recorded; no new redistribution",
+      "current_content_hash_verified": false,
+      "canonical_proxy": {
+        "path": "data/research/pluggable-pipeline-20261103/benchmarks/denmark/prepared-v2/proxy.mp4",
+        "bytes": 30442305,
+        "sha256": "d6c1e907ed0a2997f044957ae4a2f520d75af86ce911a72748db6404d72c41e6"
+      },
+      "canonical_proxy_hash_verified": true,
+      "source_crop": {
+        "proxy_fps_den": 1,
+        "proxy_fps_num": 30,
+        "proxy_frames": [
+          0,
+          3300
+        ],
+        "proxy_sha256": "d6c1e907ed0a2997f044957ae4a2f520d75af86ce911a72748db6404d72c41e6",
+        "source_decode_frames": [
+          13500,
+          16800
+        ],
+        "source_decode_start": 13500,
+        "source_frame_for_proxy_frame": "source_decode_start + proxy_frame",
+        "source_pts_mapping": "decode-index translation only; original source PTS not reconstructed",
+        "source_timestamps_preserved": false,
+        "source_window_s": [
+          450.0,
+          560.0
+        ]
+      },
+      "prepared_metadata": {
+        "path": "data/research/pluggable-pipeline-20261103/benchmarks/denmark/prepared-v2/preparation.json",
+        "bytes": 3706,
+        "sha256": "a86bd0d60a3c375ca537a97a75d7833149d51c5f75e9259a805eda224c2a15e1"
+      },
+      "match_format": "singles",
+      "annotation_source": {
+        "path": "data/research/pluggable-pipeline-20261103/benchmarks/denmark/set1.csv",
+        "bytes": 34316,
+        "sha256": "2616d6a2fbd3894158754ab2a442d3ccbc8f3d7c2e953739afb9c5091855da8d"
+      },
+      "annotation_mapping": {
+        "offset": -13503,
+        "status": "preserved earlier draft, no new fit; not independently reviewed"
+      },
+      "published_anchors": 39,
+      "published_rallies": 4,
+      "independent_dense_identity_or_physical_contact_labels": false,
+      "pending": [
+        "independent source/proxy timeline review",
+        "dense physical impact/shuttle/identity/court evaluation",
+        "prospective untouched match-disjoint test",
+        "label/source rights for intended deployment use"
+      ],
+      "manifest_source": "artifacts/benchmarking/experiments/prod_20261105_data_provenance_discovery_v1/additional_available_materials.json",
+      "camera_setup": {
+        "value": "published edited broadcast clip",
+        "review_status": "publisher/project metadata; not independent condition review",
+        "basis": "artifacts/benchmarking/experiments/prod_20261105_data_provenance_discovery_v1/additional_available_materials.json"
+      },
+      "source_media_properties": {
+        "container": null,
+        "codec": null,
+        "width": null,
+        "height": null,
+        "fps_num": null,
+        "fps_den": null,
+        "frame_count": null,
+        "duration_s": null
+      },
+      "analysis_proxy_properties": {
+        "codec": "h264",
+        "width": 1280,
+        "height": 720,
+        "fps_num": 30,
+        "fps_den": 1,
+        "frame_count": 3300
+      },
+      "game_type": "singles",
+      "annotation_status": "published human anchor/class origin; project source alignment draft, no independent dense physical/identity review",
+      "media_property_basis": "verified prepared CFR proxy headers/current NN input; original whole-source properties not newly measured"
+    },
+    {
+      "recording_id": "published-doubles-continuous-clip",
+      "source_sha256": "aa5d7df4d9ba83c74699a3c3f2c436752cadf7e9c8982363d6fbb4410ea1d2fe",
+      "match_id": "published:DShuttleNet:5",
+      "match_identity_reviewed": false,
+      "match_identity_basis": "existing publisher-bound match metadata; not a new blind split",
+      "split": "historical_evaluation",
+      "exposure": "previously_exposed",
+      "media_use_authorized": true,
+      "annotation_use_authorized": true,
+      "local_analysis_authorization": "existing relevant-project mission",
+      "redistribution_training_rights": "separate source/annotation licenses; DShuttleNet noncommercial condition recorded; no new redistribution",
+      "current_content_hash_verified": false,
+      "canonical_proxy": {
+        "path": "data/research/pluggable-pipeline-20261103/dshuttlenet-v7/prepared-v1/proxy.mp4",
+        "bytes": 32354453,
+        "sha256": "dbb07d82af5574d96d4d4363870fe674c9804c6c09733e5c31dce6eb833161e1"
+      },
+      "canonical_proxy_hash_verified": true,
+      "source_crop": {
+        "source_decode_frames": [
+          12000,
+          15600
+        ],
+        "source_window_s": [
+          400.0,
+          520.0
+        ],
+        "proxy_frames": [
+          0,
+          3600
+        ],
+        "proxy_fps_num": 30,
+        "proxy_fps_den": 1,
+        "source_frame_for_proxy_frame": "source_decode_start + proxy_frame",
+        "source_decode_start": 12000,
+        "source_timestamps_preserved": false,
+        "source_pts_mapping": "decode-index translation only; original source PTS not reconstructed",
+        "proxy_sha256": "dbb07d82af5574d96d4d4363870fe674c9804c6c09733e5c31dce6eb833161e1"
+      },
+      "prepared_metadata": {
+        "path": "data/research/pluggable-pipeline-20261103/dshuttlenet-v7/prepared-v1/preparation.json",
+        "bytes": 1602,
+        "sha256": "02eb67f2fd2743a5fd88352845b390899c12c2e941dca288a4f87cf0ba954496"
+      },
+      "match_format": "doubles",
+      "annotation_source": {
+        "path": "data/research/pluggable-pipeline-20261103/dshuttlenet-v7/shot.csv",
+        "bytes": 14553747,
+        "sha256": "c5242f8f183ce73142e7f3bbf297f69685360f33ff53bd2619cbdc1cd528b9b2"
+      },
+      "annotation_mapping": {
+        "offset": -12000,
+        "status": "preserved earlier draft, no new fit; not independently reviewed"
+      },
+      "published_anchors": 45,
+      "published_rallies": 4,
+      "independent_dense_identity_or_physical_contact_labels": false,
+      "pending": [
+        "independent source/proxy timeline review",
+        "dense physical impact/shuttle/identity/court evaluation",
+        "prospective untouched match-disjoint test",
+        "label/source rights for intended deployment use"
+      ],
+      "manifest_source": "artifacts/benchmarking/experiments/prod_20261105_data_provenance_discovery_v1/additional_available_materials.json",
+      "camera_setup": {
+        "value": "published edited broadcast clip",
+        "review_status": "publisher/project metadata; not independent condition review",
+        "basis": "artifacts/benchmarking/experiments/prod_20261105_data_provenance_discovery_v1/additional_available_materials.json"
+      },
+      "source_media_properties": {
+        "container": null,
+        "codec": null,
+        "width": null,
+        "height": null,
+        "fps_num": null,
+        "fps_den": null,
+        "frame_count": null,
+        "duration_s": null
+      },
+      "analysis_proxy_properties": {
+        "codec": "h264",
+        "width": 1280,
+        "height": 720,
+        "fps_num": 30,
+        "fps_den": 1,
+        "frame_count": 3600
+      },
+      "game_type": "doubles",
+      "annotation_status": "published human anchor/class origin; project source alignment draft, no independent dense physical/identity review",
+      "media_property_basis": "verified prepared CFR proxy headers/current NN input; original whole-source properties not newly measured"
+    }
+  ],
+  "model_training_overlap": "unknown",
+  "readiness": "No eligible new blind/generalization set or reviewed four-player component ground truth established",
+  "metadata_inputs": [
+    {
+      "path": "docs/testing/task2/drive-video-download-manifest.json",
+      "sha256": "32d2d4033dd214eb9c950ed048d3a64440ec881f6271fbdb20f8622e4dc2e4a1"
+    }
+  ],
+  "supersedes_protocol_sha256": "40cef731601e81d9a4e4fda45a9ed01a36ffc4882deb0b66a1abeb7e1b8c4138"
+}

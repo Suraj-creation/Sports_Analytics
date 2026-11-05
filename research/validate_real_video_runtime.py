@@ -552,10 +552,19 @@ def score_checks(sport, store, session, end: int) -> dict:
     }
 
 
+def create_validation_sport(session, store, profile, registry, models_dir):
+    """Current plugin injection is the staged registry, not global Settings."""
+    from bai_badminton.plugin import BadmintonSession
+
+    if Path(registry.models_dir).resolve() != Path(models_dir).resolve():
+        raise ValueError("validation registry must use the isolated staged model root")
+    return BadmintonSession(session, store, profile, registry, emit=lambda events: None)
+
+
 def run_session(raw: dict, profile, registry, args, output: Path) -> dict:
     import numpy as np
 
-    from bai_badminton.plugin import REF_FILE, BadmintonSession
+    from bai_badminton.plugin import REF_FILE
     from bai_engine.media import Tools, probe
     from bai_engine.runtime.runner import SessionRunner
     from bai_engine.schema import Event, Session, SessionStatus, TrackObject, samples_to_table
@@ -669,10 +678,9 @@ def run_session(raw: dict, profile, registry, args, output: Path) -> dict:
             shutil.copyfile(camera_ref, paths.root / REF_FILE)
             report["camera_reference_sha256"] = sha256(camera_ref)
         decoder = CanonicalProxy(proxy, media, segment_frames)
-        # Production session obtains only its runtime cache root through settings.
-        # Registry artifacts and derived caches both live in this isolated copy.
-        with patch("bai_badminton.plugin.get_settings", return_value=SimpleNamespace(models_dir=output / "models")):
-            sport = BadmintonSession(session, store, profile, registry, emit=lambda events: None)
+        # BadmintonSession passes registry.models_dir to perception explicitly;
+        # the current plugin has no global Settings hook to patch.
+        sport = create_validation_sport(session, store, profile, registry, output / "models")
         report["model_calls"] = instrument_models(sport.perception)
         sport.attach_frames(decoder.frame_at, paths.root)
         sampler = SessionRunner.__new__(SessionRunner)

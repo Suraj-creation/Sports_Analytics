@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "records": [
+    {
+      "recording_id": "test_9.mp4",
+      "source_sha256": "f2aabeb9610c437b38b840ae45885b4b71854702a6b30dd4aee4c54d1417dd4a",
+      "exposure": "unknown",
+      "evidence": "docs/testing/task2/drive-video-download-manifest.json"
+    },
+    {
+      "recording_id": "Test_10.mp4",
+      "source_sha256": "cf71d8e02086df5e192e3cf834804407ca5d9e0f2f6bdf26512b39b6b264214f",
+      "exposure": "unknown",
+      "evidence": "docs/testing/task2/drive-video-download-manifest.json"
+    },
+    {
+      "recording_id": "Test1_Full_rev.mp4",
+      "source_sha256": "877c6d39d34ccfb302865ed44f7e08949b0f72be2833f71777066f837e6b8bd6",
+      "exposure": "tuning",
+      "evidence": "docs/testing/task2/drive-video-download-manifest.json"
+    },
+    {
+      "recording_id": "Test3_Full_Rev.mp4",
+      "source_sha256": "d587569affa3b4fcabab0ea6b97ecd278af15675ce5cba36c79298bb6d0db5fa",
+      "exposure": "unknown",
+      "evidence": "docs/testing/task2/drive-video-download-manifest.json"
+    },
+    {
+      "recording_id": "Test2_Full_Rev.mp4",
+      "source_sha256": "4d687b4240fd501fb723c50588ecd095b9d9863299108c9d43b77c9587ba3c0a",
+      "exposure": "unknown",
+      "evidence": "docs/testing/task2/drive-video-download-manifest.json"
+    },
+    {
+      "recording_id": "Test4_Full_Rev.mp4",
+      "source_sha256": "adff61dad4741ea6e8220c5d3292ddb0578b3c91b9e724f49b6f6608203558ed",
+      "exposure": "unknown",
+      "evidence": "docs/testing/task2/drive-video-download-manifest.json"
+    },
+    {
+      "recording_id": "Test6_Full.mp4",
+      "source_sha256": "45f873540649ec9d2b20e2d14edbf35ba2b2e41b150bfe07f3c995a0310fdab8",
+      "exposure": "unknown",
+      "evidence": "docs/testing/task2/drive-video-download-manifest.json"
+    },
+    {
+      "recording_id": "Test7_Full.mp4",
+      "source_sha256": "1ad1eac44150a0a23e2bad1f3d4204bd41f2d257ff6b35156234d38cfa2b9d9c",
+      "exposure": "previously_exposed",
+      "evidence": "docs/architecture/audits/part2-label-readiness-20261103.md"
+    },
+    {
+      "recording_id": "Test5_Full.mp4",
+      "source_sha256": "e432dd8cac76e4d4ec5d4d328ba3c3517eecd893d7e217627100365dbc7cf85c",
+      "exposure": "unknown",
+      "evidence": "docs/testing/task2/drive-video-download-manifest.json"
+    },
+    {
+      "recording_id": "0044.mp4",
+      "source_sha256": "1ac5999828f4d789e246d3cfce2ef0fbd7b647cd4e40326a6629157b368899e7",
+      "match_id": "finebadminton:0044:sen-teh",
+      "exposure": "historical_predictions_seen",
+      "evidence": "docs/testing/task2/validation-20261028-continuity/README.md"
+    },
+    {
+      "recording_id": "0046.mp4",
+      "source_sha256": "263c7456643f96f37ad5ccc7d04c01c08d201209d49f141997405325709d0a2d",
+      "match_id": "finebadminton:0046:sen-ogawa",
+      "exposure": "historical_predictions_seen",
+      "evidence": "docs/testing/task2/validation-20261028-continuity/README.md"
+    },
+    {
+      "recording_id": "task2-doubles-250-frame-excerpt",
+      "source_sha256": "e50e00223bf41468ac4c913ff5a7647d909563326d256be8037fe79fedace640",
+      "exposure": "ai_draft_validation",
+      "evidence": "docs/testing/task2/validation-20261028-continuity/README.md"
+    },
+    {
+      "recording_id": "published-india-continuous-clip",
+      "source_sha256": "47bb759f8f6864c2c1c6952b743c1a4735137fe86835a6b240f3ceffd05603ca",
+      "match_id": "published:CoachAI-ShuttleSet22:india_open_2022_final",
+      "exposure": "previously_exposed",
+      "evidence": "docs/architecture/pluggable-pipeline-quality-20261104.md"
+    },
+    {
+      "recording_id": "published-denmark-continuous-clip",
+      "source_sha256": "10deb446cfb77e93b36103a9e674e97be7eb0136da68357871c8667008163b41",
+      "match_id": "published:CoachAI-ShuttleSet22:denmark_open_2022_sf",
+      "exposure": "previously_exposed",
+      "evidence": "docs/architecture/pluggable-pipeline-quality-20261104.md"
+    },
+    {
+      "recording_id": "published-doubles-continuous-clip",
+      "source_sha256": "aa5d7df4d9ba83c74699a3c3f2c436752cadf7e9c8982363d6fbb4410ea1d2fe",
+      "match_id": "published:DShuttleNet:5",
+      "exposure": "previously_exposed",
+      "evidence": "docs/architecture/pluggable-pipeline-quality-20261104.md"
+    }
+  ],
+  "scope": "Historical exposure metadata; unknown is not an assertion of unseen status.",
+  "supersedes_sha256": "91892865f1d8e186f7a406042b3beacc4f4d593e8488c1791d67c97720d48b76"
+}
