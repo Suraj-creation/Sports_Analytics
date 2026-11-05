@@ -42,8 +42,9 @@ function Overview({ session }: { session: Session }) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const events = useSession((s) => s.events);
   const eventsVersion = useSession((s) => s.eventsVersion);
-  const frontier = useSession((s) => s.session?.frontier_frame ?? 0);
-  const status = useSession((s) => s.session?.status ?? session.status);
+  const liveSession = useSession((s) => s.session?.session_id === session.session_id ? s.session : null);
+  const activeSession = liveSession ?? session;
+  const status = activeSession.status;
   const seekFrame = usePlayback((s) => s.seekFrame);
   const uiFrame = usePlayback((s) => s.frame);
   const selection = usePlayback((s) => s.selection);
@@ -126,7 +127,7 @@ function Overview({ session }: { session: Session }) {
   };
   const hoverRally =
     hover != null ? data.rallies.find((r) => hover >= r.start && hover <= r.stop) : undefined;
-  const analysedTo = status === "analysed" ? n : Math.min(n, Math.max(0, frontier + 1));
+  const analysedTo = session.media ? Math.min(n, Math.max(0, activeSession.analysed_frames)) : 0;
 
   return (
     <div ref={ref} className="relative">
@@ -219,7 +220,9 @@ function Overview({ session }: { session: Session }) {
           {data.rallies.length} rally {data.rallies.length === 1 ? "candidate" : "candidates"} · select a
           moment to seek
         </p>
-        <p>{Math.round((analysedTo / n) * 100)}% of analysis proxy frames processed</p>
+        <p>{session.media && session.media.n_frames > 0
+          ? `${Math.round((analysedTo / n) * 100)}% of analysis proxy frames processed`
+          : "Analysis coverage unavailable"}</p>
       </div>
       {hover != null && (
         <div
@@ -255,8 +258,10 @@ function Detail({ session }: { session: Session }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const events = useSession((s) => s.events);
   const eventsVersion = useSession((s) => s.eventsVersion);
-  const frontier = useSession((s) => s.session?.frontier_frame ?? 0);
-  const status = useSession((s) => s.session?.status ?? session.status);
+  const liveSession = useSession((s) => s.session?.session_id === session.session_id ? s.session : null);
+  const activeSession = liveSession ?? session;
+  const frontier = activeSession.frontier_frame;
+  const status = activeSession.status;
   const seekFrame = usePlayback((s) => s.seekFrame);
   const fps = fpsOf(session.media);
   const n = session.media?.n_frames ?? 0;
@@ -322,7 +327,7 @@ function Detail({ session }: { session: Session }) {
         if ((t / step) % 2 === 0) g.fillText(clock(t, session.media), Math.max(LABEL_W, px - 10), H - 2);
       }
       // not-yet-analysed region
-      const analysedTo = status === "analysed" ? n : Math.min(n, Math.max(0, frontier + 1));
+      const analysedTo = session.media ? Math.min(n, Math.max(0, activeSession.analysed_frames)) : 0;
       if (analysedTo < Math.min(a + span, n)) {
         const px = Math.max(LABEL_W, X(analysedTo));
         g.fillStyle = "rgba(12,38,32,0.7)";
@@ -364,7 +369,7 @@ function Detail({ session }: { session: Session }) {
       g.fillStyle = "#ffffff";
       g.fillRect(X(f) - 1, 4, 2, H - 20);
     });
-  }, [width, events, shots, frontier, status, fps, span, n, session.media, name1, name2, H, unassigned]);
+  }, [width, events, shots, activeSession.analysed_frames, frontier, status, fps, span, n, session.media, name1, name2, H, unassigned]);
 
   const frameAtX = (clientX: number, el: Element) => {
     const r = el.getBoundingClientRect();

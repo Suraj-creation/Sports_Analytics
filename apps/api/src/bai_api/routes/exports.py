@@ -83,11 +83,34 @@ def _snapshot_rally_rows(session: Any, store: Any) -> list[dict[str, Any]]:
     return rows
 
 
+# Stable public application CSV schema, including an empty/failed analysis.
+# This is independent of the seven-column research benchmark export.
+_RALLY_COLUMNS = [
+    "match_id",
+    "game_id",
+    "rally_id",
+    "frame_start",
+    "frame_end",
+    "start_time",
+    "end_time",
+    "duration_s",
+    "winner",
+    "loser",
+    "outcome",
+    "shots",
+    "n_shots",
+    "score_P1",
+    "score_P2",
+    "score_available",
+    "rally_event_id",
+]
+
+
 @router.get("/{session_id}/exports/rallies.csv")
 def rallies_csv(session: SessionDep, r: Repo) -> Response:
     rows = _rally_rows(session, r)
     buf = io.StringIO()
-    cols = [k for k in (rows[0] if rows else {"match_id": ""}) if not k.startswith("_")]
+    cols = _RALLY_COLUMNS
     w = csv.DictWriter(buf, fieldnames=cols, extrasaction="ignore")
     w.writeheader()
     w.writerows(rows)

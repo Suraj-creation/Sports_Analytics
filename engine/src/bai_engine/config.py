@@ -50,7 +50,12 @@ class Settings(BaseSettings):
 
     # LLM
     llm_provider: str = "azure_openai"
-    llm_budget_tokens_per_session: int = 400_000
+    # Reported mode accounts actual provider totals and gates later calls; unknown
+    # prompt size means this is not a pre-request total billing hard cap.
+    llm_budget_tokens_per_session: int = Field(default=400_000, ge=0)
+    llm_budget_mode: Literal["reported", "strict"] = "reported"
+    # None preserves the provider adapter default (Anthropic16000, compat4096).
+    llm_max_output_tokens_per_call: int | None = Field(default=None, ge=1, le=65536)
     # Local / Ollama / LM Studio endpoint (used when llm_provider == "local")
     local_llm_url: str = "http://127.0.0.1:1234/v1"
     local_llm_model: str = "local-model"

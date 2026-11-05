@@ -142,10 +142,13 @@ def _seed_match(settings: Settings) -> str:
             if part:
                 ts.write_chunk(obj, ch.start, ch.end, samples_to_table(part))
     eng.flush()
-    apply_reviewed_synthetic_labels(eng, [
-        (winner, offset, rally.contacts)
-        for winner, offset, rally in zip(m.winners, m.offsets, m.rallies, strict=True)
-    ])
+    apply_reviewed_synthetic_labels(
+        eng,
+        [
+            (winner, offset, rally.contacts)
+            for winner, offset, rally in zip(m.winners, m.offsets, m.rallies, strict=True)
+        ],
+    )
     repo.update(
         s.session_id,
         players=[PlayerInfo(player_id="P1", name="An Se Young"), PlayerInfo(player_id="P2", name="Tai Tzu Ying")],
@@ -206,7 +209,19 @@ class _FakeProvider:
     name, model = "fake", "fake-1"
 
     def __init__(self) -> None:
+        from bai_agents.budget import TokenBudgetContract
+
         self.turn = 0
+        self.contract = TokenBudgetContract()
+        self.token_budget_capability = self
+
+    def input_token_upper_bound(self, system, messages, tools):
+        from bai_agents.budget import InputTokenBound, token_request_sha256
+
+        return InputTokenBound(1, token_request_sha256(self, system, messages, tools), "controlled_fixture_protocol")
+
+    def total_usage_tokens(self, turn):
+        return 1  # The fixture is an exact controlled protocol, not a real tokenizer.
 
     def complete(self, system, messages, tools, *, max_tokens=4096, agent="agent"):  # type: ignore[no-untyped-def]
         import json

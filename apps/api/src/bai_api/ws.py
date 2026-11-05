@@ -27,7 +27,7 @@ import msgpack
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 
 from bai_api.auth import ws_user
-from bai_api.public import public_session
+from bai_api.public import public_session, public_status_message
 from bai_engine.bus import Bus, topic
 from bai_engine.obs import WS_CLIENTS, get_logger
 from bai_engine.schema import TrackObject, table_to_samples
@@ -83,7 +83,7 @@ async def session_ws(ws: WebSocket, session_id: str) -> None:
 
     async def send(msg: dict[str, Any]) -> None:
         async with send_lock:
-            await ws.send_bytes(_pack(msg))
+            await ws.send_bytes(_pack(public_status_message(msg)))
 
     async def sync_events(*, hello: bool = False) -> None:
         """Replay durable pages, recovering queue gaps and replaced analysis logs."""

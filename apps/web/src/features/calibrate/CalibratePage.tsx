@@ -98,7 +98,11 @@ export function CalibratePage() {
   }, [points, ref]);
 
   const save = useMutation({
-    mutationFn: () => api.calibrate(sessionId, points, prop.data?.frame),
+    mutationFn: (request: {
+      sessionId: string;
+      points: Record<string, P>;
+      frame: number | undefined;
+    }) => api.calibrate(request.sessionId, request.points, request.frame),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["session", sessionId] });
       navigate({ to: "/sessions/$sessionId", params: { sessionId } });
@@ -387,7 +391,7 @@ export function CalibratePage() {
               className="w-full"
               disabled={!fit}
               busy={save.isPending}
-              onClick={() => save.mutate()}
+              onClick={() => save.mutate({ sessionId, points, frame: prop.data?.frame })}
             >
               Save calibration
             </Button>

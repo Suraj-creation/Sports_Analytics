@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import functools
+import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import asdict
@@ -13,9 +14,16 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from bai_agents.agent import Answer, answer
+from bai_agents.budget import (
+    BudgetedProvider,
+    TokenBudgetCapability,
+    TokenBudgetContract,
+    TokenBudgetError,
+    TokenBudgetLedger,
+)
 from bai_agents.providers import LLMError, LLMProvider, make_provider
 from bai_agents.tools import ToolContext
-from bai_api.deps import Repo, SessionDep
+from bai_api.deps import Repo, SessionDep, SettingsDep
 
 router = APIRouter(prefix="/api/sessions", tags=["agents"])
 
@@ -37,7 +45,7 @@ class Ask(BaseModel):
 
 
 @router.post("/{session_id}/ask")
-async def ask(session: SessionDep, body: Ask, r: Repo) -> dict[str, Any]:
+async def ask(session: SessionDep, body: Ask, r: Repo, s: SettingsDep) -> dict[str, Any]:
     ctx = ToolContext(session=session, store=r.events(session.session_id), tracks=r.tracks(session.session_id))
     revision = int(session.meta.get("analysis_revision", 0))
     evidence_sequence: int | None = None
@@ -65,8 +73,34 @@ async def ask(session: SessionDep, body: Ask, r: Repo) -> dict[str, Any]:
         for h in body.history
         if h.get("role") in ("user", "assistant") and isinstance(h.get("content"), str)
     ]
+
+    def run_answer() -> Answer:
+        provider = _provider()
+        if provider is None:
+            return answer(body.question, ctx, None, history)
+        # This ledger outlives reset_analysis and is independent of event snapshots.
+        # Keep its connection alive inside the worker even if the HTTP task is cancelled.
+        path = r.data_dir / "llm_budget" / f"{session.session_id}.sqlite"
+        try:
+            with TokenBudgetLedger(path, session.session_id) as ledger:
+                budgeted = BudgetedProvider(
+                    provider,
+                    ledger,
+                    s.llm_budget_tokens_per_session,
+                    mode=s.llm_budget_mode,
+                    output_limit=s.llm_max_output_tokens_per_call,
+                )
+                result = answer(body.question, ctx, budgeted, history)
+                # Earlier successful turns stay visible after a later provider failure.
+                result.usage = dict(budgeted.reported_usage)
+                return result
+        except (TokenBudgetError, OSError, sqlite3.Error):
+            result = answer(body.question, ctx, None, history)
+            result.issues.append("Session token accounting is unavailable; no unreserved model call was sent.")
+            return result
+
     try:
-        a = await asyncio.to_thread(answer, body.question, ctx, _provider(), history)
+        a = await asyncio.to_thread(run_answer)
         out = asdict(a)
         # A slow model request must not publish claims from a replaced analysis.
         with read_scope():
@@ -92,6 +126,24 @@ async def ask(session: SessionDep, body: Ask, r: Repo) -> dict[str, Any]:
 
 
 @router.get("/{session_id}/ask/provider")
-def provider_info(session: SessionDep) -> dict[str, Any]:
+def provider_info(session: SessionDep, s: SettingsDep) -> dict[str, Any]:
     p = _provider()
-    return {"available": p is not None, "provider": p.name if p else None, "model": p.model if p else None}
+    capability = getattr(p, "token_budget_capability", None)
+    strict = isinstance(capability, TokenBudgetCapability) and isinstance(capability.contract, TokenBudgetContract)
+    available = p is not None and (s.llm_budget_mode != "strict" or strict)
+    return {
+        "available": available,
+        "configured_available": p is not None,
+        "provider": p.name if p else None,
+        "model": p.model if p else None,
+        "token_budget": {
+            "mode": s.llm_budget_mode,
+            "limit": s.llm_budget_tokens_per_session,
+            "strict_input_bound_available": strict,
+            "output_limit": s.llm_max_output_tokens_per_call or getattr(p, "default_output_tokens", 4096),
+            "semantics": "verified_provider_upper_bound_admission"
+            if s.llm_budget_mode == "strict"
+            else "reported_usage_admission;not_a_total_billing_hard_cap",
+            "availability": "checked_per_call_in_durable_session_ledger",
+        },
+    }

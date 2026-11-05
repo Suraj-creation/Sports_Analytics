@@ -211,6 +211,31 @@ def list_rallies(
     return {"rallies": rows, "count": len(rows), "evidence_ids": ctx.cite([r["rally_event_id"] for r in rows])}
 
 
+def _shot_physical_fields(event, contacts, frame):
+    """Expose a bounded, live, frame-aligned physical assessment, never ledger status."""
+    status, reference = "unknown", None
+    if event is not None:
+        identity = event.payload.get("physical_evidence_event_id")
+        parent = contacts.get(identity) if isinstance(identity, str) else None
+        declared = event.payload.get("physical_event_status")
+        if (
+            parent is not None
+            and parent.session_id == event.session_id
+            and parent.frame_start == event.frame_start == frame
+            and isinstance(declared, str)
+            and declared in {"confirmed", "probable", "ambiguous", "rejected", "insufficient"}
+            and parent.payload.get("physical_event_status") == declared
+        ):
+            status, reference = declared, parent.event_id
+    return {
+        "analysis_frame": frame,
+        "frame_timebase": "analysis_proxy",
+        "physical_event_status": status,
+        "physical_evidence_event_id": reference,
+        "confidence_semantics": "uncalibrated event support; physical-event assessment is separate",
+    }
+
+
 def get_rally(ctx: ToolContext, rally_event_id: str | None = None, rally_no: int | None = None) -> dict[str, Any]:
     from bai_badminton.analytics.rebuild import lineage_ids, rally_records
 
@@ -236,11 +261,13 @@ def get_rally(ctx: ToolContext, rally_event_id: str | None = None, rally_no: int
             "evidence_ids": [],
         }
     shots = []
+    contacts = {event.event_id: event for event in ctx.store.query(types=["contact"])}
     for s in records[ev.event_id].shots:
         st = ctx.store.get(s["event_id"]) if s.get("event_id") else None
         shots.append(
             {
                 "stroke_event_id": s.get("event_id"),
+                **_shot_physical_fields(st, contacts, s["frame"]),
                 "time": ctx.t(s["frame"]),
                 "player": ctx.names.get(s.get("player_id") or "", None),
                 "stroke": s.get("stroke"),
@@ -255,7 +282,14 @@ def get_rally(ctx: ToolContext, rally_event_id: str | None = None, rally_no: int
     rally_ids = set(lineage_ids(ctx.store, ev))
     points = [p for p in ctx.store.query(types=["point"]) if p.parent_id in rally_ids]
     pt = points[-1] if points else None
-    ids = [ev.event_id] + [s["stroke_event_id"] for s in shots if s["stroke_event_id"]] + ([pt.event_id] if pt else [])
+    ids = list(
+        dict.fromkeys(
+            [ev.event_id]
+            + [s["stroke_event_id"] for s in shots if s["stroke_event_id"]]
+            + [s["physical_evidence_event_id"] for s in shots if s["physical_evidence_event_id"]]
+            + ([pt.event_id] if pt else [])
+        )
+    )
     return {
         "rally_event_id": ev.event_id,
         "rally_no": ev.payload.get("rally_no"),
@@ -314,6 +348,7 @@ def find_strokes(
     official, _ = _official(ctx)
     owned = {s.get("event_id") for r in official for s in r.shots}
     out = []
+    contacts = {event.event_id: event for event in ctx.store.query(types=["contact"])}
     for e in ctx.store.query(types=["stroke"], player_id=pid):
         if e.event_id not in owned:
             continue
@@ -325,6 +360,7 @@ def find_strokes(
         out.append(
             {
                 "stroke_event_id": e.event_id,
+                **_shot_physical_fields(e, contacts, e.frame_start),
                 "time": ctx.t(e.frame_start),
                 "player": ctx.names.get(e.actors.player_id or "", None),
                 "stroke": p.get("stroke"),
@@ -337,7 +373,13 @@ def find_strokes(
             }
         )
     out = out[: min(limit or 40, 100)]
-    return {"strokes": out, "count": len(out), "evidence_ids": ctx.cite([s["stroke_event_id"] for s in out])}
+    ids = list(
+        dict.fromkeys(
+            [s["stroke_event_id"] for s in out]
+            + [s["physical_evidence_event_id"] for s in out if s["physical_evidence_event_id"]]
+        )
+    )
+    return {"strokes": out, "count": len(out), "evidence_ids": ctx.cite(ids)}
 
 
 def top_highlights(ctx: ToolContext, k: int | None = None, player: str | None = None) -> dict[str, Any]:

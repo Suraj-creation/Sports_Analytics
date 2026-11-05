@@ -36,7 +36,9 @@ export function ExportTab({ session }: { session: Session }) {
     <div className="space-y-3">
       {!done && (
         <p className="text-sm text-line-2">
-          Analysis is still running — exports include everything analysed so far.
+          {session.status === "failed"
+            ? "Analysis stopped before completion — exports contain partial results."
+            : "Analysis is still running — exports include everything analysed so far."}
         </p>
       )}
       <ul className="grid gap-2 md:grid-cols-2">

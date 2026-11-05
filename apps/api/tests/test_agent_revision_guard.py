@@ -8,6 +8,7 @@ import pytest
 from bai_agents.agent import Answer
 from bai_agents.tools import run_tool
 from bai_api.routes import agents
+from bai_engine.config import Settings
 from bai_engine.schema import Event, Provenance, Session, Source, SourceKind
 from bai_engine.store import SessionRepository
 
@@ -48,7 +49,9 @@ async def test_answer_revision_is_checked_at_tool_read_and_publication(tmp_path,
 
     tick = asyncio.create_task(heartbeat())
     try:
-        result = await asyncio.wait_for(agents.ask(session, agents.Ask(question="What happened?"), repo), 5)
+        result = await asyncio.wait_for(
+            agents.ask(session, agents.Ask(question="What happened?"), repo, Settings(data_dir=repo.data_dir)), 5
+        )
         if reset_at is None:
             assert result["grounded"] is True
             assert result["analysis_revision"] == 0
@@ -113,7 +116,9 @@ async def test_answer_cannot_publish_a_mixed_or_retired_same_generation_read(tmp
 
     tick = asyncio.create_task(heartbeat())
     try:
-        result = await asyncio.wait_for(agents.ask(session, agents.Ask(question="What happened?"), repo), 5)
+        result = await asyncio.wait_for(
+            agents.ask(session, agents.Ask(question="What happened?"), repo, Settings(data_dir=repo.data_dir)), 5
+        )
         assert result["grounded"] is False
         assert result["citations"] == []
         assert result["issues"] == ["analysis changed during answer"]

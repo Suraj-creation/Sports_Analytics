@@ -58,8 +58,9 @@ export function VideoStage({
   const connection = useSession((s) => s.connection);
   const tracksVersion = useSession((s) => s.tracksVersion);
   const eventsVersion = useSession((s) => s.eventsVersion);
-  const frontier = useSession((s) => s.session?.frontier_frame ?? 0);
-  const status = useSession((s) => s.session?.status ?? session.status);
+  const liveSession = useSession((s) => s.session?.session_id === session.session_id ? s.session : null);
+  const frontier = liveSession?.frontier_frame ?? session.frontier_frame;
+  const status = liveSession?.status ?? session.status;
 
   const layers = usePlayback((s) => s.layers);
   const waitForAnalysis = usePlayback((s) => s.waitForAnalysis);
@@ -315,6 +316,7 @@ export function VideoStage({
   };
 
   const noTracksYet = status === "analysing" && frontier < 1;
+  const failedWithoutMedia = status === "failed" && session.media == null;
 
   return (
     <div className="video-stage-shell">
@@ -378,7 +380,15 @@ export function VideoStage({
         {layers.scoreBug && !hidden && <ScoreBug session={session} />}
         {!hidden && <StrokeToast session={session} />}
 
-        {(hls === "loading" || hls === "waiting" || hls === "idle") && (
+        {failedWithoutMedia && (
+          <div className="absolute inset-0 grid place-items-center bg-mat-deep/90 px-6 text-center" role="status">
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Video unavailable</p>
+              <p className="text-sm text-line-2">Analysis stopped. Retry analysis or add another recording.</p>
+            </div>
+          </div>
+        )}
+        {!failedWithoutMedia && (hls === "loading" || hls === "waiting" || hls === "idle") && (
           <div className="absolute inset-0 grid place-items-center bg-mat-deep/80">
             <div className="flex flex-col items-center gap-3 text-center">
               <Spinner className="size-6" />
@@ -390,7 +400,7 @@ export function VideoStage({
             </div>
           </div>
         )}
-        {hls === "error" && (
+        {!failedWithoutMedia && hls === "error" && (
           <div className="absolute inset-0 grid place-items-center bg-mat-deep/90 px-6 text-center">
             <p className="text-sm text-line-2">
               This browser can't play the stream. Try a current Chrome, Edge or Firefox.
