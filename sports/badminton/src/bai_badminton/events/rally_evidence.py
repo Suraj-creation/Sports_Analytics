@@ -21,6 +21,7 @@ class ObservationKind(StrEnum):
     RECONSTRUCTED = "reconstructed"
     MISSING = "missing"
     INVALID = "invalid"
+    AMBIGUOUS = "ambiguous"
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,7 +63,8 @@ class RallyObservation:
         if self.player_motion is not None and type(self.player_motion) is not bool:
             raise ValueError("motion support must be true, false or unavailable")
         if type(self.exit_return_supported) is not bool or (
-            self.exit_return_supported and self.kind not in {ObservationKind.MISSING, ObservationKind.RECONSTRUCTED}
+            self.exit_return_supported
+            and self.kind not in {ObservationKind.MISSING, ObservationKind.RECONSTRUCTED, ObservationKind.AMBIGUOUS}
         ):
             raise ValueError("image-exit support belongs only to unobserved or estimated samples")
 

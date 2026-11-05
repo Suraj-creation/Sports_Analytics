@@ -47,7 +47,13 @@ from bai_badminton.perception.isolation import flight_mask
 from bai_badminton.perception.players import CourtROI, PlayerDetector, PoseEstimator
 from bai_badminton.perception.scene import CourtPresence, CutDetector, small_hsv
 from bai_badminton.perception.scoreboard import ScoreboardReader
-from bai_badminton.perception_types import ChunkPerception, FramePerception, ScoreObservationContext, ScoreReading
+from bai_badminton.perception_types import (
+    ChunkPerception,
+    FramePerception,
+    PersonObs,
+    ScoreObservationContext,
+    ScoreReading,
+)
 from bai_engine.components import ComponentHandle, ComponentRegistry
 from bai_engine.config import ModelChoice, Profile
 from bai_engine.decode import DecodedChunk
@@ -73,6 +79,13 @@ class _Scene:
     polys: list[np.ndarray | None]
     held: list[bool] = field(default_factory=list)
     broadcast_replay_status: list[str] = field(default_factory=list)
+
+
+@dataclass
+class _PlayerFrame:
+    persons: list[PersonObs]
+    detector_observed: bool
+    diagnostic: dict[str, Any] | None
 
 
 @dataclass
@@ -181,6 +194,12 @@ class BadmintonPerception:
             "ocr_every_s": profile.ocr_every_s,
         }
         self.shuttle = self._create_component("shuttle", context, identity)
+        self.shuttle_association = self._create_component("shuttle_association", context, identity)
+        self.content_continuity = self._create_component("content_continuity", context, identity)
+        self._content_epoch = 0
+        self._content_previous: tuple[int, _PlayerFrame, bool] | None = None
+        if self.shuttle_association is not None and self.diagnostic_selection.candidate_floor != 0.1:
+            raise ValueError("association requires its declared candidate floor 0.1; diagnostics cannot retune it")
         det = self._create_component("player_detector", context, identity)
         pose = self._create_component("pose", context, identity)
         # Preserve the legacy singles policy. An explicit component selection can
@@ -288,6 +307,8 @@ class BadmintonPerception:
         """Clear provider-owned temporal evidence at an explicit session boundary."""
         for handle in self.component_handles.values():
             handle.reset()
+        self._content_previous = None
+        self._content_epoch = 0
 
     def close(self) -> None:
         for handle in reversed(list(self.component_handles.values())):
@@ -457,6 +478,13 @@ class BadmintonPerception:
         names = ("far_left", "far_right", "near_right", "near_left")
         poly = h.court_to_image(np.array([REFERENCE_POINTS[n] for n in names])).astype(np.float32)
         self.players.on_cut()
+        association = getattr(self, "shuttle_association", None)
+        if association is not None:
+            association.reset()
+        continuity = getattr(self, "content_continuity", None)
+        if continuity is not None:
+            continuity.reset()
+            self._content_previous = None
         self.players.set_roi(CourtROI(poly, homography=h))
         self.presence = CourtPresence(poly)
         self._ref_poly = poly
@@ -509,6 +537,55 @@ class BadmintonPerception:
         self.shuttle.bg.seed(0, small)
 
     # ------------------------------------------------------------------ per chunk
+    def _people_at(
+        self,
+        fidx: int,
+        img: np.ndarray,
+        *,
+        cut: bool,
+        poly: np.ndarray | None,
+        G: np.ndarray | None,
+        replay: bool,
+        strides: tuple[int, int],
+        selection: DiagnosticSelection,
+        diagnostics: bool,
+    ) -> _PlayerFrame:
+        configure = getattr(self.players, "set_diagnostics", None)
+        if callable(configure):
+            configure(diagnostics and not replay, selection.top_k)
+        if cut:
+            self.players.on_cut()
+        if poly is not None:
+            H_now = self._H_ref
+            if G is not None and H_now is not None:
+                H_now = G @ H_now
+            h_now = Homography(H_now, 0.0, 4) if H_now is not None else None
+            self.players.set_roi(CourtROI(poly.astype(np.float32), homography=h_now))
+        persons = [] if replay else self.players.process(fidx, img, strides)
+        racket_detector = getattr(self, "racket", None)
+        if racket_detector is not None and persons and not replay:
+            observed_rackets = racket_detector.detect(img, persons)
+            for person in persons:
+                person.racket = observed_rackets.get(person.track_id)
+                person.racket_frame_idx = fidx if person.racket is not None else None
+        identity_error = getattr(self.players, "last_identity_error", None)
+        if identity_error is not None and not any(
+            d.stage == "player_identity" and d.reason == identity_error for d in self.degraded
+        ):
+            self._degrade("player_identity", identity_error)
+        reason = "Too many court tracks in some frames; player evidence was withheld."
+        if (
+            not replay
+            and getattr(self.players, "last_capacity_limited", False)
+            and not any(d.stage == "player_tracking" and d.reason == reason for d in self.degraded)
+        ):
+            self._degrade("player_tracking", reason)
+        return _PlayerFrame(
+            persons,
+            bool(not replay and getattr(self.players, "last_detector_observed", False)),
+            getattr(self.players, "last_diagnostic", None) if callable(configure) else None,
+        )
+
     def process(self, chunk: DecodedChunk, in_play: bool) -> ChunkPerception:
         p = self.profile
         n = len(chunk.frames)
@@ -548,8 +625,71 @@ class BadmintonPerception:
         shuttle = [None] * n
         diagnostic_selection = getattr(self, "diagnostic_selection", DiagnosticSelection())
         diagnostic_indices = {i for i in range(n) if diagnostic_selection.includes(chunk.start + i)}
+        content = getattr(self, "content_continuity", None)
+        content_epochs = [getattr(self, "_content_epoch", 0)] * n
+        content_evidence = [None] * n
+        pre_people: list[_PlayerFrame] | None = None
+        if content is not None:
+            from bai_badminton.perception.content import scene_change_from_dict, scene_change_to_dict
+            from bai_badminton.perception.scene_change import ForegroundRegion
+
+            pre_people = []
+            started = _now()
+            for i, image in enumerate(chunk.frames):
+                frame = chunk.start + i
+                previous = self._content_previous
+                regions = (
+                    [
+                        ForegroundRegion(
+                            previous[0],
+                            f"track:{p.track_id}",
+                            tuple(float(v) for v in p.bbox),
+                            p.detector_matched,
+                            previous[1].detector_observed,
+                        )
+                        for p in previous[1].persons
+                    ]
+                    if previous is not None and previous[0] == frame - 1
+                    else []
+                )
+                evidence = content.observe(
+                    frame,
+                    image,
+                    previous_regions=regions,
+                    previous_view_valid=bool(previous is not None and previous[0] == frame - 1 and previous[2]),
+                    current_view_valid=not replay[i],
+                    hard_cut=cut_flags[i],
+                )
+                evidence = scene_change_from_dict(scene_change_to_dict(evidence), frame_idx=frame)
+                barrier = content.barrier_enabled and evidence.hypothesis
+                if barrier:
+                    self._content_epoch += 1
+                content_epochs[i] = self._content_epoch
+                if evidence.hypothesis or i in diagnostic_indices:
+                    content_evidence[i] = evidence
+                people = self._people_at(
+                    frame,
+                    image,
+                    cut=cut_flags[i] or barrier,
+                    poly=polys[i],
+                    G=poses[i] if poses is not None else None,
+                    replay=replay[i],
+                    strides=(rates_det, rates_pose),
+                    selection=diagnostic_selection,
+                    diagnostics=i in diagnostic_indices,
+                )
+                pre_people.append(people)
+                self._content_previous = frame, people, not replay[i]
+            self._rate("content_continuity_and_players", n, started)
         shuttle_diagnostics = [None] * n
         diagnostics_supported = isinstance(self.shuttle, DiagnosticShuttlePort) and self.shuttle.supports_diagnostics
+        association = getattr(self, "shuttle_association", None)
+        if association is not None and not diagnostics_supported:
+            reason = "Shuttle provider has no candidate evidence; association remains unknown."
+            if not any(d.stage == "shuttle_association" and d.reason == reason for d in self.degraded):
+                self._degrade("shuttle_association", reason)
+        acquisition_indices = set(range(n)) if association is not None else diagnostic_indices
+        acquisition_selection = DiagnosticSelection(top_k=8) if association is not None else diagnostic_selection
         if self.shuttle is not None and not all(replay):
             with timed("shuttle"):
                 t0 = _now()
@@ -572,17 +712,26 @@ class BadmintonPerception:
                         else np.zeros((HEIGHT, WIDTH), np.uint8)
                         for i, (img, poly) in enumerate(zip(chunk.frames, polys, strict=True))
                     ]
-                if diagnostic_indices and diagnostics_supported:
+                if acquisition_indices and diagnostics_supported:
                     shuttle, shuttle_diagnostics = self.shuttle.detect_with_diagnostics(
                         chunk.frames,
-                        shots,
+                        [(shot << 32) | epoch for shot, epoch in zip(shots, content_epochs, strict=True)]
+                        if content is not None and content.barrier_enabled
+                        else shots,
                         step=step,
                         masks=masks,
-                        selection=diagnostic_selection,
-                        indices=diagnostic_indices,
+                        selection=acquisition_selection,
+                        indices=acquisition_indices,
                     )
                 else:
-                    shuttle = self.shuttle.detect(chunk.frames, shots, step=step, masks=masks)
+                    shuttle = self.shuttle.detect(
+                        chunk.frames,
+                        [(shot << 32) | epoch for shot, epoch in zip(shots, content_epochs, strict=True)]
+                        if content is not None and content.barrier_enabled
+                        else shots,
+                        step=step,
+                        masks=masks,
+                    )
                 self._rate("shuttle", n, t0)
 
         frames: list[FramePerception] = []
@@ -590,46 +739,48 @@ class BadmintonPerception:
         with timed("players"):
             for i, img in enumerate(chunk.frames):
                 fidx = chunk.start + i
-                configure_diagnostics = getattr(self.players, "set_diagnostics", None)
-                if callable(configure_diagnostics):
-                    configure_diagnostics(i in diagnostic_indices and not replay[i], diagnostic_selection.top_k)
-                if cut_flags[i]:
-                    self.players.on_cut()
-                poly = polys[i]
-                if poly is not None:  # the player ROI follows the court as the camera moves
-                    H_now = self._H_ref
-                    if poses is not None and poses[i] is not None and H_now is not None:
-                        H_now = poses[i] @ H_now
-                    h_now = Homography(H_now, 0.0, 4) if H_now is not None else None
-                    self.players.set_roi(CourtROI(poly.astype(np.float32), homography=h_now))
-                persons = [] if replay[i] else self.players.process(fidx, img, (rates_det, rates_pose))
-                racket_detector = getattr(self, "racket", None)
-                # Equipment remains observable when the independent shuttle stage misses.
-                if racket_detector is not None and persons and not replay[i]:
-                    observed_rackets = racket_detector.detect(img, persons)
-                    for person in persons:
-                        person.racket = observed_rackets.get(person.track_id)
-                identity_error = getattr(self.players, "last_identity_error", None)
-                if identity_error is not None and not any(
-                    d.stage == "player_identity" and d.reason == identity_error for d in self.degraded
-                ):
-                    self._degrade("player_identity", identity_error)
-                reason = "Too many court tracks in some frames; player evidence was withheld."
-                if (
-                    not replay[i]
-                    and getattr(self.players, "last_capacity_limited", False)
-                    and not any(d.stage == "player_tracking" and d.reason == reason for d in self.degraded)
-                ):
-                    self._degrade("player_tracking", reason)
+                people = (
+                    pre_people[i]
+                    if pre_people is not None
+                    else self._people_at(
+                        fidx,
+                        img,
+                        cut=cut_flags[i],
+                        poly=polys[i],
+                        G=poses[i] if poses is not None else None,
+                        replay=replay[i],
+                        strides=(rates_det, rates_pose),
+                        selection=diagnostic_selection,
+                        diagnostics=i in diagnostic_indices,
+                    )
+                )
+                persons = people.persons
                 s = shuttle[i] if not replay[i] else None
                 # lines mode: every calibrated frame carries its pose (other cameras too: the court is drawn
                 # there); camera mode: only analysed frames (another camera's pose is not measured)
                 G = poses[i] if poses is not None and (self.mode == "lines" or not replay[i]) else None
+                association_evidence = None
+                if association is not None:
+                    association_evidence = association.update(
+                        fidx,
+                        epoch=(shots[i] << 32) | content_epochs[i],
+                        raw_xy=(s.x, s.y) if s is not None else None,
+                        raw_support=s.conf if s is not None else 0.0,
+                        diagnostic=shuttle_diagnostics[i],
+                        image_valid=not replay[i],
+                        image_to_reference=np.linalg.inv(G) if G is not None and states[i].value == "VALID" else None,
+                    )
+                public_diagnostic = shuttle_diagnostics[i]
+                if public_diagnostic is not None and association is not None:
+                    public_diagnostic = replace(
+                        public_diagnostic, candidates=public_diagnostic.candidates[: diagnostic_selection.top_k]
+                    )
                 frames.append(
                     FramePerception(
                         frame_idx=fidx,
                         shuttle_xy=(s.x, s.y) if s is not None else None,
                         shuttle_conf=s.conf if s is not None else 0.0,
+                        shuttle_observation=association_evidence,
                         persons=persons,
                         replay=replay[i],
                         shot_id=shots[i],
@@ -642,16 +793,16 @@ class BadmintonPerception:
                         pose_stride=int(rates_pose)
                         if not replay[i] and getattr(self.players, "pose", None) is not None
                         else 0,
-                        detector_observed=bool(
-                            not replay[i] and getattr(self.players, "last_detector_observed", False)
-                        ),
+                        detector_observed=people.detector_observed,
+                        content_epoch=content_epochs[i],
+                        content_change=content_evidence[i],
                         diagnostic=FrameDiagnostic(
                             frame_idx=fidx,
                             canonical_time_sec=fidx / self.fps,
                             shot_id=shots[i],
                             view=scene.views[i],
                             calibration_state=states[i].value,
-                            shuttle=shuttle_diagnostics[i],
+                            shuttle=public_diagnostic,
                             acquisition_reason="view_excluded"
                             if replay[i]
                             else "provider_unavailable"
@@ -660,9 +811,7 @@ class BadmintonPerception:
                             if diagnostics_supported
                             else "provider_diagnostics_unsupported",
                             provider=self.models.get("shuttle", "unavailable"),
-                            players=getattr(self.players, "last_diagnostic", None)
-                            if callable(configure_diagnostics)
-                            else None,
+                            players=people.diagnostic,
                         )
                         if i in diagnostic_indices
                         else None,

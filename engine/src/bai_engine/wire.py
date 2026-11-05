@@ -3,10 +3,10 @@
 A window of per-frame samples is sent as one msgpack map of parallel arrays — ~10× smaller than
 a list of objects and trivially decoded into typed arrays in the browser::
 
-    {"v": 1, "from": 1200, "to": 1259,
+    {"v": 2, "from": 1200, "to": 1259,
      "shuttle": {"f": [...], "x": [...], "y": [...], "c": [...]},          # visible frames only
      "players": {"P1": {"f": [...], "b": [x1,y1,x2,y2,...], "k": [x,y,s × 17 ...] | null,
-                        "cx": [...], "cy": [...]}, "P2": {...}},
+                        "pf": [pose_source_frame | null, ...], "cx": [...], "cy": [...]}, "P2": {...}},
      "cam": {"f": [...], "g": [3×3 row-major × n], "h": [...], "q": [...]}}  # absent when untracked
 
 ``cam.g`` maps the calibration's reference-frame px to the frame's px (court → image = g · H); all
@@ -25,7 +25,7 @@ import msgpack
 
 from bai_engine.schema.tracks import TrackObject, TrackSample
 
-VERSION = 1
+VERSION = 2
 
 
 def _r(v: float | None, nd: int = 1) -> float | None:
@@ -64,7 +64,8 @@ def encode_tracks(samples: list[TrackSample], frame_from: int, frame_to: int) ->
             target = players if s.player_id else anonymous
             identity = s.player_id or f"{s.participant_observation_id or 'track'}:{s.track_id}"
             p = target.setdefault(
-                identity, {key: [] for key in ("f", "b", "k", "cx", "cy", "t", "c", "obs", "d", "m", "raw", "method")}
+                identity,
+                {key: [] for key in ("f", "b", "k", "pf", "cx", "cy", "t", "c", "obs", "d", "m", "raw", "method")},
             )
             p["f"].append(s.frame_idx)
             p["t"].append(s.track_id)
@@ -74,6 +75,7 @@ def encode_tracks(samples: list[TrackSample], frame_from: int, frame_to: int) ->
             p["m"].append(s.detector_matched)
             p["raw"].append(s.raw_track_id)
             p["method"].append(s.identity_method)
+            p["pf"].append(s.pose_frame_idx)
             p["b"].extend(_r(v) for v in (s.bbox or (0, 0, 0, 0)))
             if s.keypoints is not None and len(s.keypoints) == 17:
                 for x, y, sc in s.keypoints:
@@ -94,5 +96,17 @@ def encode_tracks(samples: list[TrackSample], frame_from: int, frame_to: int) ->
 
 def decode_tracks(data: bytes) -> dict[str, Any]:
     out = msgpack.unpackb(data, raw=False)
-    assert isinstance(out, dict)
+    if not isinstance(out, dict) or type(out.get("v")) is not int or out["v"] not in (1, VERSION):
+        raise ValueError("unsupported track wire version")
+    for group in ("players", "anonymous"):
+        for player in out.get(group, {}).values():
+            sources = player.get("pf")
+            if sources is None:
+                continue  # Legacy data has no claimed pose observation frame.
+            frames = player["f"]
+            if not isinstance(sources, list) or len(sources) != len(frames):
+                raise ValueError("pose source-frame column must align with player frames")
+            for frame, source in zip(frames, sources, strict=True):
+                if source is not None and (type(source) is not int or source < 0 or source > frame):
+                    raise ValueError("invalid or future pose source frame")
     return out

@@ -71,7 +71,7 @@ def test_upload_to_playback_end_to_end(client: TestClient, tmp_path: Path) -> No
     assert client.get(f"/api/sessions/{sid}/hls/../../secret").status_code == 404
 
     tr = client.get(f"/api/sessions/{sid}/tracks", params={"from": 0, "to": 149})
-    assert tr.status_code == 200 and msgpack.unpackb(tr.content)["v"] == 1
+    assert tr.status_code == 200 and msgpack.unpackb(tr.content)["v"] == 2
 
     ev = client.get(f"/api/sessions/{sid}/events").json()
     assert "last_seq" in ev

@@ -56,7 +56,7 @@ from bai_engine.store import EventStore, TrackStore
 log = get_logger(__name__)
 AUTO_CALIBRATION_MIN_SCORE = 0.6
 REF_FILE = "camera_ref.png"  # the frame the calibration was made on (lossless: its id is a content hash)
-CODEC_VERSION = 18  # bounded optional diagnostic schema; v17 remains diagnostic-readable
+CODEC_VERSION = 20  # exact pose source frames plus association/content evidence; older reads keep unknown provenance
 MAX_ADJUST = 0.03  # a human calibration the court lines move by more than this (× frame width) is kept as is
 
 
@@ -862,8 +862,7 @@ class BadmintonSession:
             "required": False,
             "reason": "Scoring names and configured format do not bind visual tracks to named athletes.",
             "review_action": (
-                "Configure participants, review identity intervals, "
-                "then confirm the hitter for each stroke."
+                "Configure participants, review identity intervals, then confirm the hitter for each stroke."
             ),
             "policy": "reviewed_named_attribution_v1",
         }
@@ -1062,6 +1061,8 @@ class BadmintonSession:
         return policy
 
     def encode_perception(self, p: ChunkPerception) -> bytes:
+        from bai_badminton.perception.content import scene_change_to_dict
+
         frames = []
         for fp in p.frames:
             frames.append(
@@ -1080,6 +1081,9 @@ class BadmintonSession:
                     "do": fp.detector_observed,
                     "ps": fp.pose_stride,
                     "dg": fp.diagnostic.to_dict() if fp.diagnostic is not None else None,
+                    "sa": fp.shuttle_observation.to_dict() if fp.shuttle_observation is not None else None,
+                    "ce": fp.content_epoch,
+                    "cc": scene_change_to_dict(fp.content_change) if fp.content_change is not None else None,
                     "p": [
                         {
                             "t": q.track_id,
@@ -1090,6 +1094,8 @@ class BadmintonSession:
                             "rt": q.raw_track_id,
                             "dm": q.detector_matched,
                             "im": q.identity_method,
+                            "pf": q.pose_frame_idx,
+                            "rf": q.racket_frame_idx,
                             "rk": asdict(q.racket) if q.racket is not None else None,
                         }
                         for q in fp.persons
@@ -1130,22 +1136,46 @@ class BadmintonSession:
             raise StaleCacheError("badminton requires sequential fresh perception; cache is diagnostic only")
         d = msgpack.unpackb(data, raw=False)
         ref_id = self.perception.ref_id
-        if d.get("v", 1) not in {17, CODEC_VERSION} or d.get("cr") != ref_id or d.get("ci") != self._isolation_id():
+        if (
+            d.get("v", 1) not in {17, 18, 19, CODEC_VERSION}
+            or d.get("cr") != ref_id
+            or d.get("ci") != self._isolation_id()
+        ):
             # A static calibration has no camera reference, but its geometry and
             # lock policy still control both player admission and shuttle peaks.
             raise StaleCacheError(
                 f"perception segment {d['start']} has stale codec/calibration policy "
                 f"(version {d.get('v', 1)} vs {CODEC_VERSION}; reference {d.get('cr')} vs {ref_id})"
             )
-        if d["v"] == CODEC_VERSION and any("dg" not in frame for frame in d["frames"]):
+        if d["v"] >= 18 and any("dg" not in frame for frame in d["frames"]):
             raise StaleCacheError("perception segment lacks diagnostic schema metadata")
+        from bai_badminton.perception.association import ShuttleObservationEvidence
+        from bai_badminton.perception.content import scene_change_from_dict
         from bai_badminton.perception.diagnostics import FrameDiagnostic
 
         diagnostics = {}
+        associations = {}
+        content_changes = {}
         try:
             for frame in d["frames"]:
+                if d["v"] >= 19:
+                    if "sa" not in frame or "cc" not in frame or type(frame.get("ce")) is not int or frame["ce"] < 0:
+                        raise ValueError("association schema/content epoch metadata is missing")
+                    if frame["cc"] is not None:
+                        content_changes[frame["f"]] = scene_change_from_dict(frame["cc"], frame_idx=frame["f"])
+                    if frame["sa"] is not None:
+                        observation = ShuttleObservationEvidence.from_dict(frame["sa"])
+                        raw_xy = tuple(frame["s"]) if frame["s"] is not None else None
+                        if (
+                            observation.frame_idx != frame["f"]
+                            or observation.epoch != (frame["sh"] << 32) | frame["ce"]
+                            or observation.raw_xy != raw_xy
+                            or observation.raw_model_support != frame["c"]
+                        ):
+                            raise ValueError("association provenance differs from its raw frame")
+                        associations[frame["f"]] = observation
                 if frame.get("dg") is not None:
-                    if d["v"] != CODEC_VERSION:
+                    if d["v"] < 18:
                         raise ValueError("legacy diagnostic cache cannot carry the new schema")
                     diagnostic = FrameDiagnostic.from_dict(frame["dg"])
                     if diagnostic.frame_idx != frame["f"] or diagnostic.shot_id != frame["sh"]:
@@ -1190,6 +1220,20 @@ class BadmintonSession:
             for person in frame["p"]
         ):
             raise StaleCacheError("perception segment lacks valid player identity provenance")
+        if d["v"] >= 20 and any(
+            "pf" not in person
+            or (person["pf"] is not None and (type(person["pf"]) is not int or not 0 <= person["pf"] <= frame["f"]))
+            for frame in d["frames"]
+            for person in frame["p"]
+        ):
+            raise StaleCacheError("perception segment lacks valid pose source-frame provenance")
+        if d["v"] >= 20 and any(
+            "rf" not in person
+            or (person["rf"] is not None and (type(person["rf"]) is not int or not 0 <= person["rf"] <= frame["f"]))
+            for frame in d["frames"]
+            for person in frame["p"]
+        ):
+            raise StaleCacheError("perception segment lacks valid racket source-frame provenance")
         frames = [
             FramePerception(
                 frame_idx=f["f"],
@@ -1206,6 +1250,9 @@ class BadmintonSession:
                 detector_observed=f["do"],
                 pose_stride=f["ps"],
                 diagnostic=diagnostics.get(f["f"]),
+                shuttle_observation=associations.get(f["f"]),
+                content_epoch=f.get("ce", 0),
+                content_change=content_changes.get(f["f"]),
                 persons=[
                     PersonObs(
                         track_id=q["t"],
@@ -1216,6 +1263,8 @@ class BadmintonSession:
                         raw_track_id=q["rt"],
                         detector_matched=q["dm"],
                         identity_method=q["im"],
+                        pose_frame_idx=q.get("pf") if d["v"] >= 20 else None,
+                        racket_frame_idx=q.get("rf") if d["v"] >= 20 else None,
                         racket=RacketObservation(**q["rk"]) if q.get("rk") is not None else None,
                     )
                     for q in f["p"]
@@ -1240,9 +1289,23 @@ class BadmintonSession:
 class BadmintonPlugin:
     name = "badminton"
     pipeline_id = "badminton-broadcast"
-    pipeline_version = "2"
+    pipeline_version = "3"
     stages = (
-        ("perception", (), ("shuttle", "player_detector", "pose", "player_reid", "tracking", "racket", "ocr")),
+        (
+            "perception",
+            (),
+            (
+                "shuttle",
+                "shuttle_association",
+                "content_continuity",
+                "player_detector",
+                "pose",
+                "player_reid",
+                "tracking",
+                "racket",
+                "ocr",
+            ),
+        ),
         ("format", ("perception",), ("format",)),
         ("identity", ("perception", "format"), ("identity",)),
         ("activity", ("perception", "identity"), ("activity",)),

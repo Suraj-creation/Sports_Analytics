@@ -18,12 +18,18 @@ heuristic support, not probabilities of physical racket contact.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from itertools import pairwise
 
 import numpy as np
 from numpy.typing import NDArray
 
+from bai_badminton.events.contact_evidence import (
+    ContactEvidence,
+    ContactEvidenceInputs,
+    ContactMotionEvidence,
+    assess_contact_evidence,
+)
 from bai_badminton.observations import PlayerSeries, WindowObs
 from bai_badminton.perception.keypoints import KP
 
@@ -54,6 +60,9 @@ class ContactCandidate:
     shuttle_xy: tuple[float, float] | None = None
     attribution_reason: str | None = None
     model: str = CONTACT_MODEL
+    # Physical reliability is separate from p, identity and event-ledger status.
+    # Independent/legacy providers may omit it; omission remains unknown.
+    evidence: ContactEvidence | None = None
 
     @property
     def components(self) -> dict[str, float]:
@@ -338,6 +347,92 @@ def score_frame(
     )
 
 
+def build_contact_evidence(
+    w: WindowObs,
+    candidate: ContactCandidate,
+    *,
+    motion_reliability: ContactMotionReliability | None = None,
+) -> ContactEvidence:
+    """Explain a selected candidate without changing its score or model.
+
+    Coordinate visibility proves neither detector freshness nor association.
+    Those explicit upstream properties stay unknown here and may be enriched
+    by the caller through ``replace(evidence.inputs, ...)`` and reassessed.
+    A diagnostic sensitivity may be supplied for a legacy-selected candidate;
+    that does not replace the selected contact provider or its support score.
+    """
+    i = candidate.frame - w.frame0
+    if not 0 <= i < w.n:
+        raise ValueError("contact candidate frame must belong to the supplied observation window")
+    lo, hi = _context_bounds(w, i, 3)
+    t = w.shuttle
+    ok = t.vis & ~t.interp & np.isfinite(t.x) & np.isfinite(t.y)
+    before_indices = np.arange(max(lo, i - 3), i + 1)
+    after_indices = np.arange(i, min(hi - 1, i + 3) + 1)
+    before_indices = before_indices[ok[before_indices]]
+    after_indices = after_indices[ok[after_indices]]
+    vb = _seg_velocity(t.x, t.y, ok, max(lo, i - 3), i)
+    va = _seg_velocity(t.x, t.y, ok, i, min(hi - 1, i + 3))
+    motion = None
+    if vb is not None and va is not None:
+        nb, na = math.hypot(*vb), math.hypot(*va)
+        sigma = motion_reliability.spatial_sigma_px if motion_reliability is not None else None
+        qb = qa = redirect = gain = sb = sa = None
+        if sigma is not None:
+            before = _velocity_reliability(t.x, t.y, ok, max(lo, i - 3), i, sigma)
+            after = _velocity_reliability(t.x, t.y, ok, i, min(hi - 1, i + 3), sigma)
+            if before is not None and after is not None:
+                sb, sa = before[0], after[0]
+                qb = max(0.0, 1.0 - 3.0 * sb / nb) if nb else 0.0
+                qa = max(0.0, 1.0 - 3.0 * sa / na) if na else 0.0
+                cosine = (vb[0] * va[0] + vb[1] * va[1]) / max(nb * na, 1e-9)
+                angle = math.degrees(math.acos(max(-1.0, min(1.0, cosine))))
+                redirect = float(np.clip((angle - 25.0) / 70.0, 0.0, 1.0)) * min(qb, qa)
+                margin = 3.0 * math.hypot(sb, sa)
+                gain = max(0.0, (na - nb - margin) / (na + nb + margin))
+        motion = ContactMotionEvidence(
+            before_frames=tuple(int(w.frame0 + j) for j in before_indices),
+            after_frames=tuple(int(w.frame0 + j) for j in after_indices),
+            speed_before=nb,
+            speed_after=na,
+            spatial_sigma_px=sigma,
+            incoming_direction_support=qb,
+            outgoing_direction_support=qa,
+            redirect_support=redirect,
+            speed_gain_support=gain,
+            incoming_slope_sigma_px_per_frame=sb,
+            outgoing_slope_sigma_px_per_frame=sa,
+            incoming_fit_residual_rms_px=_fit_residual_rms(t.x, t.y, before_indices, vb),
+            outgoing_fit_residual_rms_px=_fit_residual_rms(t.x, t.y, after_indices, va),
+        )
+    return assess_contact_evidence(
+        ContactEvidenceInputs(
+            frame=candidate.frame,
+            available_through=w.frame0 + hi - 1,
+            context_start=w.frame0 + lo,
+            context_stop=w.frame0 + hi,
+            provider=candidate.model,
+            motion=motion,
+            context_valid=not bool(w.replay[i]),
+            proximity_support=candidate.scores.get("proximity"),
+            swing_support=candidate.scores.get("swing"),
+            racket_overlap_support=candidate.scores.get("racket_overlap"),
+            attribution_target=candidate.player_id,
+            attribution_reason=candidate.attribution_reason,
+        )
+    )
+
+
+def _fit_residual_rms(
+    x: NDArray[np.float64], y: NDArray[np.float64], indices: NDArray[np.int64], velocity: tuple[float, float]
+) -> float:
+    """Spatial Euclidean RMS around the already-computed least-squares line."""
+    points = np.column_stack((x[indices], y[indices]))
+    tc = indices - indices.mean()
+    residuals = points - (points.mean(axis=0) + tc[:, None] * velocity)
+    return float(np.sqrt(np.mean(np.sum(residuals**2, axis=1))))
+
+
 def detect_contacts(
     w: WindowObs,
     *,
@@ -399,6 +494,15 @@ def detect_contacts(
             and (other.p > c.p or (other.p == c.p and other.frame < c.frame))
             for other in cands
         )
+    ]
+    # Attach bounded, immutable explanations only after numerical peak
+    # selection. Legacy scores, NMS competition and provider identity remain
+    # exact, and all freshness/association unknowns remain explicit.
+    kept = [
+        replace(c, evidence=build_contact_evidence(w, c, motion_reliability=motion_reliability))
+        if c.evidence is None
+        else c
+        for c in kept
     ]
     if not enforce_alternation:
         return kept

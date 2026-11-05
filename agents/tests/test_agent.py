@@ -292,3 +292,56 @@ def test_get_rally_keeps_one_revision_when_correction_arrives_during_read(
     refreshed = json.loads(run_tool(ctx, "get_rally", {"rally_event_id": rally.event_id}))
     assert refreshed["rally_event_id"] == replacement_ids[0]
     assert refreshed["phase_reason"] == "concurrent reviewer revision"
+
+
+@pytest.mark.parametrize("arguments", [[], "not an object", 7, None])
+def test_malformed_provider_arguments_return_tool_error_and_allow_abstention(ctx, arguments):
+    provider = Scripted(
+        [
+            LLMTurn("", [ToolCall("bad-shape", "match_overview", arguments)], "tool_use"),
+            LLMTurn("Insufficient evidence to answer.", [], "stop"),
+        ]
+    )
+    result = answer("Summarize the match", ctx, provider)
+    assert result.grounded is True
+    assert len(result.tool_trace) == 1
+    assert "error" in json.loads(ctx.outputs[-1])
+
+
+@pytest.mark.parametrize(
+    "name,args",
+    [
+        ("rules_and_background", {"query": ["badminton"]}),
+        ("player_stats", {"player": 12}),
+        ("find_strokes", {"limit": True}),
+        ("match_overview", {"_invalid_json": "{"}),
+    ],
+)
+def test_tool_argument_types_fail_before_execution(ctx, name, args):
+    assert "error" in json.loads(run_tool(ctx, name, args))
+
+
+@pytest.mark.parametrize(
+    "name,key", [("find_strokes", "player"), ("top_highlights", "player"), ("list_rallies", "winner")]
+)
+@pytest.mark.parametrize("who", ["Person never in this match", " "])
+def test_unknown_player_filter_cannot_silently_broaden_query(ctx, name, key, who):
+    result = json.loads(run_tool(ctx, name, {key: who}))
+    assert "error" in result
+    assert result.get("evidence_ids", []) == []
+
+
+def test_player_resolution_requires_unique_supported_alias(ctx):
+    assert ctx.resolve_player(" ") is None
+    ctx.session.players[0].name = "Lee Min"
+    ctx.session.players[1].name = "Lee Jae"
+    assert ctx.resolve_player("Lee") is None
+    assert ctx.resolve_player("Lee Min") == "P1"
+    assert ctx.resolve_player("P1") == "P1"
+
+
+@pytest.mark.parametrize("arguments", [[], "{"])
+def test_text_tool_call_malformed_arguments_are_not_replaced_with_a_valid_empty_request(ctx, arguments):
+    calls = text_tool_calls(json.dumps({"name": "match_overview", "arguments": arguments}))
+    assert len(calls) == 1
+    assert "error" in json.loads(run_tool(ctx, calls[0].name, calls[0].arguments))

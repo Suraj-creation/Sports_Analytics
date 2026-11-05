@@ -141,7 +141,7 @@ describe("AskTab", () => {
     fireEvent.change(screen.getByLabelText("Question"), { target: { value: "Show the shot" } });
     fireEvent.click(screen.getByRole("button", { name: "Ask" }));
     const chip = await screen.findByRole("button", { name: "1" });
-    expect(chip).toHaveAttribute("title", expect.stringContaining("uncertain evidence"));
+    expect(chip).toHaveAttribute("title", expect.stringContaining("support band: uncertain"));
     fireEvent.click(chip);
     expect(usePlayback.getState().selection).toMatchObject({
       start: 1500,

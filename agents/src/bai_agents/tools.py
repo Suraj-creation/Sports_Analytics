@@ -49,16 +49,17 @@ class ToolContext:
         return {p.player_id: p.name or p.player_id for p in self.session.players}
 
     def resolve_player(self, who: str | None) -> str | None:
-        if not who:
+        if not isinstance(who, str) or not who.strip():
             return None
-        w = who.strip().lower()
-        if w in ("p1", "p2"):
-            return w.upper()
-        for pid, name in self.names.items():
-            n = name.lower()
-            if w == n or w in n or (n.split() and n.split()[-1] == w.split()[-1]):
-                return pid
-        return None
+        w = who.strip().casefold()
+        ids = [pid for pid in self.names if pid.casefold() == w]
+        if len(ids) == 1:
+            return ids[0]
+        exact = [pid for pid, name in self.names.items() if name.casefold() == w]
+        if exact:
+            return exact[0] if len(exact) == 1 else None
+        aliases = [pid for pid, name in self.names.items() if w in name.casefold()]
+        return aliases[0] if len(aliases) == 1 else None
 
     def analytics(self) -> Any:
         stat = self.store.path.stat()
@@ -177,6 +178,8 @@ def list_rallies(
     from bai_badminton.analytics.rebuild import rally_records
 
     pid = ctx.resolve_player(winner)
+    if winner is not None and pid is None:
+        return {"error": "winner does not identify one known player or scoring slot", "evidence_ids": []}
     rows: list[dict[str, Any]] = []
     for r in rally_records(ctx.store):
         if not r.official and not include_unofficial:
@@ -306,6 +309,8 @@ def find_strokes(
     limit: int | None = None,
 ) -> dict[str, Any]:
     pid = ctx.resolve_player(player)
+    if player is not None and pid is None:
+        return {"error": "player does not identify one known player or scoring slot", "evidence_ids": []}
     official, _ = _official(ctx)
     owned = {s.get("event_id") for r in official for s in r.shots}
     out = []
@@ -337,6 +342,8 @@ def find_strokes(
 
 def top_highlights(ctx: ToolContext, k: int | None = None, player: str | None = None) -> dict[str, Any]:
     pid = ctx.resolve_player(player)
+    if player is not None and pid is None:
+        return {"error": "player does not identify one known player or scoring slot", "evidence_ids": []}
     hl = ctx.analytics().highlights(k=min(k or 8, 20), player=pid)
     rows = [{**h.to_public(), "time": ctx.t(h.start), "player": ctx.names.get(h.player or "", None)} for h in hl]
     return {"highlights": rows, "evidence_ids": ctx.cite([h.rally_id for h in hl])}
@@ -440,15 +447,38 @@ TOOLS: dict[str, tuple[ToolSpec, Callable[..., dict[str, Any]]]] = {
 
 
 def run_tool(ctx: ToolContext, name: str, args: dict[str, Any]) -> str:
-    entry = TOOLS.get(name)
+    entry = TOOLS.get(name) if isinstance(name, str) else None
+    error = None
     if entry is None:
-        return json.dumps({"error": f"unknown tool {name}"})
-    _, fn = entry
-    clean = {k: v for k, v in args.items() if v is not None and not k.startswith("_")}
-    with ctx.read_scope() if ctx.read_scope else nullcontext():
-        try:
-            out = json.dumps(fn(ctx, **clean), default=str)
-        except TypeError as e:
-            out = json.dumps({"error": f"bad arguments: {e}"})
+        error = "unknown tool"
+    elif not isinstance(args, dict):
+        error = "bad arguments: expected an object"
+    else:
+        properties = entry[0].parameters["properties"]
+        for key, value in args.items():
+            if key not in properties:
+                error = "bad arguments: unknown parameter"
+                break
+            spec = properties[key]
+            allowed = spec["type"] if isinstance(spec["type"], list) else [spec["type"]]
+            valid = (
+                (value is None and "null" in allowed)
+                or (isinstance(value, str) and "string" in allowed)
+                or (type(value) is bool and "boolean" in allowed)
+                or (type(value) is int and "integer" in allowed)
+            )
+            if not valid or ("enum" in spec and value not in spec["enum"]):
+                error = f"bad arguments: invalid {key}"
+                break
+    if error:
+        out = json.dumps({"error": error, "evidence_ids": []})
+    else:
+        _, fn = entry
+        clean = {k: v for k, v in args.items() if v is not None}
+        with ctx.read_scope() if ctx.read_scope else nullcontext():
+            try:
+                out = json.dumps(fn(ctx, **clean), default=str)
+            except TypeError as e:
+                out = json.dumps({"error": f"bad arguments: {e}", "evidence_ids": []})
     ctx.outputs.append(out)
     return out

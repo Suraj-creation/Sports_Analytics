@@ -92,6 +92,9 @@ function FeedItem({ e, session }: { e: BaiEvent; session: Session }) {
                 : `Rally ${e.payload.rally_no} · ${w ? `${shortName(session, w)} wins` : "winner unclear"}`}
             </span>
             {corrected && <span className="text-xs text-signal">corrected</span>}
+            <span className="text-xs text-line-3">
+              {e.status === "human_verified" ? "Human reviewed" : "Estimate"}
+            </span>
           </span>
           <span className="block text-xs text-line-2">
             {e.payload.n_shots ?? 0} shots
@@ -105,6 +108,9 @@ function FeedItem({ e, session }: { e: BaiEvent; session: Session }) {
       return (
         <span className="flex min-w-0 flex-1 items-center gap-2 text-sm">
           <Zap className="size-3.5 shrink-0" style={{ color: playerColor(pid) }} aria-hidden />
+          <span className="text-xs text-line-3">
+            {e.status === "human_verified" ? "Human reviewed" : "Estimate"}
+          </span>
           <BandChip band={e.band} color={playerColor(pid)}>
             {strokeLabel(e.payload)}
           </BandChip>

@@ -555,9 +555,23 @@ class PlayerPerception:
         return persons
 
     def _attach(self, frame_idx: int, img: NDArray[np.uint8], persons: list[PersonObs], pose_stride: int) -> None:
-        if self.pose is not None and pose_stride and frame_idx % pose_stride == 0 and persons:
+        # A scheduled tick, non-null coordinates or carried box is not evidence
+        # that this person's pose was inferred on the current source image.
+        for p in persons:
+            p.pose_frame_idx = None
+        if self.pose is not None and pose_stride > 0 and frame_idx % pose_stride == 0 and persons:
             for p, k in zip(persons, self.pose(img, [p.bbox for p in persons]), strict=True):
-                p.kps = k
+                p.kps = k.copy() if isinstance(k, np.ndarray) else k
+                if k is not None:
+                    values = np.asarray(k)
+                    try:
+                        observed = values.shape == (17, 3) and bool(
+                            (np.isfinite(values).all(axis=1) & (values[:, 2] > 0)).any()
+                        )
+                    except (TypeError, ValueError):
+                        observed = False
+                    if observed:
+                        p.pose_frame_idx = frame_idx
         for p in persons:
             x1, y1, x2, y2 = (int(v) for v in p.bbox)
             crop = img[max(0, y1) : max(0, y2), max(0, x1) : max(0, x2)]

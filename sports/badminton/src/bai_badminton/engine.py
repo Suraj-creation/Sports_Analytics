@@ -55,7 +55,9 @@ from bai_badminton.events.contact import (
     ATTRIBUTION_POLICY,
     CONTACT_MODEL,
     ContactCandidate,
+    build_contact_evidence,
 )
+from bai_badminton.events.contact_evidence import assess_contact_evidence
 from bai_badminton.events.match_phase import (
     MatchPhaseTracker,
     Phase,
@@ -218,6 +220,8 @@ def _stabilise(p: PersonObs, Ginv: Any) -> PersonObs:
         detector_matched=p.detector_matched,
         identity_method=p.identity_method,
         racket=p.racket.transformed(Ginv) if p.racket is not None else None,
+        pose_frame_idx=p.pose_frame_idx,
+        racket_frame_idx=p.racket_frame_idx,
     )
 
 
@@ -324,7 +328,7 @@ class BadmintonMatchEngine:
         self.identity = self.identity_provider.named_resolver()
         self.participants: ParticipantTracker | None = None
         self._participant_births: dict[str, str] = {}
-        self._participant_shot_id: int | None = None
+        self._participant_shot_id: tuple[int, int] | None = None
         self._participant_last_coverage: int | None = None
         self._participant_reference_changed = False
         # A configured sport format and score-slot names do not identify a
@@ -377,6 +381,8 @@ class BadmintonMatchEngine:
         self._sy: list[float] = []
         self._svis: list[bool] = []
         self._sconf: list[float] = []
+        self._shuttle_evidence: list[Any] = []
+        self._content_epoch: list[int] = []
         # Raw proxy detections remain overlay evidence even when they cannot
         # be compared in the current stabilized reference. These private masks
         # describe analysis coordinates, not independent shuttle observations.
@@ -924,7 +930,9 @@ class BadmintonMatchEngine:
         G = _usable_camera_pose(fp) if tracked and reference_matches else None
         self._cam.append(G)
         Ginv = np.linalg.inv(G) if G is not None else None
-        sxy = fp.shuttle_xy
+        self._shuttle_evidence.append(fp.shuttle_observation)
+        self._content_epoch.append(fp.content_epoch)
+        sxy = fp.shuttle_observation.selected_xy if fp.shuttle_observation is not None else fp.shuttle_xy
         if sxy is not None and Ginv is not None:
             sx, sy = project(Ginv, [sxy])[0]
             sxy = (float(sx), float(sy))
@@ -983,7 +991,7 @@ class BadmintonMatchEngine:
         if self.participants is not None:
             if self._participant_reference_changed:
                 reason = "calibration_changed"
-            elif self._participant_shot_id is not None and fp.shot_id != self._participant_shot_id:
+            elif self._participant_shot_id is not None and (fp.shot_id, fp.content_epoch) != self._participant_shot_id:
                 reason = "visual_tracker_reset"
             elif (
                 detector_coverage_valid
@@ -1013,7 +1021,7 @@ class BadmintonMatchEngine:
                     ]
                 )
         self._participant_reference_changed = False
-        self._participant_shot_id = fp.shot_id
+        self._participant_shot_id = fp.shot_id, fp.content_epoch
         if detector_coverage_valid:
             self._participant_last_coverage = fp.frame_idx
         participant_frame = self.participants.update(
@@ -1037,6 +1045,8 @@ class BadmintonMatchEngine:
                     detector_observed=fp.detector_observed,
                     detector_matched=person.detector_matched,
                     racket=person.racket,
+                    pose_frame_idx=person.pose_frame_idx,
+                    racket_frame_idx=person.racket_frame_idx,
                 )
         participant_events = [
             self._event(
@@ -1256,6 +1266,7 @@ class BadmintonMatchEngine:
                         court_y=court_xy[1] if court_xy else None,
                         bbox=box_tuple(p.bbox),
                         keypoints=keypoint_rows(p.kps),
+                        pose_frame_idx=p.pose_frame_idx,
                         conf=float(p.conf),
                         model=self._provenance.get("pose", self._provenance.get("player_detector", "")),
                     )
@@ -1279,6 +1290,7 @@ class BadmintonMatchEngine:
                     court_y=p.court_xy[1] if p.court_xy else None,
                     bbox=box_tuple(r.bbox),
                     keypoints=keypoint_rows(r.kps),
+                    pose_frame_idx=r.pose_frame_idx,
                     conf=float(p.conf),
                     model=self._provenance.get("pose", self._provenance.get("player_detector", "")),
                 )
@@ -1321,6 +1333,8 @@ class BadmintonMatchEngine:
             self._sy,
             self._svis,
             self._sconf,
+            self._shuttle_evidence,
+            self._content_epoch,
             self._temporal_valid,
             self._coordinate_context,
             self._replay,
@@ -1350,6 +1364,7 @@ class BadmintonMatchEngine:
             if j > 0:
                 break_before[i] = (
                     self._shot[j] != self._shot[j - 1]
+                    or self._content_epoch[j] != self._content_epoch[j - 1]
                     or self._replay[j] != self._replay[j - 1]
                     or self._coordinate_context[j] != self._coordinate_context[j - 1]
                 )
@@ -1366,6 +1381,12 @@ class BadmintonMatchEngine:
             Track.from_arrays(np.array(self._sx[a:b]), np.array(self._sy[a:b]), visible, np.array(self._sconf[a:b])),
             break_before=break_before,
         )
+        for index, evidence in enumerate(self._shuttle_evidence[a:b]):
+            if evidence is not None and evidence.status != "observed":
+                # A competing hypothesis is retained as evidence, never filled
+                # into a physical observation by the interpolation consumer.
+                track.vis[index] = False
+                track.interp[index] = False
         players = {}
         for pid, buf in self._players.items():
             s = PlayerSeries.empty(n)
@@ -1390,6 +1411,7 @@ class BadmintonMatchEngine:
             replay=replay,
             pose_stride=np.array(self._pose_stride[a:b], dtype=np.int64),
             break_before=break_before,
+            shuttle_evidence=tuple(self._shuttle_evidence[a:b]),
         )
 
     def _same_segment(self, first: int, last: int) -> bool:
@@ -1443,6 +1465,7 @@ class BadmintonMatchEngine:
                 enforce_alternation=False,
                 proximity_split=ATTRIBUTION_MIN_PROXIMITY,
             ):
+                candidate = self._contact_with_observation_evidence(candidate, episode_window, frames)
                 snapshot = frames[candidate.frame - w.frame0].get(candidate.player_id)
                 idx = candidate.frame - self._buf0
                 named = [
@@ -1459,7 +1482,7 @@ class BadmintonMatchEngine:
         else:
             # Legacy/synthetic named observations without participant episodes.
             contacts = {
-                c.frame: c
+                c.frame: self._contact_with_observation_evidence(c, w, frames)
                 for c in self.contact_inference.detect(
                     w,
                     start=i0,
@@ -1528,6 +1551,8 @@ class BadmintonMatchEngine:
                 kind = (
                     ObservationKind.INVALID
                     if not context_valid
+                    else ObservationKind.AMBIGUOUS
+                    if w.shuttle_evidence[i] is not None and w.shuttle_evidence[i].status == "ambiguous"
                     else ObservationKind.OBSERVED
                     if observed[i]
                     else ObservationKind.RECONSTRUCTED
@@ -1535,7 +1560,7 @@ class BadmintonMatchEngine:
                     else ObservationKind.MISSING
                 )
                 exit_supported = False
-                if kind in {ObservationKind.MISSING, ObservationKind.RECONSTRUCTED}:
+                if kind in {ObservationKind.MISSING, ObservationKind.RECONSTRUCTED, ObservationKind.AMBIGUOUS}:
                     if isinstance(self.fsm, AssociatedExitRallySegmentation):
                         exit_supported = self.fsm.exit_return_support(
                             w, i, frame_height=self.cfg.frame_height, raw_xy=self._raw_xy
@@ -1596,6 +1621,67 @@ class BadmintonMatchEngine:
             self._emit([self._rally_start_event])
 
     # ================================================================== contacts & strokes
+    def _contact_with_observation_evidence(
+        self, candidate: ContactCandidate, window: WindowObs, frames: list[dict[str, ParticipantSnapshot]]
+    ) -> ContactCandidate:
+        evidence = candidate.evidence or build_contact_evidence(window, candidate)
+        inputs = evidence.inputs
+        if inputs.frame != candidate.frame:
+            raise ValueError("contact evidence frame differs from its selected candidate identity")
+        if (
+            inputs.context_start < window.frame0
+            or inputs.context_stop > window.frame0 + window.n
+            or inputs.available_through >= window.frame0 + window.n
+        ):
+            raise ValueError("contact evidence context/availability exceeds the supplied observation window")
+        index = window.idx(candidate.frame)
+        observation = window.shuttle_evidence[index] if window.shuttle_evidence is not None else None
+        status = None
+        association = None
+        if observation is not None:
+            status = "fresh_observed" if observation.status == "observed" else observation.status
+            association = observation.association_status
+            if inputs.motion is not None:
+                # Reacquisition inside a fit is not evidence of a physical turn.
+                for frame in inputs.motion.before_frames + inputs.motion.after_frames:
+                    item = window.shuttle_evidence[window.idx(frame)]
+                    if item is None or item.association_status == "unknown":
+                        association = "unknown"
+                        break
+                    if item.association_status == "reacquisition":
+                        association = "reacquisition"
+        player_frames, pose_frames, racket_frames = [], [], []
+        for frame in range(inputs.context_start, inputs.context_stop):
+            j = window.idx(frame)
+            snapshot = frames[j].get(candidate.player_id) if 0 <= j < len(frames) else None
+            if snapshot is None:
+                continue
+            if snapshot.detector_observed is True and snapshot.detector_matched is True:
+                player_frames.append(frame)
+            cadence = window.pose_stride[j] if window.pose_stride is not None else -1
+            if snapshot.kps is not None and snapshot.pose_frame_idx == frame and cadence > 0 and frame % cadence == 0:
+                wrists = np.asarray(snapshot.kps)[[9, 10]]
+                if (np.isfinite(wrists).all(axis=1) & (wrists[:, 2] >= 0.3)).any():
+                    pose_frames.append(frame)
+            if snapshot.racket is not None and snapshot.racket_frame_idx == frame and snapshot.detector_matched is True:
+                racket_frames.append(frame)
+        return replace(
+            candidate,
+            evidence=assess_contact_evidence(
+                replace(
+                    inputs,
+                    observation_status=status,
+                    association_status=association,
+                    player_observed=candidate.frame in player_frames,
+                    pose_observed=len(pose_frames) >= 2,
+                    racket_observed=candidate.frame in racket_frames,
+                    player_observation_frames=tuple(player_frames),
+                    pose_observation_frames=tuple(pose_frames),
+                    racket_observation_frames=tuple(racket_frames),
+                )
+            ),
+        )
+
     def _retract_contact(self, c: _Contact, note: str) -> None:
         """Withdraw a contact *and* the stroke classified from it (and its analytics)."""
         prov = self._prov("rally_fsm_v1")
@@ -1641,6 +1727,9 @@ class BadmintonMatchEngine:
             "racket_contact_observed": False,
             "racket_overlap_observed": c.scores.get("racket_overlap", 0) >= 0.5,
             "racket_evidence_method": "opencv_ellipse_shaft_v1" if c.scores.get("racket_observed", 0) else None,
+            "physical_evidence": c.evidence.to_payload() if c.evidence is not None else None,
+            "physical_event_status": c.evidence.impact.reliability.value if c.evidence is not None else "insufficient",
+            "temporal_role": "kinematic_activity_candidate;not_confirmed_physical_impact",
         }
         # For an unresolved named hitter, retain separately-scored provisional
         # track-episode evidence without asserting a player or team identity.
@@ -1853,6 +1942,8 @@ class BadmintonMatchEngine:
             "serve_evidence": serve_evidence,
             "contact_status": "estimated",
             "classification_status": "unknown" if stroke == "unknown" else "estimated",
+            "physical_event_status": c.event.payload.get("physical_event_status", "insufficient"),
+            "physical_evidence_event_id": c.event.event_id,
             "confidence_semantics": "uncalibrated_heuristic_support"
             if pred.model == RuleStrokeClassifier.name
             else "model_score",
@@ -1916,7 +2007,19 @@ class BadmintonMatchEngine:
             evidence=(
                 Evidence(kind=EvidenceKind.EVENT, event_id=c.event.event_id),
                 Evidence(kind=EvidenceKind.COMPONENT_SCORES, scores=comps or {"margin": round(margin, 4)}),
-                Evidence(kind=EvidenceKind.POSE, frames=(cand.frame - 20, cand.frame + 6)),
+            )
+            + (
+                (
+                    Evidence(
+                        kind=EvidenceKind.POSE,
+                        frames=(
+                            cand.evidence.inputs.pose_observation_frames[0],
+                            cand.evidence.inputs.pose_observation_frames[-1],
+                        ),
+                    ),
+                )
+                if cand.evidence is not None and cand.evidence.inputs.pose_observation_frames
+                else ()
             ),
             model=pred.model,
             status=EventStatus.CONFIRMED,

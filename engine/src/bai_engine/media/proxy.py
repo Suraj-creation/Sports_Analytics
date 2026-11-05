@@ -164,10 +164,15 @@ def build_command(src: str, mp: MediaPaths, plan: ProxyPlan, tools: Tools) -> li
         ]
     # Outputs are relative to the media root (ffmpeg runs with cwd=mp.root): the tee muxer's option
     # syntax cannot carry Windows drive letters, and relative names need no escaping at all.
+    # fMP4 can represent the encoder's negative decode timestamps. The HLS
+    # muxer must retain them: shifting all timestamps to make DTS nonnegative
+    # also shifts physical video presentation away from canonical frame zero.
+    # This applies to encoder reorder delay and AAC priming without changing
+    # encoded pixels, cadence, or the independent MP4 output.
     hls = (
         f"[f=hls:onfail=abort:hls_time={plan.segment_seconds * 0.999:.4f}:hls_playlist_type=event"
         ":hls_segment_type=fmp4:hls_fmp4_init_filename=init.mp4:hls_segment_filename=hls/seg_%05d.m4s"
-        ":hls_flags=independent_segments+temp_file]hls/index.m3u8"
+        ":avoid_negative_ts=disabled:hls_flags=independent_segments+temp_file]hls/index.m3u8"
     )
     mp4 = "[f=mp4:onfail=abort:movflags=+faststart]proxy.mp4"
     cmd = [

@@ -7,8 +7,10 @@ from dataclasses import dataclass, field
 import numpy as np
 from numpy.typing import NDArray
 
+from bai_badminton.perception.association import ShuttleObservationEvidence
 from bai_badminton.perception.calibration_state import CalibrationState
 from bai_badminton.perception.diagnostics import FrameDiagnostic
+from bai_badminton.perception.scene_change import SceneChangeEvidence
 
 
 @dataclass(frozen=True)
@@ -72,6 +74,8 @@ class PersonObs:
     detector_matched: bool | None = None  # unique match to this frame's person detection
     identity_method: str | None = None  # uncalibrated association policy/reason, never a person name
     racket: RacketObservation | None = None
+    pose_frame_idx: int | None = None  # actual pose inference source; schedule/non-null keypoints are insufficient
+    racket_frame_idx: int | None = None
 
 
 @dataclass
@@ -102,6 +106,31 @@ class FramePerception:
     # Scheduled pose cadence, not a claim of successful keypoint observation.
     pose_stride: int | None = None  # None legacy/unknown, 0 disabled
     diagnostic: FrameDiagnostic | None = None  # opt-in bounded values; never inference input
+    # Raw image detection above is preserved independently of temporal admission.
+    shuttle_observation: ShuttleObservationEvidence | None = None
+    content_epoch: int = 0  # timeline edits need not invalidate the same camera's court geometry
+    content_change: SceneChangeEvidence | None = None
+
+    def __post_init__(self) -> None:
+        if type(self.content_epoch) is not int or self.content_epoch < 0:
+            raise ValueError("content epoch must be a nonnegative integer")
+        if self.content_change is not None and self.content_change.frame != self.frame_idx:
+            raise ValueError("content change evidence must identify its canonical frame")
+        if any(
+            source is not None and (type(source) is not int or not 0 <= source <= self.frame_idx)
+            for p in self.persons
+            for source in (p.pose_frame_idx, p.racket_frame_idx)
+        ):
+            raise ValueError("pose/racket provenance cannot use a future or invalid source frame")
+        evidence = self.shuttle_observation
+        if evidence is not None and evidence.epoch != (self.shot_id << 32) | self.content_epoch:
+            raise ValueError("shuttle association epoch differs from the frame context")
+        if evidence is not None and (
+            evidence.frame_idx != self.frame_idx
+            or evidence.raw_xy != self.shuttle_xy
+            or evidence.raw_model_support != self.shuttle_conf
+        ):
+            raise ValueError("shuttle association must identify the exact raw frame observation")
 
     @property
     def scene(self) -> str:

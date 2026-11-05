@@ -179,7 +179,7 @@ function Answer({ a, session }: { a: AskAnswer; session: Session }) {
             className="mx-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-line/12 px-1 align-[1px] text-[11px] font-semibold tabular-nums text-line hover:bg-line hover:text-mat-deep"
             title={
               event
-                ? `Watch event at ${clock(event.frame_start, session.media)} · ${event.band} evidence`
+                ? `${event.status === "human_verified" ? "Human reviewed event" : "Estimated event"} at ${clock(event.frame_start, session.media)} · support band: ${event.band}`
                 : c?.frame != null
                   ? `Go to ${clock(c.frame, session.media)} · analysis time only; event details unavailable`
                   : "Event time unavailable"

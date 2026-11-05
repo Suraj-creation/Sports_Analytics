@@ -3,8 +3,10 @@
 The available :class:`RuleStrokeClassifier` (``stroke_rules_v0``) is a
 heuristic using the hitter's court zone, the shuttle's post-contact speed and
 flight time. Its scores are not calibrated classification probabilities.
-The configured BST-CG-AP model is not implemented in this checkout; specifying
-its name in a profile does not load pretrained weights.
+The optional pretrained BST-CG-AP adapter lives in ``events/bst.py`` for
+explicit singles-only shadow evaluation with verified weights and chronological
+observations. This rules component does not load it; a profile label alone does
+not establish model execution or classification accuracy.
 """
 
 from __future__ import annotations

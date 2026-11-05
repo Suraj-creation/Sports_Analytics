@@ -10,7 +10,7 @@ from enum import StrEnum
 
 import numpy as np
 import pyarrow as pa
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class TrackObject(StrEnum):
@@ -43,6 +43,7 @@ class TrackSample(BaseModel):
     court_y: float | None = None
     bbox: tuple[float, float, float, float] | None = None  # x1, y1, x2, y2
     keypoints: tuple[tuple[float, float, float], ...] | None = None  # (x, y, score) × 17
+    pose_frame_idx: int | None = Field(default=None, ge=0, strict=True)  # Canonical pose source frame; legacy unknown.
     visible: bool = True
     conf: float = 0.0
     model: str = ""
@@ -51,6 +52,12 @@ class TrackSample(BaseModel):
     # CAMERA rows ``track_id`` is the physical camera (0 = the main camera, analysed; -1 = no court in view)
     # and ``conf`` the court-line fit's precision.
     cam: tuple[float, ...] | None = None
+
+    @model_validator(mode="after")
+    def _pose_source_is_causal(self) -> TrackSample:
+        if self.pose_frame_idx is not None and self.pose_frame_idx > self.frame_idx:
+            raise ValueError("pose_frame_idx cannot be after the sample frame")
+        return self
 
 
 TRACK_ARROW_SCHEMA = pa.schema(
@@ -70,6 +77,7 @@ TRACK_ARROW_SCHEMA = pa.schema(
         pa.field("court_y", pa.float32()),
         pa.field("bbox", pa.list_(pa.float32())),  # [x1, y1, x2, y2]
         pa.field("keypoints", pa.list_(pa.float32())),  # flattened (x, y, score) x N_KEYPOINTS
+        pa.field("pose_frame_idx", pa.int32()),
         pa.field("visible", pa.bool_(), nullable=False),
         pa.field("conf", pa.float32(), nullable=False),
         pa.field("model", pa.dictionary(pa.int8(), pa.string())),
@@ -99,6 +107,7 @@ def samples_to_table(samples: list[TrackSample]) -> pa.Table:
         cols["keypoints"].append(
             np.asarray(s.keypoints, dtype=np.float32).reshape(-1).tolist() if s.keypoints is not None else None
         )
+        cols["pose_frame_idx"].append(s.pose_frame_idx)
         cols["visible"].append(s.visible)
         cols["conf"].append(s.conf)
         cols["model"].append(s.model or None)
@@ -128,6 +137,7 @@ def table_to_samples(table: pa.Table) -> list[TrackSample]:
                 court_y=row["court_y"],
                 bbox=tuple(row["bbox"]) if row["bbox"] is not None else None,
                 keypoints=tuple(tuple(kps[i : i + 3]) for i in range(0, len(kps), 3)) if kps is not None else None,
+                pose_frame_idx=row.get("pose_frame_idx"),
                 visible=row["visible"],
                 conf=row["conf"],
                 model=row["model"] or "",

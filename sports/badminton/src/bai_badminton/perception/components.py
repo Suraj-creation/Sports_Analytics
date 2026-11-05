@@ -8,7 +8,7 @@ contract. Positions are canonical analysis-frame pixels, not 3D measurements.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
@@ -16,8 +16,11 @@ from typing import Any, Protocol, runtime_checkable
 import numpy as np
 from numpy.typing import NDArray
 
+from bai_badminton.perception.association import CausalShuttleAssociation, ShuttleObservationEvidence
+from bai_badminton.perception.content import CONTENT_IMPLEMENTATION, ContentContinuityProvider
 from bai_badminton.perception.diagnostics import DiagnosticSelection, ShuttleDiagnostic
 from bai_badminton.perception.players import CourtROI, PlayerPerception
+from bai_badminton.perception.scene_change import SCENE_CONTINUITY_VERSION, ForegroundRegion, SceneChangeEvidence
 from bai_badminton.perception.tracknet import BackgroundModel, ShuttleDetection
 from bai_badminton.perception_types import PersonObs, RacketObservation, ScoreReading
 from bai_engine.components import ComponentContract, ComponentRegistry
@@ -62,6 +65,51 @@ class DiagnosticShuttlePort(ShuttlePort, Protocol):
         selection: DiagnosticSelection,
         indices: set[int],
     ) -> tuple[list[ShuttleDetection | None], list[ShuttleDiagnostic | None]]: ...
+
+
+@runtime_checkable
+class ShuttleAssociationPort(Protocol):
+    def update(
+        self,
+        frame: int,
+        *,
+        epoch: int,
+        raw_xy: tuple[float, float] | None,
+        raw_support: float,
+        diagnostic: ShuttleDiagnostic | None,
+        image_valid: bool,
+        image_to_reference: np.ndarray | None = None,
+    ) -> ShuttleObservationEvidence: ...
+
+    def reset(self) -> None: ...
+
+    def close(self) -> None: ...
+
+
+@runtime_checkable
+class ContentContinuityPort(Protocol):
+    """Current image + prior-frame regions to a nonauthoritative hypothesis."""
+
+    barrier_enabled: bool
+
+    def observe(
+        self,
+        frame: int,
+        pixels: NDArray[np.uint8],
+        *,
+        previous_regions: Sequence[ForegroundRegion],
+        previous_view_valid: bool,
+        current_view_valid: bool,
+        hard_cut: bool = False,
+    ) -> SceneChangeEvidence: ...
+
+    def reset(self) -> None: ...
+
+    def close(self) -> None: ...
+
+    def checkpoint(self) -> object: ...
+
+    def restore(self, checkpoint: object) -> None: ...
 
 
 @runtime_checkable
@@ -177,6 +225,8 @@ PERCEPTION_PORTS: dict[str, type[Any]] = {
     "racket": RacketPort,
     "ocr": OCRPort,
     "tracking": TrackingPort,
+    "shuttle_association": ShuttleAssociationPort,
+    "content_continuity": ContentContinuityPort,
 }
 
 BASELINE_IMPLEMENTATIONS = {
@@ -187,6 +237,8 @@ BASELINE_IMPLEMENTATIONS = {
     "racket": "racket-geometry-v1",
     "ocr": "rapidocr-v1",
     "tracking": "court-player-episodes-v1",
+    "shuttle_association": "coobserved-static-hypotheses-v1",
+    "content_continuity": CONTENT_IMPLEMENTATION,
 }
 
 
@@ -341,6 +393,8 @@ def register_perception_components(registry: ComponentRegistry) -> None:
     for doubles. Backend/artifact verification remains in each existing loader.
     """
     for kind, interface in PERCEPTION_PORTS.items():
+        if kind in {"shuttle_association", "content_continuity"}:
+            continue
         registry.register(
             ComponentContract(
                 kind=kind,
@@ -375,3 +429,85 @@ def register_perception_components(registry: ComponentRegistry) -> None:
             ),
             _tracking_factory if kind == "tracking" else _baseline_factory(kind),
         )
+
+    def association(context: PerceptionContext, configuration: dict[str, Any]) -> ShuttleAssociationPort:
+        result = CausalShuttleAssociation(fps=context.fps, **configuration.get("params", {}))
+        context.record_model("shuttle_association", "coobserved-static-hypotheses-v1@1")
+        context.record_runtime("shuttle_association", {"backend": "numpy-cpu", "weights": None})
+        return result
+
+    registry.register(
+        ComponentContract(
+            kind="shuttle_association",
+            implementation=BASELINE_IMPLEMENTATIONS["shuttle_association"],
+            version="1",
+            input_schema="badminton-shuttle-candidates:v1",
+            output_schema="badminton-shuttle-association:v2",
+            interface=ShuttleAssociationPort,
+            context_type=PerceptionContext,
+            supported_formats=frozenset({"singles", "doubles", "unknown"}),
+            failure_policy="abstain",
+            stateful=True,
+            declaration={
+                "timeline": "canonical_cfr_frame_index;causal_current_and_prior_observations",
+                "coordinates": "raw_analysis_image_pixels;optional_registered_reference_for_association_only",
+                "devices": ["cpu"],
+                "backends": ["numpy-cpu"],
+                "required_evidence": ["bounded_heatmap_candidates"],
+                "optional_evidence": ["current_verified_image_registration"],
+                "state_restore": "checkpoint_or_recompute_in_frame_order",
+                "score_semantics": "heuristic_support_not_calibrated_probability;experimental",
+            },
+        ),
+        association,
+    )
+
+    def content(context: PerceptionContext, configuration: dict[str, Any]) -> ContentContinuityPort:
+        choice = ModelChoice.model_validate(configuration)
+        if choice.model != "none" or choice.backend not in {"none", "opencv-cpu"}:
+            raise ValueError("content continuity is explicitly weightless OpenCV CPU perception")
+        result = ContentContinuityProvider(**choice.params)
+        context.record_model("content_continuity", f"{CONTENT_IMPLEMENTATION}@1")
+        context.record_runtime(
+            "content_continuity",
+            {
+                "backend": "opencv-cpu",
+                "weights": None,
+                "input_dtype": "uint8",
+                "mode": result.mode,
+                "barrier_enabled": result.barrier_enabled,
+                "evidence_schema": SCENE_CONTINUITY_VERSION,
+                "score_semantics": "uncalibrated_pixel_and_ratio_evidence",
+            },
+        )
+        return result
+
+    registry.register(
+        ComponentContract(
+            kind="content_continuity",
+            implementation=CONTENT_IMPLEMENTATION,
+            version="1",
+            input_schema="badminton-content-continuity-input:v1",
+            output_schema=SCENE_CONTINUITY_VERSION,
+            interface=ContentContinuityPort,
+            context_type=PerceptionContext,
+            supported_formats=frozenset({"singles", "doubles", "unknown"}),
+            failure_policy="abstain",
+            stateful=True,
+            declaration={
+                "timeline": "canonical_cfr_frame_index;current_pixels_and_immediately_previous_regions_only",
+                "coordinates": "analysis_proxy_image_pixels;prior_region_boxes_not_player_identity",
+                "devices": ["cpu"],
+                "backends": ["opencv-cpu"],
+                "weights": None,
+                "required_evidence": ["current_image", "frame_minus_one_target_regions", "explicit_view_validity"],
+                "optional_evidence": ["fresh_carried_or_unknown_detector_provenance"],
+                "state_restore": "owner_bound_checkpoint_or_recompute_in_frame_order",
+                "score_semantics": "uncalibrated_hypothesis;authority_is_explicit_separate_experimental_policy",
+                "modes": ["diagnostic", "barrier_hypothesis_v1"],
+                "default_enabled": False,
+                "bounded_evidence": {"regions": 8, "reasons": 8, "text_characters": 160, "stored_pixel_arrays": 0},
+            },
+        ),
+        content,
+    )

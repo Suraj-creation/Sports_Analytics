@@ -16,7 +16,12 @@ import numpy as np
 
 from bai_badminton.analytics.match import MatchAnalytics, RallyRecord
 from bai_badminton.events.activity import ActivityEstimate, ActivityInterval, ActivityObservation, ActivityTracker
-from bai_badminton.events.contact import ContactCandidate, ContactMotionReliability, detect_contacts
+from bai_badminton.events.contact import (
+    ContactCandidate,
+    ContactMotionReliability,
+    build_contact_evidence,
+    detect_contacts,
+)
 from bai_badminton.events.rally_evidence import EvidenceRallyFSM, RallyObservation
 from bai_badminton.events.rally_fsm import RallyFSM, RallyParams, RallySegment, RallyState, RallyUpdate
 from bai_badminton.events.rally_motion import (
@@ -304,6 +309,27 @@ class _MotionReliableContact(_Contact):
         return detect_contacts(window, **{**self.params, **kwargs}, motion_reliability=self.policy)
 
 
+class _ContactEvidence(_Contact):
+    """Preserve selected candidates while reporting a separately declared sensitivity.
+
+    The diagnostic scale is not a calibrated observation covariance. Physical
+    impact and actor freshness are assessed independently by the event consumer.
+    """
+
+    def __init__(self, params: dict[str, Any]) -> None:
+        params = dict(params)
+        if "spatial_sigma_px" not in params:
+            raise ValueError("contact evidence requires an explicit spatial sensitivity")
+        self.policy = ContactMotionReliability(params.pop("spatial_sigma_px"))
+        super().__init__(params)
+
+    def detect(self, window: WindowObs, **kwargs: Any) -> list[ContactCandidate]:
+        return [
+            replace(c, evidence=build_contact_evidence(window, c, motion_reliability=self.policy))
+            for c in super().detect(window, **kwargs)
+        ]
+
+
 class _BaselineTemporalState:
     """Only these baseline adapters own pure Python temporal state.
 
@@ -469,60 +495,91 @@ class _Score:
 
 
 @dataclass(frozen=True, slots=True)
+class _AnalyticsOperation:
+    previous: _AnalyticsOperation | None
+    method: str
+    args: tuple[Any, ...]
+    kwargs: tuple[tuple[str, Any], ...]
+
+
+@dataclass(frozen=True, slots=True)
 class _AnalyticsCheckpoint:
     owner: str
-    operations: tuple[tuple[str, tuple[Any, ...], dict[str, Any]], ...]
+    head: _AnalyticsOperation | None
 
 
 class TransactionalAnalytics(MatchAnalytics):
     """Checkpoint pure event/record inputs, never deepcopy an arbitrary provider.
 
-    The aggregate remains the existing implementation. A rollback replays its
-    typed input records; checkpoints survive a reset during an attempted refold.
-    The containing engine treats a custom provider's checkpoint as opaque and
-    invokes that provider's explicit restore method.
+    The append-only linked journal shares historical entries with checkpoints,
+    so taking a checkpoint never copies or replays history. Caller inputs and
+    aggregate projections receive separate copies: mutable Event payloads or
+    RallyRecords cannot rewrite an existing journal entry. Only restore (or a
+    failed append) replays typed inputs. Checkpoints survive resets/refolds.
+
+    This private journal belongs only to the baseline analytics implementation.
+    The engine still treats every provider's checkpoint as opaque and invokes
+    its explicit restore method; arbitrary providers/models are never copied.
     """
 
     def __init__(self, fps: float) -> None:
         self._owner = str(uuid4())
-        self._operations: list[tuple[str, tuple[Any, ...], dict[str, Any]]] = []
+        self._journal: _AnalyticsOperation | None = None
         super().__init__(fps)
 
+    def _append_operation(self, method: str, args: tuple[Any, ...], kwargs: dict[str, Any]) -> None:
+        saved_args, saved_kwargs = copy.deepcopy(args), copy.deepcopy(kwargs)
+        try:
+            # MatchAnalytics retains some records. Keep those projection
+            # references separate from the private persistent journal.
+            getattr(MatchAnalytics, method)(self, *copy.deepcopy(saved_args), **copy.deepcopy(saved_kwargs))
+        except BaseException:
+            # A failing base operation can mutate before raising (e.g. append a
+            # rally before discovering an invalid player). Rebuild only then.
+            self._restore_journal(self._journal)
+            raise
+        self._journal = _AnalyticsOperation(self._journal, method, saved_args, tuple(saved_kwargs.items()))
+
+    def _restore_journal(self, head: _AnalyticsOperation | None) -> None:
+        operations = []
+        current = head
+        while current is not None:
+            operations.append(current)
+            current = current.previous
+        MatchAnalytics.__init__(self, self.fps)
+        for operation in reversed(operations):
+            getattr(MatchAnalytics, operation.method)(
+                self, *copy.deepcopy(operation.args), **copy.deepcopy(dict(operation.kwargs))
+            )
+        self._journal = head
+
     def on_stroke(self, event: Event, *, spatial_valid: bool = False) -> None:
-        self._operations.append(("on_stroke", (event,), {"spatial_valid": spatial_valid}))
-        super().on_stroke(event, spatial_valid=spatial_valid)
+        self._append_operation("on_stroke", (event,), {"spatial_valid": spatial_valid})
 
     def on_stroke_retracted(self, event: Event) -> None:
-        self._operations.append(("on_stroke_retracted", (event,), {}))
-        super().on_stroke_retracted(event)
+        self._append_operation("on_stroke_retracted", (event,), {})
 
     def on_presence(self, player_id: str, points: Any) -> None:
         saved = tuple(tuple(float(value) for value in point) for point in points)
-        self._operations.append(("on_presence", (player_id, saved), {}))
-        super().on_presence(player_id, saved)
+        self._append_operation("on_presence", (player_id, saved), {})
 
     def on_rally(self, rally: RallyRecord) -> None:
-        self._operations.append(("on_rally", (copy.deepcopy(rally),), {}))
-        super().on_rally(rally)
+        self._append_operation("on_rally", (rally,), {})
 
     def checkpoint(self) -> _AnalyticsCheckpoint:
-        return _AnalyticsCheckpoint(self._owner, tuple(copy.deepcopy(self._operations)))
+        return _AnalyticsCheckpoint(self._owner, self._journal)
 
     def restore(self, checkpoint: object) -> None:
         if not isinstance(checkpoint, _AnalyticsCheckpoint) or checkpoint.owner != self._owner:
             raise ValueError("incompatible analytics checkpoint")
-        operations = copy.deepcopy(checkpoint.operations)
-        MatchAnalytics.__init__(self, self.fps)
-        for method, args, kwargs in operations:
-            getattr(MatchAnalytics, method)(self, *args, **kwargs)
-        self._operations = list(operations)
+        self._restore_journal(checkpoint.head)
 
     def reset(self) -> None:
-        self._operations = []
+        self._journal = None
         MatchAnalytics.__init__(self, self.fps)
 
     def close(self) -> None:
-        self._operations.clear()
+        self._journal = None
 
 
 def register_domain_components(registry: ComponentRegistry) -> None:
@@ -558,9 +615,9 @@ def register_domain_components(registry: ComponentRegistry) -> None:
             ComponentContract(
                 kind=kind,
                 implementation=BASELINE_IMPLEMENTATIONS[kind],
-                version="2" if kind == "rally" else "1",
+                version="2" if kind in {"rally", "contact"} else "1",
                 input_schema=f"badminton-{kind}-input:v1",
-                output_schema=f"badminton-{kind}-output:v1",
+                output_schema=f"badminton-{kind}-output:v3" if kind == "contact" else f"badminton-{kind}-output:v1",
                 interface=interface,
                 context_type=DomainContext,
                 supported_formats=frozenset({"singles", "doubles", "unknown"}),
@@ -596,9 +653,9 @@ def register_domain_components(registry: ComponentRegistry) -> None:
         ComponentContract(
             kind="contact",
             implementation="contact-motion-reliability-v1",
-            version="1",
+            version="2",
             input_schema="badminton-contact-input:v1",
-            output_schema="badminton-contact-output:v2",
+            output_schema="badminton-contact-output:v3",
             interface=ContactInference,
             context_type=DomainContext,
             supported_formats=frozenset({"singles", "doubles", "unknown"}),
@@ -611,6 +668,26 @@ def register_domain_components(registry: ComponentRegistry) -> None:
             },
         ),
         lambda context, configuration: _MotionReliableContact(configuration.get("params", configuration)),
+    )
+    registry.register(
+        ComponentContract(
+            kind="contact",
+            implementation="contact-evidence-v1",
+            version="1",
+            input_schema="badminton-contact-input:v1",
+            output_schema="badminton-contact-output:v3",
+            interface=ContactInference,
+            context_type=DomainContext,
+            supported_formats=frozenset({"singles", "doubles", "unknown"}),
+            failure_policy="abstain",
+            stateful=False,
+            declaration={
+                **CONTRACT_DETAILS["contact"],
+                "optional_evidence": ["declared_image_localization_sensitivity", "typed_shuttle_association"],
+                "score_semantics": "legacy_candidate_support;separate_physical_reliability;experimental",
+            },
+        ),
+        lambda context, configuration: _ContactEvidence(configuration.get("params", configuration)),
     )
     registry.register(
         ComponentContract(

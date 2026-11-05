@@ -185,8 +185,12 @@ def text_tool_calls(text: str) -> list[ToolCall]:
                 try:
                     args = json.loads(args)
                 except ValueError:
-                    args = {}
-            out.append(ToolCall(f"text-{len(out)}", obj["name"], args if isinstance(args, dict) else {}))
+                    args = {"_invalid_json": True}
+            out.append(
+                ToolCall(
+                    f"text-{len(out)}", obj["name"], args if isinstance(args, dict) else {"_invalid_arguments": True}
+                )
+            )
         i = text.find("{", end)
     return out
 
@@ -204,8 +208,9 @@ def repair_citations(text: str, ctx: ToolContext, trace: list[dict[str, Any]]) -
         for t in trace:
             if not t.get("evidence"):
                 continue
+            arguments = t["args"] if isinstance(t["args"], dict) else {}
             words = set(re.split(r"[^a-z0-9]+", t["tool"].lower())) | {
-                str(v).lower() for v in t["args"].values() if v is not None
+                str(v).lower() for v in arguments.values() if v is not None
             }
             score = len(toks & words)
             if score > best_score:

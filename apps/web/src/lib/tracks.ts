@@ -14,6 +14,7 @@ interface WirePlayer {
   m?: (boolean | null)[];
   raw?: (number | null)[];
   method?: (string | null)[];
+  pf?: (number | null)[];
 }
 
 interface WireWindow {
@@ -63,6 +64,8 @@ export interface PlayerFrame {
   detectorMatched: boolean | null;
   rawTrack: number | null;
   identityMethod: string | null;
+  /** Canonical pose observation source; absent in legacy callers and null when unknown. */
+  poseObservedFrame?: number | null;
 }
 
 export interface DisplayPose {
@@ -96,6 +99,7 @@ function playerFrame(p: WirePlayer, i: number, playerId: PlayerId | null): Playe
     detectorMatched: p.m?.[i] ?? null,
     rawTrack: p.raw?.[i] ?? null,
     identityMethod: p.method?.[i] ?? null,
+    poseObservedFrame: p.pf?.[i] ?? null,
   };
 }
 
@@ -118,6 +122,26 @@ export class TrackBuffer {
   version = 0;
 
   ingest(win: WireWindow): void {
+    if (win.v !== 1 && win.v !== 2) throw new Error("Unsupported track wire version");
+    // Validate new provenance before any replacement mutates an existing window.
+    for (const p of [...Object.values(win.players), ...Object.values(win.anonymous ?? {})]) {
+      if (p.pf === undefined) continue;
+      if (!Array.isArray(p.pf) || p.pf.length !== p.f.length)
+        throw new Error("Misaligned pose source frames");
+      for (let i = 0; i < p.f.length; i++) {
+        const source = p.pf[i];
+        const frame = p.f[i];
+        if (
+          source !== null &&
+          (source === undefined ||
+            !Number.isInteger(source) ||
+            source < 0 ||
+            frame === undefined ||
+            source > frame)
+        )
+          throw new Error("Invalid or future pose source frame");
+      }
+    }
     // a window replaces whatever we had for its range (refinement revisions arrive this way)
     for (let f = win.from; f <= win.to; f++) {
       this.shuttle.delete(f);

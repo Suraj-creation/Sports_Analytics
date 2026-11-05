@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 import numpy as np
 from numpy.typing import NDArray
 
+from bai_badminton.perception.association import ShuttleObservationEvidence
 from bai_badminton.perception.shuttle_post import Track
 from bai_badminton.perception_types import RacketObservation
 
@@ -79,9 +80,15 @@ class WindowObs:
     pose_stride: NDArray[np.int64] | None = None  # -1 unknown; 0 disabled; >0 actual schedule
     # True at an index whose preceding frame belongs to another temporal context.
     break_before: NDArray[np.bool_] | None = None
+    shuttle_evidence: tuple[ShuttleObservationEvidence | None, ...] | None = None
 
     def __post_init__(self) -> None:
         n = len(self.shuttle)
+        if self.shuttle_evidence is not None and (
+            len(self.shuttle_evidence) != n
+            or any(e is not None and e.frame_idx != self.frame0 + i for i, e in enumerate(self.shuttle_evidence))
+        ):
+            raise ValueError("shuttle evidence must align with canonical window frames")
         if self.replay.shape[0] == 0:
             self.replay = np.zeros(n, bool)
         elif self.replay.shape != (n,):

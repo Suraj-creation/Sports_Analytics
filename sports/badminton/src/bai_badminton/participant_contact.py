@@ -29,6 +29,8 @@ class ParticipantSnapshot:
     detector_observed: bool | None = None
     detector_matched: bool | None = None
     racket: RacketObservation | None = None
+    pose_frame_idx: int | None = None
+    racket_frame_idx: int | None = None
 
 
 def has_target_court_provenance(snapshot: ParticipantSnapshot) -> bool:
@@ -91,6 +93,7 @@ def participant_window(
         replay=window.replay,
         pose_stride=window.pose_stride,
         break_before=window.break_before,
+        shuttle_evidence=window.shuttle_evidence,
     )
 
 
