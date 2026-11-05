@@ -55,6 +55,20 @@ def _identity_metadata(person: dict) -> dict:
 def decode_observations(data: bytes, n_frames: int) -> ChunkPerception | None:
     """Historical observation replay, intentionally separate from production codecs."""
     decoded = msgpack.unpackb(data, raw=False)
+    if decoded.get("v", 1) >= 19:
+        # New temporal admission/content evidence must not be silently dropped
+        # by the permissive historical migration path below.
+        from types import SimpleNamespace
+
+        from bai_badminton.plugin import BadmintonSession
+
+        receiver = SimpleNamespace(
+            perception=SimpleNamespace(ref_id=decoded.get("cr")), _isolation_id=lambda: decoded.get("ci")
+        )
+        chunk = BadmintonSession.decode_perception(receiver, data, diagnostic=True)
+        if chunk.start >= n_frames:
+            return None
+        return BadmintonSession._slice_perception(chunk, chunk.start, min(chunk.end, n_frames - 1))
     frames = []
     for frame in decoded["frames"]:
         if frame["f"] >= n_frames:

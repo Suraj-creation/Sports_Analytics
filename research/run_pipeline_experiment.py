@@ -15,6 +15,7 @@ import subprocess
 import sys
 import threading
 import time
+from contextlib import nullcontext
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -189,6 +190,20 @@ def worker(video, output):
                 "pipeline": runner.sport.describe_pipeline(),
                 "effective_profile": runner.sport.perception.profile.model_dump(mode="json"),
                 "execution_backends": runner.sport.perception.runtimes,
+                "execution_device": {
+                    "cuda_visible_devices": os.environ.get("CUDA_VISIBLE_DEVICES"),
+                    "torch_cuda_initialized": torch.cuda.is_initialized(),
+                    "visible_torch_devices": [
+                        {
+                            "logical_index": i,
+                            "name": torch.cuda.get_device_properties(i).name,
+                            "uuid": str(torch.cuda.get_device_properties(i).uuid),
+                        }
+                        for i in range(torch.cuda.device_count())
+                    ]
+                    if torch.cuda.is_initialized()
+                    else [],
+                },
                 "degraded": runner.sport.degraded(),
                 "models": registry.status(),
                 "event_counts": dict(collections.Counter(e.type for e in events)),
@@ -223,12 +238,19 @@ def main():
     parser.add_argument("--rally-params", type=json.loads, default={})
     parser.add_argument("--shuttle-step", type=int, choices=[1, 4, 8], default=8)
     parser.add_argument("--shuttle-params", type=json.loads, default={})
+    parser.add_argument(
+        "--components", type=json.loads, default={}, help="Explicit optional perception/domain providers"
+    )
     parser.add_argument("--worker", action="store_true")
+    parser.add_argument("--gpu-index", type=int, help="Physical GPU with an exclusive benchmark-executor lease")
     args = parser.parse_args()
     output = args.output.resolve()
     if args.worker:
         worker(args.video.resolve(), output)
         return
+    from research.production_resource_guard import gpu_lease, gpu_uuid
+
+    allocated_gpu = gpu_uuid(args.gpu_index) if args.gpu_index is not None else None
     output.mkdir(parents=True, exist_ok=False)
     baseline = ROOT / "outputs/benchmarking/test1"
     base_metadata = json.loads((baseline / "benchmark_metadata.json").read_text())
@@ -247,6 +269,9 @@ def main():
     if "step" in args.shuttle_params and args.shuttle_params["step"] != args.shuttle_step:
         raise ValueError("shuttle step override conflicts with the explicit step argument")
     profile["shuttle"]["params"].update(args.shuttle_params)
+    if not isinstance(args.components, dict) or "rally" in args.components:
+        raise ValueError("components must be a mapping; use the separate rally implementation/options")
+    profile["components"].update(args.components)
     (output / "profiles").mkdir()
     (output / "profiles/experiment.yaml").write_text(yaml.safe_dump(profile, sort_keys=False))
     source_files = {
@@ -258,11 +283,13 @@ def main():
         "status": "running",
         "exploratory": True,
         "dataset_role": "development; no held-out claim",
+        "allocated_gpu_uuid": allocated_gpu,
         "execution_date": datetime.now(UTC).isoformat(),
         "git_commit_sha": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
         "active_branch": subprocess.check_output(["git", "branch", "--show-current"], cwd=ROOT, text=True).strip(),
         "source_hashes": source_files,
         "runner_sha256": digest(Path(__file__)),
+        "resource_guard_sha256": digest(ROOT / "research/production_resource_guard.py"),
         "source_video_sha256": base_metadata["source_video_sha256"],
         "ground_truth_sha256": base_metadata["ground_truth_sha256"],
         "ground_truth_path": base_metadata["ground_truth_path"],
@@ -276,6 +303,8 @@ def main():
         },
     }
     dump(output / "benchmark_metadata.json", metadata)
+    (output / "executed_runner.py").write_bytes(Path(__file__).read_bytes())
+    (output / "executed_resource_guard.py").write_bytes((ROOT / "research/production_resource_guard.py").read_bytes())
     (output / "source.diff").write_text(
         subprocess.check_output(["git", "diff", "HEAD", "--", "engine", "sports"], cwd=ROOT, text=True)
     )
@@ -289,10 +318,14 @@ def main():
             "--output",
             str(output),
         ]
-        with (output / "execution.log").open("x") as stream:
+        environment = dict(os.environ)
+        if allocated_gpu is not None:
+            environment["CUDA_VISIBLE_DEVICES"] = allocated_gpu
+        lease = gpu_lease(output.parent / ".gpu_leases", allocated_gpu) if allocated_gpu else nullcontext()
+        with lease, (output / "execution.log").open("x") as stream:
             stream.write("Command: " + json.dumps(command) + "\n")
             stream.flush()
-            subprocess.run(command, cwd=ROOT, stdout=stream, stderr=subprocess.STDOUT, check=True)
+            subprocess.run(command, cwd=ROOT, stdout=stream, stderr=subprocess.STDOUT, check=True, env=environment)
         if any(digest(ROOT / name) != value for name, value in source_files.items()):
             raise RuntimeError("production source changed during inference")
         if digest(args.video) != base_metadata["source_video_sha256"] or (

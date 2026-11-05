@@ -146,7 +146,12 @@ def main():
             player_diagnostic = diagnostic.get("players") if diagnostic else None
             external_probe = component_probe.get(f)
             candidate_diagnostic = shuttle_diagnostic or (external_probe.get("diagnostic") if external_probe else None)
-            candidates = candidate_diagnostic.get("candidates", []) if candidate_diagnostic else []
+            association = raw.get("sa")
+            candidates = (
+                association["candidates"]
+                if association is not None
+                else (candidate_diagnostic.get("candidates", []) if candidate_diagnostic else [])
+            )
             xy = [semantic.get("x"), semantic.get("y")]
             matrix = raw.get("g") or np.eye(3).reshape(-1).tolist()
             court_lines = []
@@ -168,6 +173,9 @@ def main():
                 "processed_raw_xy": project(matrix, xy) if None not in xy else None,
                 "kind": semantic.get("evidence", {}).get("kind", "unknown"),
                 "shot": raw.get("sh"),
+                "content_epoch": raw.get("ce", 0),
+                "content_change": raw.get("cc"),
+                "shuttle_association": association,
                 "view": raw.get("v"),
                 "calibration": raw.get("cs"),
                 "players": [
@@ -205,7 +213,9 @@ def main():
                 "perception_diagnostic": diagnostic,
                 "external_component_probe": external_probe,
                 "candidate_source": (
-                    "selected run's own frame diagnostic"
+                    "selected run's own bounded association candidates"
+                    if association is not None
+                    else "selected run's own frame diagnostic"
                     if shuttle_diagnostic
                     else "external controlled TrackNet component inference with recorded scene/mask context"
                     if external_probe
@@ -216,12 +226,12 @@ def main():
                 "rejected_player_boxes": player_diagnostic.get("roi_rejected", []) if player_diagnostic else [],
                 "top_k_candidates": (
                     "recorded raw heatmap components above diagnostic floor; not calibrated probabilities"
-                    if candidate_diagnostic
+                    if association is not None or candidate_diagnostic
                     else "not recorded for this frame (legacy cache or unselected diagnostic window)"
                 ),
                 "rejected_candidates": (
                     "recorded candidates retain threshold/mask/selection flags"
-                    if candidate_diagnostic
+                    if association is not None or candidate_diagnostic
                     else "not recorded for this frame"
                 ),
             }
