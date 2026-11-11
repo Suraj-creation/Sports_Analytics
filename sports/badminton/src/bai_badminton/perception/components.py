@@ -225,7 +225,7 @@ def _tracking_factory(context: TrackingContext, configuration: dict[str, Any]) -
         reid=context.reid,
         identity_retention_s=float(params.get("identity_retention_s", context.identity_retention_s)),
     )
-    context.record_model("tracking", "court-player-episodes-v1@3")
+    context.record_model("tracking", "court-player-episodes-v1@4")
     return result
 
 
@@ -411,7 +411,7 @@ def register_perception_components(registry: ComponentRegistry) -> None:
             ComponentContract(
                 kind=kind,
                 implementation=BASELINE_IMPLEMENTATIONS[kind],
-                version="3" if kind in {"ocr", "tracking"} else "1",
+                version="4" if kind == "tracking" else "3" if kind == "ocr" else "1",
                 input_schema=f"badminton-{kind}-input:v1",
                 output_schema=f"badminton-{kind}-output:v1",
                 interface=interface,
@@ -438,7 +438,7 @@ def register_perception_components(registry: ComponentRegistry) -> None:
                         {
                             "scene_foreground": {
                                 "interface": "ForegroundContinuityPort",
-                                "schema": "court-origin-image-regions:v1",
+                                "schema": "court-origin-image-regions:v2",
                                 "maximum_regions": 8,
                                 "authority": "image_continuity_only;never_participant_pose_or_identity",
                                 "failure": "overflow_abstains_until_reset;other_providers_use_person_regions",

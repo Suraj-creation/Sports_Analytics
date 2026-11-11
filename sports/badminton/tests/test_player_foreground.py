@@ -109,13 +109,19 @@ def test_visual_carries_are_typed_unobserved_and_do_not_create_detection():
 def test_single_current_box_cannot_refresh_two_visual_episodes():
     p, state, image = perception()
     p.process(0, image)
-    assert len(regions(p, 0)) == 2
+    regions_at_zero = regions(p, 0)
+    assert len(regions_at_zero) == 2
     # Both prior boxes overlap this wide current proposal at the existing .3 gate.
     p.detector = lambda _image: (np.array([[10.0, 10.0, 70.0, 95.0]]), np.array([0.95]))
     p.process(1, image)
-    keys = [r.key for r in regions(p, 1)]
-    assert len(keys) == len(set(keys))
-    assert len(keys) <= 1
+    context = regions(p, 1)
+    assert len({r.key for r in context}) == len(context)
+    # Ambiguity is bounded missing image evidence, never a fresh observation
+    # of both prior regions from this single current proposal.
+    previous = {r.key: r for r in regions_at_zero}
+    retained = [r for r in context if r.key in previous]
+    assert len(retained) == 2
+    assert all(not r.detector_matched and r.bbox == previous[r.key].bbox for r in retained)
 
 
 def test_visual_context_cannot_revive_after_unscheduled_gap():
@@ -161,3 +167,40 @@ def test_visual_memory_carry_cannot_rewind_and_revive_expired_context():
     assert memory.at(31) == ()
     with pytest.raises(ValueError, match="increasing"):
         memory.carry(1)
+
+
+def test_ambiguous_image_match_remains_missing_then_recovers_unique_outside_context():
+    from bai_badminton.perception.foreground import CourtForegroundMemory
+
+    memory = CourtForegroundMemory(30)
+    memory.update(0, np.array([[10.0, 10.0, 30.0, 95.0]]), np.array([True]))
+    key = memory.at(0)[0].key
+    outside = np.array([[10.0, 10.0, 30.0, 103.0]])
+    memory.update(1, outside, np.array([False]))
+    previous = memory.at(1)[0]
+    competing = np.array([[10.0, 10.0, 30.0, 103.0], [12.0, 10.0, 32.0, 103.0]])
+    memory.update(2, competing, np.array([False, False]))
+    missing = memory.at(2)
+    assert len(missing) == 1
+    assert missing[0].key == key and not missing[0].detector_matched
+    assert missing[0].bbox == previous.bbox
+    # No inside/court authority is supplied to reacquisition.
+    memory.update(3, outside, np.array([False]))
+    recovered = memory.at(3)
+    assert len(recovered) == 1 and recovered[0].key == key and recovered[0].detector_matched
+
+
+def test_ambiguous_image_matches_never_renew_freshness_or_resurrect_expired_context():
+    from bai_badminton.perception.foreground import CourtForegroundMemory
+
+    memory = CourtForegroundMemory(30)
+    memory.update(0, np.array([[10.0, 10.0, 30.0, 95.0]]), np.array([True]))
+    competing = np.array([[10.0, 10.0, 30.0, 103.0], [12.0, 10.0, 32.0, 103.0]])
+    for frame in range(1, 31):
+        memory.update(frame, competing, np.array([False, False]))
+        assert len(memory.at(frame)) == 1
+        assert not memory.at(frame)[0].detector_matched
+    memory.update(31, competing, np.array([False, False]))
+    assert memory.at(31) == ()
+    memory.update(32, competing[:1], np.array([False]))
+    assert memory.at(32) == ()

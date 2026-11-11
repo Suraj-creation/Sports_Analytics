@@ -1380,7 +1380,7 @@ class BadmintonSession:
 class BadmintonPlugin:
     name = "badminton"
     pipeline_id = "badminton-broadcast"
-    pipeline_version = "6"
+    pipeline_version = "7"
     stages = (
         (
             "perception",

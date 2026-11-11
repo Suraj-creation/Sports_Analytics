@@ -60,12 +60,12 @@ class CourtForegroundMemory:
                 self._regions[key] = (frame, boxes[row].copy())
                 self._matched.add(key)
                 used.add(row)
-            elif len(matches):
-                # Ambiguous region correspondence cannot carry old authority
-                # or count the same image evidence as independent witnesses.
-                del self._regions[key]
+            # Ambiguous and absent matches remain bounded missing estimates.
+            # Neither may move the box or renew its last observed timestamp.
+            # A later unique image match can recover before that lease expires;
+            # these image estimates never renew participant court authority.
         for row in np.flatnonzero(inside):
-            if int(row) not in used:
+            if int(row) not in used and not overlap[int(row)].any():
                 key = f"court-origin:{self._next}"
                 self._next += 1
                 self._regions[key] = (frame, boxes[row].copy())

@@ -410,7 +410,7 @@ class PlayerPerception:
             "policy": self._associator.policy_fingerprint if self._associator else "bytetrack_birth_activation_v2",
             "tracking_activation": TRACKER_ACTIVATION_POLICY,
             "court_membership": "observed_court_anchor_lease_v2",
-            "scene_foreground": "court_origin_image_continuity_v1",
+            "scene_foreground": "court_origin_image_continuity_v2",
         }
 
     def set_roi(self, roi: CourtROI | None) -> None:
