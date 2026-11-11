@@ -27,7 +27,7 @@ def main():
  state('fresh Test1 post-fix inference on GPU1',{'frames':n,'fixes':['recovery cut-frontier','independent score transition votes','stabilized ground-foot projection'],'source_plan':str(A/'protocol/plan.json')})
  run([R/'research/production_external_stress.py','run','--case','test1','--plan',A/'protocol/plan.json','--output',A/'run','--gpu-index','1'],'inference')
  state('verifying complete post-fix Test1 timestamps and components')
- run([R.parent/'pipeline-repair-runs-20261105/normal_timestamp_audit.py','--run',A/'run','--output',A/'timestamps'],'timestamps')
+ run([R/'research/normal_timestamp_audit.py','--run',A/'run','--output',A/'timestamps'],'timestamps')
  run([R/'research/pipeline_repair_run_analysis.py','--run',A/'run','--output',A/'analysis'],'analysis')
  run([R/'research/pipeline_repair_evaluation.py','--run',A/'run','--session','UPLOADTEST1','--reference',R/'Part2/dataset/Test1_Full/Test1_Full_rally.csv','--output',A/'rally_reference_evaluation'],'rally_evaluation')
  run([W/'orchestration/evaluate_test01_components.py','--run',A/'run','--output',A/'all_reference_components'],'all_reference_components')

@@ -31,9 +31,7 @@ MEDIA = {
     "test1": ROOT
     / "artifacts/benchmarking/experiments/prod_20261105_fresh_association_scene_v1/runtime/media"
     / "877c6d39d34ccfb302865ed44f7e08949b0f72be2833f71777066f837e6b8bd6/proxy.mp4",
-    "test2": ROOT.parent
-    / "test2-runs-20261105/fresh_v1/data/media"
-    / "4d687b4240fd501fb723c50588ecd095b9d9863299108c9d43b77c9587ba3c0a/proxy.mp4",
+    "test2": ROOT / "data/benchmarking/test2/retained_historical_proxy.mp4",
     "doubles": ROOT / "data/research/pluggable-pipeline-20261103/dshuttlenet-v7/prepared-v1/proxy.mp4",
     "amateur": ROOT / "data/media/90d1f399c05312ede173de2f2c8cd2fee09f1d201df46b476119660a00039ff0/proxy.mp4",
 }

@@ -1,5 +1,7 @@
 # Test-video benchmark collection
 
+**Retention update:** four historical artifact roots were deleted by request. Current runs and all eight analysis-video links are retained; some older run links now expose compact records only. Read the [retention notice](RETENTION_NOTICE.md) before attempting historical replay.
+
 Tests **1, 2, 3, 4, 6, 7, 9, 10**. Tests **5 and 8** are excluded from the evaluated-video collection.
 
 Start with [the comprehensive ground-truth evaluation](reports/consolidated/COMPREHENSIVE_EIGHT_VIDEO_GROUND_TRUTH_EVALUATION.md), then [the consolidated summary](reports/consolidated/CONSOLIDATED_SEQUENTIAL_BENCHMARK_REPORT.md).

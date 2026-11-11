@@ -31,7 +31,7 @@ def main():
  state('fresh current-source Test1 inference on GPU1',{'frames':n,'plan':str(A/'protocol/plan.json')})
  call([R/'research/production_external_stress.py','run','--case','test1','--plan',A/'protocol/plan.json','--output',A/'run','--gpu-index','1'],'fresh_inference')
  state('Test1 full-timestamp and component analysis')
- call([R.parent/'pipeline-repair-runs-20261105/normal_timestamp_audit.py','--run',A/'run','--output',A/'timestamps'],'timestamps')
+ call([R/'research/normal_timestamp_audit.py','--run',A/'run','--output',A/'timestamps'],'timestamps')
  call([R/'research/pipeline_repair_run_analysis.py','--run',A/'run','--output',A/'analysis'],'component_analysis')
  state('Test1 legacy rally reference evaluation; additional reference metrics pending explicit mapping')
  call([R/'research/pipeline_repair_evaluation.py','--run',A/'run','--session','UPLOADTEST1','--reference',R/'Part2/dataset/Test1_Full/Test1_Full_rally.csv','--output',A/'rally_reference_evaluation'],'rally_evaluation')
