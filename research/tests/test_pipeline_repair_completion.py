@@ -234,6 +234,14 @@ def test_recovery_catalog_accepts21_without_mutating_original_worker_allowlist(t
     assert before == original.PERCEPTION_CATALOG_LIMITS
     value["v"] = 22
     (directory / "seg_00000.msgpack").write_bytes(msgpack.packb(value))
+    # The historical recovery path stays21-only even when the normal writer
+    # supports22. This controlled fixture is not a rewritten completed run.
+    with pytest.raises(ValueError, match="unsupported cache codec"):
+        recovery.cache_catalog(
+            tmp_path, session_id="SOURCE", source_sha256="a" * 64, proxy_sha256="b" * 64, media=media, profile=profile
+        )
+    value["v"] = 23
+    (directory / "seg_00000.msgpack").write_bytes(msgpack.packb(value))
     with pytest.raises(ValueError, match="unsupported cache codec"):
         original.perception_catalog(
             tmp_path, session_id="SOURCE", source_sha256="a" * 64, proxy_sha256="b" * 64, media=media

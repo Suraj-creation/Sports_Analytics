@@ -121,6 +121,20 @@ def completed(tmp_path):
     )
     payload = BadmintonSession.encode_perception(receiver, ChunkPerception(0, 1, [first, last], models=models))
     value = msgpack.unpackb(payload, raw=False)
+    # Construct controlled SYNTHETIC historical21 wire data independently of
+    # the latest writer version. This is not real-run header rewriting or
+    # recovery: no source footage, worker receipt or observation is reused.
+    assert value["v"] in (21, 22)
+    value["v"] = 21
+    for frame in value["frames"]:
+        frame.pop("fg", None)
+        if frame.get("cc"):
+            frame["cc"].pop("supporting_region_keys", None)
+            frame["cc"].pop("witness_parameters", None)
+        if frame.get("cd"):
+            frame["cd"].pop("supporting_region_keys", None)
+            frame["cd"].pop("layout_indices", None)
+    payload = msgpack.packb(value, use_bin_type=True)
     assert value["v"] == 21
     path = directory / "seg_00000.msgpack"
     path.write_bytes(payload)
@@ -151,7 +165,7 @@ def test_real_codec21_decoder_is_used_and_roundtrip_catalog_is_bound(tool, compl
     verified = tool.verify_perception_catalog(output, receipt, **bindings)
     assert len(calls) == 2 and all(data == path.read_bytes() and diagnostic for data, diagnostic in calls)
     assert verified["files"][0]["codec_version"] == 21
-    assert verified["limits"]["accepted_codec_versions"] == [20, 21]
+    assert verified["limits"]["accepted_codec_versions"] == [20, 21, 22]
     assert verified["source_sha256"] == bindings["source_sha256"]
     assert verified["files"][0]["sha256"] == tool.digest(path)
 
@@ -165,7 +179,7 @@ def test_codec20_legacy_header_contract_remains_supported(tool, completed):
     assert tool.perception_catalog(output, **bindings)["frame_count"] == 2
 
 
-@pytest.mark.parametrize("version", [17, 19, 22, 999, True])
+@pytest.mark.parametrize("version", [17, 19, 23, 999, True])
 def test_no_legacy_or_future_codec_allowlist_bypass(tool, completed, version):
     output, path, value, bindings = completed
     value["v"] = version
@@ -277,7 +291,7 @@ def test_old_published_codec20_catalog_remains_verifiable_without_rewriting(tool
     before = target.read_bytes()
     assert tool.verify_perception_catalog(output, receipt, **bindings) == recorded
     assert target.read_bytes() == before
-    assert tool.PERCEPTION_CATALOG_LIMITS["accepted_codec_versions"] == [20, 21]
+    assert tool.PERCEPTION_CATALOG_LIMITS["accepted_codec_versions"] == [20, 21, 22]
 
 
 @pytest.mark.parametrize("change", ["bounds", "schema", "source", "cache_bytes"])

@@ -85,7 +85,7 @@ def copied_sql_rows(path, query, params=()):
             return connection.execute(query, params).fetchall()
 
 
-def validate_cache21(payload, profile, media):
+def _validate_cache_context(payload, profile, media, *, accepted_versions=(21,), context_label="codec21"):
     import msgpack
 
     from bai_badminton.plugin import BadmintonSession
@@ -93,14 +93,14 @@ def validate_cache21(payload, profile, media):
     value = msgpack.unpackb(payload, raw=False)
     identity = value.get("ci")
     if (
-        value.get("v") != 21
+        value.get("v") not in accepted_versions
         or not isinstance(identity, dict)
         or identity.get("profile") != profile
         or identity.get("loaded_models") != value.get("models")
         or identity.get("frame_size") != [media["width"], media["height"]]
         or identity.get("fps") != media["fps_num"] / media["fps_den"]
     ):
-        raise ValueError("codec21 source profile/model/media identity mismatch")
+        raise ValueError(f"{context_label} source profile/model/media identity mismatch")
     for group in ("components", "domain_components"):
         for kind, metadata in identity.get(group, {}).items():
             configuration = metadata.get("configuration")
@@ -112,6 +112,18 @@ def validate_cache21(payload, profile, media):
     receiver = SimpleNamespace(perception=SimpleNamespace(ref_id=value.get("cr")), _isolation_id=lambda: identity)
     decoded = BadmintonSession.decode_perception(receiver, payload, diagnostic=True)
     return value, decoded
+
+
+def validate_cache21(payload, profile, media):
+    """Historical recovery contract stays strictly codec21, without header rewriting."""
+    return _validate_cache_context(payload, profile, media, accepted_versions=(21,))
+
+
+def validate_completed_cache(payload, profile, media):
+    """Normal completed-run schema validation; no recovery or neural execution."""
+    return _validate_cache_context(
+        payload, profile, media, accepted_versions=(21, 22), context_label="completed codec21/22"
+    )
 
 
 def cache_catalog(run, *, session_id, source_sha256, proxy_sha256, media, profile):

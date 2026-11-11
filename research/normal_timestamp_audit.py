@@ -8,7 +8,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
-from research.pipeline_repair_completion import decode_source_pts, validate_cache21, verify_proxy  # noqa: E402
+from research.pipeline_repair_completion import decode_source_pts, validate_completed_cache, verify_proxy  # noqa: E402
 from research.production_external_semantic_replay import load_finished_input, sha  # noqa: E402
 
 
@@ -30,7 +30,7 @@ def audit(run, output):
         data = path.read_bytes()
         if hashlib.sha256(data).hexdigest() != expected:
             raise ValueError("actual completed cache changed")
-        _, decoded = validate_cache21(data, bound.profile, bound.media)
+        _, decoded = validate_completed_cache(data, bound.profile, bound.media)
         inputs[str(path)] = expected
         for frame in decoded.frames:
             decision = frame.content_decision

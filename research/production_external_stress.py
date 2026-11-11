@@ -38,7 +38,7 @@ PERCEPTION_CATALOG_LIMITS = {
     "max_cache_bytes": 16 * 1024 * 1024,
     "max_total_cache_bytes": 8 * 1024**3,
     "max_catalog_bytes": 8 * 1024 * 1024,
-    "accepted_codec_versions": [20, 21],
+    "accepted_codec_versions": [20, 21, 22],
 }
 
 
@@ -142,7 +142,7 @@ def perception_catalog(output: Path, *, session_id: str, source_sha256: str, pro
                 or not math.isclose(fps, media["fps_num"] / media["fps_den"], rel_tol=0, abs_tol=1e-9)
             ):
                 raise ValueError("cache timebase does not match canonical media")
-            if value["v"] == 21:
+            if value["v"] in (21, 22):
                 from types import SimpleNamespace
 
                 from bai_badminton.plugin import BadmintonSession
@@ -237,17 +237,18 @@ def verify_perception_catalog(output: Path, receipt: dict, **bindings) -> dict:
         raise ValueError("perception cache catalog SHA256 mismatch")
     recorded = json.loads(data)
     observed = perception_catalog(output, **bindings)
-    # Older published catalogues recorded the narrower codec20-only policy.
-    # Normalize that one metadata field only for an actual all-codec20 population;
-    # every remaining limit, source/header/hash/population and receipt stays exact.
-    legacy_limits = {**PERCEPTION_CATALOG_LIMITS, "accepted_codec_versions": [20]}
-    if (
-        isinstance(recorded, dict)
-        and recorded.get("schema") == PERCEPTION_CATALOG_SCHEMA
-        and recorded.get("limits") == legacy_limits
-        and all(row["codec_version"] == 20 for row in observed["files"])
-    ):
-        observed["limits"]["accepted_codec_versions"] = [20]
+    # Preserve a published acceptance policy only when the observed population
+    # actually fits it. Every other limit, header, byte hash and receipt is exact.
+    for historical_versions in ([20], [20, 21]):
+        historical_limits = {**PERCEPTION_CATALOG_LIMITS, "accepted_codec_versions": historical_versions}
+        if (
+            isinstance(recorded, dict)
+            and recorded.get("schema") == PERCEPTION_CATALOG_SCHEMA
+            and recorded.get("limits") == historical_limits
+            and all(row["codec_version"] in historical_versions for row in observed["files"])
+        ):
+            observed["limits"]["accepted_codec_versions"] = historical_versions
+            break
     if recorded != observed or receipt != _perception_receipt(observed, sha256):
         raise ValueError("perception cache catalog population/bytes/header/source binding mismatch")
     return recorded
