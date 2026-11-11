@@ -12,14 +12,16 @@ from __future__ import annotations
 from collections import deque
 from collections.abc import Sequence
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from math import isfinite
+from numbers import Real
 
 import cv2
 import numpy as np
 from numpy.typing import NDArray
 
 SCENE_CONTINUITY_VERSION = "foreground-scene-hypothesis:v2"
+SCENE_CONTINUITY_VERSION_V3 = "foreground-scene-hypothesis:v3"
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,7 +40,9 @@ class ForegroundRegion:
             or not 1 <= len(self.key) <= 160
         ):
             raise ValueError("foreground regions require canonical frame and opaque episode provenance")
-        if len(self.bbox) != 4 or not all(isfinite(v) for v in self.bbox):
+        if len(self.bbox) != 4 or any(
+            isinstance(v, (bool, np.bool_)) or not isinstance(v, Real) or not isfinite(v) for v in self.bbox
+        ):
             raise ValueError("foreground region requires finite image coordinates")
         if self.bbox[2] <= self.bbox[0] or self.bbox[3] <= self.bbox[1]:
             raise ValueError("foreground region must have positive extent")
@@ -84,6 +88,8 @@ class SceneChangeEvidence:
     correspondence_hypothesis: bool = False
     appearance_hypothesis: bool = False
     appearance_discontinuity: float | None = None
+    supporting_region_keys: tuple[str, ...] = ()
+    witness_parameters: tuple[float, float] | None = None
 
 
 def _flow(previous, current, mask):
@@ -119,6 +125,7 @@ class SceneContinuityDetector:
     """
 
     minimum_regions = 2
+    maximum_regions = 4
 
     def _retain_appearance_pair(self, value: float) -> bool:
         return True
@@ -191,7 +198,7 @@ class SceneContinuityDetector:
             self._history.clear()
             self._appearance_history.clear()
             return SceneChangeEvidence(frame, previous_frame, "unknown", False, ("excluded_view",))
-        if not self.minimum_regions <= len(previous_regions) <= 4:
+        if not self.minimum_regions <= len(previous_regions) <= self.maximum_regions:
             self._history.clear()
             self._appearance_history.clear()
             return SceneChangeEvidence(frame, previous_frame, "unknown", False, ("two_to_four_prior_regions_required",))
@@ -342,3 +349,86 @@ class SceneContinuityDetectorV2(SceneContinuityDetector):
 
     def _retain_appearance_pair(self, value: float) -> bool:
         return value >= 1.0
+
+
+def independent_scene_witnesses(regions, *, reliable, adaptive_ratio, minimum_discontinuity, ratio_name, value_name):
+    eligible = [
+        region
+        for region in regions
+        if (ratio := getattr(region, ratio_name)) is not None
+        and ratio >= adaptive_ratio
+        and getattr(region, value_name) is not None
+        and region.features >= 6
+    ]
+    # Repeated/overlapping image areas are not independent witnesses.
+    independent = []
+    for region in eligible:
+        a = region.region.bbox
+        if any(
+            other is not region
+            and min(a[2], other.region.bbox[2]) > max(a[0], other.region.bbox[0])
+            and min(a[3], other.region.bbox[3]) > max(a[1], other.region.bbox[1])
+            for other in eligible
+        ):
+            continue
+        independent.append(region)
+    if (
+        not reliable
+        or len(independent) < 2
+        or np.mean([getattr(region, value_name) for region in independent]) < minimum_discontinuity
+    ):
+        return ()
+    return tuple(region.region.key for region in independent)
+
+
+class SceneContinuityDetectorV3(SceneContinuityDetector):
+    """Joint image witnesses without a static bystander's veto.
+
+    Preserve every bounded region measurement. Each channel independently
+    needs at least two nonoverlapping regions with sufficient prior history
+    and the existing adaptive and aggregate intensity gates. One appearance
+    witness and one correspondence witness cannot be combined into a quorum.
+    These are scene hypotheses, never athlete identity or participant authority.
+    """
+
+    maximum_regions = 8
+
+    def observe(self, *args, **kwargs) -> SceneChangeEvidence:
+        raw = super().observe(*args, **kwargs)
+        reliable = (
+            raw.background_features >= 6
+            and raw.background_consistent_fraction is not None
+            and raw.background_consistent_fraction >= 0.5
+        )
+
+        parameters = dict(
+            reliable=reliable, adaptive_ratio=self.adaptive_ratio, minimum_discontinuity=self.minimum_discontinuity
+        )
+        correspondence = independent_scene_witnesses(
+            raw.regions, **parameters, ratio_name="adaptive_ratio", value_name="discontinuity"
+        )
+        appearance = independent_scene_witnesses(
+            raw.regions, **parameters, ratio_name="appearance_adaptive_ratio", value_name="median_patch_error"
+        )
+        # Each channel has already qualified independently. Preserve both
+        # cohorts so positive layout on one cannot hide another's innovation.
+        # A single witness in each channel cannot create a combined quorum.
+        supporting = tuple(
+            region.region.key for region in raw.regions if region.region.key in set(correspondence) | set(appearance)
+        )
+        hypothesis = bool(supporting)
+        return replace(
+            raw,
+            version=SCENE_CONTINUITY_VERSION_V3,
+            status="hypothesis" if hypothesis else "unknown" if raw.status == "unknown" else "measured",
+            hypothesis=hypothesis,
+            correspondence_hypothesis=bool(correspondence),
+            appearance_hypothesis=bool(appearance),
+            supporting_region_keys=supporting,
+            witness_parameters=(self.adaptive_ratio, self.minimum_discontinuity),
+            reasons=("joint_independent_region_innovation", "image_hypothesis_not_participant_authority")
+            if hypothesis
+            else ("insufficient_independent_region_witnesses",)
+            if raw.hypothesis
+            else raw.reasons,
+        )

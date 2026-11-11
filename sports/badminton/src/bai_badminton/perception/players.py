@@ -25,7 +25,9 @@ from numpy.typing import NDArray
 
 from bai_badminton.court import HALF_LEN, WIDTH_DOUBLES, Homography
 from bai_badminton.identity import hsv_signature
+from bai_badminton.perception.foreground import CourtForegroundMemory
 from bai_badminton.perception.player_association import PersistentPlayerAssociator
+from bai_badminton.perception.scene_change import ForegroundRegion
 from bai_badminton.perception_types import PersonObs
 
 PERSON = 0
@@ -377,6 +379,14 @@ class PlayerPerception:
         self._diagnostic_top_k = 0
         self.last_diagnostic: dict[str, Any] | None = None
         self._force_detection = False
+        self._foreground = CourtForegroundMemory(fps)
+
+    def foreground_regions(self, frame_idx: int) -> tuple[ForegroundRegion, ...]:
+        """Detached scene-only regions; these never authorize participants."""
+        return self._foreground.at(frame_idx)
+
+    def reset_foreground(self) -> None:
+        self._foreground.reset()
 
     def set_diagnostics(self, enabled: bool, top_k: int = 3) -> None:
         if type(enabled) is not bool or type(top_k) is not int or not 1 <= top_k <= 8:
@@ -400,6 +410,7 @@ class PlayerPerception:
             "policy": self._associator.policy_fingerprint if self._associator else "bytetrack_birth_activation_v2",
             "tracking_activation": TRACKER_ACTIVATION_POLICY,
             "court_membership": "observed_court_anchor_lease_v2",
+            "scene_foreground": "court_origin_image_continuity_v1",
         }
 
     def set_roi(self, roi: CourtROI | None) -> None:
@@ -412,6 +423,7 @@ class PlayerPerception:
         self._last = []
         self._admitted.clear()
         self._court_tracks.clear()
+        self._foreground.reset()
         self._last_detection_frame = None
         self._force_detection = True
         if self._associator is not None:
@@ -480,6 +492,7 @@ class PlayerPerception:
                 else "scheduled_carry",
             }
         if self.detector is None or det_stride == 0:
+            self._foreground.reset()
             return []
         if detection_probe is not None and self._last_detection_frame == frame_idx:
             raise ValueError("current detector probe was already consumed by tracking")
@@ -509,6 +522,11 @@ class PlayerPerception:
         self._force_detection = False
         if len(boxes):
             boxes = boxes + np.array([x0, y0, x0, y0], dtype=np.float64)
+        self._foreground.update(
+            frame_idx,
+            np.asarray(boxes, dtype=float).reshape(-1, 4),
+            np.asarray([self.roi is not None and self.roi.contains_feet(box) for box in boxes], dtype=bool),
+        )
         if self.last_diagnostic is not None:
             self.last_diagnostic.update(
                 detector_executed=True,
@@ -624,12 +642,14 @@ class PlayerPerception:
         return persons
 
     def _carry(self, frame_idx: int, img: NDArray[np.uint8], pose_stride: int, det_stride: int) -> list[PersonObs]:
+        self._foreground.carry(frame_idx)
         # Membership time is measured on every source frame, including frames
         # between detector ticks. A carried box cannot extend an expired lease.
         self._court_tracks = {
             tid: value for tid, value in self._court_tracks.items() if frame_idx - value[0] <= self.fps
         }
         if self._last_detection_frame is None or frame_idx - self._last_detection_frame > det_stride:
+            self._foreground.reset()
             # Scene gating can skip process() for a long interval. Returning to
             # the main camera between detector ticks must not revive old boxes.
             if self.last_diagnostic is not None:

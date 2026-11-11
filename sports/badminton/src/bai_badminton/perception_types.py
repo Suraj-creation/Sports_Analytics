@@ -11,7 +11,7 @@ from bai_badminton.perception.association import ShuttleObservationEvidence
 from bai_badminton.perception.calibration_state import CalibrationState
 from bai_badminton.perception.content import SceneDecisionEvidence, validate_scene_decision_binding
 from bai_badminton.perception.diagnostics import FrameDiagnostic
-from bai_badminton.perception.scene_change import SceneChangeEvidence
+from bai_badminton.perception.scene_change import ForegroundRegion, SceneChangeEvidence
 
 
 @dataclass(frozen=True)
@@ -112,8 +112,18 @@ class FramePerception:
     content_epoch: int = 0  # timeline edits need not invalidate the same camera's court geometry
     content_change: SceneChangeEvidence | None = None
     content_decision: SceneDecisionEvidence | None = None
+    foreground_regions: tuple[ForegroundRegion, ...] = ()
 
     def __post_init__(self) -> None:
+        if (
+            len(self.foreground_regions) > 8
+            or any(
+                not isinstance(region, ForegroundRegion) or region.frame != self.frame_idx
+                for region in self.foreground_regions
+            )
+            or len({region.key for region in self.foreground_regions}) != len(self.foreground_regions)
+        ):
+            raise ValueError("invalid bounded current-frame scene-only foreground observations")
         if type(self.content_epoch) is not int or self.content_epoch < 0:
             raise ValueError("content epoch must be a nonnegative integer")
         if self.content_change is not None and self.content_change.frame != self.frame_idx:

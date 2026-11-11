@@ -37,6 +37,7 @@ from bai_badminton.perception.components import (
     BASELINE_IMPLEMENTATIONS,
     PERCEPTION_PORTS,
     DiagnosticShuttlePort,
+    ForegroundContinuityPort,
     PerceptionContext,
     TrackingContext,
     register_perception_components,
@@ -46,6 +47,7 @@ from bai_badminton.perception.diagnostics import DiagnosticSelection, FrameDiagn
 from bai_badminton.perception.isolation import flight_mask
 from bai_badminton.perception.players import CourtROI, PlayerDetector, PoseEstimator
 from bai_badminton.perception.scene import CourtPresence, CutDetector, small_hsv
+from bai_badminton.perception.scene_change import ForegroundRegion
 from bai_badminton.perception.scoreboard import ScoreboardReader
 from bai_badminton.perception_types import (
     ChunkPerception,
@@ -86,6 +88,7 @@ class _PlayerFrame:
     persons: list[PersonObs]
     detector_observed: bool
     diagnostic: dict[str, Any] | None
+    foreground_regions: tuple[ForegroundRegion, ...] = ()
 
 
 @dataclass
@@ -561,6 +564,9 @@ class BadmintonPerception:
             self.players.on_cut()
         self._set_player_roi(poly, G)
         if replay:
+            reset_foreground = getattr(self.players, "reset_foreground", None)
+            if callable(reset_foreground):
+                reset_foreground()
             persons = []
         elif detection_probe is not None:
             persons = self.players.process(fidx, img, strides, detection_probe=detection_probe)
@@ -584,10 +590,32 @@ class BadmintonPerception:
             and not any(d.stage == "player_tracking" and d.reason == reason for d in self.degraded)
         ):
             self._degrade("player_tracking", reason)
+        foreground = (
+            self.players.foreground_regions(fidx)
+            if isinstance(self.players, ForegroundContinuityPort) and not replay
+            else tuple(
+                ForegroundRegion(
+                    fidx,
+                    f"track:{p.track_id}",
+                    tuple(float(v) for v in p.bbox),
+                    p.detector_matched,
+                    bool(getattr(self.players, "last_detector_observed", False)),
+                )
+                for p in persons
+            )
+        )
+        if (
+            not isinstance(foreground, tuple)
+            or len(foreground) > 8
+            or any(not isinstance(region, ForegroundRegion) or region.frame != fidx for region in foreground)
+            or len({region.key for region in foreground}) != len(foreground)
+        ):
+            raise ValueError("tracking foreground port violates its bounded current-frame contract")
         return _PlayerFrame(
             persons,
             bool(not replay and getattr(self.players, "last_detector_observed", False)),
             getattr(self.players, "last_diagnostic", None) if callable(configure) else None,
+            foreground,
         )
 
     def _set_player_roi(self, poly: np.ndarray | None, G: np.ndarray | None) -> None:
@@ -644,27 +672,13 @@ class BadmintonPerception:
         pre_people: list[_PlayerFrame] | None = None
         if content is not None:
             from bai_badminton.perception.content import scene_change_from_dict, scene_change_to_dict
-            from bai_badminton.perception.scene_change import ForegroundRegion
 
             pre_people = []
             started = _now()
             for i, image in enumerate(chunk.frames):
                 frame = chunk.start + i
                 previous = self._content_previous
-                regions = (
-                    [
-                        ForegroundRegion(
-                            previous[0],
-                            f"track:{p.track_id}",
-                            tuple(float(v) for v in p.bbox),
-                            p.detector_matched,
-                            previous[1].detector_observed,
-                        )
-                        for p in previous[1].persons
-                    ]
-                    if previous is not None and previous[0] == frame - 1
-                    else []
-                )
+                regions = previous[1].foreground_regions if previous is not None and previous[0] == frame - 1 else []
                 evidence = content.observe(
                     frame,
                     image,
@@ -827,6 +841,7 @@ class BadmintonPerception:
                         content_epoch=content_epochs[i],
                         content_change=content_evidence[i],
                         content_decision=content_decisions[i],
+                        foreground_regions=people.foreground_regions,
                         diagnostic=FrameDiagnostic(
                             frame_idx=fidx,
                             canonical_time_sec=fidx / self.fps,

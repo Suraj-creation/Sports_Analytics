@@ -125,6 +125,13 @@ class PlayerDetectorPort(Protocol):
 
 
 @runtime_checkable
+class ForegroundContinuityPort(Protocol):
+    """Optional scene-only image evidence, separate from participant outputs."""
+
+    def foreground_regions(self, frame_idx: int) -> tuple[ForegroundRegion, ...]: ...
+
+
+@runtime_checkable
 class PosePort(Protocol):
     """BGR image and xyxy boxes to COCO17 image-coordinate x/y/confidence."""
 
@@ -218,7 +225,7 @@ def _tracking_factory(context: TrackingContext, configuration: dict[str, Any]) -
         reid=context.reid,
         identity_retention_s=float(params.get("identity_retention_s", context.identity_retention_s)),
     )
-    context.record_model("tracking", "court-player-episodes-v1@2")
+    context.record_model("tracking", "court-player-episodes-v1@3")
     return result
 
 
@@ -404,7 +411,7 @@ def register_perception_components(registry: ComponentRegistry) -> None:
             ComponentContract(
                 kind=kind,
                 implementation=BASELINE_IMPLEMENTATIONS[kind],
-                version="3" if kind == "ocr" else "2" if kind == "tracking" else "1",
+                version="3" if kind in {"ocr", "tracking"} else "1",
                 input_schema=f"badminton-{kind}-input:v1",
                 output_schema=f"badminton-{kind}-output:v1",
                 interface=interface,
@@ -427,6 +434,19 @@ def register_perception_components(registry: ComponentRegistry) -> None:
                     "coordinates": "analysis_proxy_image_pixels;BGR_input;shuttle_masks_512x288",
                     "required_evidence": ["view_eligible_image"],
                     "optional_evidence": ["verified_target_court", "current_person_and_pose_for_racket"],
+                    **(
+                        {
+                            "scene_foreground": {
+                                "interface": "ForegroundContinuityPort",
+                                "schema": "court-origin-image-regions:v1",
+                                "maximum_regions": 8,
+                                "authority": "image_continuity_only;never_participant_pose_or_identity",
+                                "failure": "overflow_abstains_until_reset;other_providers_use_person_regions",
+                            }
+                        }
+                        if kind == "tracking"
+                        else {}
+                    ),
                     "state_restore": "recompute_in_frame_order"
                     if kind in {"shuttle", "ocr", "tracking"}
                     else "stateless",
@@ -474,7 +494,7 @@ def register_perception_components(registry: ComponentRegistry) -> None:
         upgraded = choice.implementation == CONTENT_IMPLEMENTATION_V2
         result = (ContentContinuityProviderV2 if upgraded else ContentContinuityProvider)(**choice.params)
         context.record_model(
-            "content_continuity", f"{CONTENT_IMPLEMENTATION_V2}@2" if upgraded else f"{CONTENT_IMPLEMENTATION}@1"
+            "content_continuity", f"{CONTENT_IMPLEMENTATION_V2}@3" if upgraded else f"{CONTENT_IMPLEMENTATION}@1"
         )
         context.record_runtime(
             "content_continuity",
@@ -484,7 +504,9 @@ def register_perception_components(registry: ComponentRegistry) -> None:
                 "input_dtype": "uint8",
                 "mode": result.mode,
                 "barrier_enabled": result.barrier_enabled,
-                "evidence_schema": SCENE_CONTINUITY_VERSION,
+                "evidence_schema": "foreground-scene-hypothesis:v3"
+                if upgraded and result.requires_detector_layout
+                else SCENE_CONTINUITY_VERSION,
                 "score_semantics": "uncalibrated_pixel_and_ratio_evidence",
             },
         )
@@ -523,9 +545,9 @@ def register_perception_components(registry: ComponentRegistry) -> None:
         ComponentContract(
             kind="content_continuity",
             implementation=CONTENT_IMPLEMENTATION_V2,
-            version="2",
+            version="3",
             input_schema="badminton-content-continuity-input:v1",
-            output_schema=SCENE_CONTINUITY_VERSION,
+            output_schema="foreground-scene-hypothesis:v2-or-v3",
             interface=ContentContinuityPort,
             context_type=PerceptionContext,
             supported_formats=frozenset({"singles", "doubles", "unknown"}),

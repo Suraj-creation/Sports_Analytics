@@ -56,7 +56,7 @@ from bai_engine.store import EventStore, TrackStore
 log = get_logger(__name__)
 AUTO_CALIBRATION_MIN_SCORE = 0.6
 REF_FILE = "camera_ref.png"  # the frame the calibration was made on (lossless: its id is a content hash)
-CODEC_VERSION = 21  # current detector-layout decision evidence; older diagnostic reads retain unknown decisions
+CODEC_VERSION = 22  # detached scene-only foreground; older diagnostic reads retain unknown regions
 MAX_ADJUST = 0.03  # a human calibration the court lines move by more than this (× frame width) is kept as is
 
 
@@ -1100,6 +1100,7 @@ class BadmintonSession:
                     "ce": fp.content_epoch,
                     "cc": scene_change_to_dict(fp.content_change) if fp.content_change is not None else None,
                     "cd": scene_decision_to_dict(fp.content_decision) if fp.content_decision is not None else None,
+                    "fg": [asdict(region) for region in fp.foreground_regions],
                     "p": [
                         {
                             "t": q.track_id,
@@ -1153,7 +1154,7 @@ class BadmintonSession:
         d = msgpack.unpackb(data, raw=False)
         ref_id = self.perception.ref_id
         if (
-            d.get("v", 1) not in {17, 18, 19, 20, CODEC_VERSION}
+            d.get("v", 1) not in {17, 18, 19, 20, 21, CODEC_VERSION}
             or d.get("cr") != ref_id
             or d.get("ci") != self._isolation_id()
         ):
@@ -1177,6 +1178,10 @@ class BadmintonSession:
         associations = {}
         content_changes = {}
         content_decisions = {}
+        foreground_regions = {}
+        from bai_badminton.perception.scene_change import ForegroundRegion
+
+        foreground_fields = {"frame", "key", "bbox", "detector_matched", "detector_observed"}
         cache_policy = d.get("ci") if isinstance(d.get("ci"), dict) else {}
         profile_policy = cache_policy.get("profile")
         components_policy = profile_policy.get("components", {}) if isinstance(profile_policy, dict) else {}
@@ -1187,6 +1192,22 @@ class BadmintonSession:
         )
         try:
             for frame in d["frames"]:
+                if d["v"] >= 22:
+                    regions = frame.get("fg")
+                    if not isinstance(regions, (list, tuple)) or len(regions) > 8:
+                        raise ValueError("missing bounded scene-only foreground provenance")
+                    values = []
+                    for region in regions:
+                        if (
+                            not isinstance(region, dict)
+                            or set(region) != foreground_fields
+                            or region["frame"] != frame["f"]
+                        ):
+                            raise ValueError("scene-only foreground source frame/fields disagree")
+                        values.append(ForegroundRegion(**region))
+                    if len({region.key for region in values}) != len(values):
+                        raise ValueError("duplicate scene-only foreground region")
+                    foreground_regions[frame["f"]] = tuple(values)
                 if d["v"] >= 21:
                     if "cd" not in frame:
                         raise ValueError("content decision provenance field is missing")
@@ -1222,6 +1243,15 @@ class BadmintonSession:
                         raise ValueError("association schema/content epoch metadata is missing")
                     if frame["cc"] is not None:
                         content_changes[frame["f"]] = scene_change_from_dict(frame["cc"], frame_idx=frame["f"])
+                        change = content_changes[frame["f"]]
+                        if change.witness_parameters is not None:
+                            parameters = content_choice.get("params", {})
+                            expected = (
+                                float(parameters.get("adaptive_ratio", 3.0)),
+                                float(parameters.get("minimum_discontinuity", 15.0)),
+                            )
+                            if change.witness_parameters != expected:
+                                raise ValueError("scene witness parameters differ from the producer configuration")
                     if frame["sa"] is not None:
                         observation = ShuttleObservationEvidence.from_dict(frame["sa"])
                         raw_xy = tuple(frame["s"]) if frame["s"] is not None else None
@@ -1313,6 +1343,7 @@ class BadmintonSession:
                 content_epoch=f.get("ce", 0),
                 content_change=content_changes.get(f["f"]),
                 content_decision=content_decisions.get(f["f"]),
+                foreground_regions=foreground_regions.get(f["f"], ()),
                 persons=[
                     PersonObs(
                         track_id=q["t"],
@@ -1349,7 +1380,7 @@ class BadmintonSession:
 class BadmintonPlugin:
     name = "badminton"
     pipeline_id = "badminton-broadcast"
-    pipeline_version = "5"
+    pipeline_version = "6"
     stages = (
         (
             "perception",
