@@ -218,7 +218,7 @@ def _tracking_factory(context: TrackingContext, configuration: dict[str, Any]) -
         reid=context.reid,
         identity_retention_s=float(params.get("identity_retention_s", context.identity_retention_s)),
     )
-    context.record_model("tracking", "court-player-episodes-v1@1")
+    context.record_model("tracking", "court-player-episodes-v1@2")
     return result
 
 
@@ -404,7 +404,7 @@ def register_perception_components(registry: ComponentRegistry) -> None:
             ComponentContract(
                 kind=kind,
                 implementation=BASELINE_IMPLEMENTATIONS[kind],
-                version="3" if kind == "ocr" else "1",
+                version="3" if kind == "ocr" else "2" if kind == "tracking" else "1",
                 input_schema=f"badminton-{kind}-input:v1",
                 output_schema=f"badminton-{kind}-output:v1",
                 interface=interface,

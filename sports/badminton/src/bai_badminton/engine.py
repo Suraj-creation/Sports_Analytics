@@ -1422,17 +1422,24 @@ class BadmintonMatchEngine:
         n = b - a
         replay = np.asarray(self._replay[a:b], dtype=bool)
         break_before = self._segment_breaks(lo, hi)
-        visible = np.asarray(self._svis[a:b], dtype=bool) & np.asarray(self._temporal_valid[a:b], dtype=bool)
+        excluded = ~np.asarray(self._temporal_valid[a:b], dtype=bool)
+        for index, evidence in enumerate(self._shuttle_evidence[a:b]):
+            if evidence is not None and (
+                evidence.status in {"ambiguous", "invalid"} or evidence.association_status == "rejected"
+            ):
+                excluded[index] = True
+        # Ordinary raw absence may have independently bracketed reconstructed
+        # context. Contradictory/invalid evidence is an interpolation barrier,
+        # including for neighboring missing samples; it is not a camera cut.
+        processing_breaks = break_before | excluded
+        processing_breaks[1:] |= excluded[:-1]
+        visible = np.asarray(self._svis[a:b], dtype=bool) & ~excluded
         track = process(
             Track.from_arrays(np.array(self._sx[a:b]), np.array(self._sy[a:b]), visible, np.array(self._sconf[a:b])),
-            break_before=break_before,
+            break_before=processing_breaks,
         )
-        for index, evidence in enumerate(self._shuttle_evidence[a:b]):
-            if evidence is not None and evidence.status != "observed":
-                # A competing hypothesis is retained as evidence, never filled
-                # into a physical observation by the interpolation consumer.
-                track.vis[index] = False
-                track.interp[index] = False
+        track.vis[excluded] = False
+        track.interp[excluded] = False
         players = {}
         for pid, buf in self._players.items():
             s = PlayerSeries.empty(n)

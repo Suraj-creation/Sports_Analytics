@@ -887,6 +887,8 @@ class BadmintonSession:
             ("racket", "racket", False),
         ):
             choice = getattr(profile, attr, None)
+            if stage == "player_identity":
+                choice = getattr(self.perception, "effective_choices", {}).get("player_reid", choice)
             requested = choice.model if choice is not None else None
             active = loaded.get("player_reid" if stage == "player_identity" else stage)
             disabled = requested in (None, "none") or (choice is not None and choice.backend == "none")
@@ -894,8 +896,18 @@ class BadmintonSession:
             reason = next((d.reason for d in self.perception.degraded if d.stage == stage), "")
             if reason and active:
                 status = "unavailable"
-            if stage == "player_identity" and self.perception.match_format != "doubles" and not active:
-                status, reason = "disabled", "Neural identity association is currently available for doubles only."
+            if (
+                stage == "player_identity"
+                and not active
+                and not disabled
+                and not reason
+                and self.perception.match_format == "singles"
+                and "player_reid" not in profile.components
+            ):
+                status = "disabled"
+                reason = (
+                    "Default singles acquisition omits appearance association; an explicit component can enable it."
+                )
             out[stage] = {
                 "status": status,
                 "requested_model": requested,
@@ -1337,7 +1349,7 @@ class BadmintonSession:
 class BadmintonPlugin:
     name = "badminton"
     pipeline_id = "badminton-broadcast"
-    pipeline_version = "4"
+    pipeline_version = "5"
     stages = (
         (
             "perception",

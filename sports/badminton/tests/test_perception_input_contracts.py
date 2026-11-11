@@ -72,14 +72,22 @@ def test_rtmpose_receives_rgb_before_actual_affine_crop_and_normalisation():
 def test_tracker_lost_identity_expires_after_one_video_second_independent_of_call_count(fps):
     tracker = PlayerTracker(fps)
     box, score = np.array([[20, 20, 80, 160]], float), np.array([0.95])
-    assert tracker.update(box, score, 0) == []  # ByteTrack requires a second observation to admit a birth.
-    first = tracker.update(box, score, 2)[0][0]
-    short_gap = tracker.update(box, score, 6)[0][0]
-    assert short_gap == first
+    born = tracker.update(box, score, 0)
+    assert len(born) == 1  # The configured one-observation minimum includes the initial detection.
+    first = born[0][0]
+    assert first >= 0
+    for frame in (2, 6):
+        current = tracker.update(box, score, frame)
+        assert len(current) == 1
+        assert current[0][0] == first
     # Only a few detector calls, but more than one second since last observation.
-    assert tracker.update(box, score, 6 + fps + 1) == []
-    after_gap = tracker.update(box, score, 6 + fps + 3)[0][0]
+    reborn = tracker.update(box, score, 6 + fps + 1)
+    assert len(reborn) == 1
+    after_gap = reborn[0][0]
     assert after_gap != first
+    matched = tracker.update(box, score, 6 + fps + 3)
+    assert len(matched) == 1
+    assert matched[0][0] == after_gap
 
 
 def test_player_perception_passes_absolute_frames_across_changing_detector_cadence():

@@ -29,6 +29,7 @@ from bai_badminton.perception.player_association import PersistentPlayerAssociat
 from bai_badminton.perception_types import PersonObs
 
 PERSON = 0
+TRACKER_ACTIVATION_POLICY = "initial_observation_counts_v2"
 
 
 @dataclass(frozen=True, slots=True)
@@ -302,9 +303,9 @@ class PlayerTracker:
     """ByteTrack over detector outputs using elapsed video time between detections."""
 
     def __init__(self, fps: float) -> None:
-        from trackers import ByteTrackTracker
+        from bai_badminton.perception._bytetrack import ObservationCountByteTrack
 
-        self._tracker = ByteTrackTracker(
+        self._tracker = ObservationCountByteTrack(
             frame_rate=fps,
             lost_track_buffer=30,  # expressed in 30-FPS frames: one second at any source rate
             track_activation_threshold=0.4,
@@ -368,6 +369,8 @@ class PlayerPerception:
         self.roi: CourtROI | None = None
         self._last: list[PersonObs] = []
         self._admitted: dict[int, int] = {}
+        # Last court-supported anchor time and latest matched continuity box.
+        # An outside observation may move the box but cannot renew membership.
         self._court_tracks: dict[int, tuple[int, NDArray[np.float64]]] = {}
         self._last_detection_frame: int | None = None
         self.fps = fps
@@ -394,8 +397,9 @@ class PlayerPerception:
             if self._associator
             else "disabled",
             "model": self._reid_fingerprint,
-            "policy": self._associator.policy_fingerprint if self._associator else "bytetrack_v1",
-            "court_membership": "observed_box_continuity_v1",
+            "policy": self._associator.policy_fingerprint if self._associator else "bytetrack_birth_activation_v2",
+            "tracking_activation": TRACKER_ACTIVATION_POLICY,
+            "court_membership": "observed_court_anchor_lease_v2",
         }
 
     def set_roi(self, roi: CourtROI | None) -> None:
@@ -564,8 +568,16 @@ class PlayerPerception:
         tracks = tracks[: self.max_players + 2]
         observed = _unique_detection_matches(tracks, boxes)
         for (tid, box, _), matched in zip(tracks, observed, strict=True):
-            if matched:
-                self._court_tracks[tid] = (frame_idx, box.copy())
+            if matched and self.roi is not None:
+                if self.roi.contains_feet(box):
+                    self._court_tracks[tid] = (frame_idx, box.copy())
+                elif tid in self._court_tracks:
+                    # Retain spatial continuity during a moving jump/runoff,
+                    # while the original court observation's one-second lease
+                    # remains unchanged. Otherwise a spectator handover could
+                    # refresh its own authority forever outside the court.
+                    anchor, _ = self._court_tracks[tid]
+                    self._court_tracks[tid] = (anchor, box.copy())
         canonical = [tid for tid, _, _ in tracks]
         reasons = ["bytetrack_v1"] * len(tracks)
         if self._associator is not None:
@@ -612,6 +624,11 @@ class PlayerPerception:
         return persons
 
     def _carry(self, frame_idx: int, img: NDArray[np.uint8], pose_stride: int, det_stride: int) -> list[PersonObs]:
+        # Membership time is measured on every source frame, including frames
+        # between detector ticks. A carried box cannot extend an expired lease.
+        self._court_tracks = {
+            tid: value for tid, value in self._court_tracks.items() if frame_idx - value[0] <= self.fps
+        }
         if self._last_detection_frame is None or frame_idx - self._last_detection_frame > det_stride:
             # Scene gating can skip process() for a long interval. Returning to
             # the main camera between detector ticks must not revive old boxes.
