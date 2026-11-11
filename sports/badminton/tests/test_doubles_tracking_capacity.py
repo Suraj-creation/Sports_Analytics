@@ -97,6 +97,8 @@ def test_pipeline_reports_capacity_degradation_once_and_withholds_detector_cover
     p.profile = SimpleNamespace(detector_rates=rates, pose_rates=rates)
     p.mode = "lines"
     p._lines_id = 123
+    p.match_format = "unknown"
+    p.match_format_confirmed = False
     p._H_ref = np.eye(3)
     p._ref_poly = None
     p.camera = SimpleNamespace(_st=None)

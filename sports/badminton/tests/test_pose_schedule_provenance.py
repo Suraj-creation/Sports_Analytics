@@ -69,6 +69,8 @@ def test_pipeline_records_actual_idle_and_play_cadence_without_claiming_pose_obs
     )
     p.mode = "lines"
     p._lines_id = 123
+    p.match_format = "unknown"
+    p.match_format_confirmed = False
     p._H_ref = np.eye(3)
     p._ref_poly = None
     p.camera = SimpleNamespace(_st=None)
