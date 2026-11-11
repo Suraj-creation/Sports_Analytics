@@ -1,0 +1,359 @@
+description: 'EXPERIMENTAL repair validation on Pascal GTX1080Ti: CUDA FP16 TrackNet,
+  actual FP32 detector/pose, explicit CPU OCR; no production promotion'
+device: cuda
+analysis_height: 720
+chunk_frames: 64
+lead_buffer_s: 5.0
+shuttle:
+  model: tracknetv3
+  backend: torch-cuda
+  precision: fp16
+  batch: 4
+  input_size:
+  - 512
+  - 288
+  params:
+    seq_len: 8
+    bg_mode: concat
+    threshold: 0.5
+    step: 8
+    flight_region: vertical_columns_to_image_top_v1
+    diagnostics:
+      ranges:
+      - - 0
+        - 29
+      - - 245
+        - 274
+      - - 491
+        - 520
+      - - 737
+        - 766
+      - - 983
+        - 1012
+      - - 1229
+        - 1258
+      - - 1475
+        - 1504
+      - - 1721
+        - 1750
+      - - 1967
+        - 1996
+      - - 2213
+        - 2242
+      - - 2459
+        - 2488
+      - - 2705
+        - 2734
+      - - 2951
+        - 2980
+      - - 3197
+        - 3226
+      - - 3443
+        - 3472
+      - - 3688
+        - 3717
+      - - 3934
+        - 3963
+      - - 4180
+        - 4209
+      - - 4426
+        - 4455
+      - - 4672
+        - 4701
+      - - 4918
+        - 4947
+      - - 5164
+        - 5193
+      - - 5410
+        - 5439
+      - - 5656
+        - 5685
+      - - 5902
+        - 5931
+      - - 6148
+        - 6177
+      - - 6394
+        - 6423
+      - - 6640
+        - 6669
+      - - 6886
+        - 6915
+      - - 7132
+        - 7161
+      - - 7377
+        - 7406
+      - - 7623
+        - 7652
+      - - 7869
+        - 7898
+      - - 8115
+        - 8144
+      - - 8361
+        - 8390
+      - - 8607
+        - 8636
+      - - 8853
+        - 8882
+      - - 9099
+        - 9128
+      - - 9345
+        - 9374
+      - - 9591
+        - 9620
+      - - 9837
+        - 9866
+      - - 10083
+        - 10112
+      - - 10329
+        - 10358
+      - - 10575
+        - 10604
+      - - 10821
+        - 10850
+      - - 11066
+        - 11095
+      - - 11312
+        - 11341
+      - - 11558
+        - 11587
+      - - 11804
+        - 11833
+      - - 12050
+        - 12079
+      - - 12296
+        - 12325
+      - - 12542
+        - 12571
+      - - 12788
+        - 12817
+      - - 13034
+        - 13063
+      - - 13280
+        - 13309
+      - - 13526
+        - 13555
+      - - 13772
+        - 13801
+      - - 14018
+        - 14047
+      - - 14264
+        - 14293
+      - - 14510
+        - 14539
+      - - 14755
+        - 14784
+      - - 15001
+        - 15030
+      - - 15247
+        - 15276
+      - - 15493
+        - 15522
+      - - 15739
+        - 15768
+      - - 15985
+        - 16014
+      - - 16231
+        - 16260
+      - - 16477
+        - 16506
+      - - 16723
+        - 16752
+      - - 16969
+        - 16998
+      - - 17215
+        - 17244
+      - - 17461
+        - 17490
+      - - 17707
+        - 17736
+      - - 17953
+        - 17982
+      - - 18199
+        - 18228
+      - - 18444
+        - 18473
+      - - 18690
+        - 18719
+      - - 18936
+        - 18965
+      - - 19182
+        - 19211
+      - - 19428
+        - 19457
+      - - 19674
+        - 19703
+      - - 19920
+        - 19949
+      - - 20166
+        - 20195
+      - - 20412
+        - 20441
+      - - 20658
+        - 20687
+      - - 20904
+        - 20933
+      - - 21150
+        - 21179
+      - - 21396
+        - 21425
+      - - 21642
+        - 21671
+      - - 21888
+        - 21917
+      - - 22133
+        - 22162
+      - - 22379
+        - 22408
+      - - 22625
+        - 22654
+      - - 22871
+        - 22900
+      - - 23117
+        - 23146
+      - - 23363
+        - 23392
+      - - 23609
+        - 23638
+      - - 23855
+        - 23884
+      - - 24101
+        - 24130
+      - - 24347
+        - 24376
+      - - 24593
+        - 24622
+      - - 24839
+        - 24868
+      - - 25085
+        - 25114
+      - - 25331
+        - 25360
+      - - 25577
+        - 25606
+      - - 25822
+        - 25851
+      - - 26068
+        - 26097
+      - - 26314
+        - 26343
+      - - 26560
+        - 26589
+      - - 26806
+        - 26835
+      - - 27052
+        - 27081
+      - - 27298
+        - 27327
+      - - 27544
+        - 27573
+      - - 27790
+        - 27819
+      - - 28036
+        - 28065
+      - - 28282
+        - 28311
+      - - 28528
+        - 28557
+      - - 28774
+        - 28803
+      - - 29020
+        - 29049
+      - - 29266
+        - 29295
+      top_k: 5
+      candidate_floor: 0.1
+shuttle_live:
+  model: racketvision_balltrack
+  backend: torch-cuda
+  precision: fp16
+shuttle_second_opinion:
+  model: wasb_badminton
+  backend: torch-cuda
+  precision: fp16
+player_detector:
+  model: rfdetr_small
+  backend: onnx-cuda
+  precision: fp32
+  input_size:
+  - 512
+  - 512
+  params:
+    score_threshold: 0.35
+    court_roi: true
+player_reid:
+  model: osnet_ain_x0_25
+  backend: torch-cuda
+  precision: fp32
+  params:
+    retention_seconds: 8
+pose:
+  model: rtmpose_m_body7
+  backend: onnx-cuda
+  precision: fp32
+  batch: 2
+  input_size:
+  - 192
+  - 256
+racket:
+  model: racket_geometry_v1
+  backend: opencv-cpu
+  precision: fp32
+components:
+  stroke:
+    implementation: stroke-rules-v0
+    model: none
+    backend: none
+  rally:
+    model: none
+    backend: none
+    implementation: rally-evidence-tracklets-v1
+    params:
+      use_reconstruction: false
+      motion_guard: false
+      use_exit_recovery: true
+      use_curve_exit: false
+      use_short_exchange_evidence: true
+      use_terminal_contact_evidence: false
+  shuttle_association:
+    model: none
+    backend: none
+    implementation: coobserved-static-hypotheses-v1
+    params: {}
+  contact:
+    model: none
+    backend: none
+    implementation: contact-evidence-v1
+    params:
+      spatial_sigma_px: 0.7216878364870323
+  content_continuity:
+    model: none
+    backend: none
+    implementation: foreground-content-continuity-v2
+    params:
+      mode: barrier_detector_layout_v2
+stroke:
+  model: none
+  backend: none
+contact:
+  model: contact_fusion_v2
+  backend: none
+ocr:
+  model: rapidocr_v4
+  backend: onnx-cpu
+  params: {}
+detector_rates:
+  in_play: 2
+  idle: 6
+  replay: 0
+pose_rates:
+  in_play: 1
+  idle: 6
+  replay: 0
+shuttle_rates:
+  in_play: 1
+  idle: 1
+  replay: 0
+ocr_every_s: 1.0
+court_verify_every_s: 2.0
+escalation_budget: 0.15
+racket_window: 6

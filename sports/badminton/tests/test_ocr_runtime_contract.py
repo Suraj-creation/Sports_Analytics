@@ -7,7 +7,7 @@ from types import ModuleType, SimpleNamespace
 import pytest
 
 from bai_badminton.perception.pipeline import BadmintonPerception
-from bai_badminton.perception.scoreboard import ScoreboardReader
+from bai_badminton.perception.scoreboard import PARSER_POLICY, ScoreboardReader
 from bai_engine.config import ModelChoice
 
 
@@ -36,6 +36,11 @@ def fake_rapidocr(monkeypatch, tmp_path, providers):
 
     def create(*, params):
         calls.append(params)
+        for stage in ("det", "cls", "rec"):
+            components[f"text_{stage}"].session.session.get_session_options = lambda: SimpleNamespace(
+                intra_op_num_threads=params.get("EngineConfig.onnxruntime.intra_op_num_threads", 0),
+                inter_op_num_threads=params.get("EngineConfig.onnxruntime.inter_op_num_threads", 0),
+            )
         return SimpleNamespace(cfg=SimpleNamespace(**cfg), **components)
 
     monkeypatch.setattr(rapidocr, "RapidOCR", create, raising=False)
@@ -64,6 +69,8 @@ def test_loader_honors_backend_without_changing_weights_or_preprocessing(monkeyp
     assert reader.runtime["stages"]["det"]["model_file"] == "PP-OCRv6_det_small.onnx"
     assert reader.runtime["stages"]["cls"]["model_file"] == "ch_ppocr_mobile_v2.0_cls_mobile.onnx"
     assert reader.model_ref.startswith("rapidocr@3.10.0+")
+    assert reader.model_ref.endswith(f"+{PARSER_POLICY}")
+    assert reader.runtime["parser_policy"] == PARSER_POLICY
     assert "rapidocr_v4@4" not in reader.model_ref
 
 
@@ -79,7 +86,47 @@ def test_wrong_engine_is_rejected_instead_of_silently_running_cpu():
         ScoreboardReader.load(25, backend="torch-cuda")
 
 
-def test_pipeline_passes_backend_records_actual_ref_and_exposes_fallback(monkeypatch):
+@pytest.mark.parametrize("num_threads", [0, -1, True, 1.5, "4"])
+def test_invalid_explicit_thread_count_is_rejected(num_threads):
+    with pytest.raises(ValueError, match="positive integer"):
+        ScoreboardReader.load(25, num_threads=num_threads)
+
+
+def test_explicit_threads_are_forwarded_without_changing_default_runtime(monkeypatch, tmp_path):
+    calls = fake_rapidocr(monkeypatch, tmp_path, ["CPUExecutionProvider"])
+    reader = ScoreboardReader.load(25, num_threads=4)
+    assert calls == [
+        {
+            "EngineConfig.onnxruntime.use_cuda": False,
+            "EngineConfig.onnxruntime.intra_op_num_threads": 4,
+            "EngineConfig.onnxruntime.inter_op_num_threads": 4,
+        }
+    ]
+    assert reader.runtime["requested_num_threads"] == 4
+    assert all(
+        stage["session_options"] == {"intra_op_num_threads": 4, "inter_op_num_threads": 4}
+        for stage in reader.runtime["stages"].values()
+    )
+
+
+def test_ignored_explicit_thread_count_is_rejected(monkeypatch, tmp_path):
+    fake_rapidocr(monkeypatch, tmp_path, ["CPUExecutionProvider"])
+    original = sys.modules["rapidocr"].RapidOCR
+
+    def ignored_threads(*, params):
+        result = original(params=params)
+        result.text_det.session.session.get_session_options = lambda: SimpleNamespace(
+            intra_op_num_threads=0, inter_op_num_threads=0
+        )
+        return result
+
+    monkeypatch.setattr(sys.modules["rapidocr"], "RapidOCR", ignored_threads)
+    with pytest.raises(RuntimeError, match="did not honor explicit"):
+        ScoreboardReader.load(25, num_threads=4)
+
+
+@pytest.mark.parametrize("params", [{}, {"num_threads": 4}])
+def test_pipeline_passes_backend_records_actual_ref_and_exposes_fallback(monkeypatch, params):
     perception = BadmintonPerception.__new__(BadmintonPerception)
     perception.models, perception.degraded = {}, []
     perception.profile = SimpleNamespace(ocr_every_s=1.2)
@@ -92,15 +139,15 @@ def test_pipeline_passes_backend_records_actual_ref_and_exposes_fallback(monkeyp
         },
     )
 
-    def load(*, every, backend):
-        calls.append((every, backend))
+    def load(*, every, backend, **kwargs):
+        calls.append({"every": every, "backend": backend, **kwargs})
         return reader
 
     monkeypatch.setattr(ScoreboardReader, "load", load)
-    choice = ModelChoice(model="rapidocr_v4", backend="onnx-cuda")
+    choice = ModelChoice(model="rapidocr_v4", backend="onnx-cuda", params=params)
     registry = SimpleNamespace(get=lambda _: SimpleNamespace(format="package", source={"package": "rapidocr"}))
     assert perception._load_ocr(choice, registry, 25) is reader
-    assert calls == [(30, "onnx-cuda")]
+    assert calls == [{"every": 30, "backend": "onnx-cuda", **params}]
     assert perception.models["ocr"] == reader.model_ref
     assert perception.degraded[0].stage == "ocr_backend"
     assert "CPUExecutionProvider" in perception.degraded[0].reason

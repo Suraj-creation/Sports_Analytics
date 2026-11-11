@@ -287,16 +287,23 @@ def validate_result(result: dict, *, expect_fixes: bool = False) -> None:
             raise AssertionError("Failure detail is not projected for the public response")
 
 
-def stage_completed_run(run_path: Path, config: dict) -> dict:
+def stage_completed_run(run_path: Path, config: dict, *, completion_recovery: Path | None = None) -> dict:
     """Physically copy a closed completed run; never open an original database."""
     from bai_api.routes.exports import _rally_rows
     from bai_engine.schema import Session
     from bai_engine.store import SessionRepository
 
     report_path, session_path = run_path / "inference.json", run_path / "session.json"
-    report = json.loads(report_path.read_text())
+    if completion_recovery is not None:
+        from research.pipeline_repair_completion import verify_completion_receipt
+
+        bound = verify_completion_receipt(run_path, completion_recovery)
+        report_path = bound["report_path"]
+        report = json.loads(report_path.read_text())
+    else:
+        report = json.loads(report_path.read_text())
     session = Session.model_validate_json(session_path.read_text())
-    if report["status"] != "completed" or session.status != "analysed":
+    if (completion_recovery is None and report["status"] != "completed") or session.status != "analysed":
         raise ValueError("Only a durably completed neural run can be copied for product replay")
     if report["frames_processed"] != session.media.n_frames or session.frontier_frame != session.media.n_frames - 1:
         raise ValueError("Completed run does not cover its exact canonical frame extent")
@@ -353,6 +360,9 @@ def stage_completed_run(run_path: Path, config: dict) -> dict:
     record = {
         "mode": "read_only_product_rendering_of_completed_neural_results_no_new_inference",
         "source_run": str(run_path.resolve()),
+        "explicit_posthoc_finalization_recovery": completion_recovery is not None,
+        "producer_receipt": str(report_path.resolve()),
+        "original_worker_receipt_unchanged": True,
         "original_sqlite_connection_opened": False,
         "original_file_access": "read-only byte hashing/copying; no original SQLite connection or sidecar handling",
         "start_engine": False,
@@ -445,10 +455,24 @@ def check_completed_product(seed: dict, output: Path, app_base: str, navigate, j
 
 
 def run(
-    output: Path, build: Path, fixture: Path, *, expect_fixes: bool = False, completed_run: Path | None = None
+    output: Path,
+    build: Path,
+    fixture: Path,
+    *,
+    expect_fixes: bool = False,
+    completed_run: Path | None = None,
+    completion_recovery: Path | None = None,
 ) -> dict:
     config = prepare(output, build, fixture)
-    seed = stage_completed_run(completed_run, config) if completed_run is not None else None
+    if completion_recovery is not None and completed_run is None:
+        raise ValueError("completion recovery requires the actual original run")
+    seed = None
+    if completed_run is not None:
+        seed = (
+            stage_completed_run(completed_run, config)
+            if completion_recovery is None
+            else stage_completed_run(completed_run, config, completion_recovery=completion_recovery)
+        )
     config_path = output / "configuration.json"
     app_base, driver_base = f"http://127.0.0.1:{config['app_port']}", f"http://127.0.0.1:{config['driver_port']}"
     env = {k: v for k, v in os.environ.items() if not k.startswith("BAI_")}
@@ -860,6 +884,7 @@ def main():
     run_parser.add_argument("--fixture", type=Path, default=DEFAULT_FIXTURE)
     run_parser.add_argument("--expect-fixes", action="store_true")
     run_parser.add_argument("--completed-run", type=Path)
+    run_parser.add_argument("--completion-recovery", type=Path)
     server_parser = sub.add_parser("serve")
     server_parser.add_argument("--configuration", type=Path, required=True)
     args = parser.parse_args()
@@ -874,6 +899,9 @@ def main():
                     args.fixture.resolve(),
                     expect_fixes=args.expect_fixes,
                     completed_run=None if args.completed_run is None else args.completed_run.resolve(),
+                    completion_recovery=None
+                    if args.completion_recovery is None
+                    else args.completion_recovery.resolve(),
                 ),
                 indent=2,
             )

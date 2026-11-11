@@ -92,6 +92,7 @@ def test_upload_worker_reaches_real_runner_plugin_with_injected_registry(tmp_pat
         "input_files_sha256": {},
         "cases": {
             "test7": {
+                "kind": "production_upload",
                 "session": str(session_path),
                 "source": str(source),
                 "source_sha256": external.digest(source),

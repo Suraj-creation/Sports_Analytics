@@ -118,6 +118,11 @@ class SceneContinuityDetector:
     cannot establish a multi-region change. Unknown features/view/context abstain.
     """
 
+    minimum_regions = 2
+
+    def _retain_appearance_pair(self, value: float) -> bool:
+        return True
+
     def __init__(self, *, analysis_width=480, history_pairs=2, adaptive_ratio=3.0, minimum_discontinuity=15.0):
         if type(analysis_width) is not int or analysis_width < 96:
             raise ValueError("analysis width must be an integer of at least96")
@@ -186,7 +191,7 @@ class SceneContinuityDetector:
             self._history.clear()
             self._appearance_history.clear()
             return SceneChangeEvidence(frame, previous_frame, "unknown", False, ("excluded_view",))
-        if not 2 <= len(previous_regions) <= 4:
+        if not self.minimum_regions <= len(previous_regions) <= 4:
             self._history.clear()
             self._appearance_history.clear()
             return SceneChangeEvidence(frame, previous_frame, "unknown", False, ("two_to_four_prior_regions_required",))
@@ -251,9 +256,9 @@ class SceneContinuityDetector:
             else:
                 history.clear()
             self._history[region.key] = history
-            if appearance is not None:
+            if appearance is not None and self._retain_appearance_pair(appearance):
                 appearance_history.append(appearance)
-            else:
+            elif appearance is None:
                 appearance_history.clear()
             self._appearance_history[region.key] = appearance_history
         keys = {region.key for region in previous_regions}
@@ -320,3 +325,20 @@ class SceneContinuityDetector:
             appearance_hypothesis=appearance_hypothesis,
             appearance_discontinuity=appearance_score,
         )
+
+
+class SceneContinuityDetectorV2(SceneContinuityDetector):
+    """Measure single-region changes and avoid a duplicate-cadence baseline bias.
+
+    An LK intensity error below one uint8 intensity level cannot establish a
+    new appearance innovation. Such pairs remain in the emitted measurements,
+    but do not replace appearance-history samples. The same one-level floor
+    already bounds the adaptive denominator; no dataset-specific threshold is
+    introduced. A single observed region is diagnostic, never multi-actor edit
+    corroboration. The provider separately decides whether to erect a barrier.
+    """
+
+    minimum_regions = 1
+
+    def _retain_appearance_pair(self, value: float) -> bool:
+        return value >= 1.0

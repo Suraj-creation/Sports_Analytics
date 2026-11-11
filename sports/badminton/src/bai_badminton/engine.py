@@ -38,9 +38,11 @@ from bai_badminton.components import (
     ActivityInference,
     Analytics,
     AssociatedExitRallySegmentation,
+    ContactEvidenceRallySegmentation,
     ContactInference,
     DomainContext,
     EvidenceRallySegmentation,
+    ExchangeEvidenceRallySegmentation,
     IdentityInference,
     OutcomeInference,
     OutcomeInput,
@@ -57,7 +59,8 @@ from bai_badminton.events.contact import (
     ContactCandidate,
     build_contact_evidence,
 )
-from bai_badminton.events.contact_evidence import assess_contact_evidence
+from bai_badminton.events.contact_evidence import ContactEvidenceInputs, assess_contact_evidence
+from bai_badminton.events.exchange_evidence import ContactParticipantContext, ContactParticipantObservation
 from bai_badminton.events.match_phase import (
     MatchPhaseTracker,
     Phase,
@@ -202,10 +205,20 @@ def camera_sample(fp: FramePerception) -> TrackSample:
     )
 
 
-def _stabilise(p: PersonObs, Ginv: Any) -> PersonObs:
-    """``p`` seen through the reference view: box corners and skeleton mapped by G⁻¹ (a copy)."""
+def _stabilise(p: PersonObs, Ginv: Any, homography: Homography | None = None) -> PersonObs:
+    """Map image evidence to the reference view without moving its ground point.
+
+    Reboxing a transformed rectangle changes its bottom-centre under rotation
+    or projective registration. Project the original detector ground point
+    separately before constructing the axis-aligned reference-view envelope.
+    """
     x1, y1, x2, y2 = (float(v) for v in p.bbox)
     q = project(Ginv, [[x1, y1], [x2, y1], [x2, y2], [x1, y2]])
+    court_xy = None
+    if homography is not None:
+        reference_feet = project(Ginv, [[(x1 + x2) / 2, y2]])
+        cx, cy = homography.image_to_court(reference_feet)[0]
+        court_xy = (float(cx), float(cy))
     kps = None
     if p.kps is not None:
         kps = np.array(p.kps, dtype=np.float64, copy=True)
@@ -214,6 +227,7 @@ def _stabilise(p: PersonObs, Ginv: Any) -> PersonObs:
         track_id=p.track_id,
         bbox=np.array([q[:, 0].min(), q[:, 1].min(), q[:, 0].max(), q[:, 1].max()]),
         conf=p.conf,
+        court_xy=court_xy,
         kps=kps,
         appearance=p.appearance,
         raw_track_id=p.raw_track_id,
@@ -243,6 +257,7 @@ class _PendingRally:
     seg: RallySegment
     contacts: list[_Contact]
     start_event: Event | None
+    admission: dict[str, Any] | None = None
 
 
 @dataclass
@@ -405,6 +420,9 @@ class BadmintonMatchEngine:
         self._proc: Track | None = None  # processed shuttle over the current window
         self._proc0 = 0
         self._last_frame = -1
+        # A later format confirmation must not authorize earlier observations.
+        # Compatible image-space temporal evidence can nevertheless continue.
+        self._format_known_from: int | None = 0 if cfg.match_format_known else None
         self._final = -1  # last finalised frame
         self._open_contacts: list[_Contact] = []
         self._last_contact_candidate: ContactCandidate | None = None
@@ -442,6 +460,7 @@ class BadmintonMatchEngine:
         current = self.match_cfg.discipline if self.cfg.match_format_known else None
         if current == match_format:
             return []
+        preserve_context = current is None and match_format == self.match_cfg.discipline
         with self._score_lock:
             references = {
                 name: getattr(self, name)
@@ -460,6 +479,7 @@ class BadmintonMatchEngine:
                     "doubles_teams",
                     "_current_team_key",
                     "_coordinate_epoch",
+                    "_format_known_from",
                 )
             }
             temporal = deepcopy(
@@ -483,8 +503,9 @@ class BadmintonMatchEngine:
                     until = frame - 1
                     if until >= 0:
                         self._advance(until)
-                        self._emit_activity(self.activity.flush())
-                        self._handle_fsm(self.fsm.flush(until), until)
+                        if not preserve_context:
+                            self._emit_activity(self.activity.flush())
+                            self._handle_fsm(self.fsm.flush(until), until)
                         ready = sorted(
                             (item for item in self._pending if item.seg.end <= until),
                             key=lambda item: (item.seg.start, item.seg.end),
@@ -498,42 +519,45 @@ class BadmintonMatchEngine:
                     )
                     self.cfg = replace(self.cfg, match=new_match, match_format_known=match_format is not None)
                     self.match_cfg = new_match
+                    self._format_known_from = frame if match_format is not None else None
 
-                    def converted(calibration: _Calib) -> _Calib:
-                        geometry = CourtImageGeometry.from_homography(
-                            calibration.homography,
-                            singles=new_match.discipline == "singles",
-                        )
-                        old = calibration.geometry
-                        geometry = replace(
-                            geometry,
-                            net_ground_y=old.net_ground_y,
-                            net_top_y=old.net_top_y,
-                            net_x_min=old.net_x_min,
-                            net_x_max=old.net_x_max,
-                            net_tol_px=old.net_tol_px,
-                        )
-                        return _Calib(calibration.homography, geometry)
+                    if not preserve_context:
 
-                    mapping = {id(value): converted(value) for value in self.calibration.values()}
-                    self.calibration = {key: mapping[id(value)] for key, value in self.calibration.items()}
-                    if self._main_calib is not None:
-                        self._main_calib = mapping.get(id(self._main_calib)) or converted(self._main_calib)
-                    self.fsm.reset()
-                    self.activity.reset()
-                    self.identity = self.identity_provider.named_resolver()
-                    self.participants = None
-                    self._participant_births = {}
-                    self._participant_shot_id = self._participant_last_coverage = None
-                    self._participant_reference_changed = False
-                    self._multi_person_identity_ambiguous = True
-                    self.doubles_teams = self.identity_provider.team_tracker()
-                    self._current_team_key = None
-                    self._activity_positions = deque(maxlen=max(3, round(self.cfg.fps * 0.5)))
-                    self._last_contact_candidate = self._rally_start_event = None
-                    self._open_contacts = []
-                    self._proc = None
-                    self._coordinate_epoch += 1
+                        def converted(calibration: _Calib) -> _Calib:
+                            geometry = CourtImageGeometry.from_homography(
+                                calibration.homography,
+                                singles=new_match.discipline == "singles",
+                            )
+                            old = calibration.geometry
+                            geometry = replace(
+                                geometry,
+                                net_ground_y=old.net_ground_y,
+                                net_top_y=old.net_top_y,
+                                net_x_min=old.net_x_min,
+                                net_x_max=old.net_x_max,
+                                net_tol_px=old.net_tol_px,
+                            )
+                            return _Calib(calibration.homography, geometry)
+
+                        mapping = {id(value): converted(value) for value in self.calibration.values()}
+                        self.calibration = {key: mapping[id(value)] for key, value in self.calibration.items()}
+                        if self._main_calib is not None:
+                            self._main_calib = mapping.get(id(self._main_calib)) or converted(self._main_calib)
+                        self.fsm.reset()
+                        self.activity.reset()
+                        self.identity = self.identity_provider.named_resolver()
+                        self.participants = None
+                        self._participant_births = {}
+                        self._participant_shot_id = self._participant_last_coverage = None
+                        self._participant_reference_changed = False
+                        self._multi_person_identity_ambiguous = True
+                        self.doubles_teams = self.identity_provider.team_tracker()
+                        self._current_team_key = None
+                        self._activity_positions = deque(maxlen=max(3, round(self.cfg.fps * 0.5)))
+                        self._last_contact_candidate = self._rally_start_event = None
+                        self._open_contacts = []
+                        self._proc = None
+                        self._coordinate_epoch += 1
                     event = self._event(
                         "format_decision",
                         frame,
@@ -542,7 +566,9 @@ class BadmintonMatchEngine:
                             "match_format": match_format or "unknown",
                             "previous_format": current or "unknown",
                             "known": match_format is not None,
-                            "policy_version": 1,
+                            "policy_version": 2,
+                            "temporal_reset": not preserve_context,
+                            "rules_valid_from_frame": self._format_known_from,
                             "coordinate_epoch": self._coordinate_epoch,
                             "decision": decision or {},
                         },
@@ -952,7 +978,11 @@ class BadmintonMatchEngine:
         self._shot.append(fp.shot_id)
         # a tracked camera has one calibration (in the reference view) wherever the court is in view
         calib = (self._main_calib if G is not None else None) if tracked else self._calib(fp.shot_id)
-        persons = [_stabilise(p, Ginv) for p in fp.persons] if Ginv is not None else fp.persons
+        persons = (
+            [_stabilise(p, Ginv, calib.homography if calib is not None else None) for p in fp.persons]
+            if Ginv is not None
+            else fp.persons
+        )
         # A lost or non-main view cannot support authoritative court coordinates,
         # even if an upstream observation carries a stale position.
         geometry_unavailable = (
@@ -1544,7 +1574,11 @@ class BadmintonMatchEngine:
                 c = None
             if c is not None:
                 self._last_contact_candidate = c
-                self._handle_fsm(self.fsm.on_contact(f), f)
+                if isinstance(self.fsm, ContactEvidenceRallySegmentation):
+                    update = self.fsm.on_contact_evidence(f, c.evidence)
+                else:
+                    update = self.fsm.on_contact(f)
+                self._handle_fsm(update, f)
                 self._on_contact(c, w)
             if isinstance(self.fsm, EvidenceRallySegmentation):
                 context_valid = bool(self._temporal_valid[f - self._buf0]) and not bool(w.replay[i])
@@ -1607,7 +1641,12 @@ class BadmintonMatchEngine:
             seg: RallySegment = upd.finalized
             in_rally = [c for c in self._open_contacts if seg.start - 3 <= c.cand.frame <= seg.end + 3]
             self._open_contacts = [c for c in self._open_contacts if c not in in_rally]
-            self._pending.append(_PendingRally(seg, in_rally, self._rally_start_event))
+            admission = (
+                self.fsm.last_exchange_admission if isinstance(self.fsm, ExchangeEvidenceRallySegmentation) else None
+            )
+            if admission is not None and (admission.get("start"), admission.get("end")) != (seg.start, seg.end):
+                raise ValueError("rally admission proof does not identify the finalized interval")
+            self._pending.append(_PendingRally(seg, in_rally, self._rally_start_event, deepcopy(admission)))
             self._rally_start_event = None
         if upd.started is not None:
             self._rally_start_event = self._event(
@@ -1678,9 +1717,54 @@ class BadmintonMatchEngine:
                     player_observation_frames=tuple(player_frames),
                     pose_observation_frames=tuple(pose_frames),
                     racket_observation_frames=tuple(racket_frames),
+                    participant_context=self._contact_participant_context(inputs, window, frames),
                 )
             ),
         )
+
+    def _contact_participant_context(
+        self, inputs: ContactEvidenceInputs, window: WindowObs, frames: list[dict[str, ParticipantSnapshot]]
+    ) -> ContactParticipantContext | None:
+        """Retain simultaneous fresh episode observations, never infer named identity."""
+        lo, hi = inputs.context_start - self._buf0, inputs.context_stop - self._buf0
+        buffers = (self._shot, self._content_epoch, self._coordinate_context, self._geometry_valid, self._replay)
+        if not 0 <= lo <= hi or any(hi > len(buffer) for buffer in buffers) or len(frames) != window.n:
+            return None  # independent/legacy windows have no retained epoch proof
+        if not self._same_segment(inputs.context_start, inputs.context_stop - 1):
+            return None
+        index = inputs.frame - self._buf0
+        if not 0 <= index < len(self._coordinate_context):
+            return None
+        epoch = (self._shot[index], self._content_epoch[index], self._coordinate_context[index][0])
+        observations = []
+        for frame in range(inputs.context_start, min(inputs.context_stop, inputs.available_through + 1)):
+            source = frame - self._buf0
+            if not 0 <= source < len(self._geometry_valid) or not self._geometry_valid[source]:
+                continue
+            if (self._shot[source], self._content_epoch[source], self._coordinate_context[source][0]) != epoch:
+                return None
+            for participant_id, snapshot in sorted(frames[frame - window.frame0].items()):
+                if (
+                    snapshot.detector_observed is True
+                    and snapshot.detector_matched is True
+                    and snapshot.track_id >= 0
+                    and snapshot.observation_id is not None
+                    and snapshot.court_xy is not None
+                    and has_target_court_provenance(snapshot)
+                ):
+                    observations.append(
+                        ContactParticipantObservation(
+                            frame,
+                            participant_id,
+                            snapshot.observation_id,
+                            snapshot.track_id,
+                            float(snapshot.court_xy[1]),
+                        )
+                    )
+        # More people than the bounded witness contract can represent is unknown.
+        if len(observations) > 256:
+            return None
+        return ContactParticipantContext(*epoch, tuple(observations))
 
     def _retract_contact(self, c: _Contact, note: str) -> None:
         """Withdraw a contact *and* the stroke classified from it (and its analytics)."""
@@ -1731,6 +1815,10 @@ class BadmintonMatchEngine:
             "physical_event_status": c.evidence.impact.reliability.value if c.evidence is not None else "insufficient",
             "temporal_role": "kinematic_activity_candidate;not_confirmed_physical_impact",
         }
+        if isinstance(self.fsm, ContactEvidenceRallySegmentation):
+            admission = self.fsm.last_contact_admission
+            if admission is not None and admission.frame == c.frame:
+                payload["rally_admission"] = asdict(admission)
         # For an unresolved named hitter, retain separately-scored provisional
         # track-episode evidence without asserting a player or team identity.
         lo = w.frame0 - self._buf0
@@ -2264,7 +2352,8 @@ class BadmintonMatchEngine:
         )
         source_transition = self.ocr.source_transition(seg.start, seg.end, until, lookback=int(30 * self.cfg.fps))
         self._last_rally_end = seg.end
-        winner = observed if decision.official and self.cfg.match_format_known else None
+        format_known = self._format_known_for(seg)
+        winner = observed if decision.official and format_known else None
         association = "candidate" if source_transition is not None else "unavailable"
         if source_transition is not None and source_transition.after_frames[0] < seg.start:
             association = "source_transition_before_rally"
@@ -2281,7 +2370,7 @@ class BadmintonMatchEngine:
                 association = "claimed"
             else:
                 winner, association = None, "claimed_by_another_rally"
-        if not self.cfg.match_format_known:
+        if not format_known:
             association = "match_format_unknown"
         loser_pid = other(winner) if winner in ("P1", "P2") else None  # type: ignore[arg-type]
         shots = [
@@ -2316,9 +2405,10 @@ class BadmintonMatchEngine:
                 "score_transition_policy": _SCORE_TRANSITION_POLICY,
                 "score_transition": source_transition.to_public() if source_transition is not None else None,
                 "score_transition_status": association,
-                "match_format_known": self.cfg.match_format_known,
-                "match_format": self.match_cfg.discipline if self.cfg.match_format_known else "unknown",
-                "match_format_policy": "rally_bound_format_v1",
+                "match_format_known": format_known,
+                "match_format": self.match_cfg.discipline if format_known else "unknown",
+                "match_format_policy": "rally_bound_format_v2",
+                "rally_admission": p.admission,
                 "rule_check": check,
                 "n_shots": len(shots),
                 "shots": shots,
@@ -2563,8 +2653,14 @@ class BadmintonMatchEngine:
             return {"P1": g[0], "P2": g[1]}
         return dict(res.after.score)
 
+    def _format_known_for(self, seg: RallySegment) -> bool:
+        """Rules are eligible only if known throughout this observation interval."""
+        return (
+            self.cfg.match_format_known and self._format_known_from is not None and seg.start >= self._format_known_from
+        )
+
     def _outcome(self, seg: RallySegment) -> tuple[str, str, str, float]:
-        if not self.cfg.match_format_known:
+        if not self._format_known_for(seg):
             return Outcome.UNKNOWN.value, "unknown", "match_format_unknown", 0.2
         # A camera cut or EOF closes our observation interval, not the rally.
         # Applying landing/extrapolation heuristics to an airborne shuttle

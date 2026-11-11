@@ -439,7 +439,10 @@ class BadmintonPerception:
             spec = reg.get(c.model)
             if spec.format != "package" or spec.source.get("package") != "rapidocr":
                 raise ModelError(f"{c.model} is not a RapidOCR package alias")
-            r = ScoreboardReader.load(every=max(1, int(round(self.profile.ocr_every_s * fps))), backend=c.backend)
+            options = {"num_threads": c.params["num_threads"]} if "num_threads" in c.params else {}
+            r = ScoreboardReader.load(
+                every=max(1, int(round(self.profile.ocr_every_s * fps))), backend=c.backend, **options
+            )
             self.models["ocr"] = r.model_ref
             if r.runtime.get("backend_fallback"):
                 providers = {stage: info["providers"] for stage, info in r.runtime["stages"].items()}
@@ -549,19 +552,20 @@ class BadmintonPerception:
         strides: tuple[int, int],
         selection: DiagnosticSelection,
         diagnostics: bool,
+        detection_probe: Any = None,
     ) -> _PlayerFrame:
         configure = getattr(self.players, "set_diagnostics", None)
         if callable(configure):
             configure(diagnostics and not replay, selection.top_k)
         if cut:
             self.players.on_cut()
-        if poly is not None:
-            H_now = self._H_ref
-            if G is not None and H_now is not None:
-                H_now = G @ H_now
-            h_now = Homography(H_now, 0.0, 4) if H_now is not None else None
-            self.players.set_roi(CourtROI(poly.astype(np.float32), homography=h_now))
-        persons = [] if replay else self.players.process(fidx, img, strides)
+        self._set_player_roi(poly, G)
+        if replay:
+            persons = []
+        elif detection_probe is not None:
+            persons = self.players.process(fidx, img, strides, detection_probe=detection_probe)
+        else:
+            persons = self.players.process(fidx, img, strides)
         racket_detector = getattr(self, "racket", None)
         if racket_detector is not None and persons and not replay:
             observed_rackets = racket_detector.detect(img, persons)
@@ -585,6 +589,14 @@ class BadmintonPerception:
             bool(not replay and getattr(self.players, "last_detector_observed", False)),
             getattr(self.players, "last_diagnostic", None) if callable(configure) else None,
         )
+
+    def _set_player_roi(self, poly: np.ndarray | None, G: np.ndarray | None) -> None:
+        if poly is not None:
+            H_now = self._H_ref
+            if G is not None and H_now is not None:
+                H_now = G @ H_now
+            h_now = Homography(H_now, 0.0, 4) if H_now is not None else None
+            self.players.set_roi(CourtROI(poly.astype(np.float32), homography=h_now))
 
     def process(self, chunk: DecodedChunk, in_play: bool) -> ChunkPerception:
         p = self.profile
@@ -628,6 +640,7 @@ class BadmintonPerception:
         content = getattr(self, "content_continuity", None)
         content_epochs = [getattr(self, "_content_epoch", 0)] * n
         content_evidence = [None] * n
+        content_decisions = [None] * n
         pre_people: list[_PlayerFrame] | None = None
         if content is not None:
             from bai_badminton.perception.content import scene_change_from_dict, scene_change_to_dict
@@ -661,7 +674,23 @@ class BadmintonPerception:
                     hard_cut=cut_flags[i],
                 )
                 evidence = scene_change_from_dict(scene_change_to_dict(evidence), frame_idx=frame)
-                barrier = content.barrier_enabled and evidence.hypothesis
+                policy = getattr(content, "barrier_for", None)
+                barrier = policy(evidence) if callable(policy) else content.barrier_enabled and evidence.hypothesis
+                probe = None
+                if getattr(content, "requires_detector_layout", False) and evidence.hypothesis:
+                    self._set_player_roi(polys[i], poses[i] if poses is not None else None)
+                    acquire = getattr(self.players, "probe_detection", None)
+                    geometry_valid = not replay[i] and states[i].value == "VALID"
+                    if callable(acquire) and geometry_valid:
+                        probe = acquire(frame, image)
+                    decision = content.layout_decision(
+                        evidence,
+                        probe,
+                        detector_model=self.models.get("player_detector"),
+                        geometry_valid=geometry_valid,
+                    )
+                    content_decisions[i] = decision
+                    barrier = content.tracking_barrier_for_decision(decision)
                 if barrier:
                     self._content_epoch += 1
                 content_epochs[i] = self._content_epoch
@@ -677,6 +706,7 @@ class BadmintonPerception:
                     strides=(rates_det, rates_pose),
                     selection=diagnostic_selection,
                     diagnostics=i in diagnostic_indices,
+                    detection_probe=probe,
                 )
                 pre_people.append(people)
                 self._content_previous = frame, people, not replay[i]
@@ -796,6 +826,7 @@ class BadmintonPerception:
                         detector_observed=people.detector_observed,
                         content_epoch=content_epochs[i],
                         content_change=content_evidence[i],
+                        content_decision=content_decisions[i],
                         diagnostic=FrameDiagnostic(
                             frame_idx=fidx,
                             canonical_time_sec=fidx / self.fps,

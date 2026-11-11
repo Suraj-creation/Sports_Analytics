@@ -253,6 +253,7 @@ class ScoreReconciler:
     row_map: dict[int, str] | None = None  # bug row index → player id
     _votes: dict[tuple[int, str], int] = field(default_factory=dict)
     _transition_claims: dict[str, str] = field(default_factory=dict, repr=False)
+    _mapping_vote_transitions: set[str] = field(default_factory=set, repr=False)
 
     def _corroborated_runs(self, until: int) -> list[_CorroboratedBoardRun]:
         runs: list[_CorroboratedBoardRun] = []
@@ -372,6 +373,7 @@ class ScoreReconciler:
         if previous is not None and self._names(previous) != self._names(r):
             self.row_map = None
             self._votes.clear()
+            self._mapping_vote_transitions.clear()
         if self.row_map is None:
             self._try_names(r)
         if previous is not None and all(
@@ -548,7 +550,16 @@ class ScoreReconciler:
         if row is None:
             return geometry_winner, "geometry"
         if mapping is None:
-            if geometry_winner is not None and self._names(reading) == latest_names:
+            if (
+                geometry_winner is not None
+                and self._names(reading) == latest_names
+                and ref is not None
+                and ref.transition_id not in self._mapping_vote_transitions
+            ):
+                # Reconciliation/refolding may ask about the same source point
+                # repeatedly. Only independent corroborated increments vote.
+                # This ledger is separate from accepted-point ownership claims.
+                self._mapping_vote_transitions.add(ref.transition_id)
                 self._votes[(row, geometry_winner)] = self._votes.get((row, geometry_winner), 0) + 1
                 self._maybe_fix_map()
                 mapping = self.row_map

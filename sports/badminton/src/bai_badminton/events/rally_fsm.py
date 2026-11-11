@@ -142,7 +142,26 @@ class RallyFSM:
 
         if visible:
             self._invisible = 0
-            if speed > p.start_speed:
+            # Closing a stationary terminal must not weaken the existing
+            # ENDING resume gate into the lower idle-start motion threshold.
+            # A slow pickup can satisfy start motion without contradicting
+            # the observed rest that closed this exchange.
+            motion_threshold = (
+                p.resume_speed
+                if self.state is RallyState.CLOSED
+                and self.closed is not None
+                and self.closed.reason == "stationary"
+                and (
+                    frame - self.closed.end <= p.merge_frames
+                    or (
+                        self._run_visible > 0
+                        and self._run_start is not None
+                        and self._run_start - self.closed.end <= p.merge_frames
+                    )
+                )
+                else p.start_speed
+            )
+            if speed > motion_threshold:
                 if self._run_visible == 0:
                     self._run_start = frame
                 self._run_visible += 1
@@ -180,6 +199,11 @@ class RallyFSM:
                 self._finalize(upd)
                 if self._run_visible >= p.start_visible and self._run_start is not None:
                     self._open(self._run_start, upd)
+        if self.state is RallyState.IN_PLAY:
+            # A motion-driven open/reopen or an ENDING resume consumes this
+            # frame as in-play evidence too. Retain it if the next callback
+            # is a cut; the previous active frontier predates the recovery.
+            self._last_in_play_frame = frame
         return upd
 
     def on_discontinuity(self, frame: int) -> RallyUpdate:

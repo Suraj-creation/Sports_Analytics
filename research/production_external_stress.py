@@ -15,6 +15,7 @@ import hashlib
 import json
 import math
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -37,7 +38,7 @@ PERCEPTION_CATALOG_LIMITS = {
     "max_cache_bytes": 16 * 1024 * 1024,
     "max_total_cache_bytes": 8 * 1024**3,
     "max_catalog_bytes": 8 * 1024 * 1024,
-    "accepted_codec_versions": [20],
+    "accepted_codec_versions": [20, 21],
 }
 
 
@@ -57,7 +58,8 @@ def perception_catalog(output: Path, *, session_id: str, source_sha256: str, pro
 
     Cache header ends are inclusive canonical proxy frames. Source/proxy identity
     is bound by the worker receipt; codec20 itself has no source-hash field. This
-    checks header/extent integrity, not the complete sport observation schema.
+    checks header/extent integrity; codec21 also uses the production diagnostic
+    decoder for observation/model/source-frame consistency, without model replay.
     """
     import msgpack
 
@@ -140,6 +142,28 @@ def perception_catalog(output: Path, *, session_id: str, source_sha256: str, pro
                 or not math.isclose(fps, media["fps_num"] / media["fps_den"], rel_tol=0, abs_tol=1e-9)
             ):
                 raise ValueError("cache timebase does not match canonical media")
+            if value["v"] == 21:
+                from types import SimpleNamespace
+
+                from bai_badminton.plugin import BadmintonSession
+                from bai_engine.config import Profile
+
+                models = value.get("models")
+                if (
+                    not isinstance(models, dict)
+                    or any(not isinstance(key, str) or not isinstance(ref, str) for key, ref in models.items())
+                    or identity.get("loaded_models") != models
+                ):
+                    raise ValueError("cache models differ from their recorded inference identity")
+                Profile.model_validate(identity.get("profile"))
+                # Recorded context permits schema validation without constructing
+                # neural models. The completion receipt binds source/proxy origin;
+                # this does not independently attest the cached detector pixels.
+                receiver = SimpleNamespace(
+                    perception=SimpleNamespace(ref_id=value.get("cr")),
+                    _isolation_id=lambda identity=identity: identity,
+                )
+                BadmintonSession.decode_perception(receiver, data, diagnostic=True)
             header = {key: value.get(key) for key in ["v", "start", "end", "cr", "ci", "models"]}
             header_sha = hashlib.sha256(json.dumps(header, sort_keys=True, allow_nan=False).encode()).hexdigest()
         except (KeyError, TypeError, ValueError, msgpack.exceptions.UnpackException) as error:
@@ -213,6 +237,17 @@ def verify_perception_catalog(output: Path, receipt: dict, **bindings) -> dict:
         raise ValueError("perception cache catalog SHA256 mismatch")
     recorded = json.loads(data)
     observed = perception_catalog(output, **bindings)
+    # Older published catalogues recorded the narrower codec20-only policy.
+    # Normalize that one metadata field only for an actual all-codec20 population;
+    # every remaining limit, source/header/hash/population and receipt stays exact.
+    legacy_limits = {**PERCEPTION_CATALOG_LIMITS, "accepted_codec_versions": [20]}
+    if (
+        isinstance(recorded, dict)
+        and recorded.get("schema") == PERCEPTION_CATALOG_SCHEMA
+        and recorded.get("limits") == legacy_limits
+        and all(row["codec_version"] == 20 for row in observed["files"])
+    ):
+        observed["limits"]["accepted_codec_versions"] = [20]
     if recorded != observed or receipt != _perception_receipt(observed, sha256):
         raise ValueError("perception cache catalog population/bytes/header/source binding mismatch")
     return recorded
@@ -222,11 +257,128 @@ def source_files():
     paths = [
         Path(__file__),
         ROOT / "research/production_resource_guard.py",
+        ROOT / "research/pipeline_repair_performance.py",
         ROOT / "research/validate_real_video_runtime.py",
+        ROOT / "scripts/benchmarking/evaluate_rallies.py",
     ]
     for name in ["engine/src", "sports/badminton/src", "agents/src", "apps/api/src", "apps/web/src"]:
         paths.extend(p for p in (ROOT / name).rglob("*") if p.suffix in {".py", ".ts", ".tsx"})
     return sorted(set(paths))
+
+
+def diagnostic_ranges(frame_count: int) -> list[list[int]]:
+    """Input-only evenly spaced one-second windows within the existing 3600 cap."""
+    if type(frame_count) is not int or frame_count <= 0:
+        raise ValueError("diagnostics require a positive frame count")
+    if frame_count <= 3600:
+        return [[0, frame_count - 1]]
+    width, windows = 30, 120
+    return [
+        [i * (frame_count - width) // (windows - 1), i * (frame_count - width) // (windows - 1) + width - 1]
+        for i in range(windows)
+    ]
+
+
+def prepare_upload(video: Path, profile_source: Path, output: Path, case: str):
+    """Freeze one full upload without importing annotations or prior sessions.
+
+    This executor currently requires CFR at an unchanged production proxy rate.
+    A VFR/rate-converted input needs an explicit original-to-proxy frame map.
+    """
+    from bai_engine.media.ffmpeg import Tools, run_json
+    from bai_engine.media.probe import probe
+    from bai_engine.media.proxy import plan_proxy
+    from bai_engine.schema import Session, Source, SourceKind
+
+    if re.fullmatch(r"[a-z][a-z0-9]{0,31}", case) is None:
+        raise ValueError("upload case must be a lowercase alphanumeric name")
+    output = validate_output(output, [ROOT])
+    video, profile_source = video.resolve(strict=True), profile_source.resolve(strict=True)
+    tools = Tools.resolve()
+    media = probe(video, tools, timeout=120)
+    proxy_plan = plan_proxy(media, tools, prefer_gpu=False)
+    if not media.packet_cadence_complete or media.variable_frame_rate or media.fps != proxy_plan.fps:
+        raise ValueError("upload requires verified CFR at the unchanged proxy rate; explicit PTS mapping needed")
+    header = run_json(
+        [
+            tools.ffprobe,
+            "-v",
+            "error",
+            "-select_streams",
+            str(media.video_stream_index),
+            "-count_frames",
+            "-show_streams",
+            "-show_format",
+            "-of",
+            "json",
+            str(video),
+        ],
+        timeout=300,
+    )
+    stream = next(s for s in header["streams"] if s["codec_type"] == "video")
+    count = int(stream["nb_read_frames"])
+    if count <= 0 or (media.n_frames is not None and count != media.n_frames):
+        raise ValueError("source decoded frame count differs from its declared frame count")
+    profile = passive_profile(yaml.safe_load(profile_source.read_text()))
+    profile["shuttle"]["params"]["diagnostics"]["ranges"] = diagnostic_ranges(count)
+    sha = digest(video)
+    session = Session(
+        session_id="UPLOAD" + case.upper(),
+        title=f"Fresh complete upload: {case}",
+        profile="experiment",
+        source=Source(kind=SourceKind.UPLOAD, uri=str(video), original_name=video.name, sha256=sha),
+        players=[],
+    )
+    output.mkdir(parents=True, exist_ok=False)
+    (output / "profiles").mkdir()
+    profile_path = output / "profiles/experiment.yaml"
+    profile_path.write_text(yaml.safe_dump(profile, sort_keys=False))
+    session_path = output / f"{case}_session.json"
+    dump_new(session_path, session.model_dump(mode="json"))
+    dump_new(output / "source_probe.json", header)
+    inputs = {
+        str(path): digest(path)
+        for path in [
+            video,
+            profile_path,
+            session_path,
+            profile_source,
+            ROOT / "models/manifest.yaml",
+            ROOT / "models/cache/lock.json",
+        ]
+    }
+    snapshots = {}
+    for source in source_files():
+        destination = output / "executed_source" / source.relative_to(ROOT)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(source.read_bytes())
+        snapshots[str(source)] = digest(source)
+    plan = {
+        "schema": "production-single-upload-plan:v1",
+        "root": str(output),
+        "cases": {
+            case: {
+                "kind": "production_upload",
+                "session": str(session_path),
+                "source": str(video),
+                "source_sha256": sha,
+                "frames": count,
+            }
+        },
+        "source_files_sha256": snapshots,
+        "input_files_sha256": inputs,
+        "profile_source": str(profile_source),
+        "profile_source_sha256": digest(profile_source),
+        "profile_mutation": "passive diagnostics only: 120 evenly spaced 30-frame windows, at most 3600 frames",
+        "diagnostic_scope": "all-frame raw/association caches; peak/player diagnostics only in recorded windows",
+        "timestamp_scope": "verified CFR at unchanged proxy FPS; source/proxy PTS must also be checked after run",
+        "warm_start_scope": "complete input only; no prior calibration, identity, reviews or annotations",
+        "code_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
+        "git_status": subprocess.check_output(["git", "status", "--short"], cwd=ROOT, text=True).strip(),
+    }
+    dump_new(output / "plan.json", plan)
+    verify_inputs(plan)
+    return plan
 
 
 def passive_profile(raw):
@@ -235,11 +387,12 @@ def passive_profile(raw):
     if raw["components"]["shuttle_association"]["implementation"] != "coobserved-static-hypotheses-v1":
         raise ValueError("expected the frozen primary association profile")
     content = raw["components"]["content_continuity"]
-    if (
-        content["implementation"] != "foreground-content-continuity-v1"
-        or content["params"]["mode"] != "barrier_hypothesis_v1"
-    ):
-        raise ValueError("expected the frozen primary scene profile")
+    validated_scene_profiles = {
+        ("foreground-content-continuity-v1", "barrier_hypothesis_v1"),
+        ("foreground-content-continuity-v2", "barrier_detector_layout_v2"),
+    }
+    if (content["implementation"], content["params"]["mode"]) not in validated_scene_profiles:
+        raise ValueError("expected the frozen primary or validated detector-layout scene profile")
     result["shuttle"]["params"]["diagnostics"]["ranges"] = []
     expected = copy.deepcopy(result)
     expected["shuttle"]["params"]["diagnostics"]["ranges"] = raw["shuttle"]["params"]["diagnostics"]["ranges"]
@@ -395,7 +548,9 @@ def command_for(plan, case, output):
         return [
             sys.executable,
             str(Path(__file__).resolve()),
-            "test7-worker",
+            "upload-worker",
+            "--case",
+            case,
             "--plan",
             str(prepared / "plan.json"),
             "--output",
@@ -434,6 +589,40 @@ def verify_models(report):
                 raise ValueError(f"source model artifact changed: {path}")
             checked[str(path)] = actual
     return checked
+
+
+def process_resources(pid: int) -> dict:
+    """Sample only the owned worker and its current descendants, no other jobs."""
+    try:
+        pending, seen = [pid], set()
+        rss, cpu, count = 0, 0.0, 0
+        while pending and len(seen) < 4096:
+            child = pending.pop()
+            if child in seen:
+                continue
+            seen.add(child)
+            root = Path(f"/proc/{child}")
+            try:
+                usage = root.joinpath("stat").read_text().rsplit(")", 1)[1].split()
+                rss += int(root.joinpath("statm").read_text().split()[1]) * os.sysconf("SC_PAGE_SIZE")
+                cpu += (int(usage[11]) + int(usage[12])) / os.sysconf("SC_CLK_TCK")
+                count += 1
+                for task in root.joinpath("task").iterdir():
+                    pending.extend(int(value) for value in task.joinpath("children").read_text().split())
+            except (OSError, ValueError, IndexError):
+                continue
+        available = next(
+            line for line in Path("/proc/meminfo").read_text().splitlines() if line.startswith("MemAvailable:")
+        )
+        return {
+            "worker_tree_rss_bytes": rss,
+            "worker_tree_cpu_seconds": cpu,
+            "worker_tree_processes": count,
+            "system_available_ram_bytes": int(available.split()[1]) * 1024,
+            "sampling_scope": "current worker descendants; exiting children may be absent",
+        }
+    except (OSError, ValueError, StopIteration) as error:
+        return {"resource_sampling_error": type(error).__name__}
 
 
 @contextlib.contextmanager
@@ -479,7 +668,7 @@ def run(plan_path, case, output, gpu_index):
         "physical_gpu_index": gpu_index,
         "allocated_gpu_uuid": allocated,
         "cuda_visible_devices": allocated,
-        "mode": "fresh exposed-data stress; no GT worker argument; not blind evaluation",
+        "mode": "fresh complete input; no GT worker argument; match-disjoint independence unestablished",
         "started_s": time.time(),
     }
     with gpu_lease(ROOT / "artifacts/benchmarking/experiments/.gpu_leases", allocated):
@@ -499,7 +688,16 @@ def run(plan_path, case, output, gpu_index):
                                 text=True,
                                 timeout=5,
                             )
-                            samples.write(json.dumps({"elapsed_s": time.monotonic() - started, "rows": rows}) + "\n")
+                            samples.write(
+                                json.dumps(
+                                    {
+                                        "elapsed_s": time.monotonic() - started,
+                                        "rows": rows,
+                                        **process_resources(process.pid),
+                                    }
+                                )
+                                + "\n"
+                            )
                             samples.flush()
                         except (OSError, subprocess.SubprocessError) as error:
                             samples.write(json.dumps({"sampling_error": type(error).__name__}) + "\n")
@@ -512,7 +710,7 @@ def run(plan_path, case, output, gpu_index):
             outer["status"] = "completed" if process.returncode == 0 else "partial_or_failed"
         except ValueError as error:
             outer.update(status="failed_source_guard", error=str(error), frozen_source_inputs_unchanged=False)
-        if case == "test7":
+        if plan["cases"][case]["kind"] == "production_upload":
             try:
                 details = json.loads((output / "inference.json").read_text())
                 outer["output_proxy_sha256"] = details["proxy_sha256"]
@@ -579,7 +777,7 @@ def require_complete(session, expected_frames):
         raise RuntimeError("full dynamic source frame count/frontier mismatch")
 
 
-def test7_worker(plan_path: Path, output: Path):
+def upload_worker(plan_path: Path, output: Path, case: str):
     """Generic full-upload SessionRunner use; no reference/evaluator is loaded."""
     import resource
 
@@ -588,16 +786,41 @@ def test7_worker(plan_path: Path, output: Path):
     from bai_engine.runtime.runner import SessionRunner
     from bai_engine.schema import Session
     from bai_engine.store import SessionRepository
+    from research.pipeline_repair_performance import observe_perception_rates, summarize_stage_samples
     from research.validate_real_video_runtime import offline_network, prepare_models
     from scripts.benchmarking.evaluate_rallies import write_predictions
 
+    timings = collections.defaultdict(float)
+    stage_samples = {}
+
+    class TimedUploadRunner(SessionRunner):
+        def _create_sport(self):
+            began = time.monotonic()
+            try:
+                sport = super()._create_sport()
+                observe_perception_rates(sport.perception, stage_samples)
+                return sport
+            finally:
+                timings["component_initialization_including_models_s"] += time.monotonic() - began
+
+        def _perceive(self, *args, **kwargs):
+            began = time.monotonic()
+            try:
+                return super()._perceive(*args, **kwargs)
+            finally:
+                timings["decode_perception_cache_s"] += time.monotonic() - began
+
     plan = json.loads(plan_path.read_text())
-    item = plan["cases"]["test7"]
+    item = plan["cases"][case]
+    if item["kind"] != "production_upload":
+        raise ValueError("full upload worker requires production_upload plan entry")
     verify_inputs(plan)
     output = validate_output(output, [ROOT, Path(plan["root"])])
     output.mkdir(parents=True, exist_ok=False)
     profile = load_profile("experiment", Path(plan["root"]) / "profiles")
+    model_staging_started = time.monotonic()
     registry, artifacts = prepare_models(ROOT / "models", output / "models", [profile])
+    model_staging_seconds = time.monotonic() - model_staging_started
     repo = SessionRepository(output / "data")
     session = Session.model_validate_json(Path(item["session"]).read_bytes())
     # Let the existing media subsystem derive canonical proxy properties.
@@ -612,7 +835,7 @@ def test7_worker(plan_path: Path, output: Path):
         proxy_height=720,
     )
     bus = LocalBus()
-    runner = SessionRunner(session.session_id, repo, bus, settings, registry)
+    runner = TimedUploadRunner(session.session_id, repo, bus, settings, registry)
     started = time.monotonic()
     try:
         media_started = time.monotonic()
@@ -636,6 +859,7 @@ def test7_worker(plan_path: Path, output: Path):
             for event in repo.events(session.session_id).query(live_only=False):
                 stream.write(event.model_dump_json() + "\n")
         dump_new(output / "session.json", final.model_dump(mode="json"))
+        dump_new(output / "stage_latency_samples.json", stage_samples)
         import torch
 
         proxy = repo.media_paths(item["source_sha256"]).proxy
@@ -644,6 +868,8 @@ def test7_worker(plan_path: Path, output: Path):
             "mode": "fresh generic full-upload SessionRunner; no labels consumed",
             "elapsed_s": time.monotonic() - started,
             "media_ready_s": media_seconds,
+            "model_staging_s": model_staging_seconds,
+            "runner_stage_seconds": dict(timings),
             "media": final.media.model_dump(mode="json"),
             "frontier_frame": final.frontier_frame,
             "frames_processed": final.media.n_frames,
@@ -653,6 +879,8 @@ def test7_worker(plan_path: Path, output: Path):
             "execution_backends": runner.sport.perception.runtimes,
             "degraded": runner.sport.degraded(),
             "perception_stage_seconds": runner.sport.perception.stats.seconds,
+            "perception_stage_latency": summarize_stage_samples(stage_samples),
+            "stage_latency_samples_sha256": digest(output / "stage_latency_samples.json"),
             "event_counts": dict(collections.Counter(e.type for e in events)),
             "proxy_sha256": digest(proxy),
             "source_sha256": digest(Path(item["source"])),
@@ -700,6 +928,11 @@ def test7_worker(plan_path: Path, output: Path):
         repo.close()
 
 
+def test7_worker(plan_path: Path, output: Path):
+    """Retain the historical CLI/function entry point."""
+    return upload_worker(plan_path, output, "test7")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="action", required=True)
@@ -707,20 +940,31 @@ def main():
     p.add_argument("--materials", type=Path, required=True)
     p.add_argument("--profile-source", type=Path, required=True)
     p.add_argument("--output", type=Path, required=True)
-    for name in ["run", "test7-worker"]:
+    p = sub.add_parser("prepare-upload")
+    p.add_argument("--video", type=Path, required=True)
+    p.add_argument("--profile-source", type=Path, required=True)
+    p.add_argument("--output", type=Path, required=True)
+    p.add_argument("--case", required=True)
+    for name in ["run", "test7-worker", "upload-worker"]:
         p = sub.add_parser(name)
         p.add_argument("--plan", type=Path, required=True)
         p.add_argument("--output", type=Path, required=True)
         if name == "run":
-            p.add_argument("--case", choices=["india", "denmark", "doubles", "test7"], required=True)
+            p.add_argument("--case", required=True)
             p.add_argument("--gpu-index", type=int, required=True)
+        elif name == "upload-worker":
+            p.add_argument("--case", required=True)
     args = parser.parse_args()
     if args.action == "prepare":
         prepare(args.materials.resolve(), args.profile_source.resolve(), args.output.resolve())
+    elif args.action == "prepare-upload":
+        prepare_upload(args.video, args.profile_source, args.output, args.case)
     elif args.action == "run":
         raise SystemExit(run(args.plan.resolve(), args.case, args.output.resolve(), args.gpu_index))
-    else:
+    elif args.action == "test7-worker":
         test7_worker(args.plan.resolve(), args.output.resolve())
+    else:
+        upload_worker(args.plan.resolve(), args.output.resolve(), args.case)
 
 
 if __name__ == "__main__":

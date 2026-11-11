@@ -1,10 +1,94 @@
 """Source-proof controls; fake hashes validate contracts, never sports accuracy."""
 
 import copy
+import hashlib
 
 import pytest
 
 from research import production_external_semantic_replay as replay
+
+
+def test_recorded_format_reapplication_retains_validated_producer_provenance_and_strict_parity():
+    from types import SimpleNamespace
+
+    from bai_engine.schema import Event, Provenance
+    from research.production_replay_parity_audit import compare_live
+
+    original = Event(session_id="SOURCE", type="format_decision", frame_start=96, frame_end=96, pts_us=3200000,
+                     provenance=Provenance(model="sustained_target_court_format_v1", profile="experiment"),
+                     payload={"match_format": "singles", "decision": {"source": "inferred"}})
+    captured = []
+
+    def set_format(selected, frame, provenance, *, decision):
+        captured.append((selected, frame, provenance, decision))
+
+    replay.apply_recorded_format(SimpleNamespace(set_match_format=set_format), original.model_dump(mode="json"))
+    selected, frame, provenance, decision = captured[0]
+    assert (selected, frame, decision) == ("singles", 96, {"source": "inferred"})
+    assert provenance == original.provenance
+    clone = original.model_copy(update={"event_id": "replayed", "provenance": provenance})
+    assert not compare_live([original.model_dump(mode="json")], [clone.model_dump(mode="json")])["differences"]
+    substituted = original.model_copy(update={"provenance": Provenance(model="diagnostic:recorded-format")})
+    assert compare_live([original.model_dump(mode="json")], [substituted.model_dump(mode="json")])["differences"]
+
+
+@pytest.mark.parametrize("change", ["wrong_type", "missing_provenance", "malformed_provenance"])
+def test_recorded_format_requires_a_valid_original_event(change):
+    from types import SimpleNamespace
+
+    from bai_engine.schema import Event, Provenance
+
+    original = Event(session_id="SOURCE", type="format_decision", frame_start=96, frame_end=96, pts_us=3200000,
+                     provenance=Provenance(model="original"), payload={"match_format": "singles"})
+    row = original.model_dump(mode="json")
+    if change == "wrong_type":
+        row["type"] = "contact"
+    elif change == "missing_provenance":
+        row.pop("provenance")
+    else:
+        row["provenance"] = {"model": {"untrusted": "substitute"}}
+    with pytest.raises(ValueError):
+        replay.apply_recorded_format(SimpleNamespace(set_match_format=lambda *a, **k: pytest.fail("must reject")), row)
+
+
+@pytest.mark.parametrize("trace", [False, True])
+def test_replay_manifest_binds_all_generated_diagnostic_bytes_without_self_hash(tmp_path, trace):
+    names = [*replay.REPLAY_OUTPUT_ARTIFACTS]
+    if trace:
+        names.append("bounded_fsm_trace.jsonl")
+    originals = {}
+    for name in names:
+        originals[name] = (name + " exact diagnostic bytes\n").encode()
+        (tmp_path / name).write_bytes(originals[name])
+    hashes = replay.replay_output_hashes(tmp_path, trace=trace)
+    assert hashes == {name: hashlib.sha256(data).hexdigest() for name, data in originals.items()}
+    assert "replay_manifest.json" not in hashes
+    assert "events.sqlite" not in hashes
+    proof = {"output_artifact_sha256": hashes, "trace_ranges_telemetry_only": [[0, 3]] if trace else []}
+    replay.verify_replay_output_artifacts(tmp_path, proof)
+    assert {name: (tmp_path / name).read_bytes() for name in names} == originals
+    (tmp_path / names[-1]).write_bytes(b"different trace or diagnostic artifact")
+    with pytest.raises(ValueError, match="artifact bytes or population changed"):
+        replay.verify_replay_output_artifacts(tmp_path, proof)
+
+
+@pytest.mark.parametrize("change", ["missing", "symlink", "missing_digest", "wrong_population"])
+def test_replay_artifact_guard_refuses_incomplete_or_redirected_source_read(tmp_path, change):
+    for name in replay.REPLAY_OUTPUT_ARTIFACTS:
+        (tmp_path / name).write_bytes(b"original evidence")
+    hashes = replay.replay_output_hashes(tmp_path, trace=False)
+    proof = {"output_artifact_sha256": hashes, "trace_ranges_telemetry_only": []}
+    if change == "missing_digest":
+        proof.pop("output_artifact_sha256")
+    elif change == "wrong_population":
+        proof["output_artifact_sha256"]["../foreign.json"] = "foreign"
+    else:
+        victim = tmp_path / replay.REPLAY_OUTPUT_ARTIFACTS[0]
+        victim.unlink()
+        if change == "symlink":
+            victim.symlink_to(tmp_path / replay.REPLAY_OUTPUT_ARTIFACTS[1])
+    with pytest.raises(ValueError, match="replay output artifact"):
+        replay.verify_replay_output_artifacts(tmp_path, proof)
 
 
 def proof():
@@ -167,8 +251,20 @@ def full_upload(tmp_path):
     plan = {
         "code_commit": "source-commit",
         "source_files_sha256": {},
-        "cases": {"test7": {"frames": 3, "source": str(source), "source_sha256": source_sha}},
+        "cases": {
+            "test7": {
+                "kind": "production_upload",
+                "frames": 3,
+                "source": str(source),
+                "source_sha256": source_sha,
+                "session": str(tmp_path / "source-session.json"),
+            }
+        },
     }
+    source_session = {"session_id": "REALTEST7", "source": {"sha256": source_sha, "uri": str(source)}}
+    source_session_path = tmp_path / "source-session.json"
+    source_session_path.write_text(json.dumps(source_session))
+    plan["input_files_sha256"] = {str(source_session_path): replay.sha(source_session_path)}
     plan_path = tmp_path / "plan.json"
     plan_path.write_text(json.dumps(plan))
     executor = {
@@ -186,6 +282,8 @@ def full_upload(tmp_path):
         (run.with_suffix(".executor.json"), executor),
     ]:
         path.write_text(json.dumps(value))
+    executor["worker_report_sha256"] = replay.sha(run / "inference.json")
+    run.with_suffix(".executor.json").write_text(json.dumps(executor))
     (run / "events.jsonl").write_text("")
     caches = run / "data/sessions/REALTEST7/perception"
     caches.mkdir(parents=True)
@@ -204,6 +302,78 @@ def test_genuine_full_upload_paths_are_used_without_fabricated_harness_metadata(
     assert "after completion" in loaded.cache_digest_scope
     assert not (run / "run.json").exists()
     assert not (run / "benchmark_metadata.json").exists()
+
+
+def rewrite_upload_plan(run, executor, plan_path, plan):
+    import json
+
+    plan_path.write_text(json.dumps(plan))
+    executor["plan_sha256"] = replay.sha(plan_path)
+    run.with_suffix(".executor.json").write_text(json.dumps(executor))
+
+
+def bind_worker_report(run):
+    """Model the parent receipt after an intentionally constructed worker output."""
+    import json
+
+    path = run.with_suffix(".executor.json")
+    executor = json.loads(path.read_text())
+    executor["worker_report_sha256"] = replay.sha(run / "inference.json")
+    path.write_text(json.dumps(executor))
+
+
+def test_full_upload_uses_recorded_case_instead_of_test7_constant(tmp_path):
+    import json
+
+    run, _, executor, _ = full_upload(tmp_path)
+    plan_path = tmp_path / "plan.json"
+    plan = json.loads(plan_path.read_text())
+    plan["cases"]["test2"] = plan["cases"].pop("test7")
+    executor["case"] = "test2"
+    rewrite_upload_plan(run, executor, plan_path, plan)
+    loaded = replay.load_finished_input(run, "REALTEST7")
+    assert loaded.media["n_frames"] == 3
+    assert tmp_path / "source-session.json" in loaded.input_paths
+
+
+@pytest.mark.parametrize("kind", [None, "research_harness", "production_upload_typo"])
+def test_recorded_case_must_be_an_actual_production_upload(tmp_path, kind):
+    import json
+
+    run, _, executor, _ = full_upload(tmp_path)
+    plan_path = tmp_path / "plan.json"
+    plan = json.loads(plan_path.read_text())
+    plan["cases"]["test7"]["kind"] = kind
+    rewrite_upload_plan(run, executor, plan_path, plan)
+    with pytest.raises(ValueError, match="production_upload case"):
+        replay.load_finished_input(run, "REALTEST7")
+
+
+@pytest.mark.parametrize("field,value", [("session_id", "OTHER"), ("sha256", "other-source"), ("uri", "other.mp4")])
+def test_original_session_must_bind_same_sid_and_source_even_with_updated_plan_digest(tmp_path, field, value):
+    import json
+
+    run, _, executor, _ = full_upload(tmp_path)
+    plan_path = tmp_path / "plan.json"
+    plan = json.loads(plan_path.read_text())
+    source_session_path = tmp_path / "source-session.json"
+    session = json.loads(source_session_path.read_text())
+    if field == "session_id":
+        session[field] = value
+    else:
+        session["source"][field] = value
+    source_session_path.write_text(json.dumps(session))
+    plan["input_files_sha256"][str(source_session_path)] = replay.sha(source_session_path)
+    rewrite_upload_plan(run, executor, plan_path, plan)
+    with pytest.raises(ValueError, match="source/frontier mismatch"):
+        replay.load_finished_input(run, "REALTEST7")
+
+
+def test_original_session_bytes_cannot_change_after_guarded_plan(tmp_path):
+    run, _, _, _ = full_upload(tmp_path)
+    (tmp_path / "source-session.json").write_text("{}")
+    with pytest.raises(ValueError, match="original session digest changed"):
+        replay.load_finished_input(run, "REALTEST7")
 
 
 @pytest.mark.parametrize(
@@ -230,6 +400,7 @@ def test_full_upload_cannot_shorten_both_session_and_info_relative_to_original_p
     info["frames_processed"] = 2
     (run / "session.json").write_text(json.dumps(session))
     (run / "inference.json").write_text(json.dumps(info))
+    bind_worker_report(run)
     with pytest.raises(ValueError, match="source/frontier mismatch"):
         replay.load_finished_input(run, "REALTEST7")
 
@@ -238,6 +409,26 @@ def test_full_upload_plan_cannot_change_after_worker_guard(tmp_path):
     run, _, _, _ = full_upload(tmp_path)
     (tmp_path / "plan.json").write_text("{}")
     with pytest.raises(ValueError, match="plan digest changed"):
+        replay.load_finished_input(run, "REALTEST7")
+
+
+def test_full_upload_report_profile_cannot_change_after_executor_digest(tmp_path):
+    import json
+
+    run, info, _, _ = full_upload(tmp_path)
+    info["profile"] = {"name": "unrecorded replacement profile"}
+    (run / "inference.json").write_text(json.dumps(info))
+    with pytest.raises(ValueError, match="worker report digest"):
+        replay.load_finished_input(run, "REALTEST7")
+
+
+def test_full_upload_missing_executor_report_digest_is_not_compatible_legacy(tmp_path):
+    import json
+
+    run, _, executor, _ = full_upload(tmp_path)
+    executor.pop("worker_report_sha256")
+    run.with_suffix(".executor.json").write_text(json.dumps(executor))
+    with pytest.raises(ValueError, match="worker report digest"):
         replay.load_finished_input(run, "REALTEST7")
 
 
@@ -277,6 +468,7 @@ def add_completion_catalogue(run, info):
     )
     info["perception_cache_catalog"] = receipt
     (run / "inference.json").write_text(json.dumps(info))
+    bind_worker_report(run)
     return cache
 
 
@@ -315,6 +507,7 @@ def test_present_null_catalogue_is_not_legacy_absence(tmp_path):
     run, info, _, _ = full_upload(tmp_path)
     info["perception_cache_catalog"] = None
     (run / "inference.json").write_text(json.dumps(info))
+    bind_worker_report(run)
     with pytest.raises(ValueError):
         replay.load_finished_input(run, "REALTEST7")
 

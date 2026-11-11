@@ -12,7 +12,7 @@ import hashlib
 import json
 import math
 import sys
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, is_dataclass
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -29,12 +29,19 @@ from bai_badminton.plugin import BadmintonSession  # noqa: E402
 from bai_badminton.rules.bwf import MatchConfig  # noqa: E402
 from bai_engine.components import ComponentRegistry  # noqa: E402
 from bai_engine.config import ModelChoice, Profile  # noqa: E402
-from bai_engine.schema import Provenance, Session  # noqa: E402
+from bai_engine.schema import Session  # noqa: E402
 from bai_engine.store import EventStore  # noqa: E402
 from research.production_external_reference_report import validate_coverage, validate_finished  # noqa: E402
 from research.production_replay_parity_audit import compare_live  # noqa: E402
 
 REPLAY_SCHEMA = "cached-external-semantic:v2"
+REPLAY_OUTPUT_ARTIFACTS = (
+    "events.jsonl",
+    "current-events.jsonl",
+    "parity_vs_fresh.json",
+    "emission_frontiers.json",
+    "contact_readouts.json",
+)
 
 
 def sha(path):
@@ -49,6 +56,75 @@ def dump(path, value):
     with Path(path).open("x") as stream:
         json.dump(value, stream, indent=2, ensure_ascii=False, allow_nan=False)
         stream.write("\n")
+
+
+def replay_output_hashes(output, *, trace):
+    """Bind completed diagnostic bytes, excluding the manifest and mutable SQLite."""
+    names = (*REPLAY_OUTPUT_ARTIFACTS, "bounded_fsm_trace.jsonl") if trace else REPLAY_OUTPUT_ARTIFACTS
+    hashes = {}
+    for name in names:
+        path = output / name
+        if path.is_symlink() or not path.is_file():
+            raise ValueError("completed regular replay output artifact required")
+        hashes[name] = sha(path)
+    return hashes
+
+
+def capture_core_source_snapshot(expected, output, *, root=ROOT):
+    """Archive the exact core bytes before diagnostic execution, never just hashes."""
+    if not expected:
+        raise ValueError("nonempty executed core source population required")
+    for name, digest in expected.items():
+        relative = Path(name)
+        if relative.is_absolute() or ".." in relative.parts:
+            raise ValueError("core source snapshot requires repository-relative paths")
+        data = (root / relative).read_bytes()
+        if hashlib.sha256(data).hexdigest() != digest:
+            raise ValueError("core source changed before snapshot capture")
+        destination = output / "executed_core_source" / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        with destination.open("xb") as stream:
+            stream.write(data)
+    return {"directory": "executed_core_source", "sha256": dict(expected)}
+
+
+def verify_core_source_snapshot(output, receipt):
+    if receipt.get("directory") != "executed_core_source" or not receipt.get("sha256"):
+        raise ValueError("unsupported or missing core source snapshot receipt")
+    for name, digest in receipt["sha256"].items():
+        relative = Path(name)
+        if relative.is_absolute() or ".." in relative.parts:
+            raise ValueError("core source snapshot path is not relative")
+        path = output / receipt["directory"] / relative
+        if path.is_symlink() or not path.is_file() or sha(path) != digest:
+            raise ValueError("executed core source snapshot bytes changed")
+
+
+def verify_replay_output_artifacts(output, manifest):
+    expected = manifest.get("output_artifact_sha256")
+    actual = replay_output_hashes(output, trace=bool(manifest.get("trace_ranges_telemetry_only")))
+    if not expected or actual != expected:
+        raise ValueError("replay output artifact bytes or population changed")
+    if manifest.get("core_source_snapshot") is not None:
+        verify_core_source_snapshot(output, manifest["core_source_snapshot"])
+
+
+def apply_recorded_format(engine, row):
+    """Reapply an actual source decision; preserve its producer, never re-infer."""
+    from bai_engine.schema import Event
+
+    original = Event.model_validate(row)
+    selected = original.payload.get("match_format")
+    if original.type != "format_decision" or original.frame_start != original.frame_end:
+        raise ValueError("source format decision must be a canonical single-frame event")
+    if selected not in ("unknown", "singles", "doubles"):
+        raise ValueError("recorded format decision has no supported format")
+    engine.set_match_format(
+        None if selected == "unknown" else selected,
+        original.frame_start,
+        original.provenance,
+        decision=original.payload.get("decision", {}),
+    )
 
 
 def source_hashes():
@@ -96,6 +172,57 @@ def require_baseline_proof(proof, *, report_sha, engine_sources, harness_sources
         raise ValueError("baseline parity proof is missing or from another runner/helper/source/configuration")
 
 
+def require_source_intervention(manifest, proof, *, report_sha, proof_sha, current_sources, recorded_sources):
+    """Authorize only an explicit, complete source delta after strict baseline parity.
+
+    This is a development experiment with frozen perception, never a fresh run
+    or a baseline proof. Default replay remains strict and refuses changed sport
+    sources. Model/perception changes still require subsequent fresh inference.
+    """
+    recorded = {
+        name: digest for name, digest in recorded_sources.items() if name.startswith(("engine/src/", "sports/"))
+    }
+    changes = {
+        name: {"recorded": recorded.get(name), "current": current_sources.get(name)}
+        for name in sorted(recorded.keys() | current_sources.keys())
+        if recorded.get(name) != current_sources.get(name)
+    }
+    if (
+        not changes
+        or manifest.get("schema") != "controlled-semantic-source-intervention:v1"
+        or manifest.get("source_report_sha256") != report_sha
+        or manifest.get("baseline_proof_sha256") != proof_sha
+        or manifest.get("executed_source_sha256") != current_sources
+        or manifest.get("changes") != changes
+        or not isinstance(manifest.get("hypothesis"), str)
+        or not manifest["hypothesis"].strip()
+    ):
+        raise ValueError("source intervention must bind the complete declared code delta and baseline receipt")
+    options = manifest.get("rally_evidence_options", {})
+    if (
+        not isinstance(options, dict)
+        or options.keys() - {"use_short_exchange_evidence", "use_terminal_contact_evidence"}
+        or any(type(value) is not bool for value in options.values())
+    ):
+        raise ValueError("controlled rally options require explicit supported boolean evidence policies")
+    if (
+        proof.get("schema") != REPLAY_SCHEMA
+        or proof.get("baseline_parity") is not True
+        or proof.get("geometry_bracket") is not False
+        or proof.get("contact_motion_reliability") is not False
+        or proof.get("source_intervention") is not None
+        or proof.get("source_report_sha256") != report_sha
+        or not proof.get("harness_source_sha256")
+        or any(
+            proof.get("executed_source_sha256", {}).get(name) != digest
+            for name, digest in recorded.items()
+            if name.startswith("sports/")
+        )
+    ):
+        raise ValueError("source intervention requires an unchanged-sport strict baseline parity proof")
+    return changes
+
+
 @dataclass(frozen=True)
 class FinishedInput:
     layout: str
@@ -114,8 +241,15 @@ class FinishedInput:
     cache_catalogue_receipt: dict | None = None
 
 
-def load_finished_input(run, sid):
+def load_finished_input(run, sid, *, completion_recovery: Path | None = None):
     """Read genuine harness or full-upload exports; never fabricate run metadata."""
+    if completion_recovery is not None:
+        from research.pipeline_repair_completion import verify_completion_receipt
+
+        bound = verify_completion_receipt(run, completion_recovery)
+        if read(bound["session_path"])["session_id"] != sid:
+            raise ValueError("recovered completion belongs to a different session")
+        return FinishedInput(**{name: bound[name] for name in FinishedInput.__dataclass_fields__})
     if (run / "run.json").is_file():
         manifest_path, report_path = run / "run.json", run / "results" / sid / "report.json"
         manifest, report = read(manifest_path), read(report_path)
@@ -154,10 +288,12 @@ def load_finished_input(run, sid):
         or executor.get("status") != "completed"
         or executor.get("worker_exit_code") != 0
         or executor.get("frozen_source_inputs_unchanged") is not True
-        or executor.get("case") != "test7"
+        or not isinstance(executor.get("case"), str)
         or info.get("cached_perception_used") is not False
     ):
         raise ValueError("finished source-guarded full-upload worker required")
+    if sha(report_path) != executor.get("worker_report_sha256"):
+        raise ValueError("full-upload worker report digest changed or missing")
     command = executor["command"]
     if command.count("--plan") != 1:
         raise ValueError("explicit recorded full-upload plan required")
@@ -165,7 +301,15 @@ def load_finished_input(run, sid):
     if sha(plan_path) != executor.get("plan_sha256"):
         raise ValueError("full-upload plan digest changed")
     plan = read(plan_path)
-    item = plan["cases"]["test7"]
+    case = executor["case"]
+    cases = plan.get("cases", {})
+    if case not in cases or cases[case].get("kind") != "production_upload":
+        raise ValueError("finished source-guarded production_upload case required")
+    item = cases[case]
+    source_session_path = Path(item["session"])
+    if sha(source_session_path) != plan.get("input_files_sha256", {}).get(str(source_session_path)):
+        raise ValueError("full-upload original session digest changed or missing")
+    source_session = read(source_session_path)
     session_path, events_path = run / "session.json", run / "events.jsonl"
     session = read(session_path)
     media = info["media"]
@@ -179,6 +323,9 @@ def load_finished_input(run, sid):
         or session["frontier_frame"] != info["frontier_frame"]
         or session["source"]["sha256"] != item["source_sha256"]
         or info["source_sha256"] != item["source_sha256"]
+        or source_session["session_id"] != sid
+        or source_session["source"]["sha256"] != item["source_sha256"]
+        or Path(source_session["source"]["uri"]).resolve() != Path(item["source"]).resolve()
     ):
         raise ValueError("full-upload session/media/source/frontier mismatch")
     proxy = run / "data/media" / info["source_sha256"] / "proxy.mp4"
@@ -228,7 +375,7 @@ def load_finished_input(run, sid):
         plan["code_commit"],
         expected_caches,
         scope,
-        (plan_path, report_path, session_path, events_path, executor_path, *catalogue_paths),
+        (plan_path, report_path, source_session_path, session_path, events_path, executor_path, *catalogue_paths),
         receipt,
     )
 
@@ -240,6 +387,7 @@ def attach_bounded_fsm_trace(provider, engine, ranges, raw_frames):
         return any(lo <= frame < hi for lo, hi in ranges)
 
     def state():
+        admission = getattr(provider, "last_contact_admission", None)
         return {
             "state": provider.state.value,
             "start": provider.start,
@@ -250,6 +398,8 @@ def attach_bounded_fsm_trace(provider, engine, ranges, raw_frames):
             "moving_run_start": provider._run_start,
             "invisible_run": provider._invisible,
             "last_contact": provider._last_contact_frame,
+            "contact_admission": asdict(admission) if is_dataclass(admission) else None,
+            "exchange_admission": getattr(provider, "last_exchange_admission", None),
         }
 
     def finite(value):
@@ -280,8 +430,10 @@ def attach_bounded_fsm_trace(provider, engine, ranges, raw_frames):
         return result
 
     provider.step_evidence = step
-    for name in ("on_contact", "on_discontinuity", "flush"):
-        original = getattr(provider, name)
+    for name in ("on_contact", "on_contact_evidence", "on_discontinuity", "flush"):
+        original = getattr(provider, name, None)
+        if not callable(original):
+            continue
 
         def call(frame, *args, original=original, name=name, **kwargs):
             before = state() if selected(frame) or name == "flush" else None
@@ -303,12 +455,28 @@ def attach_bounded_fsm_trace(provider, engine, ranges, raw_frames):
     return trace, counts
 
 
-def replay(run, sid, output, *, bracket=False, motion=False, baseline_proof=None, focus=(), trace_ranges=()):
+def replay(
+    run,
+    sid,
+    output,
+    *,
+    bracket=False,
+    motion=False,
+    baseline_proof=None,
+    focus=(),
+    trace_ranges=(),
+    source_intervention=None,
+    completion_recovery=None,
+):
     import msgpack
 
     harness_bytes, harness_before = capture_harness_sources()
     before = source_hashes()
-    recorded = load_finished_input(run, sid)
+    recorded = (
+        load_finished_input(run, sid)
+        if completion_recovery is None
+        else load_finished_input(run, sid, completion_recovery=completion_recovery)
+    )
     manifest_path, report_path, media = recorded.manifest_path, recorded.report_path, recorded.media
     input_before = {
         str(path): sha(path)
@@ -320,7 +488,27 @@ def replay(run, sid, output, *, bracket=False, motion=False, baseline_proof=None
         for path, digest in recorded.code_files.items()
         if path in before and before[path] != digest
     }
-    if any(path.startswith("sports/") for path in changes):
+    if source_intervention is not None:
+        if baseline_proof is None or bracket or motion:
+            raise ValueError("source intervention requires a strict baseline proof and no other intervention")
+        proof = read(baseline_proof / "replay_manifest.json")
+        verify_replay_output_artifacts(baseline_proof, proof)
+        if proof.get("cache_sha256") != recorded.expected_caches:
+            raise ValueError("baseline proof does not bind this completed perception cache")
+        for name, digest in proof.get("harness_source_sha256", {}).items():
+            if sha(baseline_proof / "executed_helpers" / name) != digest:
+                raise ValueError("baseline proof helper source bytes changed")
+        intervention = read(source_intervention)
+        changes = require_source_intervention(
+            intervention,
+            proof,
+            report_sha=sha(report_path),
+            proof_sha=sha(baseline_proof / "replay_manifest.json"),
+            current_sources=before,
+            recorded_sources=recorded.code_files,
+        )
+        input_before[str(source_intervention)] = sha(source_intervention)
+    elif any(path.startswith("sports/") for path in changes):
         raise ValueError("sport semantics changed from frozen neural run")
     if bracket and motion:
         raise ValueError("one-variable experiments required")
@@ -328,14 +516,30 @@ def replay(run, sid, output, *, bracket=False, motion=False, baseline_proof=None
         if baseline_proof is None:
             raise ValueError("baseline proof required before optional geometry")
         proof = read(baseline_proof / "replay_manifest.json")
+        verify_replay_output_artifacts(baseline_proof, proof)
         require_baseline_proof(
             proof, report_sha=sha(report_path), engine_sources=before, harness_sources=harness_before
         )
     if output.exists() or run.resolve() in output.resolve().parents:
         raise ValueError("new output outside inference run required")
     output.mkdir(parents=True)
+    core_source_snapshot = capture_core_source_snapshot(before, output)
     session = Session.model_validate_json(recorded.session_path.read_bytes())
     profile = Profile.model_validate(recorded.profile)
+    if source_intervention is not None and intervention.get("rally_evidence_options"):
+        choice = profile.components.get("rally")
+        if choice is None or choice.implementation not in {"rally-evidence-tracklets-v1", "rally-evidence-v2"}:
+            raise ValueError("controlled evidence options require the explicit existing rally provider")
+        profile = profile.model_copy(
+            update={
+                "components": {
+                    **profile.components,
+                    "rally": choice.model_copy(
+                        update={"params": {**choice.params, **intervention["rally_evidence_options"]}}
+                    ),
+                }
+            }
+        )
     configured_format = session.roster.match_format if session.roster else None
     discipline = configured_format or "singles"
     context = DomainContext(
@@ -496,7 +700,8 @@ def replay(run, sid, output, *, bracket=False, motion=False, baseline_proof=None
             for row in wire["frames"]:
                 if any(lo <= row["f"] < hi for lo, hi in trace_ranges):
                     raw_trace_frames[row["f"]] = {
-                        key: row.get(key) for key in ("s", "c", "r", "sh", "g", "l", "v", "cs", "do", "ps", "sa", "ce")
+                        key: row.get(key)
+                        for key in ("s", "c", "r", "sh", "g", "l", "v", "cs", "do", "ps", "sa", "ce", "cc", "cd")
                     }
                     raw_trace_frames[row["f"]]["people"] = [
                         {key: person.get(key) for key in ("t", "b", "dm", "pf", "rf")} for person in row["p"]
@@ -512,13 +717,7 @@ def replay(run, sid, output, *, bracket=False, motion=False, baseline_proof=None
                 frame = event["frame_start"]
                 if cursor < frame:
                     engine.ingest(BadmintonSession._slice_perception(chunk, cursor, frame - 1))
-                value = event["payload"]
-                engine.set_match_format(
-                    value["match_format"],
-                    frame,
-                    Provenance(model="diagnostic:recorded-format"),
-                    decision=value["decision"],
-                )
+                apply_recorded_format(engine, event)
                 cursor = frame
             engine.ingest(BadmintonSession._slice_perception(chunk, cursor, chunk.end))
             engine.drain_tracks()
@@ -554,7 +753,9 @@ def replay(run, sid, output, *, bracket=False, motion=False, baseline_proof=None
             raise ValueError("source metadata/catalogue/events changed during replay")
         evidence = {
             "schema": REPLAY_SCHEMA,
-            "mode": "own recorded perception replay; NOT fresh inference",
+            "mode": "controlled source intervention on recorded perception; NOT fresh inference"
+            if source_intervention is not None
+            else "own recorded perception replay; NOT fresh inference",
             "session_id": sid,
             "source_run": str(run),
             "source_report_sha256": sha(report_path),
@@ -562,8 +763,10 @@ def replay(run, sid, output, *, bracket=False, motion=False, baseline_proof=None
             "source_layout": recorded.layout,
             "source_report_path": str(report_path),
             "executed_source_sha256": before,
+            "core_source_snapshot": core_source_snapshot,
             "harness_source_sha256": harness_before,
             "generic_source_deltas_from_fresh": changes,
+            "source_intervention": intervention if source_intervention is not None else None,
             "geometry_bracket": bracket,
             "contact_motion_reliability": motion,
             "actual_contact_configuration": handles["contact"].configuration
@@ -584,17 +787,26 @@ def replay(run, sid, output, *, bracket=False, motion=False, baseline_proof=None
             "trace_ranges_telemetry_only": trace_ranges,
             "trace_step_count": trace_counts["steps"],
             "profile": recorded.profile,
+            "actual_profile": profile.model_dump(mode="json"),
             "no_GT_or_neural_model_input": True,
+            "format_decision_replay": {
+                "mode": "reapplied source-bound recorded decisions with original validated producer provenance",
+                "format_detector_rerun": False,
+                "fresh_neural_inference": False,
+                "source_event_ids": [row["event_id"] for row in formats],
+            },
             "frontier_checks": "geometry source frames <= recorded actual emission frontier",
             "input_artifacts_sha256": input_before,
+            "output_artifact_sha256": replay_output_hashes(output, trace=bool(trace_ranges)),
         }
         for name, data in harness_bytes.items():
             destination = output / "executed_helpers" / name
             destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_bytes(data)
         (output / Path(__file__).name).write_bytes(harness_bytes["research/production_external_semantic_replay.py"])
+        verify_replay_output_artifacts(output, evidence)
         dump(output / "replay_manifest.json", evidence)
-        if not (bracket or motion) and not baseline_parity:
+        if not (bracket or motion or source_intervention is not None) and not baseline_parity:
             raise ValueError("baseline semantic parity failed; optional experiment refused")
         return evidence
     finally:
@@ -609,6 +821,8 @@ def main():
     p.add_argument("--geometry-bracket", action="store_true")
     p.add_argument("--contact-motion-reliability", action="store_true")
     p.add_argument("--baseline-proof", type=Path)
+    p.add_argument("--source-intervention", type=Path)
+    p.add_argument("--completion-recovery", type=Path, help="Explicit independently verified finalization recovery")
     p.add_argument("--focus", default="419,1569,2714,3736,441,1070,621,1100")
     p.add_argument("--trace-ranges", type=json.loads, default=[])
     a = p.parse_args()
@@ -621,6 +835,8 @@ def main():
         baseline_proof=a.baseline_proof.resolve(strict=True) if a.baseline_proof else None,
         focus=tuple(int(value) for value in a.focus.split(",") if value),
         trace_ranges=a.trace_ranges,
+        source_intervention=a.source_intervention.resolve(strict=True) if a.source_intervention else None,
+        completion_recovery=a.completion_recovery.resolve(strict=True) if a.completion_recovery else None,
     )
     print(
         json.dumps(
