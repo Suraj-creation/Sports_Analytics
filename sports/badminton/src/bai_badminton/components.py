@@ -22,7 +22,8 @@ from bai_badminton.events.contact import (
     build_contact_evidence,
     detect_contacts,
 )
-from bai_badminton.events.rally_evidence import EvidenceRallyFSM, RallyObservation
+from bai_badminton.events.contact_evidence import ContactEvidence
+from bai_badminton.events.rally_evidence import EvidenceRallyFSM, RallyContactAdmission, RallyObservation
 from bai_badminton.events.rally_fsm import RallyFSM, RallyParams, RallySegment, RallyState, RallyUpdate
 from bai_badminton.events.rally_motion import (
     ImageExitReturnSupport,
@@ -133,6 +134,20 @@ class RallySegmentation(Protocol):
     def on_discontinuity(self, frame: int) -> RallyUpdate: ...
 
     def flush(self, frame: int) -> RallyUpdate: ...
+
+
+@runtime_checkable
+class ContactEvidenceRallySegmentation(RallySegmentation, Protocol):
+    """Optional physical-evidence admission; candidate retention is independent."""
+
+    last_contact_admission: RallyContactAdmission | None
+
+    def on_contact_evidence(self, frame: int, evidence: ContactEvidence | None) -> RallyUpdate: ...
+
+
+@runtime_checkable
+class ExchangeEvidenceRallySegmentation(ContactEvidenceRallySegmentation, Protocol):
+    last_exchange_admission: dict[str, Any] | None
 
 
 @runtime_checkable
@@ -386,6 +401,8 @@ class _EvidenceRally(_BaselineTemporalState, EvidenceRallyFSM):
         use_reconstruction: bool = True,
         motion_guard: bool = False,
         use_exit_recovery: bool = False,
+        use_short_exchange_evidence: bool = False,
+        use_terminal_contact_evidence: bool = False,
     ) -> None:
         self._checkpoint_owner = str(uuid4())
         super().__init__(
@@ -393,6 +410,8 @@ class _EvidenceRally(_BaselineTemporalState, EvidenceRallyFSM):
             use_reconstruction=use_reconstruction,
             motion_guard=motion_guard,
             use_exit_recovery=use_exit_recovery,
+            use_short_exchange_evidence=use_short_exchange_evidence,
+            use_terminal_contact_evidence=use_terminal_contact_evidence,
         )
 
     def reset(self) -> None:
@@ -402,6 +421,8 @@ class _EvidenceRally(_BaselineTemporalState, EvidenceRallyFSM):
             use_reconstruction=self.use_reconstruction,
             motion_guard=self.motion_guard,
             use_exit_recovery=self.use_exit_recovery,
+            use_short_exchange_evidence=self.use_short_exchange_evidence,
+            use_terminal_contact_evidence=self.use_terminal_contact_evidence,
         )
 
     def close(self) -> None:
@@ -633,11 +654,15 @@ def register_domain_components(registry: ComponentRegistry) -> None:
         reconstruction = params.pop("use_reconstruction", True)
         motion_guard = params.pop("motion_guard", False)
         exit_recovery = params.pop("use_exit_recovery", False)
+        short_exchange = params.pop("use_short_exchange_evidence", False)
+        terminal_contact = params.pop("use_terminal_contact_evidence", False)
         return _EvidenceRally(
             RallyParams(fps=context.fps, **params),
             use_reconstruction=reconstruction,
             motion_guard=motion_guard,
             use_exit_recovery=exit_recovery,
+            use_short_exchange_evidence=short_exchange,
+            use_terminal_contact_evidence=terminal_contact,
         )
 
     def tracklet_rally(context: DomainContext, configuration: dict[str, Any]) -> AssociatedExitRallySegmentation:
@@ -645,7 +670,13 @@ def register_domain_components(registry: ComponentRegistry) -> None:
         curve = params.pop("use_curve_exit", False)
         options = {
             key: params.pop(key, default)
-            for key, default in (("use_reconstruction", False), ("motion_guard", False), ("use_exit_recovery", True))
+            for key, default in (
+                ("use_reconstruction", False),
+                ("motion_guard", False),
+                ("use_exit_recovery", True),
+                ("use_short_exchange_evidence", False),
+                ("use_terminal_contact_evidence", False),
+            )
         }
         return _TrackletEvidenceRally(RallyParams(fps=context.fps, **params), use_curve_exit=curve, **options)
 
@@ -693,7 +724,7 @@ def register_domain_components(registry: ComponentRegistry) -> None:
         ComponentContract(
             kind="rally",
             implementation="rally-evidence-tracklets-v1",
-            version="1",
+            version="2",
             input_schema="badminton-rally-evidence:v2",
             output_schema="badminton-rally-output:v1",
             interface=AssociatedExitRallySegmentation,
@@ -707,6 +738,7 @@ def register_domain_components(registry: ComponentRegistry) -> None:
                 "optional_evidence": [
                     "qualified_event_singleton_exit_association:v1",
                     "optional_observed_bracket_image_curve:v1",
+                    "typed_contact_temporal_admission:v1",
                 ],
                 "limitations": [
                     "VOD_available_window_only",
@@ -722,7 +754,7 @@ def register_domain_components(registry: ComponentRegistry) -> None:
         ComponentContract(
             kind="rally",
             implementation="rally-evidence-v2",
-            version="2",
+            version="3",
             input_schema="badminton-rally-evidence:v2",
             output_schema="badminton-rally-output:v1",
             interface=EvidenceRallySegmentation,

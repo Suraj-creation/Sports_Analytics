@@ -15,6 +15,7 @@ execution providers and the TensorRT engine cache are controlled per profile.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
@@ -28,6 +29,49 @@ from bai_badminton.perception.player_association import PersistentPlayerAssociat
 from bai_badminton.perception_types import PersonObs
 
 PERSON = 0
+
+
+@dataclass(frozen=True, slots=True)
+class PlayerDetectionProbe:
+    """Detached detector outputs tied to one exact decoded source image.
+
+    Probing does not advance ByteTrack, participant identity, or pose. The same
+    outputs may subsequently be consumed once by the normal tracking step.
+    """
+
+    frame_idx: int
+    image_shape: tuple[int, int, int]
+    image_sha256: str
+    boxes: tuple[tuple[float, float, float, float], ...]
+    scores: tuple[float, ...]
+    crop_box: tuple[int, int, int, int]
+    admitted_indices: tuple[int, ...]
+
+    def __post_init__(self) -> None:
+        if type(self.frame_idx) is not int or self.frame_idx < 0:
+            raise ValueError("detector probe requires a canonical source frame")
+        if (
+            len(self.image_shape) != 3
+            or any(type(v) is not int or v <= 0 for v in self.image_shape)
+            or self.image_shape[2] != 3
+        ):
+            raise ValueError("detector probe requires a valid source image shape")
+        if (
+            len(self.image_sha256) != 64
+            or any(c not in "0123456789abcdef" for c in self.image_sha256)
+            or len(self.boxes) != len(self.scores)
+            or len(self.boxes) > 4096
+        ):
+            raise ValueError("detector probe source or bounded output is invalid")
+        for box, score in zip(self.boxes, self.scores, strict=True):
+            if len(box) != 4 or not np.isfinite([*box, score]).all() or not 0 <= score <= 1:
+                raise ValueError("detector probe requires finite boxes and supports")
+            if box[2] <= box[0] or box[3] <= box[1]:
+                raise ValueError("detector probe boxes must have positive extent")
+        if len(set(self.admitted_indices)) != len(self.admitted_indices) or any(
+            type(i) is not int or not 0 <= i < len(self.boxes) for i in self.admitted_indices
+        ):
+            raise ValueError("invalid detector probe region admission")
 
 
 def _swap_session(tool: Any, onnx_path: Path, providers: list[Any]) -> None:
@@ -329,6 +373,7 @@ class PlayerPerception:
         self.fps = fps
         self._diagnostic_top_k = 0
         self.last_diagnostic: dict[str, Any] | None = None
+        self._force_detection = False
 
     def set_diagnostics(self, enabled: bool, top_k: int = 3) -> None:
         if type(enabled) is not bool or type(top_k) is not int or not 1 <= top_k <= 8:
@@ -364,11 +409,55 @@ class PlayerPerception:
         self._admitted.clear()
         self._court_tracks.clear()
         self._last_detection_frame = None
+        self._force_detection = True
         if self._associator is not None:
             self._associator.reset()
 
+    def probe_detection(self, frame_idx: int, img: NDArray[np.uint8]) -> PlayerDetectionProbe | None:
+        """Acquire current pixels without changing tracker/identity state."""
+        if self.detector is None:
+            return None
+        h, w = img.shape[:2]
+        crop = self.roi.crop_box(w, h) if self.roi is not None else (0, 0, w, h)
+        x0, y0, x1, y1 = crop
+        boxes, scores = self.detector(img[y0:y1, x0:x1])
+        boxes = np.asarray(boxes, dtype=np.float64).reshape(-1, 4)
+        scores = np.asarray(scores, dtype=np.float64).reshape(-1)
+        if len(boxes):
+            boxes = boxes + np.asarray([x0, y0, x0, y0], dtype=np.float64)
+        keep, _ = self._roi_admission(boxes, frame_idx)
+        return PlayerDetectionProbe(
+            frame_idx,
+            tuple(img.shape),
+            sha256(img.tobytes()).hexdigest(),
+            tuple(tuple(float(v) for v in box) for box in boxes),
+            tuple(float(v) for v in scores),
+            crop,
+            tuple(int(i) for i in np.flatnonzero(keep)),
+        )
+
+    def _roi_admission(self, boxes: NDArray, frame_idx: int) -> tuple[NDArray[np.bool_], set[int]]:
+        keep = np.ones(len(boxes), dtype=bool)
+        continuing: set[int] = set()
+        if self.roi is not None and len(boxes):
+            keep = np.asarray([self.roi.contains_feet(box) for box in boxes], dtype=bool)
+            history = [(tid, value) for tid, value in self._court_tracks.items() if frame_idx - value[0] <= self.fps]
+            if history:
+                overlap = _box_iou(boxes, np.asarray([value[1][1] for value in history])) >= 0.3
+                for i in range(len(boxes)):
+                    matches = np.flatnonzero(overlap[i])
+                    if len(matches) == 1 and overlap[:, matches[0]].sum() == 1:
+                        continuing.add(history[int(matches[0])][0])
+                        keep[i] = True
+        return keep, continuing
+
     def process(
-        self, frame_idx: int, img: NDArray[np.uint8], strides: tuple[int, int] | None = None
+        self,
+        frame_idx: int,
+        img: NDArray[np.uint8],
+        strides: tuple[int, int] | None = None,
+        *,
+        detection_probe: PlayerDetectionProbe | None = None,
     ) -> list[PersonObs]:
         self.last_detector_observed = False
         self.last_capacity_limited = False
@@ -388,7 +477,9 @@ class PlayerPerception:
             }
         if self.detector is None or det_stride == 0:
             return []
-        if frame_idx % det_stride != 0:
+        if detection_probe is not None and self._last_detection_frame == frame_idx:
+            raise ValueError("current detector probe was already consumed by tracking")
+        if frame_idx % det_stride != 0 and detection_probe is None and not self._force_detection:
             return self._carry(frame_idx, img, pose_stride, det_stride)
         h, w = img.shape[:2]
         x0, y0 = 0, 0
@@ -396,9 +487,22 @@ class PlayerPerception:
         if self.roi is not None:
             x0, y0, x1, y1 = self.roi.crop_box(w, h)
             view = img[y0:y1, x0:x1]
-        boxes, scores = self.detector(view)
+        if detection_probe is not None:
+            if (
+                detection_probe.frame_idx != frame_idx
+                or detection_probe.image_shape != tuple(img.shape)
+                or detection_probe.image_sha256 != sha256(img.tobytes()).hexdigest()
+            ):
+                raise ValueError("detector probe differs from the current source frame/image")
+            boxes = np.asarray(detection_probe.boxes, dtype=np.float64).reshape(-1, 4)
+            scores = np.asarray(detection_probe.scores, dtype=np.float64)
+            # Probe boxes already use full-image coordinates.
+            boxes = boxes - [x0, y0, x0, y0]
+        else:
+            boxes, scores = self.detector(view)
         self.last_detector_observed = True
         self._last_detection_frame = frame_idx
+        self._force_detection = False
         if len(boxes):
             boxes = boxes + np.array([x0, y0, x0, y0], dtype=np.float64)
         if self.last_diagnostic is not None:
@@ -412,21 +516,12 @@ class PlayerPerception:
         self._court_tracks = {
             tid: (last, box) for tid, (last, box) in self._court_tracks.items() if frame_idx - last <= self.fps
         }
-        continuing: set[int] = set()
+        keep, continuing = self._roi_admission(boxes, frame_idx)
         if self.roi is not None and len(boxes):
-            keep = np.array([self.roi.contains_feet(b) for b in boxes], bool)
             # Bbox bottoms are ground-plane feet only while grounded. A known
             # athlete can jump above a baseline or run beyond a sideline. Keep
             # a uniquely overlapping current detection of that existing track;
             # do not admit unrelated spectators by expanding the court mask.
-            history = list(self._court_tracks.items())
-            if history:
-                overlap = _box_iou(boxes, np.asarray([value[1][1] for value in history])) >= 0.3
-                for i in range(len(boxes)):
-                    matches = np.flatnonzero(overlap[i])
-                    if len(matches) == 1 and overlap[:, matches[0]].sum() == 1:
-                        continuing.add(history[int(matches[0])][0])
-                        keep[i] = True
             if self.last_diagnostic is not None:
                 self.last_diagnostic["roi_rejected_count"] = int((~keep).sum())
                 self.last_diagnostic["roi_rejected"] = [

@@ -20,6 +20,8 @@ from enum import StrEnum
 from itertools import pairwise
 from typing import Any, Literal
 
+from bai_badminton.events.exchange_evidence import ContactParticipantContext
+
 ObservationStatus = Literal[
     "fresh_observed",
     "missing",
@@ -160,6 +162,7 @@ class ContactEvidenceInputs:
     player_observation_frames: tuple[int, ...] = ()
     pose_observation_frames: tuple[int, ...] = ()
     racket_observation_frames: tuple[int, ...] = ()
+    participant_context: ContactParticipantContext | None = None
 
     def __post_init__(self) -> None:
         if (
@@ -170,6 +173,14 @@ class ContactEvidenceInputs:
             or len(self.provider) > 128
         ):
             raise ValueError("contact evidence requires valid canonical context and provider")
+        if self.participant_context is not None and (
+            not isinstance(self.participant_context, ContactParticipantContext)
+            or any(
+                not self.context_start <= row.frame < self.context_stop or row.frame > self.available_through
+                for row in self.participant_context.observations
+            )
+        ):
+            raise ValueError("participant witness exceeds source contact context/availability")
         if self.observation_status not in {
             None,
             "fresh_observed",

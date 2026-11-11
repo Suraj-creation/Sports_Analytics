@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 from contextlib import contextmanager
+from fractions import Fraction
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -44,6 +47,33 @@ def test_wrong_primary_provider_is_rejected(component):
     raw = profile()
     raw["components"][component]["implementation"] = "another-provider"
     with pytest.raises(ValueError, match="frozen primary"):
+        tool.passive_profile(raw)
+
+
+def test_validated_detector_layout_profile_is_frozen_without_numerical_changes():
+    raw = profile()
+    raw["components"]["content_continuity"] = {
+        "implementation": "foreground-content-continuity-v2",
+        "params": {"mode": "barrier_detector_layout_v2"},
+    }
+    original = copy.deepcopy(raw)
+    result = tool.passive_profile(raw)
+    assert raw == original
+    assert result["shuttle"]["params"]["diagnostics"]["ranges"] == []
+    result["shuttle"]["params"]["diagnostics"]["ranges"] = original["shuttle"]["params"]["diagnostics"]["ranges"]
+    assert result == original
+
+
+@pytest.mark.parametrize(
+    "mode", ["barrier_correspondence_v2", "barrier_hypothesis_cadence_v2", "barrier_hypothesis_v1"]
+)
+def test_rejected_or_mismatched_scene_experiment_is_not_accepted_as_primary(mode):
+    raw = profile()
+    raw["components"]["content_continuity"] = {
+        "implementation": "foreground-content-continuity-v2",
+        "params": {"mode": mode},
+    }
+    with pytest.raises(ValueError, match="scene profile"):
         tool.passive_profile(raw)
 
 
@@ -109,6 +139,102 @@ def test_clip_command_has_no_reference_window_or_calibration_argument(tmp_path):
     assert "--retain-perception" in command
     assert command[command.index("--samples") + 1] == "1"
     assert not any("annotat" in arg or "calibration-json" in arg or "window-" in arg for arg in command)
+
+
+@pytest.mark.parametrize("count", [1, 17, 3600, 3601, 29280])
+def test_upload_diagnostics_are_input_only_bounded_and_cover_both_ends(count):
+    from bai_badminton.perception.diagnostics import DiagnosticSelection
+
+    ranges = tool.diagnostic_ranges(count)
+    selection = DiagnosticSelection.parse({"ranges": ranges})
+    assert sum(end - start + 1 for start, end in selection.ranges) == min(count, 3600)
+    assert ranges[0][0] == 0 and ranges[-1][1] == count - 1
+
+
+def test_generic_full_upload_command_keeps_case_and_has_no_labels(tmp_path):
+    plan = {"root": str(tmp_path / "protocol"), "cases": {"newmatch": {"kind": "production_upload"}}}
+    command = tool.command_for(plan, "newmatch", tmp_path / "run")
+    assert "upload-worker" in command
+    assert command[command.index("--case") + 1] == "newmatch"
+    assert not any("annotat" in value or "ground-truth" in value for value in command)
+
+
+def test_upload_rejects_unsupported_timestamps_before_writing_output(tmp_path, monkeypatch):
+    import importlib
+
+    media_probe = importlib.import_module("bai_engine.media.probe")
+    proxy = importlib.import_module("bai_engine.media.proxy")
+    video, profile_path, output = tmp_path / "video.mp4", tmp_path / "profile.yaml", tmp_path / "new"
+    video.write_bytes(b"source")
+    profile_path.write_text("unused")
+    monkeypatch.setattr(
+        media_probe,
+        "probe",
+        lambda *a, **k: SimpleNamespace(packet_cadence_complete=True, variable_frame_rate=True, fps=Fraction(30)),
+    )
+    monkeypatch.setattr(proxy, "plan_proxy", lambda *a, **k: SimpleNamespace(fps=Fraction(30)))
+    with pytest.raises(ValueError, match="explicit PTS mapping"):
+        tool.prepare_upload(video, profile_path, output, "newmatch")
+    assert not output.exists()
+
+
+def test_upload_preparation_freezes_input_only_session_and_checks_decoded_count(tmp_path, monkeypatch):
+    import importlib
+
+    import yaml
+
+    media_probe = importlib.import_module("bai_engine.media.probe")
+    proxy = importlib.import_module("bai_engine.media.proxy")
+    ffmpeg = importlib.import_module("bai_engine.media.ffmpeg")
+    repo = tmp_path / "repo"
+    (repo / "models/cache").mkdir(parents=True)
+    (repo / "models/manifest.yaml").write_text("models: {}")
+    (repo / "models/cache/lock.json").write_text("{}")
+    implementation = repo / "executor.py"
+    implementation.write_text("frozen source")
+    video, profile_path = tmp_path / "video.mp4", tmp_path / "profile.yaml"
+    video.write_bytes(b"original video")
+    profile_path.write_text(yaml.safe_dump(profile()))
+    monkeypatch.setattr(tool, "ROOT", repo)
+    monkeypatch.setattr(tool, "source_files", lambda: [implementation])
+    monkeypatch.setattr(tool.subprocess, "check_output", lambda *a, **k: "recorded git\n")
+    monkeypatch.setattr(
+        media_probe,
+        "probe",
+        lambda *a, **k: SimpleNamespace(
+            packet_cadence_complete=True, variable_frame_rate=False, fps=Fraction(30), video_stream_index=0, n_frames=17
+        ),
+    )
+    monkeypatch.setattr(proxy, "plan_proxy", lambda *a, **k: SimpleNamespace(fps=Fraction(30)))
+    header = {"streams": [{"codec_type": "video", "nb_read_frames": "17"}]}
+    monkeypatch.setattr(ffmpeg, "run_json", lambda *a, **k: header)
+    destination = tmp_path / "protocol"
+    plan = tool.prepare_upload(video, profile_path, destination, "newmatch")
+    item = plan["cases"]["newmatch"]
+    assert item["frames"] == 17 and item["kind"] == "production_upload"
+    session = json.loads(Path(item["session"]).read_text())
+    assert session["source"]["uri"] == str(video)
+    assert session["meta"] == {} and session["players"] == [] and session["media"] is None
+    assert session["session_id"] == "UPLOADNEWMATCH"
+    assert not {"ground_truth", "annotations", "reference"}.intersection(plan)
+    assert (destination / "executed_source/executor.py").read_bytes() == implementation.read_bytes()
+    header["streams"][0]["nb_read_frames"] = "16"
+    with pytest.raises(ValueError, match="decoded frame count"):
+        tool.prepare_upload(video, profile_path, tmp_path / "invalid", "newmatch")
+    assert not (tmp_path / "invalid").exists()
+
+
+@pytest.mark.parametrize("case", ["../escape", "UPPER", "a/b", "", "a" * 33])
+def test_upload_rejects_unsafe_case_before_any_media_access(tmp_path, case):
+    with pytest.raises(ValueError, match="alphanumeric"):
+        tool.prepare_upload(tmp_path / "absent", tmp_path / "absent", tmp_path / "new", case)
+
+
+def test_worker_process_resource_sample_observes_real_process():
+    row = tool.process_resources(os.getpid())
+    assert row["worker_tree_processes"] >= 1
+    assert row["worker_tree_rss_bytes"] > 0
+    assert row["worker_tree_cpu_seconds"] >= 0
 
 
 def test_guard_rejects_output_in_repository_before_gpu_access(tmp_path, monkeypatch):

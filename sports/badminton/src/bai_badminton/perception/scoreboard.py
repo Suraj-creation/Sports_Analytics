@@ -29,6 +29,7 @@ from bai_badminton.perception_types import ScoreReading
 
 _NAME = re.compile(r"[A-Za-z][A-Za-z.'\-]*")
 _NUM = re.compile(r"(?<![\d:])\d{1,2}(?![\d:])")  # 1-2 digit numbers, not clock times
+PARSER_POLICY = "nearest-name-current-column-v2"
 # (x0, y0, x1, y1) as fractions of the frame: score bugs live in the corners
 CORNERS: tuple[tuple[float, float, float, float], ...] = (
     (0.0, 0.0, 0.45, 0.25),
@@ -94,10 +95,16 @@ def _score_rows(items: list[_ScoreText]) -> list[_ScoreRow]:
             for key, other in list(remaining.items()):
                 left, right = sorted((anchor, other), key=lambda item: item.x0)
                 gap = right.x0 - left.x1
-                separated = any(not item.name and item.numbers and left.x1 <= item.x0 < right.x0
-                                and _same_baseline(left, item) for item in items)
-                if (_same_baseline(left, right) and not left.numbers and not separated
-                        and -0.25 * min(left.height, right.height) <= gap <= 1.5 * min(left.height, right.height)):
+                separated = any(
+                    not item.name and item.numbers and left.x1 <= item.x0 < right.x0 and _same_baseline(left, item)
+                    for item in items
+                )
+                if (
+                    _same_baseline(left, right)
+                    and not left.numbers
+                    and not separated
+                    and -0.25 * min(left.height, right.height) <= gap <= 1.5 * min(left.height, right.height)
+                ):
                     group.append(other)
                     pending.append(other)
                     del remaining[key]
@@ -112,10 +119,34 @@ def _score_rows(items: list[_ScoreText]) -> list[_ScoreRow]:
         for item in group:
             name_matches = list(_NAME.finditer(item.text))
             number_matches = list(_NUM.finditer(item.text))
-            if item.numbers and name_matches and number_matches and number_matches[-1].start() >= name_matches[-1].end():
+            if (
+                item.numbers
+                and name_matches
+                and number_matches
+                and number_matches[-1].start() >= name_matches[-1].end()
+            ):
                 numbers.append(item)
-        numbers.extend(item for item in items if not item.name and item.numbers and ':' not in item.text
-                       and item.x0 >= name_right - 0.25 * height and _same_baseline(anchor, item))
+        for item in items:
+            if (
+                item.name
+                or not item.numbers
+                or ":" in item.text
+                or item.x0 < name_right - 0.25 * height
+                or not _same_baseline(anchor, item)
+            ):
+                continue
+            # A score field belongs to the closest eligible name group to its
+            # left. Broadcasters' logos can share both athlete baselines; they
+            # must not borrow numbers across the actual competitor's name.
+            if any(
+                max(part.x1 for part in other) > name_right
+                and max(part.x1 for part in other) <= item.x0 + 0.25 * height
+                and _same_baseline(other[0], item)
+                for other in groups
+                if other is not group
+            ):
+                continue
+            numbers.append(item)
         if not numbers:
             continue
         numbers.sort(key=lambda item: (item.x1, item.x0, item.index))
@@ -124,18 +155,30 @@ def _score_rows(items: list[_ScoreText]) -> list[_ScoreRow]:
             continue
         # A close clock/text field to the right of an old game value is not
         # permission to treat that completed-game value as the current score.
-        if any(item.index not in {part.index for part in group + numbers}
-               and item.x0 > current.x0 and item.x0 - current.x1 <= 2 * height
-               and _same_baseline(anchor, item) for item in items):
+        if any(
+            item.index not in {part.index for part in group + numbers}
+            and item.x0 > current.x0
+            and item.x0 - current.x1 <= 2 * height
+            and _same_baseline(anchor, item)
+            for item in items
+        ):
             continue
         used = {item.index: item for item in group + numbers}
         pts = np.concatenate([item.pts for item in used.values()])
-        rows.append(_ScoreRow(
-            name=' '.join(item.name for item in group), points=current.numbers[-1],
-            conf=min(item.conf for item in used.values()), members=frozenset(used), pts=pts,
-            name_left=name_left, name_right=name_right, score_right=current.x1,
-            centre=centre, height=height,
-        ))
+        rows.append(
+            _ScoreRow(
+                name=" ".join(item.name for item in group),
+                points=current.numbers[-1],
+                conf=min(item.conf for item in used.values()),
+                members=frozenset(used),
+                pts=pts,
+                name_left=name_left,
+                name_right=name_right,
+                score_right=current.x1,
+                centre=centre,
+                height=height,
+            )
+        )
     return sorted(rows, key=lambda row: (row.centre, row.name_left))
 
 
@@ -164,30 +207,47 @@ def parse_scoreboard(
         except (TypeError, ValueError):
             return None
         raw = str(text).strip()
-        items.append(_ScoreText(index, pts, raw, ' '.join(_NAME.findall(raw)),
-                                tuple(int(number) for number in _NUM.findall(raw)), conf,
-                                float(x0), float(y0), float(x1), float(y1)))
+        items.append(
+            _ScoreText(
+                index,
+                pts,
+                raw,
+                " ".join(_NAME.findall(raw)),
+                tuple(int(number) for number in _NUM.findall(raw)),
+                conf,
+                float(x0),
+                float(y0),
+                float(x1),
+                float(y1),
+            )
+        )
     rows = _score_rows(items)
     pairs = []
     for index, first in enumerate(rows):
-        for second in rows[index + 1:]:
+        for second in rows[index + 1 :]:
             low, high = min(first.height, second.height), max(first.height, second.height)
-            if (first.members & second.members or high > 1.6 * low
-                    or not 0.65 * low <= second.centre - first.centre <= 3.5 * high):
+            if (
+                first.members & second.members
+                or high > 1.6 * low
+                or not 0.65 * low <= second.centre - first.centre <= 3.5 * high
+            ):
                 continue
             align = max(2.0, 0.75 * high)
-            name_aligned = (abs(first.name_left - second.name_left) <= align
-                            or abs(first.name_right - second.name_right) <= align)
+            name_aligned = (
+                abs(first.name_left - second.name_left) <= align or abs(first.name_right - second.name_right) <= align
+            )
             if name_aligned and abs(first.score_right - second.score_right) <= align:
                 pairs.append((first, second))
     if len(pairs) != 1:
         return None
     first, second = pairs[0]
     pts = np.concatenate((first.pts, second.pts))
-    bounds = (float(pts[:, 0].min()), float(pts[:, 1].min()),
-              float(pts[:, 0].max()), float(pts[:, 1].max()))
-    return ScoreReading(frame_idx=frame_idx, rows=((first.name, first.points), (second.name, second.points)),
-                        conf=min(first.conf, second.conf)), bounds
+    bounds = (float(pts[:, 0].min()), float(pts[:, 1].min()), float(pts[:, 0].max()), float(pts[:, 1].max()))
+    return ScoreReading(
+        frame_idx=frame_idx,
+        rows=((first.name, first.points), (second.name, second.points)),
+        conf=min(first.conf, second.conf),
+    ), bounds
 
 
 @dataclass
@@ -209,17 +269,33 @@ class ScoreboardReader:
             return "rapidocr@unknown"
         weights = {stage: info["sha256"] for stage, info in self.runtime["stages"].items()}
         fingerprint = hashlib.sha256(json.dumps(weights, sort_keys=True).encode()).hexdigest()[:12]
-        return f"rapidocr@{self.runtime['package_version']}+{fingerprint}"
+        return f"rapidocr@{self.runtime['package_version']}+{fingerprint}+{PARSER_POLICY}"
 
     @classmethod
-    def load(cls, every: int, *, backend: str = "onnx-cpu") -> ScoreboardReader:
+    def load(cls, every: int, *, backend: str = "onnx-cpu", num_threads: int | None = None) -> ScoreboardReader:
         if backend not in ("onnx-cpu", "onnx-cuda"):
             raise ValueError(f"unsupported RapidOCR backend: {backend}")
+        if num_threads is not None and (type(num_threads) is not int or num_threads < 1):
+            raise ValueError("RapidOCR num_threads must be a positive integer or None")
         from rapidocr import RapidOCR
 
         # Keep package-selected weights, thresholds and image preprocessing intact.
-        ocr = RapidOCR(params={"EngineConfig.onnxruntime.use_cuda": backend == "onnx-cuda"})
-        runtime: dict[str, Any] = {"package_version": version("rapidocr"), "requested_backend": backend, "stages": {}}
+        params: dict[str, Any] = {"EngineConfig.onnxruntime.use_cuda": backend == "onnx-cuda"}
+        if num_threads is not None:
+            params.update(
+                {
+                    "EngineConfig.onnxruntime.intra_op_num_threads": num_threads,
+                    "EngineConfig.onnxruntime.inter_op_num_threads": num_threads,
+                }
+            )
+        ocr = RapidOCR(params=params)
+        runtime: dict[str, Any] = {
+            "package_version": version("rapidocr"),
+            "requested_backend": backend,
+            "parser_policy": PARSER_POLICY,
+            "requested_num_threads": num_threads,
+            "stages": {},
+        }
         for stage, section in (("det", "Det"), ("cls", "Cls"), ("rec", "Rec")):
             # RapidOCR 3.10 loads lazily. Initialize before claiming a loaded
             # model, checking actual providers rather than assuming the flag won.
@@ -249,6 +325,16 @@ class ScoreboardReader:
                 "providers": session.get_providers(),
                 "provider_options": session.get_provider_options(),
             }
+            if hasattr(session, "get_session_options"):
+                options = session.get_session_options()
+                runtime["stages"][stage]["session_options"] = {
+                    "intra_op_num_threads": options.intra_op_num_threads,
+                    "inter_op_num_threads": options.inter_op_num_threads,
+                }
+                if num_threads is not None and (
+                    options.intra_op_num_threads != num_threads or options.inter_op_num_threads != num_threads
+                ):
+                    raise RuntimeError("RapidOCR session did not honor explicit num_threads")
         expected = "CUDAExecutionProvider" if backend == "onnx-cuda" else "CPUExecutionProvider"
         runtime["backend_fallback"] = any(
             not info["providers"] or info["providers"][0] != expected for info in runtime["stages"].values()

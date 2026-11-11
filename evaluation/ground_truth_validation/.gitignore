@@ -1,0 +1,18 @@
+# Retain raw evaluation evidence locally; publish tools and human-readable reports.
+*.json
+*.jsonl
+*.png
+*.jpg
+*.jpeg
+*.npz
+*.txt
+*.patch
+*.executed
+__pycache__/
+orchestration/inherited_authored_files/
+orchestration/pre_fix_source_backup/
+dataset_inventory/reference_documents/
+test_*/references/
+test_*/baseline_v1
+test_*/improved_v1
+test_*/logs/

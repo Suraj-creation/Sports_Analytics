@@ -9,6 +9,7 @@ from numpy.typing import NDArray
 
 from bai_badminton.perception.association import ShuttleObservationEvidence
 from bai_badminton.perception.calibration_state import CalibrationState
+from bai_badminton.perception.content import SceneDecisionEvidence, validate_scene_decision_binding
 from bai_badminton.perception.diagnostics import FrameDiagnostic
 from bai_badminton.perception.scene_change import SceneChangeEvidence
 
@@ -110,12 +111,24 @@ class FramePerception:
     shuttle_observation: ShuttleObservationEvidence | None = None
     content_epoch: int = 0  # timeline edits need not invalidate the same camera's court geometry
     content_change: SceneChangeEvidence | None = None
+    content_decision: SceneDecisionEvidence | None = None
 
     def __post_init__(self) -> None:
         if type(self.content_epoch) is not int or self.content_epoch < 0:
             raise ValueError("content epoch must be a nonnegative integer")
         if self.content_change is not None and self.content_change.frame != self.frame_idx:
             raise ValueError("content change evidence must identify its canonical frame")
+        if self.content_decision is not None and (
+            self.content_decision.frame != self.frame_idx
+            or self.content_change is None
+            or self.content_decision.previous_frame != self.content_change.previous_frame
+            or self.content_decision.raw_hypothesis != self.content_change.hypothesis
+            or self.content_decision.previous_region_count != len(self.content_change.regions)
+        ):
+            raise ValueError("content decision must retain its exact source-frame raw hypothesis")
+        if self.content_decision is not None:
+            assert self.content_change is not None
+            validate_scene_decision_binding(self.content_decision, self.content_change)
         if any(
             source is not None and (type(source) is not int or not 0 <= source <= self.frame_idx)
             for p in self.persons

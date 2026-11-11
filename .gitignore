@@ -77,3 +77,6 @@ env
 
 # Investigation/experiment evidence (large, source-bound, retained locally).
 /artifacts/benchmarking/
+
+# Local source-bound comparison table (reports retain summary values).
+/research/PART2_BASELINE_VS_CURRENT_PREDICTIONS.csv

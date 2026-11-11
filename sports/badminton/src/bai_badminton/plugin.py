@@ -56,7 +56,7 @@ from bai_engine.store import EventStore, TrackStore
 log = get_logger(__name__)
 AUTO_CALIBRATION_MIN_SCORE = 0.6
 REF_FILE = "camera_ref.png"  # the frame the calibration was made on (lossless: its id is a content hash)
-CODEC_VERSION = 20  # exact pose source frames plus association/content evidence; older reads keep unknown provenance
+CODEC_VERSION = 21  # current detector-layout decision evidence; older diagnostic reads retain unknown decisions
 MAX_ADJUST = 0.03  # a human calibration the court lines move by more than this (× frame width) is kept as is
 
 
@@ -559,13 +559,16 @@ class BadmintonSession:
             if decision.match_format not in handle.contract.supported_formats:
                 self.perception._degrade(kind, f"Selected provider does not support inferred {decision.match_format}")
                 selected = None
-        self.engine.set_match_format(selected, frame, Provenance(model=FORMAT_METHOD), decision=decision.to_public())
+        events = self.engine.set_match_format(
+            selected, frame, Provenance(model=FORMAT_METHOD), decision=decision.to_public()
+        )
         self._applied_format = selected
         self.perception.match_format = selected or "unknown"
         # Inferred singles must still observe four people to support an upgrade.
         configured = self.session.roster.match_format if self.session.roster else None
         self.perception.players.max_players = 2 if configured == "singles" else 4
-        self.perception.players.on_cut()
+        if any(event.payload.get("temporal_reset", True) for event in events):
+            self.perception.players.on_cut()
 
     def ingest(self, perception: ChunkPerception) -> None:
         boundaries: list[tuple[int, FormatDecision]] = []
@@ -1061,7 +1064,7 @@ class BadmintonSession:
         return policy
 
     def encode_perception(self, p: ChunkPerception) -> bytes:
-        from bai_badminton.perception.content import scene_change_to_dict
+        from bai_badminton.perception.content import scene_change_to_dict, scene_decision_to_dict
 
         frames = []
         for fp in p.frames:
@@ -1084,6 +1087,7 @@ class BadmintonSession:
                     "sa": fp.shuttle_observation.to_dict() if fp.shuttle_observation is not None else None,
                     "ce": fp.content_epoch,
                     "cc": scene_change_to_dict(fp.content_change) if fp.content_change is not None else None,
+                    "cd": scene_decision_to_dict(fp.content_decision) if fp.content_decision is not None else None,
                     "p": [
                         {
                             "t": q.track_id,
@@ -1137,7 +1141,7 @@ class BadmintonSession:
         d = msgpack.unpackb(data, raw=False)
         ref_id = self.perception.ref_id
         if (
-            d.get("v", 1) not in {17, 18, 19, CODEC_VERSION}
+            d.get("v", 1) not in {17, 18, 19, 20, CODEC_VERSION}
             or d.get("cr") != ref_id
             or d.get("ci") != self._isolation_id()
         ):
@@ -1150,14 +1154,57 @@ class BadmintonSession:
         if d["v"] >= 18 and any("dg" not in frame for frame in d["frames"]):
             raise StaleCacheError("perception segment lacks diagnostic schema metadata")
         from bai_badminton.perception.association import ShuttleObservationEvidence
-        from bai_badminton.perception.content import scene_change_from_dict
+        from bai_badminton.perception.content import (
+            scene_change_from_dict,
+            scene_decision_from_dict,
+            validate_scene_decision_binding,
+        )
         from bai_badminton.perception.diagnostics import FrameDiagnostic
 
         diagnostics = {}
         associations = {}
         content_changes = {}
+        content_decisions = {}
+        cache_policy = d.get("ci") if isinstance(d.get("ci"), dict) else {}
+        profile_policy = cache_policy.get("profile")
+        components_policy = profile_policy.get("components", {}) if isinstance(profile_policy, dict) else {}
+        content_choice = components_policy.get("content_continuity", {})
+        requires_decision = (
+            content_choice.get("implementation") == "foreground-content-continuity-v2"
+            and content_choice.get("params", {}).get("mode") == "barrier_detector_layout_v2"
+        )
         try:
             for frame in d["frames"]:
+                if d["v"] >= 21:
+                    if "cd" not in frame:
+                        raise ValueError("content decision provenance field is missing")
+                    if requires_decision and (frame.get("cc") or {}).get("hypothesis") and frame["cd"] is None:
+                        raise ValueError("selected layout policy lacks its mandatory source decision")
+                    if frame["cd"] is not None:
+                        decision = scene_decision_from_dict(frame["cd"], frame_idx=frame["f"])
+                        if decision.detector_model is not None and decision.detector_model != d.get("models", {}).get(
+                            "player_detector"
+                        ):
+                            raise ValueError("content decision detector differs from the producer model")
+                        raw_change = frame.get("cc")
+                        if (
+                            not isinstance(raw_change, dict)
+                            or decision.raw_hypothesis != raw_change.get("hypothesis")
+                            or decision.previous_frame != raw_change.get("previous_frame")
+                            or decision.previous_region_count != len(raw_change.get("regions", []))
+                        ):
+                            raise ValueError("content decision differs from the raw observation")
+                        validate_scene_decision_binding(
+                            decision, scene_change_from_dict(raw_change, frame_idx=frame["f"])
+                        )
+                        size = cache_policy.get("frame_size")
+                        if decision.detector_frame is not None and (
+                            not isinstance(size, (tuple, list))
+                            or len(size) != 2
+                            or decision.detector_image_shape != (size[1], size[0], 3)
+                        ):
+                            raise ValueError("content detector image dimensions differ from the source")
+                        content_decisions[frame["f"]] = decision
                 if d["v"] >= 19:
                     if "sa" not in frame or "cc" not in frame or type(frame.get("ce")) is not int or frame["ce"] < 0:
                         raise ValueError("association schema/content epoch metadata is missing")
@@ -1253,6 +1300,7 @@ class BadmintonSession:
                 shuttle_observation=associations.get(f["f"]),
                 content_epoch=f.get("ce", 0),
                 content_change=content_changes.get(f["f"]),
+                content_decision=content_decisions.get(f["f"]),
                 persons=[
                     PersonObs(
                         track_id=q["t"],
@@ -1289,7 +1337,7 @@ class BadmintonSession:
 class BadmintonPlugin:
     name = "badminton"
     pipeline_id = "badminton-broadcast"
-    pipeline_version = "3"
+    pipeline_version = "4"
     stages = (
         (
             "perception",

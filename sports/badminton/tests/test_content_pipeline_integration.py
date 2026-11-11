@@ -253,6 +253,103 @@ def test_diagnostic_mode_keeps_original_shot_inputs_and_never_enables_barriers(t
     p.close()
 
 
+def test_explicit_policy_can_retain_an_appearance_hypothesis_without_resetting_nn_context(tmp_path, monkeypatch):
+    p, ports, _ = perception(tmp_path, monkeypatch, barrier=True)
+    decisions = []
+
+    def decide(evidence):
+        decisions.append(evidence)
+        return False  # v2 cannot promote an appearance-only hypothesis
+
+    ports["content_continuity"].barrier_for = decide
+    result = p.process(chunk(0, 8), in_play=True)
+    assert len(decisions) == 8
+    assert [frame.content_epoch for frame in result.frames] == [0] * 8
+    assert ports["tracking"].resets == 0
+    assert ports["shuttle"].shots == [[7 << 32] * 8]
+    assert result.frames[3].content_change.appearance_hypothesis
+    assert result.frames[3].content_change.hypothesis
+    p.close()
+
+
+@pytest.mark.parametrize("shift,barrier", [(0, False), (90, True)])
+def test_current_detector_probe_precedes_tracking_decision_and_is_reused(tmp_path, monkeypatch, shift, barrier):
+    from hashlib import sha256
+
+    from bai_badminton.perception.content import ContentContinuityProviderV2
+    from bai_badminton.perception.players import PlayerDetectionProbe
+    from bai_badminton.perception.scene_change import RegionContinuity
+
+    p, ports, events = perception(tmp_path, monkeypatch)
+
+    class Tracking(ControlledTracking):
+        def __init__(self):
+            super().__init__(events, 2)
+            self.probes, self.reuses = [], []
+
+        def probe_detection(self, frame, image):
+            events.append(("probe", frame))
+            self.probes.append(frame)
+            boxes = tuple(
+                (10.0 + frame + 30 * key + shift, 10.0, 25.0 + frame + 30 * key + shift, 100.0) for key in range(2)
+            )
+            return PlayerDetectionProbe(
+                frame,
+                tuple(image.shape),
+                sha256(image.tobytes()).hexdigest(),
+                boxes,
+                (0.9, 0.9),
+                (0, 0, 180, 120),
+                (0, 1),
+            )
+
+        def process(self, frame, image, strides, *, detection_probe=None):
+            people = super().process(frame, image, strides)
+            if detection_probe is not None:
+                self.reuses.append(frame)
+                self.last_detector_observed = True
+                for person, box in zip(people, detection_probe.boxes, strict=True):
+                    person.bbox = np.asarray(box)
+                    person.detector_matched = True
+            return people
+
+        def on_cut(self):
+            events.append(("tracker_reset",))
+            super().on_cut()
+
+    tracking = Tracking()
+    controlled = ports["content_continuity"]
+    content = ContentContinuityProviderV2(mode="barrier_detector_layout_v2")
+
+    def observe(frame, image, **kwargs):
+        result = controlled.observe(frame, image, **kwargs)
+        if result.hypothesis:
+            regions = tuple(
+                RegionContinuity(region, 20, 0.95, 30.0, 0.1, 1.5, 1.0, 1.5, 3.0, 10.0)
+                for region in kwargs["previous_regions"]
+            )
+            result = replace(result, regions=regions)
+        return result
+
+    content.observe = observe
+    p.players, p.content_continuity = tracking, content
+    p.models["player_detector"] = "controlled@1"
+    result = p.process(chunk(0, 8), in_play=True)
+    assert tracking.probes == tracking.reuses == [3]
+    assert events.index(("probe", 3)) < events.index(("people", 3))
+    assert tracking.resets == int(barrier)
+    assert result.frames[3].content_change.hypothesis
+    assert result.frames[3].content_decision.decision == ("barrier" if barrier else "no_barrier")
+    assert result.frames[3].detector_observed
+    assert result.frames[3].content_epoch == int(barrier)
+    if barrier:
+        assert events.index(("probe", 3)) < events.index(("tracker_reset",)) < events.index(("people", 3))
+        assert all(max(window) < 3 or min(window) >= 3 for window in ports["shuttle"].windows)
+    else:
+        assert ports["shuttle"].shots == [[7 << 32] * 8]
+    p.close()
+
+
 def test_absent_optional_provider_preserves_existing_stage_order(tmp_path, monkeypatch):
     p, ports, events = perception(tmp_path, monkeypatch, enabled=False)
     result = p.process(chunk(0, 8), in_play=True)

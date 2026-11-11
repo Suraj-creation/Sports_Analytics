@@ -1,0 +1,567 @@
+{
+  "scope": "Exact production analysis-gray pixels, derived from original proxy decode at1280x720 by resize480x270 INTER_LINEAR then BGR2GRAY. Bbox coordinates scaled by3/8. Inputs repeated into BGR for observer tests preserve analysis-gray bytes. No neural inference or annotation labels.",
+  "npz_sha256": "5cd707d8a0874cba32d724f52ba8df1ff4e395085360f09abfb4570783d60322",
+  "cases": [
+    {
+      "name": "test1_edit_10770",
+      "target_frame": 10770,
+      "source_proxy_sha256": "d352d684fb5399d804b8f50c785a3605346e7f03987ecb1d9a73ef3482535a97",
+      "input_cache_sha256": {
+        "artifacts/benchmarking/experiments/prod_20261105_fresh_association_scene_v1/runtime/sessions/Test1Experiment/perception/seg_00179.msgpack": "c3edd9ed6c4251db57376bd04fdbaa1b447da3566b95158026fb95ef9d2671b0"
+      },
+      "frames": [
+        {
+          "frame": 10766,
+          "source_pts": 5512192,
+          "source_time_base": "1/15360",
+          "derived_gray_sha256": "54f788dfe0512f63b9c3f39f0fed23b3d0f0506a202f6016357db34a2b66ed1d",
+          "previous_regions": [
+            {
+              "frame": 10765,
+              "key": "track:0",
+              "bbox": [
+                219.94310760498047,
+                139.31605911254883,
+                240.5606460571289,
+                205.23172760009766
+              ],
+              "detector_matched": false,
+              "detector_observed": false
+            },
+            {
+              "frame": 10765,
+              "key": "track:2",
+              "bbox": [
+                194.6527862548828,
+                108.25622177124023,
+                213.25204467773438,
+                163.2356185913086
+              ],
+              "detector_matched": false,
+              "detector_observed": false
+            }
+          ],
+          "previous_view_valid": true,
+          "current_view_valid": true,
+          "hard_cut": false
+        },
+        {
+          "frame": 10767,
+          "source_pts": 5512704,
+          "source_time_base": "1/15360",
+          "derived_gray_sha256": "876ed25abdd8318f2a0bc58a3fc86fa1da2d6d8d2d58b84e191cf689795ea1e4",
+          "previous_regions": [
+            {
+              "frame": 10766,
+              "key": "track:0",
+              "bbox": [
+                219.2732162475586,
+                139.10110473632812,
+                240.24732971191406,
+                205.21522521972656
+              ],
+              "detector_matched": true,
+              "detector_observed": true
+            },
+            {
+              "frame": 10766,
+              "key": "track:2",
+              "bbox": [
+                194.34180450439453,
+                108.95042037963867,
+                213.23160552978516,
+                163.1469383239746
+              ],
+              "detector_matched": true,
+              "detector_observed": true
+            }
+          ],
+          "previous_view_valid": true,
+          "current_view_valid": true,
+          "hard_cut": false
+        },
+        {
+          "frame": 10768,
+          "source_pts": 5513216,
+          "source_time_base": "1/15360",
+          "derived_gray_sha256": "482923a2eaad9a6bee81e58a2dc15c0c2acccf3a6163b1e00b47ca8281b043ca",
+          "previous_regions": [
+            {
+              "frame": 10767,
+              "key": "track:0",
+              "bbox": [
+                219.2732162475586,
+                139.10110473632812,
+                240.24732971191406,
+                205.21522521972656
+              ],
+              "detector_matched": false,
+              "detector_observed": false
+            },
+            {
+              "frame": 10767,
+              "key": "track:2",
+              "bbox": [
+                194.34180450439453,
+                108.95042037963867,
+                213.23160552978516,
+                163.1469383239746
+              ],
+              "detector_matched": false,
+              "detector_observed": false
+            }
+          ],
+          "previous_view_valid": true,
+          "current_view_valid": true,
+          "hard_cut": false
+        },
+        {
+          "frame": 10769,
+          "source_pts": 5513728,
+          "source_time_base": "1/15360",
+          "derived_gray_sha256": "8181018c7089770193d4f60661ce4870594ba0ad905d3387ea283a9b0ce64632",
+          "previous_regions": [
+            {
+              "frame": 10768,
+              "key": "track:0",
+              "bbox": [
+                217.72093963623047,
+                138.73405838012695,
+                239.89064025878906,
+                205.18858337402344
+              ],
+              "detector_matched": true,
+              "detector_observed": true
+            },
+            {
+              "frame": 10768,
+              "key": "track:2",
+              "bbox": [
+                194.323974609375,
+                110.6689338684082,
+                212.79652404785156,
+                163.09962844848633
+              ],
+              "detector_matched": true,
+              "detector_observed": true
+            }
+          ],
+          "previous_view_valid": true,
+          "current_view_valid": true,
+          "hard_cut": false
+        },
+        {
+          "frame": 10770,
+          "source_pts": 5514240,
+          "source_time_base": "1/15360",
+          "derived_gray_sha256": "f3565f959683e5a5dc6843d3bf002ff25acb2836110f6295f26e686fd72dd357",
+          "previous_regions": [
+            {
+              "frame": 10769,
+              "key": "track:0",
+              "bbox": [
+                217.72093963623047,
+                138.73405838012695,
+                239.89064025878906,
+                205.18858337402344
+              ],
+              "detector_matched": false,
+              "detector_observed": false
+            },
+            {
+              "frame": 10769,
+              "key": "track:2",
+              "bbox": [
+                194.323974609375,
+                110.6689338684082,
+                212.79652404785156,
+                163.09962844848633
+              ],
+              "detector_matched": false,
+              "detector_observed": false
+            }
+          ],
+          "previous_view_valid": true,
+          "current_view_valid": true,
+          "hard_cut": false
+        }
+      ],
+      "agent_source_review": "visible_same_camera_edit",
+      "review_limits": "Agent visual diagnostic, not independent human scene GT or rally-label truth."
+    },
+    {
+      "name": "test1_edit_15579",
+      "target_frame": 15579,
+      "source_proxy_sha256": "d352d684fb5399d804b8f50c785a3605346e7f03987ecb1d9a73ef3482535a97",
+      "input_cache_sha256": {
+        "artifacts/benchmarking/experiments/prod_20261105_fresh_association_scene_v1/runtime/sessions/Test1Experiment/perception/seg_00259.msgpack": "6dc1768a71f6ef04dcc8d8f428dfd8e49b64193f7f63f54b823ad71c28a8fdfe"
+      },
+      "frames": [
+        {
+          "frame": 15575,
+          "source_pts": 7974400,
+          "source_time_base": "1/15360",
+          "derived_gray_sha256": "5a522cd84dfdebe26770f6662740e38dbb4fd17e5abb30ee14e6def55a64f981",
+          "previous_regions": [
+            {
+              "frame": 15574,
+              "key": "track:0",
+              "bbox": [
+                228.90298461914062,
+                152.22627639770508,
+                249.52379608154297,
+                219.56881713867188
+              ],
+              "detector_matched": true,
+              "detector_observed": true
+            },
+            {
+              "frame": 15574,
+              "key": "track:1",
+              "bbox": [
+                209.4631118774414,
+                60.990583419799805,
+                223.19107818603516,
+                106.37481307983398
+              ],
+              "detector_matched": true,
+              "detector_observed": true
+            }
+          ],
+          "previous_view_valid": true,
+          "current_view_valid": true,
+          "hard_cut": false
+        },
+        {
+          "frame": 15576,
+          "source_pts": 7974912,
+          "source_time_base": "1/15360",
+          "derived_gray_sha256": "6c7e683a5a868e6b983defe7ad0bb11838002df2fda3b772f1dbe82875534e7b",
+          "previous_regions": [
+            {
+              "frame": 15575,
+              "key": "track:0",
+              "bbox": [
+                228.90298461914062,
+                152.22627639770508,
+                249.52379608154297,
+                219.56881713867188
+              ],
+              "detector_matched": false,
+              "detector_observed": false
+            },
+            {
+              "frame": 15575,
+              "key": "track:1",
+              "bbox": [
+                209.4631118774414,
+                60.990583419799805,
+                223.19107818603516,
+                106.37481307983398
+              ],
+              "detector_matched": false,
+              "detector_observed": false
+            }
+          ],
+          "previous_view_valid": true,
+          "current_view_valid": true,
+          "hard_cut": false
+        },
+        {
+          "frame": 15577,
+          "source_pts": 7975424,
+          "source_time_base": "1/15360",
+          "derived_gray_sha256": "7fdcaed5e0f0956536e61d7b8b1ab60ebb2eb79f26f7e429f47cb2046a5382ae",
+          "previous_regions": [
+            {
+              "frame": 15576,
+              "key": "track:0",
+              "bbox": [
+                230.40149688720703,
+                152.46001052856445,
+                251.3657455444336,
+                219.74420928955078
+              ],
+              "detector_matched": true,
+              "detector_observed": true
+            },
+            {
+              "frame": 15576,
+              "key": "track:1",
+              "bbox": [
+                210.3479461669922,
+                60.78741645812988,
+                224.54940032958984,
+                104.76092147827148
+              ],
+              "detector_matched": true,
+              "detector_observed": true
+            }
+          ],
+          "previous_view_valid": true,
+          "current_view_valid": true,
+          "hard_cut": false
+        },
+        {
+          "frame": 15578,
+          "source_pts": 7975936,
+          "source_time_base": "1/15360",
+          "derived_gray_sha256": "42b20d91e10cbb2fd8ff845d0d9e4d60e06afe642c8e6b64a77f001843d9e484",
+          "previous_regions": [
+            {
+              "frame": 15577,
+              "key": "track:0",
+              "bbox": [
+                230.40149688720703,
+                152.46001052856445,
+                251.3657455444336,
+                219.74420928955078
+              ],
+              "detector_matched": false,
+              "detector_observed": false
+            },
+            {
+              "frame": 15577,
+              "key": "track:1",
+              "bbox": [
+                210.3479461669922,
+                60.78741645812988,
+                224.54940032958984,
+                104.76092147827148
+              ],
+              "detector_matched": false,
+              "detector_observed": false
+            }
+          ],
+          "previous_view_valid": true,
+          "current_view_valid": true,
+          "hard_cut": false
+        },
+        {
+          "frame": 15579,
+          "source_pts": 7976448,
+          "source_time_base": "1/15360",
+          "derived_gray_sha256": "0d30df50199ba1a790f324d86605ab57061af4c3540616a0049681f40c1acb69",
+          "previous_regions": [
+            {
+              "frame": 15578,
+              "key": "track:0",
+              "bbox": [
+                231.74954223632812,
+                152.65730667114258,
+                255.11194610595703,
+                219.60184478759766
+              ],
+              "detector_matched": true,
+              "detector_observed": true
+            },
+            {
+              "frame": 15578,
+              "key": "track:1",
+              "bbox": [
+                211.03623962402344,
+                60.69482231140137,
+                224.77734375,
+                104.59009552001953
+              ],
+              "detector_matched": true,
+              "detector_observed": true
+            }
+          ],
+          "previous_view_valid": true,
+          "current_view_valid": true,
+          "hard_cut": false
+        }
+      ],
+      "agent_source_review": "visible_same_camera_edit",
+      "review_limits": "Agent visual diagnostic, not independent human scene GT or rally-label truth."
+    },
+    {
+      "name": "test2_continuity_7703",
+      "target_frame": 7703,
+      "source_proxy_sha256": "2841ee54fb0b6d28c2a57e89293ba4530173980635c21aa8d08f60f52931b6cd",
+      "input_cache_sha256": {
+        "/home/administrator/Desktop/sport-analytics/test2-runs-20261105/fresh_v1/data/sessions/UPLOADTEST2/perception/seg_00128.msgpack": "828579661673cb367d7b14acba1bf02cc0f34c6067613db0f0d068bb0378a7a9"
+      },
+      "frames": [
+        {
+          "frame": 7699,
+          "source_pts": 3941888,
+          "source_time_base": "1/15360",
+          "derived_gray_sha256": "89cfc5d86662436f80a90bbf2f61265fbfbc84a9f1cdaebcccc43129d31cd7be",
+          "previous_regions": [
+            {
+              "frame": 7698,
+              "key": "track:4",
+              "bbox": [
+                207.99076080322266,
+                140.87298202514648,
+                252.910400390625,
+                200.98338317871094
+              ],
+              "detector_matched": true,
+              "detector_observed": true
+            },
+            {
+              "frame": 7698,
+              "key": "track:2",
+              "bbox": [
+                232.7079849243164,
+                89.64834022521973,
+                262.8211212158203,
+                141.19099044799805
+              ],
+              "detector_matched": true,
+              "detector_observed": true
+            }
+          ],
+          "previous_view_valid": true,
+          "current_view_valid": true,
+          "hard_cut": false
+        },
+        {
+          "frame": 7700,
+          "source_pts": 3942400,
+          "source_time_base": "1/15360",
+          "derived_gray_sha256": "1a4fb540a12ddf6976336acb76c668e5aa27da44c461060d20df19837f07a6fd",
+          "previous_regions": [
+            {
+              "frame": 7699,
+              "key": "track:4",
+              "bbox": [
+                207.99076080322266,
+                140.87298202514648,
+                252.910400390625,
+                200.98338317871094
+              ],
+              "detector_matched": false,
+              "detector_observed": false
+            },
+            {
+              "frame": 7699,
+              "key": "track:2",
+              "bbox": [
+                232.7079849243164,
+                89.64834022521973,
+                262.8211212158203,
+                141.19099044799805
+              ],
+              "detector_matched": false,
+              "detector_observed": false
+            }
+          ],
+          "previous_view_valid": true,
+          "current_view_valid": true,
+          "hard_cut": false
+        },
+        {
+          "frame": 7701,
+          "source_pts": 3942912,
+          "source_time_base": "1/15360",
+          "derived_gray_sha256": "ebaeb1440aa3fb5bfa584e06d8ef07e391d11dd1a0506f91f388d69afc049637",
+          "previous_regions": [
+            {
+              "frame": 7700,
+              "key": "track:4",
+              "bbox": [
+                207.99076080322266,
+                140.87298202514648,
+                252.910400390625,
+                200.98338317871094
+              ],
+              "detector_matched": false,
+              "detector_observed": false
+            },
+            {
+              "frame": 7700,
+              "key": "track:2",
+              "bbox": [
+                232.7079849243164,
+                89.64834022521973,
+                262.8211212158203,
+                141.19099044799805
+              ],
+              "detector_matched": false,
+              "detector_observed": false
+            }
+          ],
+          "previous_view_valid": true,
+          "current_view_valid": true,
+          "hard_cut": false
+        },
+        {
+          "frame": 7702,
+          "source_pts": 3943424,
+          "source_time_base": "1/15360",
+          "derived_gray_sha256": "109bff6d7d449af913455899ddb7091481e81a8d46770a27a3fbbc53f6ea7e0f",
+          "previous_regions": [
+            {
+              "frame": 7701,
+              "key": "track:4",
+              "bbox": [
+                207.99076080322266,
+                140.87298202514648,
+                252.910400390625,
+                200.98338317871094
+              ],
+              "detector_matched": false,
+              "detector_observed": false
+            },
+            {
+              "frame": 7701,
+              "key": "track:2",
+              "bbox": [
+                232.7079849243164,
+                89.64834022521973,
+                262.8211212158203,
+                141.19099044799805
+              ],
+              "detector_matched": false,
+              "detector_observed": false
+            }
+          ],
+          "previous_view_valid": true,
+          "current_view_valid": true,
+          "hard_cut": false
+        },
+        {
+          "frame": 7703,
+          "source_pts": 3943936,
+          "source_time_base": "1/15360",
+          "derived_gray_sha256": "3c58b38038ae7d259782b7e3eb8209faaa2c2874c486d93eb89a7a2f0ee80c35",
+          "previous_regions": [
+            {
+              "frame": 7702,
+              "key": "track:4",
+              "bbox": [
+                207.99076080322266,
+                140.87298202514648,
+                252.910400390625,
+                200.98338317871094
+              ],
+              "detector_matched": false,
+              "detector_observed": false
+            },
+            {
+              "frame": 7702,
+              "key": "track:2",
+              "bbox": [
+                232.7079849243164,
+                89.64834022521973,
+                262.8211212158203,
+                141.19099044799805
+              ],
+              "detector_matched": false,
+              "detector_observed": false
+            }
+          ],
+          "previous_view_valid": true,
+          "current_view_valid": true,
+          "hard_cut": false
+        }
+      ],
+      "agent_source_review": "visible_continuous_play",
+      "review_limits": "Agent visual diagnostic, not independent human scene GT or rally-label truth."
+    }
+  ]
+}

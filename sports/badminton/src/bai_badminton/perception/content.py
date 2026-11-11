@@ -7,7 +7,7 @@ itself remains a hypothesis and never becomes authoritative camera geometry.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import asdict, fields
+from dataclasses import asdict, dataclass, fields
 from math import isfinite
 from typing import Any
 
@@ -20,15 +20,185 @@ from bai_badminton.perception.scene_change import (
     RegionContinuity,
     SceneChangeEvidence,
     SceneContinuityDetector,
+    SceneContinuityDetectorV2,
 )
 
 CONTENT_IMPLEMENTATION = "foreground-content-continuity-v1"
+CONTENT_IMPLEMENTATION_V2 = "foreground-content-continuity-v2"
 MAX_CONTENT_REGIONS = 8
 MAX_CONTENT_REASONS = 8
 MAX_CONTENT_TEXT = 160
 _SCENE_FIELDS = {field.name for field in fields(SceneChangeEvidence)}
 _REGION_FIELDS = {field.name for field in fields(RegionContinuity)}
 _FOREGROUND_FIELDS = {field.name for field in fields(ForegroundRegion)}
+
+
+@dataclass(frozen=True, slots=True)
+class SceneDecisionEvidence:
+    """Current-detector corroboration of a tracking boundary, never a point."""
+
+    frame: int
+    previous_frame: int
+    decision: str
+    reason: str
+    raw_hypothesis: bool
+    detector_frame: int | None
+    detector_model: str | None
+    detector_image_sha256: str | None
+    detector_image_shape: tuple[int, int, int] | None
+    detector_boxes: tuple[tuple[float, float, float, float], ...]
+    detector_scores: tuple[float, ...]
+    admitted_indices: tuple[int, ...]
+    matched_pairs: tuple[tuple[int, int], ...]
+    iou_threshold: float = 0.3
+    previous_region_count: int = 0
+    version: str = "detector-layout-scene-decision:v1"
+
+    def __post_init__(self) -> None:
+        if (
+            type(self.frame) is not int
+            or self.frame < 1
+            or type(self.previous_frame) is not int
+            or self.previous_frame != self.frame - 1
+        ):
+            raise ValueError("scene decision requires adjacent canonical source frames")
+        if (
+            self.version != "detector-layout-scene-decision:v1"
+            or self.decision not in {"barrier", "no_barrier", "unknown"}
+            or not isinstance(self.reason, str)
+            or not 1 <= len(self.reason) <= MAX_CONTENT_TEXT
+            or type(self.raw_hypothesis) is not bool
+        ):
+            raise ValueError("unsupported scene decision evidence")
+        if (
+            type(self.previous_region_count) is not int
+            or not 0 <= self.previous_region_count <= 8
+            or type(self.iou_threshold) not in (int, float)
+            or self.iou_threshold != 0.3
+        ):
+            raise ValueError("scene decision must retain the existing observed-box continuity gate")
+        if len(self.detector_boxes) != len(self.detector_scores) or len(self.detector_boxes) > 4096:
+            raise ValueError("scene detector outputs exceed their bounded contract")
+        if self.detector_frame is None:
+            if (
+                self.detector_model is not None
+                or self.detector_image_sha256 is not None
+                or self.detector_image_shape is not None
+                or self.detector_boxes
+                or self.detector_scores
+                or self.admitted_indices
+                or self.matched_pairs
+                or self.decision != "unknown"
+            ):
+                raise ValueError("missing detector source cannot support a layout decision")
+            return
+        if type(self.detector_frame) is not int or self.detector_frame != self.frame:
+            raise ValueError("scene detector must observe the exact current source frame")
+        if not isinstance(self.detector_model, str) or not 1 <= len(self.detector_model) <= MAX_CONTENT_TEXT:
+            raise ValueError("scene detector model provenance is required")
+        digest = self.detector_image_sha256
+        shape = self.detector_image_shape
+        if (
+            not isinstance(digest, str)
+            or len(digest) != 64
+            or any(c not in "0123456789abcdef" for c in digest)
+            or shape is None
+            or len(shape) != 3
+            or any(type(v) is not int or v <= 0 for v in shape)
+            or shape[2] != 3
+        ):
+            raise ValueError("invalid scene detector image provenance")
+        for box, score in zip(self.detector_boxes, self.detector_scores, strict=True):
+            if (
+                len(box) != 4
+                or any(type(v) not in (int, float) or not isfinite(v) for v in (*box, score))
+                or not 0 <= score <= 1
+                or not 0 <= box[0] < box[2] <= shape[1]
+                or not 0 <= box[1] < box[3] <= shape[0]
+            ):
+                raise ValueError("invalid scene detector coordinates or supports")
+        if len(set(self.admitted_indices)) != len(self.admitted_indices) or any(
+            type(i) is not int or not 0 <= i < len(self.detector_boxes) for i in self.admitted_indices
+        ):
+            raise ValueError("invalid scene detector ROI admission")
+        previous, current = set(), set()
+        for pair in self.matched_pairs:
+            if (
+                len(pair) != 2
+                or any(type(i) is not int for i in pair)
+                or not 0 <= pair[0] < self.previous_region_count
+                or pair[1] not in self.admitted_indices
+                or pair[0] in previous
+                or pair[1] in current
+            ):
+                raise ValueError("scene correspondence must be one-to-one and source bound")
+            previous.add(pair[0])
+            current.add(pair[1])
+        if self.decision != "unknown":
+            if not self.raw_hypothesis or not 2 <= self.previous_region_count <= 4:
+                raise ValueError("layout decisions need a raw hypothesis and multiple prior regions")
+            if len(self.admitted_indices) != self.previous_region_count:
+                raise ValueError("changed/unknown person count cannot prove layout discontinuity")
+            if (self.decision == "no_barrier") != (len(self.matched_pairs) == self.previous_region_count):
+                raise ValueError("scene decision disagrees with current layout correspondence")
+
+
+def scene_decision_from_dict(value: dict[str, Any], *, frame_idx: int | None = None) -> SceneDecisionEvidence:
+    if not isinstance(value, dict) or set(value) != {f.name for f in fields(SceneDecisionEvidence)}:
+        raise ValueError("invalid or unsupported scene decision fields")
+    row = dict(value)
+    if frame_idx is not None and (type(frame_idx) is not int or row["frame"] != frame_idx):
+        raise ValueError("scene decision differs from its canonical source frame")
+    for name in ("detector_boxes", "detector_scores", "admitted_indices", "matched_pairs"):
+        if not isinstance(row[name], (tuple, list)):
+            raise ValueError("scene decision requires bounded array evidence")
+        row[name] = tuple(row[name])
+    for name in ("detector_boxes", "matched_pairs"):
+        if any(not isinstance(item, (tuple, list)) for item in row[name]):
+            raise ValueError("scene decision requires explicit coordinate/index rows")
+        row[name] = tuple(tuple(item) for item in row[name])
+    if row["detector_image_shape"] is not None:
+        if not isinstance(row["detector_image_shape"], (tuple, list)):
+            raise ValueError("scene detector image shape requires an array")
+        row["detector_image_shape"] = tuple(row["detector_image_shape"])
+    return SceneDecisionEvidence(**row)
+
+
+def scene_decision_to_dict(value: SceneDecisionEvidence) -> dict[str, Any]:
+    if not isinstance(value, SceneDecisionEvidence):
+        raise TypeError("scene decision cache requires typed evidence")
+    return asdict(scene_decision_from_dict(asdict(value)))
+
+
+def validate_scene_decision_binding(decision: SceneDecisionEvidence, raw: SceneChangeEvidence) -> None:
+    """Verify source identity and recompute each claimed layout correspondence.
+
+    Index validity alone cannot establish that two boxes overlap. Unknown
+    decisions deliberately make no correspondence claim; nonunknown decisions
+    must reproduce the unique existing0.3-IoU gate from the recorded pixels'
+    previous/current detector regions.
+    """
+    if not isinstance(decision, SceneDecisionEvidence) or not isinstance(raw, SceneChangeEvidence):
+        raise TypeError("scene decision binding requires typed source evidence")
+    if (
+        decision.frame != raw.frame
+        or decision.previous_frame != raw.previous_frame
+        or decision.raw_hypothesis != raw.hypothesis
+        or decision.previous_region_count != len(raw.regions)
+    ):
+        raise ValueError("scene decision differs from its exact source-frame raw hypothesis")
+    if decision.decision == "unknown":
+        return
+    from bai_badminton.perception.players import _box_iou
+
+    previous = np.asarray([item.region.bbox for item in raw.regions], dtype=np.float64)
+    current = np.asarray([decision.detector_boxes[i] for i in decision.admitted_indices], dtype=np.float64)
+    overlap = _box_iou(previous, current) >= decision.iou_threshold
+    if (overlap.sum(axis=0) > 1).any() or (overlap.sum(axis=1) > 1).any():
+        raise ValueError("ambiguous scene detector layout cannot support a nonunknown decision")
+    expected = tuple((int(a), int(decision.admitted_indices[b])) for a, b in zip(*np.nonzero(overlap), strict=True))
+    if decision.matched_pairs != expected:
+        raise ValueError("scene detector correspondences disagree with recorded source-region geometry")
 
 
 def _number(value: Any, name: str, *, nonnegative: bool = False, fraction: bool = False) -> None:
@@ -162,6 +332,10 @@ class ContentContinuityProvider:
     def barrier_enabled(self) -> bool:
         return self._mode == "barrier_hypothesis_v1"
 
+    def barrier_for(self, evidence: SceneChangeEvidence) -> bool:
+        """Keep the historical explicit policy separate from raw hypotheses."""
+        return self.barrier_enabled and evidence.hypothesis
+
     def _open(self) -> SceneContinuityDetector:
         if self._observer is None:
             raise RuntimeError("content-continuity provider is closed")
@@ -199,3 +373,123 @@ class ContentContinuityProvider:
 
     def restore(self, checkpoint: object) -> None:
         self._open().restore(checkpoint)
+
+
+class ContentContinuityProviderV2(ContentContinuityProvider):
+    """Explicit experimental scene policies with retained rejected controls.
+
+    Actor articulation, blur, compression and repeated source images can raise
+    intensity residuals while feature correspondence remains intact. A raw
+    appearance spike alone therefore cannot erase tracking/temporal continuity.
+    Joint correspondence loss over at least two observed regions is still only
+    a conservative tracking boundary; it does not confirm a point or camera.
+    """
+
+    def __init__(self, *, mode: str = "diagnostic", **observer_parameters: Any) -> None:
+        if not isinstance(mode, str) or mode not in {
+            "diagnostic",
+            "barrier_correspondence_v2",
+            "barrier_hypothesis_cadence_v2",
+            "barrier_detector_layout_v2",
+        }:
+            raise ValueError("unsupported explicit v2 content-continuity policy")
+        # Reuse every bounded parameter check before constructing the v2 observer.
+        super().__init__(mode="diagnostic", **observer_parameters)
+        self._mode = mode
+        self._observer = (
+            SceneContinuityDetector(**observer_parameters)
+            if self.requires_detector_layout
+            else SceneContinuityDetectorV2(**observer_parameters)
+        )
+
+    @property
+    def barrier_enabled(self) -> bool:
+        return self._mode != "diagnostic"
+
+    @property
+    def requires_detector_layout(self) -> bool:
+        return self._mode == "barrier_detector_layout_v2"
+
+    def barrier_for(self, evidence: SceneChangeEvidence) -> bool:
+        if self._mode == "barrier_hypothesis_cadence_v2":
+            return evidence.hypothesis and len(evidence.regions) >= 2
+        return (
+            self._mode == "barrier_correspondence_v2"
+            and evidence.correspondence_hypothesis
+            and len(evidence.regions) >= 2
+        )
+
+    def layout_decision(
+        self, evidence: SceneChangeEvidence, probe: Any, *, detector_model: str | None, geometry_valid: bool
+    ) -> SceneDecisionEvidence:
+        """Corroborate raw image changes without advancing tracking state.
+
+        The0.3 box-IoU gate is exactly the existing observed court-membership
+        continuity gate. Count changes, missing geometry and overlapping matches
+        abstain; neither a missing person nor a detector ID proves an edit.
+        """
+        from bai_badminton.perception.players import _box_iou
+
+        metadata = dict(
+            frame=evidence.frame,
+            previous_frame=evidence.frame - 1,
+            raw_hypothesis=evidence.hypothesis,
+            detector_frame=None,
+            detector_model=None,
+            detector_image_sha256=None,
+            detector_image_shape=None,
+            detector_boxes=(),
+            detector_scores=(),
+            admitted_indices=(),
+            matched_pairs=(),
+            previous_region_count=len(evidence.regions),
+        )
+        if probe is None or detector_model is None:
+            return SceneDecisionEvidence(
+                decision="unknown", reason="current_detector_unavailable_raw_barrier_fallback", **metadata
+            )
+        if probe.frame_idx != evidence.frame:
+            raise ValueError("scene layout probe differs from the current source frame")
+        metadata.update(
+            detector_frame=probe.frame_idx,
+            detector_model=detector_model,
+            detector_image_sha256=probe.image_sha256,
+            detector_image_shape=probe.image_shape,
+            detector_boxes=probe.boxes,
+            detector_scores=probe.scores,
+            admitted_indices=probe.admitted_indices,
+        )
+        if not geometry_valid:
+            return SceneDecisionEvidence(
+                decision="unknown", reason="geometry_unavailable_raw_barrier_fallback", **metadata
+            )
+        if not 2 <= len(evidence.regions) <= 4 or len(probe.admitted_indices) != len(evidence.regions):
+            return SceneDecisionEvidence(
+                decision="unknown", reason="participant_count_unresolved_raw_barrier_fallback", **metadata
+            )
+        previous = np.asarray([item.region.bbox for item in evidence.regions], dtype=np.float64)
+        current = np.asarray([probe.boxes[i] for i in probe.admitted_indices], dtype=np.float64)
+        overlap = _box_iou(previous, current) >= 0.3
+        if (overlap.sum(axis=0) > 1).any() or (overlap.sum(axis=1) > 1).any():
+            return SceneDecisionEvidence(
+                decision="unknown", reason="ambiguous_layout_correspondence_raw_barrier_fallback", **metadata
+            )
+        metadata["matched_pairs"] = tuple(
+            (int(a), int(probe.admitted_indices[b])) for a, b in zip(*np.nonzero(overlap), strict=True)
+        )
+        same = len(metadata["matched_pairs"]) == len(evidence.regions)
+        return SceneDecisionEvidence(
+            decision="no_barrier" if same else "barrier",
+            reason="complete_current_layout_correspondence" if same else "raw_change_and_current_layout_discontinuity",
+            **metadata,
+        )
+
+    def tracking_barrier_for_decision(self, decision: SceneDecisionEvidence) -> bool:
+        """Suppress only positive complete correspondence; retain raw fallback.
+
+        An unresolved detector layout does not confirm an edit. It preserves the
+        existing experimental raw-hypothesis reset rather than silently losing
+        previously detected edits. The explicit reason and content epoch retain
+        both the uncertainty and the actual tracking action.
+        """
+        return self.requires_detector_layout and decision.raw_hypothesis and decision.decision != "no_barrier"

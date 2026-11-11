@@ -1,0 +1,9 @@
+# The report collection is tracked; existing large evidence is linked locally.
+/collection_manifest.json
+/collection_validation.json
+/media_inventory.json
+/videos/
+/historical_evidence/
+/provenance/
+/reproduction_tools/
+/research_data/

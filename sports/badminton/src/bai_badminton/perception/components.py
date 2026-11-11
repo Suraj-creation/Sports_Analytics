@@ -17,7 +17,12 @@ import numpy as np
 from numpy.typing import NDArray
 
 from bai_badminton.perception.association import CausalShuttleAssociation, ShuttleObservationEvidence
-from bai_badminton.perception.content import CONTENT_IMPLEMENTATION, ContentContinuityProvider
+from bai_badminton.perception.content import (
+    CONTENT_IMPLEMENTATION,
+    CONTENT_IMPLEMENTATION_V2,
+    ContentContinuityProvider,
+    ContentContinuityProviderV2,
+)
 from bai_badminton.perception.diagnostics import DiagnosticSelection, ShuttleDiagnostic
 from bai_badminton.perception.players import CourtROI, PlayerPerception
 from bai_badminton.perception.scene_change import SCENE_CONTINUITY_VERSION, ForegroundRegion, SceneChangeEvidence
@@ -466,8 +471,11 @@ def register_perception_components(registry: ComponentRegistry) -> None:
         choice = ModelChoice.model_validate(configuration)
         if choice.model != "none" or choice.backend not in {"none", "opencv-cpu"}:
             raise ValueError("content continuity is explicitly weightless OpenCV CPU perception")
-        result = ContentContinuityProvider(**choice.params)
-        context.record_model("content_continuity", f"{CONTENT_IMPLEMENTATION}@1")
+        upgraded = choice.implementation == CONTENT_IMPLEMENTATION_V2
+        result = (ContentContinuityProviderV2 if upgraded else ContentContinuityProvider)(**choice.params)
+        context.record_model(
+            "content_continuity", f"{CONTENT_IMPLEMENTATION_V2}@2" if upgraded else f"{CONTENT_IMPLEMENTATION}@1"
+        )
         context.record_runtime(
             "content_continuity",
             {
@@ -507,6 +515,41 @@ def register_perception_components(registry: ComponentRegistry) -> None:
                 "modes": ["diagnostic", "barrier_hypothesis_v1"],
                 "default_enabled": False,
                 "bounded_evidence": {"regions": 8, "reasons": 8, "text_characters": 160, "stored_pixel_arrays": 0},
+            },
+        ),
+        content,
+    )
+    registry.register(
+        ComponentContract(
+            kind="content_continuity",
+            implementation=CONTENT_IMPLEMENTATION_V2,
+            version="2",
+            input_schema="badminton-content-continuity-input:v1",
+            output_schema=SCENE_CONTINUITY_VERSION,
+            interface=ContentContinuityPort,
+            context_type=PerceptionContext,
+            supported_formats=frozenset({"singles", "doubles", "unknown"}),
+            failure_policy="abstain",
+            stateful=True,
+            declaration={
+                "timeline": "canonical_cfr_frame_index;current_pixels_and_immediately_previous_regions_only",
+                "coordinates": "analysis_proxy_image_pixels;prior_region_boxes_not_player_identity",
+                "devices": ["cpu"],
+                "weights": None,
+                "required_evidence": ["current_image", "frame_minus_one_target_regions", "explicit_view_validity"],
+                "optional_evidence": ["fresh_carried_or_unknown_detector_provenance"],
+                "state_restore": "owner_bound_checkpoint_or_recompute_in_frame_order",
+                "score_semantics": "uncalibrated_hypothesis;correspondence_barrier_separate_from_appearance",
+                "modes": [
+                    "diagnostic",
+                    "barrier_correspondence_v2",
+                    "barrier_hypothesis_cadence_v2",
+                    "barrier_detector_layout_v2",
+                ],
+                "default_enabled": False,
+                "appearance_history": "detector_layout_preserves_v1_raw_hypotheses;other_modes_are_rejected_controls",
+                "barrier_authority": "explicit_mode;detector_layout_reuses_current_frame_source_bound_person_probe",
+                "rejected_controls": ["barrier_correspondence_v2", "barrier_hypothesis_cadence_v2"],
             },
         ),
         content,
