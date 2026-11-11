@@ -5,6 +5,7 @@
 *.jpg
 *.jpeg
 *.npz
+*.msgpack
 *.txt
 *.patch
 *.executed
@@ -16,3 +17,17 @@ test_*/references/
 test_*/baseline_v1
 test_*/improved_v1
 test_*/logs/
+
+# Retained run/source snapshots are local reproducibility evidence, not another
+# authored package or worktree. Keep canonical tools, tests and Markdown in Git.
+test_*/diagnostics/**/cache_snapshots/
+test_*/diagnostics/**/candidate_source/
+test_*/diagnostics/**/baseline_source/
+test_*/diagnostics/**/original_source/
+test_*/**/executed_*.py
+test_*/**/executed_*/
+test_*/diagnostics/ocr_pairing/historical_parser_*.py
+test_*/fixes/pre_fix_source/
+test_*/fixes/semantic_effect_evidence/
+test_*/regression/*_semantic_regression_v*
+test_*/retention/

@@ -34,6 +34,23 @@ def dump(path: Path, value):
         stream.write("\n")
 
 
+def rally_policy(configuration: dict, fps: float):
+    """Read numerical FSM policy without passing provider composition flags.
+
+    Keep unknown keys strict: a new/typo option needs explicit review rather
+    than silently disappearing from a diagnostic's claimed policy.
+    """
+    from bai_badminton.events.rally_fsm import RallyParams
+
+    parameters = dict(configuration)
+    for name in (
+        "use_reconstruction", "motion_guard", "use_exit_recovery", "use_curve_exit",
+        "use_short_exchange_evidence", "use_terminal_contact_evidence",
+    ):
+        parameters.pop(name, None)
+    return RallyParams(fps=fps, **parameters)
+
+
 def intervals(frames: list[int]) -> list[list[int]]:
     """Compress sorted distinct frame IDs as half-open intervals."""
     if frames != sorted(set(frames)):
@@ -283,7 +300,6 @@ def verify_comparison(comparisons: list[dict], supplemental: dict, prediction_pa
 def analyse(run: Path, replay: Path, evaluation: Path, output: Path) -> dict:
     import msgpack
 
-    from bai_badminton.events.rally_fsm import RallyParams
     from research.production_contact_result_audit import fold_events
     from research.production_external_semantic_replay import load_finished_input, verify_replay_output_artifacts
     from research.test2_failure_package import verify_replay
@@ -331,10 +347,10 @@ def analyse(run: Path, replay: Path, evaluation: Path, output: Path) -> dict:
         converted["case_id"] = f"gt_{converted['gt_rally']:03d}"
         cases.append(converted)
     cases.extend(case for case in supplemental["failure_cases"] if case["matching_status"] == "unmatched_prediction")
-    parameters = dict(bound.profile["components"]["rally"].get("params", {}))
-    for name in ["use_reconstruction", "motion_guard", "use_exit_recovery", "use_curve_exit"]:
-        parameters.pop(name, None)
-    policy = RallyParams(fps=bound.media["fps_num"] / bound.media["fps_den"], **parameters)
+    policy = rally_policy(
+        bound.profile["components"]["rally"].get("params", {}),
+        bound.media["fps_num"] / bound.media["fps_den"],
+    )
     output.mkdir(parents=True, exist_ok=False)
     (output / "cases").mkdir()
     summaries = []

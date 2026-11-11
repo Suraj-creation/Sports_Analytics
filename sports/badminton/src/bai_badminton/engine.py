@@ -106,6 +106,8 @@ from bai_badminton.perception.camera import project
 from bai_badminton.perception.keypoints import KP
 from bai_badminton.perception.shuttle_post import Track, process
 from bai_badminton.perception_types import ChunkPerception, FramePerception, PersonObs, ScoreReading
+from bai_badminton.racket_admission import POLICY as RACKET_ADMISSION_POLICY
+from bai_badminton.racket_admission import admit_racket_candidates
 from bai_badminton.rules import (
     PLAYERS,
     SCORE_REVIEW_EVENT_TYPES,
@@ -978,10 +980,24 @@ class BadmintonMatchEngine:
         self._shot.append(fp.shot_id)
         # a tracked camera has one calibration (in the reference view) wherever the court is in view
         calib = (self._main_calib if G is not None else None) if tracked else self._calib(fp.shot_id)
+        semantic_persons, racket_ambiguities = admit_racket_candidates(fp.persons, frame_idx=fp.frame_idx)
         persons = (
-            [_stabilise(p, Ginv, calib.homography if calib is not None else None) for p in fp.persons]
+            [_stabilise(p, Ginv, calib.homography if calib is not None else None) for p in semantic_persons]
             if Ginv is not None
-            else fp.persons
+            else semantic_persons
+        )
+        self._emit(
+            [
+                self._event(
+                    "racket_observation_ambiguity",
+                    fp.frame_idx,
+                    fp.frame_idx,
+                    payload=ambiguity,
+                    model=RACKET_ADMISSION_POLICY,
+                    status=EventStatus.PROVISIONAL,
+                )
+                for ambiguity in racket_ambiguities
+            ]
         )
         # A lost or non-main view cannot support authoritative court coordinates,
         # even if an upstream observation carries a stale position.

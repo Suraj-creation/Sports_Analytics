@@ -4,8 +4,26 @@ import copy
 import json
 
 import pytest
+import yaml
 
 from research import test2_causal_analysis as tool
+
+
+def test_current_production_provider_flags_preserve_numerical_diagnostic_policy():
+    configuration = yaml.safe_load(
+        (tool.ROOT / "config/profiles/experimental-pipeline-repair-v1.yaml").read_text()
+    )["components"]["rally"]["params"]
+    configuration.update(min_duration_s=3.5, start_speed=7.0)
+    before = copy.deepcopy(configuration)
+    policy = tool.rally_policy(configuration, 30)
+    assert policy.min_frames == 105
+    assert policy.start_speed == 7.0
+    assert configuration == before
+
+
+def test_unknown_provider_flag_is_not_silently_discarded():
+    with pytest.raises(TypeError, match="use_short_exchagne_evidence"):
+        tool.rally_policy({"use_short_exchagne_evidence": True}, 30)
 
 
 def fixture(count=20):
