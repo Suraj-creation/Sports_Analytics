@@ -130,11 +130,11 @@ def test_tracking_contract_and_cache_identity_record_new_algorithm(tmp_path):
     try:
         # The birth policy is retained, while the scene-only foreground policy
         # changes the registered component/cache identity independently.
-        assert perception.component_metadata["tracking"]["contract"]["version"] == "4"
-        assert perception.models["tracking"] == "court-player-episodes-v1@4"
+        assert perception.component_metadata["tracking"]["contract"]["version"] == "5"
+        assert perception.models["tracking"] == "court-player-episodes-v1@5"
         assert perception.identity_policy["policy"] == "bytetrack_birth_activation_v2"
         assert perception.identity_policy["tracking_activation"] == "initial_observation_counts_v2"
-        assert perception.identity_policy["court_membership"] == "observed_court_anchor_lease_v2"
+        assert perception.identity_policy["court_membership"] == "court_origin_observed_continuity_v3"
         assert perception.identity_policy["scene_foreground"] == "court_origin_image_continuity_v2"
     finally:
         perception.close()

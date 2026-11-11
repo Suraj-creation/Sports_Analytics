@@ -118,12 +118,17 @@ class BadmintonPerception:
         frame_size: tuple[int, int] | None = None,
         *,
         match_format: str = "singles",
+        match_format_confirmed: bool = False,
         component_registry: ComponentRegistry | None = None,
         context_identity: dict[str, Any] | None = None,
     ) -> None:
         if match_format not in ("singles", "doubles", "unknown"):
             raise ValueError("unknown match format")
+        if type(match_format_confirmed) is not bool or (match_format_confirmed and match_format == "unknown"):
+            raise ValueError("confirmed match format requires an explicit known format")
         self.match_format = match_format
+        self.match_format_confirmed = match_format_confirmed
+        self.layout_format_context = {"match_format": match_format, "confirmed": match_format_confirmed}
         self.profile = profile.model_copy(deep=True)
         profile = self.profile
         self.fps = fps
@@ -200,7 +205,7 @@ class BadmintonPerception:
         self.shuttle_association = self._create_component("shuttle_association", context, identity)
         self.content_continuity = self._create_component("content_continuity", context, identity)
         self._content_epoch = 0
-        self._content_previous: tuple[int, _PlayerFrame, bool] | None = None
+        self._content_previous: tuple[int, _PlayerFrame, bool, np.ndarray | None, bool] | None = None
         if self.shuttle_association is not None and self.diagnostic_selection.candidate_floor != 0.1:
             raise ValueError("association requires its declared candidate floor 0.1; diagnostics cannot retune it")
         det = self._create_component("player_detector", context, identity)
@@ -627,6 +632,13 @@ class BadmintonPerception:
             self.players.set_roi(CourtROI(poly.astype(np.float32), homography=h_now))
 
     def process(self, chunk: DecodedChunk, in_play: bool) -> ChunkPerception:
+        # Ingest may infer a different format after this chunk. Cache the
+        # decision context actually available to acquisition before observing
+        # its first source frame, rather than binding to the later decision.
+        self.layout_format_context = {
+            "match_format": self.match_format,
+            "confirmed": self.match_format_confirmed,
+        }
         p = self.profile
         n = len(chunk.frames)
         shots, cut_flags = [], []
@@ -691,24 +703,55 @@ class BadmintonPerception:
                 policy = getattr(content, "barrier_for", None)
                 barrier = policy(evidence) if callable(policy) else content.barrier_enabled and evidence.hypothesis
                 probe = None
-                if getattr(content, "requires_detector_layout", False) and evidence.hypothesis:
+                acquire_layout = evidence.hypothesis or bool(getattr(evidence, "acquisition_region_keys", ()))
+                if getattr(content, "requires_detector_layout", False) and acquire_layout:
                     self._set_player_roi(polys[i], poses[i] if poses is not None else None)
                     acquire = getattr(self.players, "probe_detection", None)
                     geometry_valid = not replay[i] and states[i].value == "VALID"
                     if callable(acquire) and geometry_valid:
                         probe = acquire(frame, image)
+                    layout_context = {}
+                    if getattr(content, "supports_relative_layout", False):
+                        # This is the format established before this chunk's
+                        # observations. A current detector count cannot confirm
+                        # singles, or downgrade a confirmed doubles roster.
+                        layout_context["expected_participants"] = (
+                            {"singles": 2, "doubles": 4}.get(self.layout_format_context["match_format"])
+                            if self.layout_format_context["confirmed"]
+                            else None
+                        )
+                        layout_context.update(previous_camera=None, previous_to_current=None)
+                        current_camera = poses[i] if poses is not None else None
+                        if (
+                            geometry_valid
+                            and previous is not None
+                            and previous[0] == frame - 1
+                            and previous[4]
+                            and previous[3] is not None
+                            and current_camera is not None
+                        ):
+                            try:
+                                relative = current_camera @ np.linalg.inv(previous[3])
+                            except np.linalg.LinAlgError:
+                                relative = None
+                            if relative is not None and np.isfinite(relative).all():
+                                layout_context.update(
+                                    previous_camera=tuple(float(v) for v in previous[3].ravel()),
+                                    previous_to_current=tuple(float(v) for v in relative.ravel()),
+                                )
                     decision = content.layout_decision(
                         evidence,
                         probe,
                         detector_model=self.models.get("player_detector"),
                         geometry_valid=geometry_valid,
+                        **layout_context,
                     )
                     content_decisions[i] = decision
                     barrier = content.tracking_barrier_for_decision(decision)
                 if barrier:
                     self._content_epoch += 1
                 content_epochs[i] = self._content_epoch
-                if evidence.hypothesis or i in diagnostic_indices:
+                if acquire_layout or i in diagnostic_indices:
                     content_evidence[i] = evidence
                 people = self._people_at(
                     frame,
@@ -723,7 +766,14 @@ class BadmintonPerception:
                     detection_probe=probe,
                 )
                 pre_people.append(people)
-                self._content_previous = frame, people, not replay[i]
+                camera = poses[i] if poses is not None else None
+                self._content_previous = (
+                    frame,
+                    people,
+                    not replay[i],
+                    camera.copy() if camera is not None else None,
+                    not replay[i] and states[i].value == "VALID",
+                )
             self._rate("content_continuity_and_players", n, started)
         shuttle_diagnostics = [None] * n
         diagnostics_supported = isinstance(self.shuttle, DiagnosticShuttlePort) and self.shuttle.supports_diagnostics

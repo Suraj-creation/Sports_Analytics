@@ -49,6 +49,8 @@ class PlayerDetectionProbe:
     scores: tuple[float, ...]
     crop_box: tuple[int, int, int, int]
     admitted_indices: tuple[int, ...]
+    court_polygon: tuple[tuple[float, float], ...] = ()
+    court_indices: tuple[int, ...] = ()
 
     def __post_init__(self) -> None:
         if type(self.frame_idx) is not int or self.frame_idx < 0:
@@ -75,6 +77,41 @@ class PlayerDetectionProbe:
             type(i) is not int or not 0 <= i < len(self.boxes) for i in self.admitted_indices
         ):
             raise ValueError("invalid detector probe region admission")
+        if (
+            not isinstance(self.court_indices, tuple)
+            or any(type(i) is not int or not 0 <= i < len(self.boxes) for i in self.court_indices)
+            or len(set(self.court_indices)) != len(self.court_indices)
+            or self.court_indices != strict_court_indices(self.boxes, self.court_polygon)
+        ):
+            raise ValueError("detector probe strict court membership disagrees with source geometry")
+
+
+def strict_court_indices(boxes, polygon) -> tuple[int, ...]:
+    """Recompute current geometric support, without inherited track membership.
+
+    A source-bound convex floor polygon is distinct from the padded detection
+    crop and from a court-origin image-continuity hypothesis. It still describes
+    box-bottom support, not physical identity or the location of airborne feet.
+    """
+    if not polygon:
+        return ()
+    if not isinstance(polygon, (tuple, list)) or not 3 <= len(polygon) <= 16:
+        raise ValueError("strict court geometry requires a bounded convex polygon")
+    if any(
+        not isinstance(point, (tuple, list))
+        or len(point) != 2
+        or any(isinstance(v, (bool, np.bool_)) or not isinstance(v, (int, float)) or not np.isfinite(v) for v in point)
+        for point in polygon
+    ):
+        raise ValueError("strict court geometry requires finite image coordinates")
+    contour = np.asarray(polygon, dtype=np.float32).reshape(-1, 1, 2)
+    if not cv2.isContourConvex(contour) or abs(cv2.contourArea(contour)) <= 0:
+        raise ValueError("strict court geometry requires a nondegenerate convex polygon")
+    return tuple(
+        i
+        for i, box in enumerate(boxes)
+        if cv2.pointPolygonTest(contour, (float((box[0] + box[2]) / 2), float(box[3])), False) >= 0
+    )
 
 
 def _swap_session(tool: Any, onnx_path: Path, providers: list[Any]) -> None:
@@ -371,9 +408,12 @@ class PlayerPerception:
         self.roi: CourtROI | None = None
         self._last: list[PersonObs] = []
         self._admitted: dict[int, int] = {}
-        # Last court-supported anchor time and latest matched continuity box.
-        # An outside observation may move the box but cannot renew membership.
+        # Court-origin image-continuity hypotheses expire after missing fresh
+        # observations, not after a continuously visible athlete leaves court.
+        # Preserve the actual geometric anchor separately: an outside match
+        # never becomes a fresh court observation or a named identity claim.
         self._court_tracks: dict[int, tuple[int, NDArray[np.float64]]] = {}
+        self._court_anchor_frames: dict[int, int] = {}
         self._last_detection_frame: int | None = None
         self.fps = fps
         self._diagnostic_top_k = 0
@@ -409,7 +449,7 @@ class PlayerPerception:
             "model": self._reid_fingerprint,
             "policy": self._associator.policy_fingerprint if self._associator else "bytetrack_birth_activation_v2",
             "tracking_activation": TRACKER_ACTIVATION_POLICY,
-            "court_membership": "observed_court_anchor_lease_v2",
+            "court_membership": "court_origin_observed_continuity_v3",
             "scene_foreground": "court_origin_image_continuity_v2",
         }
 
@@ -423,6 +463,7 @@ class PlayerPerception:
         self._last = []
         self._admitted.clear()
         self._court_tracks.clear()
+        self._court_anchor_frames.clear()
         self._foreground.reset()
         self._last_detection_frame = None
         self._force_detection = True
@@ -442,14 +483,18 @@ class PlayerPerception:
         if len(boxes):
             boxes = boxes + np.asarray([x0, y0, x0, y0], dtype=np.float64)
         keep, _ = self._roi_admission(boxes, frame_idx)
+        polygon = tuple(tuple(float(v) for v in point) for point in self.roi.polygon) if self.roi else ()
+        detached_boxes = tuple(tuple(float(v) for v in box) for box in boxes)
         return PlayerDetectionProbe(
             frame_idx,
             tuple(img.shape),
             sha256(img.tobytes()).hexdigest(),
-            tuple(tuple(float(v) for v in box) for box in boxes),
+            detached_boxes,
             tuple(float(v) for v in scores),
             crop,
             tuple(int(i) for i in np.flatnonzero(keep)),
+            polygon,
+            strict_court_indices(detached_boxes, polygon),
         )
 
     def _roi_admission(self, boxes: NDArray, frame_idx: int) -> tuple[NDArray[np.bool_], set[int]]:
@@ -538,6 +583,9 @@ class PlayerPerception:
         self._court_tracks = {
             tid: (last, box) for tid, (last, box) in self._court_tracks.items() if frame_idx - last <= self.fps
         }
+        self._court_anchor_frames = {
+            tid: last for tid, last in self._court_anchor_frames.items() if tid in self._court_tracks
+        }
         keep, continuing = self._roi_admission(boxes, frame_idx)
         if self.roi is not None and len(boxes):
             # Bbox bottoms are ground-plane feet only while grounded. A known
@@ -589,13 +637,12 @@ class PlayerPerception:
             if matched and self.roi is not None:
                 if self.roi.contains_feet(box):
                     self._court_tracks[tid] = (frame_idx, box.copy())
+                    self._court_anchor_frames[tid] = frame_idx
                 elif tid in self._court_tracks:
-                    # Retain spatial continuity during a moving jump/runoff,
-                    # while the original court observation's one-second lease
-                    # remains unchanged. Otherwise a spectator handover could
-                    # refresh its own authority forever outside the court.
-                    anchor, _ = self._court_tracks[tid]
-                    self._court_tracks[tid] = (anchor, box.copy())
+                    # Renew only unique fresh image continuity. The actual
+                    # court anchor remains unchanged; source edits reset both
+                    # histories before current detections can bootstrap them.
+                    self._court_tracks[tid] = (frame_idx, box.copy())
         canonical = [tid for tid, _, _ in tracks]
         reasons = ["bytetrack_v1"] * len(tracks)
         if self._associator is not None:
@@ -643,10 +690,12 @@ class PlayerPerception:
 
     def _carry(self, frame_idx: int, img: NDArray[np.uint8], pose_stride: int, det_stride: int) -> list[PersonObs]:
         self._foreground.carry(frame_idx)
-        # Membership time is measured on every source frame, including frames
-        # between detector ticks. A carried box cannot extend an expired lease.
+        # A carried box cannot renew a missing-observation continuity lease.
         self._court_tracks = {
             tid: value for tid, value in self._court_tracks.items() if frame_idx - value[0] <= self.fps
+        }
+        self._court_anchor_frames = {
+            tid: last for tid, last in self._court_anchor_frames.items() if tid in self._court_tracks
         }
         if self._last_detection_frame is None or frame_idx - self._last_detection_frame > det_stride:
             self._foreground.reset()

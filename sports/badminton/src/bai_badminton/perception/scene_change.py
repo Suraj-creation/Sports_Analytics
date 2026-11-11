@@ -22,6 +22,7 @@ from numpy.typing import NDArray
 
 SCENE_CONTINUITY_VERSION = "foreground-scene-hypothesis:v2"
 SCENE_CONTINUITY_VERSION_V3 = "foreground-scene-hypothesis:v3"
+SCENE_CONTINUITY_VERSION_V4 = "foreground-scene-hypothesis:v4"
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,6 +91,8 @@ class SceneChangeEvidence:
     appearance_discontinuity: float | None = None
     supporting_region_keys: tuple[str, ...] = ()
     witness_parameters: tuple[float, float] | None = None
+    acquisition_region_keys: tuple[str, ...] = ()
+    relative_region_keys: tuple[str, ...] = ()
 
 
 def _flow(previous, current, mask):
@@ -351,7 +354,9 @@ class SceneContinuityDetectorV2(SceneContinuityDetector):
         return value >= 1.0
 
 
-def independent_scene_witnesses(regions, *, reliable, adaptive_ratio, minimum_discontinuity, ratio_name, value_name):
+def independent_scene_witnesses(
+    regions, *, reliable, adaptive_ratio, minimum_discontinuity, ratio_name, value_name, minimum_regions=2
+):
     eligible = [
         region
         for region in regions
@@ -374,7 +379,7 @@ def independent_scene_witnesses(regions, *, reliable, adaptive_ratio, minimum_di
         independent.append(region)
     if (
         not reliable
-        or len(independent) < 2
+        or len(independent) < minimum_regions
         or np.mean([getattr(region, value_name) for region in independent]) < minimum_discontinuity
     ):
         return ()
@@ -431,4 +436,73 @@ class SceneContinuityDetectorV3(SceneContinuityDetector):
             else ("insufficient_independent_region_witnesses",)
             if raw.hypothesis
             else raw.reasons,
+        )
+
+
+def relative_scene_witnesses(regions, *, reliable, adaptive_ratio, ratio_name, value_name, minimum_regions):
+    """Relative image innovations with explicit prior history, not reset authority.
+
+    Each channel qualifies alone; the absolute strong-image floor is deliberately
+    absent here. Acquisition may request a current detector observation after one
+    independent region. A weak reset separately requires multiple same-channel
+    regions plus a complete, confirmed-format strict-court replacement proof.
+    """
+    history_name = "previous_mean" if ratio_name == "adaptive_ratio" else "appearance_previous_mean"
+    eligible = [
+        region
+        for region in regions
+        if getattr(region, history_name) is not None
+        and getattr(region, value_name) is not None
+        and getattr(region, value_name) > 0
+    ]
+    return independent_scene_witnesses(
+        eligible,
+        reliable=reliable,
+        adaptive_ratio=adaptive_ratio,
+        minimum_discontinuity=0.0,
+        ratio_name=ratio_name,
+        value_name=value_name,
+        minimum_regions=minimum_regions,
+    )
+
+
+def scene_relative_cohorts(regions, *, reliable, adaptive_ratio):
+    """Reproducible acquisition and multi-region same-channel witness unions."""
+    channels = (("adaptive_ratio", "discontinuity"), ("appearance_adaptive_ratio", "median_patch_error"))
+    cohorts = []
+    for minimum in (1, 2):
+        keys = set()
+        for ratio_name, value_name in channels:
+            keys.update(
+                relative_scene_witnesses(
+                    regions,
+                    reliable=reliable,
+                    adaptive_ratio=adaptive_ratio,
+                    ratio_name=ratio_name,
+                    value_name=value_name,
+                    minimum_regions=minimum,
+                )
+            )
+        cohorts.append(tuple(region.region.key for region in regions if region.region.key in keys))
+    return tuple(cohorts)
+
+
+class SceneContinuityDetectorV4(SceneContinuityDetectorV3):
+    """Acquire corroborating current layout without lowering strong reset gates."""
+
+    def observe(self, *args, **kwargs) -> SceneChangeEvidence:
+        raw = super().observe(*args, **kwargs)
+        reliable = (
+            raw.background_features >= 6
+            and raw.background_consistent_fraction is not None
+            and raw.background_consistent_fraction >= 0.5
+        )
+        acquisition, relative = scene_relative_cohorts(
+            raw.regions, reliable=reliable, adaptive_ratio=self.adaptive_ratio
+        )
+        return replace(
+            raw,
+            version=SCENE_CONTINUITY_VERSION_V4,
+            acquisition_region_keys=acquisition,
+            relative_region_keys=relative,
         )

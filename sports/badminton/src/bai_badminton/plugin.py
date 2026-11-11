@@ -56,7 +56,7 @@ from bai_engine.store import EventStore, TrackStore
 log = get_logger(__name__)
 AUTO_CALIBRATION_MIN_SCORE = 0.6
 REF_FILE = "camera_ref.png"  # the frame the calibration was made on (lossless: its id is a content hash)
-CODEC_VERSION = 22  # detached scene-only foreground; older diagnostic reads retain unknown regions
+CODEC_VERSION = 23  # separate scene acquisition and independently corroborated layout boundaries
 MAX_ADJUST = 0.03  # a human calibration the court lines move by more than this (× frame width) is kept as is
 
 
@@ -247,6 +247,7 @@ class BadmintonSession:
                 match_format=configured_format or "unknown",
                 component_registry=component_registry,
                 context_identity={"source": session.source.sha256},
+                match_format_confirmed=configured_format is not None,
             )
             if "stroke" not in profile.components and profile.stroke.model not in ("none", "stroke_rules_v0"):
                 self.perception._degrade(
@@ -564,6 +565,7 @@ class BadmintonSession:
         )
         self._applied_format = selected
         self.perception.match_format = selected or "unknown"
+        self.perception.match_format_confirmed = selected is not None
         # Inferred singles must still observe four people to support an upgrade.
         configured = self.session.roster.match_format if self.session.roster else None
         self.perception.players.max_players = 2 if configured == "singles" else 4
@@ -1042,6 +1044,9 @@ class BadmintonSession:
             "mode": self.perception.mode,
             "fixed_camera": self._fixed_camera,
             "match_format": getattr(self.perception, "match_format", "singles"),
+            "layout_format_confirmed": getattr(self.perception, "match_format_confirmed", False),
+            "layout_format_context": dict(getattr(self.perception, "layout_format_context", {})),
+            "layout_court_reference": self.calibration.H.tolist() if self.calibration is not None else None,
         }
         if self.perception.mode == "lines":
             policy["court_line_surface"] = 1
@@ -1154,7 +1159,7 @@ class BadmintonSession:
         d = msgpack.unpackb(data, raw=False)
         ref_id = self.perception.ref_id
         if (
-            d.get("v", 1) not in {17, 18, 19, 20, 21, CODEC_VERSION}
+            d.get("v", 1) not in {17, 18, 19, 20, 21, 22, CODEC_VERSION}
             or d.get("cr") != ref_id
             or d.get("ci") != self._isolation_id()
         ):
@@ -1191,7 +1196,13 @@ class BadmintonSession:
             and content_choice.get("params", {}).get("mode") == "barrier_detector_layout_v2"
         )
         try:
+            camera_by_frame = {row["f"]: row.get("g") for row in d["frames"]}
             for frame in d["frames"]:
+                if d["v"] < 23 and (
+                    (frame.get("cc") or {}).get("version") == "foreground-scene-hypothesis:v4"
+                    or (frame.get("cd") or {}).get("version") == "detector-layout-scene-decision:v3"
+                ):
+                    raise ValueError("new scene acquisition proof cannot be downgraded to a legacy codec")
                 if d["v"] >= 22:
                     regions = frame.get("fg")
                     if not isinstance(regions, (list, tuple)) or len(regions) > 8:
@@ -1211,7 +1222,12 @@ class BadmintonSession:
                 if d["v"] >= 21:
                     if "cd" not in frame:
                         raise ValueError("content decision provenance field is missing")
-                    if requires_decision and (frame.get("cc") or {}).get("hypothesis") and frame["cd"] is None:
+                    raw = frame.get("cc") or {}
+                    if (
+                        requires_decision
+                        and (raw.get("hypothesis") or raw.get("acquisition_region_keys"))
+                        and frame["cd"] is None
+                    ):
                         raise ValueError("selected layout policy lacks its mandatory source decision")
                     if frame["cd"] is not None:
                         decision = scene_decision_from_dict(frame["cd"], frame_idx=frame["f"])
@@ -1230,6 +1246,70 @@ class BadmintonSession:
                         validate_scene_decision_binding(
                             decision, scene_change_from_dict(raw_change, frame_idx=frame["f"])
                         )
+                        if (
+                            decision.version == "detector-layout-scene-decision:v3"
+                            and not decision.raw_hypothesis
+                            and decision.decision == "barrier"
+                        ):
+                            format_context = cache_policy.get("layout_format_context")
+                            if (
+                                not isinstance(format_context, dict)
+                                or set(format_context) != {"match_format", "confirmed"}
+                                or format_context.get("confirmed") is not True
+                                or decision.expected_participants
+                                != {"singles": 2, "doubles": 4}.get(format_context.get("match_format"))
+                            ):
+                                raise ValueError(
+                                    "weak scene proof contradicts the format known before source acquisition"
+                                )
+                        if decision.version == "detector-layout-scene-decision:v3" and decision.previous_to_current:
+                            current_camera = frame.get("g")
+                            if current_camera is None or decision.previous_camera is None:
+                                raise ValueError("relative layout proof lacks adjacent camera observations")
+                            prior = np.asarray(decision.previous_camera, dtype=np.float64).reshape(3, 3)
+                            current = np.asarray(current_camera, dtype=np.float64).reshape(3, 3)
+                            expected_relative = current @ np.linalg.inv(prior)
+                            if not np.allclose(
+                                np.asarray(decision.previous_to_current).reshape(3, 3),
+                                expected_relative,
+                                rtol=0,
+                                atol=1e-9,
+                            ):
+                                raise ValueError("relative layout transform differs from its source camera pair")
+                            if decision.previous_frame in camera_by_frame and camera_by_frame[
+                                decision.previous_frame
+                            ] != list(decision.previous_camera):
+                                raise ValueError("previous layout camera differs from its adjacent cached source")
+                        if decision.version == "detector-layout-scene-decision:v3" and decision.court_polygon:
+                            # The polygon must be this source frame's target
+                            # court, not merely a plausible convex shape that
+                            # happens to contain convenient detector boxes.
+                            from bai_badminton.perception.camera import project
+
+                            reference_h = cache_policy.get("layout_court_reference")
+                            if reference_h is None or frame.get("g") is None:
+                                raise ValueError("layout court proof lacks source calibration/camera geometry")
+                            reference_h = np.asarray(reference_h, dtype=np.float64)
+                            if (
+                                reference_h.shape != (3, 3)
+                                or not np.isfinite(reference_h).all()
+                                or lines_ref_id(reference_h) != cache_policy.get("court")
+                            ):
+                                raise ValueError("layout court reference differs from its calibrated source identity")
+                            names = ("far_left", "far_right", "near_right", "near_left")
+                            reference = (
+                                Homography(reference_h, 0.0, 4)
+                                .court_to_image(np.array([REFERENCE_POINTS[name] for name in names]))
+                                .astype(np.float32)
+                            )
+                            camera = np.asarray(frame["g"], dtype=np.float64).reshape(3, 3)
+                            polygon = project(camera, reference).astype(np.float32)
+                            if not np.array_equal(np.asarray(decision.court_polygon), polygon):
+                                raise ValueError("layout court polygon differs from the source calibrated plane")
+                            if decision.geometry_valid and (
+                                frame.get("cs") != "VALID" or frame.get("r") or frame.get("v") != "main"
+                            ):
+                                raise ValueError("layout proof contradicts its source calibration/view validity")
                         size = cache_policy.get("frame_size")
                         if decision.detector_frame is not None and (
                             not isinstance(size, (tuple, list))
@@ -1380,7 +1460,7 @@ class BadmintonSession:
 class BadmintonPlugin:
     name = "badminton"
     pipeline_id = "badminton-broadcast"
-    pipeline_version = "7"
+    pipeline_version = "8"
     stages = (
         (
             "perception",

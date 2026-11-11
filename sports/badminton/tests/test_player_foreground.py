@@ -31,7 +31,7 @@ def regions(p, frame):
 
 
 @pytest.mark.parametrize("count", [2, 4])
-def test_observed_offcourt_visual_context_survives_but_authority_expires(count):
+def test_observed_offcourt_visual_context_survives_without_refreshing_geometric_anchor(count):
     p, state, image = perception(count)
     assert len(p.process(0, image)) == count
     initial = regions(p, 0)
@@ -39,12 +39,13 @@ def test_observed_offcourt_visual_context_survives_but_authority_expires(count):
     state["bottom"] = 103.0
     for frame in range(1, 32):
         people = p.process(frame, image)
-    assert people == [] and p._court_tracks == {}
+    assert len(people) == count
+    assert set(p._court_anchor_frames.values()) == {0}
     visual = regions(p, 31)
     assert len(visual) == count
     assert {r.key for r in visual} == {r.key for r in initial}
     assert all(r.frame == 31 and r.detector_matched and r.detector_observed for r in visual)
-    assert p._last == []
+    assert len(p._last) == count
 
 
 def test_outside_person_without_observed_court_origin_cannot_seed_visual_context():

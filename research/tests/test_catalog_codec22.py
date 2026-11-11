@@ -11,7 +11,7 @@ import pytest
 from bai_badminton.perception.calibration_state import CalibrationState
 from bai_badminton.perception.scene_change import ForegroundRegion
 from bai_badminton.perception_types import ChunkPerception, FramePerception
-from bai_badminton.plugin import BadmintonSession
+from bai_badminton.plugin import CODEC_VERSION, BadmintonSession
 from bai_engine.config import Profile
 from bai_engine.runtime.registry import ModelRegistry
 from bai_engine.schema import MediaInfo, Session, Source, SourceKind
@@ -63,7 +63,7 @@ def closed_cache(tmp_path):
     value = msgpack.unpackb(
         session.encode_perception(ChunkPerception(0, 99, frames, models=dict(session.perception.models))), raw=False
     )
-    assert value["v"] == 22
+    assert value["v"] == CODEC_VERSION
     cache = directory / "seg_00000.msgpack"
     bindings = {
         "session_id": session.session.session_id,
@@ -104,7 +104,7 @@ def publish(catalogue, output, bindings, versions=None, other_limit=False):
     return catalogue._perception_receipt(record, catalogue.digest(path))
 
 
-@pytest.mark.parametrize("codec,versions", [(20, [20]), (20, [20, 21]), (21, [20, 21]), (22, None)])
+@pytest.mark.parametrize("codec,versions", [(20, [20]), (20, [20, 21]), (21, [20, 21]), (22, [20, 21, 22]), (23, None)])
 def test_original_catalogue_limits_are_preserved_for_matching_population(api, closed_cache, codec, versions):
     catalog, _ = api
     output, _, bindings, save = closed_cache
@@ -113,7 +113,7 @@ def test_original_catalogue_limits_are_preserved_for_matching_population(api, cl
     path = output / catalog.PERCEPTION_CATALOG_NAME
     original = path.read_bytes()
     checked = catalog.verify_perception_catalog(output, receipt, **bindings)
-    assert checked["limits"]["accepted_codec_versions"] == (versions or [20, 21, 22])
+    assert checked["limits"]["accepted_codec_versions"] == (versions or [20, 21, 22, 23])
     assert checked["frame_count"] == 100 and path.read_bytes() == original
 
 
@@ -166,7 +166,7 @@ def test_historical_public_wrapper_stays_strict21_while_completed_accepts22(api,
 def test_unsupported_versions_stay_rejected(api, closed_cache):
     catalog, completed = api
     output, cache, bindings, save = closed_cache
-    record = save(23)
+    record = save(24)
     with pytest.raises(ValueError, match="unsupported cache codec"):
         catalog.perception_catalog(output, **bindings)
     for validator in [completed.validate_cache21, completed.validate_completed_cache]:

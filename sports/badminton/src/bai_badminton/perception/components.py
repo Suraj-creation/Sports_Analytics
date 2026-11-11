@@ -225,7 +225,7 @@ def _tracking_factory(context: TrackingContext, configuration: dict[str, Any]) -
         reid=context.reid,
         identity_retention_s=float(params.get("identity_retention_s", context.identity_retention_s)),
     )
-    context.record_model("tracking", "court-player-episodes-v1@4")
+    context.record_model("tracking", "court-player-episodes-v1@5")
     return result
 
 
@@ -411,7 +411,7 @@ def register_perception_components(registry: ComponentRegistry) -> None:
             ComponentContract(
                 kind=kind,
                 implementation=BASELINE_IMPLEMENTATIONS[kind],
-                version="4" if kind == "tracking" else "3" if kind == "ocr" else "1",
+                version="5" if kind == "tracking" else "3" if kind == "ocr" else "1",
                 input_schema=f"badminton-{kind}-input:v1",
                 output_schema=f"badminton-{kind}-output:v1",
                 interface=interface,
@@ -494,7 +494,7 @@ def register_perception_components(registry: ComponentRegistry) -> None:
         upgraded = choice.implementation == CONTENT_IMPLEMENTATION_V2
         result = (ContentContinuityProviderV2 if upgraded else ContentContinuityProvider)(**choice.params)
         context.record_model(
-            "content_continuity", f"{CONTENT_IMPLEMENTATION_V2}@3" if upgraded else f"{CONTENT_IMPLEMENTATION}@1"
+            "content_continuity", f"{CONTENT_IMPLEMENTATION_V2}@4" if upgraded else f"{CONTENT_IMPLEMENTATION}@1"
         )
         context.record_runtime(
             "content_continuity",
@@ -504,7 +504,7 @@ def register_perception_components(registry: ComponentRegistry) -> None:
                 "input_dtype": "uint8",
                 "mode": result.mode,
                 "barrier_enabled": result.barrier_enabled,
-                "evidence_schema": "foreground-scene-hypothesis:v3"
+                "evidence_schema": "foreground-scene-hypothesis:v4"
                 if upgraded and result.requires_detector_layout
                 else SCENE_CONTINUITY_VERSION,
                 "score_semantics": "uncalibrated_pixel_and_ratio_evidence",
@@ -545,9 +545,9 @@ def register_perception_components(registry: ComponentRegistry) -> None:
         ComponentContract(
             kind="content_continuity",
             implementation=CONTENT_IMPLEMENTATION_V2,
-            version="3",
+            version="4",
             input_schema="badminton-content-continuity-input:v1",
-            output_schema="foreground-scene-hypothesis:v2-or-v3",
+            output_schema="foreground-scene-hypothesis:v2-or-v4",
             interface=ContentContinuityPort,
             context_type=PerceptionContext,
             supported_formats=frozenset({"singles", "doubles", "unknown"}),
@@ -570,7 +570,14 @@ def register_perception_components(registry: ComponentRegistry) -> None:
                 ],
                 "default_enabled": False,
                 "appearance_history": "detector_layout_preserves_v1_raw_hypotheses;other_modes_are_rejected_controls",
-                "barrier_authority": "explicit_mode;detector_layout_reuses_current_frame_source_bound_person_probe",
+                "barrier_authority": "explicit_mode;strong_image_policy_or_complete_relative_court_replacement",
+                "acquisition": "relative_image_innovation_requests_one_reusable_current_source_detector_probe",
+                "weak_reset_requires": [
+                    "two_independent_same_channel_relative_witnesses",
+                    "confirmed_preacquisition_format_and_complete_two_or_four_current_court_proposals",
+                    "all_prior_raw_and_verified_camera_aligned_layout_displacement",
+                ],
+                "weak_reset_unknown_policy": "abstain_without_promoting_relative_acquisition_to_raw_fallback",
                 "rejected_controls": ["barrier_correspondence_v2", "barrier_hypothesis_cadence_v2"],
             },
         ),

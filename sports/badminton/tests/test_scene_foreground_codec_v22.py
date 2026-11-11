@@ -11,7 +11,7 @@ from test_scene_witness_layout import decision_for, make_probe, make_v3_raw
 
 from bai_badminton.perception.scene_change import ForegroundRegion
 from bai_badminton.perception_types import ChunkPerception, FramePerception
-from bai_badminton.plugin import BadmintonSession, StaleCacheError
+from bai_badminton.plugin import CODEC_VERSION, BadmintonSession, StaleCacheError
 
 
 @pytest.fixture
@@ -43,7 +43,7 @@ def decode(session, record):
 
 def test_codec22_non30_foreground_is_exact_typed_and_detached_from_people(cache_session):
     record = unpack(cache_session)
-    assert record["v"] == 22
+    assert record["v"] == CODEC_VERSION
     assert record["ci"]["fps"] == 25
     decoded = decode(cache_session, record).frames[0]
     assert decoded.frame_idx == 25 and decoded.persons == []
