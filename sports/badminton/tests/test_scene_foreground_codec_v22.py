@@ -149,6 +149,9 @@ def v3_record(session, monkeypatch):
     record = msgpack.unpackb(
         session.encode_perception(ChunkPerception(25, 25, [frame], models={"player_detector": "detector@1"})), raw=False
     )
+    # This controlled V3 measurement exercises historical codec22 semantics;
+    # the current writer must not relabel it as codec24's exclusive-origin V5.
+    record["v"] = 22
     record["ci"]["profile"]["components"]["content_continuity"] = {
         "implementation": "foreground-content-continuity-v2",
         "params": {"mode": "barrier_detector_layout_v2", "adaptive_ratio": 4.0, "minimum_discontinuity": 19.0},

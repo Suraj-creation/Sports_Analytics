@@ -13,6 +13,7 @@ from collections import deque
 from collections.abc import Sequence
 from copy import deepcopy
 from dataclasses import dataclass, replace
+from hashlib import sha256
 from math import isfinite
 from numbers import Real
 
@@ -23,6 +24,8 @@ from numpy.typing import NDArray
 SCENE_CONTINUITY_VERSION = "foreground-scene-hypothesis:v2"
 SCENE_CONTINUITY_VERSION_V3 = "foreground-scene-hypothesis:v3"
 SCENE_CONTINUITY_VERSION_V4 = "foreground-scene-hypothesis:v4"
+SCENE_CONTINUITY_VERSION_V5 = "foreground-scene-hypothesis:v5"
+FEATURE_ORIGIN_POLICY = "exclusive_previous_roi_origins:v1"
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,6 +72,75 @@ class RegionContinuity:
 
 
 @dataclass(frozen=True, slots=True)
+class FeatureOriginMask:
+    key: str
+    pixels: int
+    sha256: str
+
+
+def exclusive_feature_origin_masks(regions, source_frame_size, analysis_frame_size):
+    """Deterministic disjoint LK feature origins; tracking patches may overlap.
+
+    Every prior full ROI participates, including a static or ineligible region.
+    The separate background mask must continue excluding the full ROI union.
+    """
+    for size in (source_frame_size, analysis_frame_size):
+        if not isinstance(size, (tuple, list)) or len(size) != 2 or any(type(v) is not int or v < 2 for v in size):
+            raise ValueError("feature-origin dimensions require positive bounded width/height")
+    width, height = analysis_frame_size
+    if not 96 <= width <= 1280 or width * height > 4_194_304:
+        raise ValueError("feature-origin analysis dimensions exceed their bounded contract")
+    scale = width / source_frame_size[0]
+    if height != max(2, round(source_frame_size[1] * scale)):
+        raise ValueError("feature-origin analysis dimensions differ from source aspect ratio")
+    masks = []
+    for region in regions:
+        x0, y0, x1, y1 = np.asarray(region.bbox) * scale
+        x0, x1 = np.clip([int(x0), int(np.ceil(x1))], 0, width)
+        y0, y1 = np.clip([int(y0), int(np.ceil(y1))], 0, height)
+        mask = np.zeros((height, width), dtype=np.uint8)
+        mask[y0:y1, x0:x1] = 255
+        masks.append(mask)
+    if not masks:
+        return (), ()
+    occupancy = np.sum([mask > 0 for mask in masks], axis=0)
+    exclusive = tuple(np.where((mask > 0) & (occupancy == 1), 255, 0).astype(np.uint8) for mask in masks)
+    records = tuple(
+        FeatureOriginMask(region.key, int(np.count_nonzero(mask)), sha256(mask.tobytes()).hexdigest())
+        for region, mask in zip(regions, exclusive, strict=True)
+    )
+    return exclusive, records
+
+
+def validate_feature_origin_basis(regions, policy, source_frame_size, analysis_frame_size, origin_masks):
+    if policy != FEATURE_ORIGIN_POLICY:
+        raise ValueError("unknown exclusive feature-origin measurement policy")
+    _, expected = exclusive_feature_origin_masks(
+        [region.region for region in regions], source_frame_size, analysis_frame_size
+    )
+    if tuple(origin_masks) != expected:
+        raise ValueError("feature-origin mask keys, areas or digests disagree with all prior ROIs")
+    for region, record in zip(regions, expected, strict=True):
+        if region.features > record.pixels:
+            raise ValueError("feature count exceeds its exclusive origin pixels")
+        if record.pixels == 0 and (
+            region.features != 0
+            or any(
+                value is not None
+                for value in (
+                    region.consistent_fraction,
+                    region.median_patch_error,
+                    region.median_forward_backward_error,
+                    region.discontinuity,
+                    region.adaptive_ratio,
+                    region.appearance_adaptive_ratio,
+                )
+            )
+        ):
+            raise ValueError("empty exclusive origins cannot supply current scene measurements")
+
+
+@dataclass(frozen=True, slots=True)
 class SceneChangeEvidence:
     frame: int
     previous_frame: int | None
@@ -93,6 +165,10 @@ class SceneChangeEvidence:
     witness_parameters: tuple[float, float] | None = None
     acquisition_region_keys: tuple[str, ...] = ()
     relative_region_keys: tuple[str, ...] = ()
+    feature_origin_policy: str | None = None
+    source_frame_size: tuple[int, int] | None = None
+    analysis_frame_size: tuple[int, int] | None = None
+    origin_masks: tuple[FeatureOriginMask, ...] = ()
 
 
 def _flow(previous, current, mask):
@@ -129,6 +205,10 @@ class SceneContinuityDetector:
 
     minimum_regions = 2
     maximum_regions = 4
+    exclusive_feature_origins = False
+
+    def _measurement_masks(self, masks):
+        return masks
 
     def _retain_appearance_pair(self, value: float) -> bool:
         return True
@@ -226,6 +306,7 @@ class SceneContinuityDetector:
             mask[y1:y2, x1:x2] = 255
             background[mask > 0] = 0
             masks.append(mask)
+        masks = self._measurement_masks(masks)
         bg_features, bg_consistent, bg_error, _ = _flow(previous, normalized, background)
         regions = []
         for region, mask in zip(previous_regions, masks, strict=True):
@@ -355,7 +436,15 @@ class SceneContinuityDetectorV2(SceneContinuityDetector):
 
 
 def independent_scene_witnesses(
-    regions, *, reliable, adaptive_ratio, minimum_discontinuity, ratio_name, value_name, minimum_regions=2
+    regions,
+    *,
+    reliable,
+    adaptive_ratio,
+    minimum_discontinuity,
+    ratio_name,
+    value_name,
+    minimum_regions=2,
+    exclusive_feature_origins=False,
 ):
     eligible = [
         region
@@ -369,7 +458,7 @@ def independent_scene_witnesses(
     independent = []
     for region in eligible:
         a = region.region.bbox
-        if any(
+        if not exclusive_feature_origins and any(
             other is not region
             and min(a[2], other.region.bbox[2]) > max(a[0], other.region.bbox[0])
             and min(a[3], other.region.bbox[3]) > max(a[1], other.region.bbox[1])
@@ -407,7 +496,10 @@ class SceneContinuityDetectorV3(SceneContinuityDetector):
         )
 
         parameters = dict(
-            reliable=reliable, adaptive_ratio=self.adaptive_ratio, minimum_discontinuity=self.minimum_discontinuity
+            reliable=reliable,
+            adaptive_ratio=self.adaptive_ratio,
+            minimum_discontinuity=self.minimum_discontinuity,
+            exclusive_feature_origins=self.exclusive_feature_origins,
         )
         correspondence = independent_scene_witnesses(
             raw.regions, **parameters, ratio_name="adaptive_ratio", value_name="discontinuity"
@@ -439,7 +531,9 @@ class SceneContinuityDetectorV3(SceneContinuityDetector):
         )
 
 
-def relative_scene_witnesses(regions, *, reliable, adaptive_ratio, ratio_name, value_name, minimum_regions):
+def relative_scene_witnesses(
+    regions, *, reliable, adaptive_ratio, ratio_name, value_name, minimum_regions, exclusive_feature_origins=False
+):
     """Relative image innovations with explicit prior history, not reset authority.
 
     Each channel qualifies alone; the absolute strong-image floor is deliberately
@@ -463,10 +557,11 @@ def relative_scene_witnesses(regions, *, reliable, adaptive_ratio, ratio_name, v
         ratio_name=ratio_name,
         value_name=value_name,
         minimum_regions=minimum_regions,
+        exclusive_feature_origins=exclusive_feature_origins,
     )
 
 
-def scene_relative_cohorts(regions, *, reliable, adaptive_ratio):
+def scene_relative_cohorts(regions, *, reliable, adaptive_ratio, exclusive_feature_origins=False):
     """Reproducible acquisition and multi-region same-channel witness unions."""
     channels = (("adaptive_ratio", "discontinuity"), ("appearance_adaptive_ratio", "median_patch_error"))
     cohorts = []
@@ -481,6 +576,7 @@ def scene_relative_cohorts(regions, *, reliable, adaptive_ratio):
                     ratio_name=ratio_name,
                     value_name=value_name,
                     minimum_regions=minimum,
+                    exclusive_feature_origins=exclusive_feature_origins,
                 )
             )
         cohorts.append(tuple(region.region.key for region in regions if region.region.key in keys))
@@ -498,11 +594,43 @@ class SceneContinuityDetectorV4(SceneContinuityDetectorV3):
             and raw.background_consistent_fraction >= 0.5
         )
         acquisition, relative = scene_relative_cohorts(
-            raw.regions, reliable=reliable, adaptive_ratio=self.adaptive_ratio
+            raw.regions,
+            reliable=reliable,
+            adaptive_ratio=self.adaptive_ratio,
+            exclusive_feature_origins=self.exclusive_feature_origins,
         )
         return replace(
             raw,
             version=SCENE_CONTINUITY_VERSION_V4,
             acquisition_region_keys=acquisition,
             relative_region_keys=relative,
+        )
+
+
+class SceneContinuityDetectorV5(SceneContinuityDetectorV4):
+    """Measure disjoint feature-origin pools while preserving full layout ROIs.
+
+    LK windows and pyramids can share photometric pixels. This is source-origin
+    separation, never calibrated independence or automatic reset authority.
+    """
+
+    exclusive_feature_origins = True
+
+    def _measurement_masks(self, masks):
+        occupancy = np.sum([mask > 0 for mask in masks], axis=0)
+        return [np.where((mask > 0) & (occupancy == 1), 255, 0).astype(np.uint8) for mask in masks]
+
+    def observe(self, frame, pixels, **kwargs):
+        raw = super().observe(frame, pixels, **kwargs)
+        height, width = np.asarray(pixels).shape[:2]
+        source_size = (width, height)
+        analysis_size = (self.analysis_width, max(2, round(height * (self.analysis_width / width))))
+        _, records = exclusive_feature_origin_masks([r.region for r in raw.regions], source_size, analysis_size)
+        return replace(
+            raw,
+            version=SCENE_CONTINUITY_VERSION_V5,
+            feature_origin_policy=FEATURE_ORIGIN_POLICY,
+            source_frame_size=source_size,
+            analysis_frame_size=analysis_size,
+            origin_masks=records,
         )

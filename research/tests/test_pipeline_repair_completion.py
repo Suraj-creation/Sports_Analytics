@@ -240,7 +240,7 @@ def test_recovery_catalog_accepts21_without_mutating_original_worker_allowlist(t
         recovery.cache_catalog(
             tmp_path, session_id="SOURCE", source_sha256="a" * 64, proxy_sha256="b" * 64, media=media, profile=profile
         )
-    value["v"] = 24
+    value["v"] = 25
     (directory / "seg_00000.msgpack").write_bytes(msgpack.packb(value))
     with pytest.raises(ValueError, match="unsupported cache codec"):
         original.perception_catalog(

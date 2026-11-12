@@ -33,7 +33,7 @@ def session(tmp_path):
 
 
 def native_record(session, *, count=2, include_previous=False):
-    assert CODEC_VERSION == 23
+    assert CODEC_VERSION >= 23
     raw = raw_relative(count, changed=2)
     raw = replace(
         raw,
@@ -101,6 +101,9 @@ def native_record(session, *, count=2, include_previous=False):
         ),
         raw=False,
     )
+    # This suite remains a legacy codec23 control. A new producer header must
+    # not silently relabel these whole-ROI V4 measurements as exclusive origins.
+    record["v"] = 23
     record["ci"]["layout_court_reference"] = REFERENCE.tolist()
     record["ci"]["court"] = lines_ref_id(REFERENCE)
     record["ci"]["match_format"] = "singles" if count == 2 else "doubles"

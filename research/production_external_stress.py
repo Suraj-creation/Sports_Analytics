@@ -38,7 +38,7 @@ PERCEPTION_CATALOG_LIMITS = {
     "max_cache_bytes": 16 * 1024 * 1024,
     "max_total_cache_bytes": 8 * 1024**3,
     "max_catalog_bytes": 8 * 1024 * 1024,
-    "accepted_codec_versions": [20, 21, 22, 23],
+    "accepted_codec_versions": [20, 21, 22, 23, 24],
 }
 
 
@@ -142,7 +142,7 @@ def perception_catalog(output: Path, *, session_id: str, source_sha256: str, pro
                 or not math.isclose(fps, media["fps_num"] / media["fps_den"], rel_tol=0, abs_tol=1e-9)
             ):
                 raise ValueError("cache timebase does not match canonical media")
-            if value["v"] in (21, 22, 23):
+            if value["v"] in (21, 22, 23, 24):
                 from types import SimpleNamespace
 
                 from bai_badminton.plugin import BadmintonSession

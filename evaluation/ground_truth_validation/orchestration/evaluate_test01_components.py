@@ -98,7 +98,10 @@ def evaluate_components(run,output,completion_recovery=None,coordinate_binding=N
  annotations=ROOT/'Part2/dataset/Test1_Full';paths=sorted(p for p in annotations.iterdir() if p.is_file());hashes={p.name:sha(p) for p in paths}
  consumed={str(p):sha(p) for p in bound['input_paths']};consumed[str(run/'predicted_rallies.csv')]=sha(run/'predicted_rallies.csv');consumed.update({str(p):hashes[p.name] for p in paths})
  if coordinate_binding is not None:consumed[str(coordinate_binding)]=sha(coordinate_binding)
- chunks,frames=load_chunks(bound['cache_dir'],bound['cache_sha256'],consumed);coverage,_=audit_frames(frames,n);pred=read_csv(run/'predicted_rallies.csv',fps)
+ chunks,frames=load_chunks(bound['cache_dir'],bound['cache_sha256'],consumed)
+ from research.scene_epoch_audit_v3 import audit_completed_component_frames
+ coverage,_=(audit_completed_component_frames(frames,n,packets=chunks,consumed=consumed,producer_root=ROOT) if any(chunk['v']>=24 for chunk in chunks) else audit_frames(frames,n))
+ pred=read_csv(run/'predicted_rallies.csv',fps)
  evpath=bound['events_path'];consumed[str(evpath)]=sha(evpath);live=select_live_events([json.loads(x) for x in evpath.read_text().splitlines() if x.strip()],session['session_id'])
  ends=sorted((x['frame_start'],x['frame_end']) for x in live if x['type']=='rally_end')
  if ends!=[(x.start_frame,x.end_frame) for x in pred]:raise ValueError('Prediction export differs from original live rally ledger')

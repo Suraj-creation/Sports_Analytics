@@ -122,7 +122,7 @@ def validate_cache21(payload, profile, media):
 def validate_completed_cache(payload, profile, media):
     """Normal completed-run schema validation; no recovery or neural execution."""
     return _validate_cache_context(
-        payload, profile, media, accepted_versions=(21, 22, 23), context_label="completed codec21/22/23"
+        payload, profile, media, accepted_versions=(21, 22, 23, 24), context_label="completed codec21/22/23/24"
     )
 
 

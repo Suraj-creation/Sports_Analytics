@@ -494,7 +494,7 @@ def register_perception_components(registry: ComponentRegistry) -> None:
         upgraded = choice.implementation == CONTENT_IMPLEMENTATION_V2
         result = (ContentContinuityProviderV2 if upgraded else ContentContinuityProvider)(**choice.params)
         context.record_model(
-            "content_continuity", f"{CONTENT_IMPLEMENTATION_V2}@4" if upgraded else f"{CONTENT_IMPLEMENTATION}@1"
+            "content_continuity", f"{CONTENT_IMPLEMENTATION_V2}@5" if upgraded else f"{CONTENT_IMPLEMENTATION}@1"
         )
         context.record_runtime(
             "content_continuity",
@@ -504,7 +504,7 @@ def register_perception_components(registry: ComponentRegistry) -> None:
                 "input_dtype": "uint8",
                 "mode": result.mode,
                 "barrier_enabled": result.barrier_enabled,
-                "evidence_schema": "foreground-scene-hypothesis:v4"
+                "evidence_schema": "foreground-scene-hypothesis:v5"
                 if upgraded and result.requires_detector_layout
                 else SCENE_CONTINUITY_VERSION,
                 "score_semantics": "uncalibrated_pixel_and_ratio_evidence",
@@ -545,9 +545,9 @@ def register_perception_components(registry: ComponentRegistry) -> None:
         ComponentContract(
             kind="content_continuity",
             implementation=CONTENT_IMPLEMENTATION_V2,
-            version="4",
+            version="5",
             input_schema="badminton-content-continuity-input:v1",
-            output_schema="foreground-scene-hypothesis:v2-or-v4",
+            output_schema="foreground-scene-hypothesis:v2-or-v5",
             interface=ContentContinuityPort,
             context_type=PerceptionContext,
             supported_formats=frozenset({"singles", "doubles", "unknown"}),

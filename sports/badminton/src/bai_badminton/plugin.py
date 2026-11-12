@@ -56,7 +56,7 @@ from bai_engine.store import EventStore, TrackStore
 log = get_logger(__name__)
 AUTO_CALIBRATION_MIN_SCORE = 0.6
 REF_FILE = "camera_ref.png"  # the frame the calibration was made on (lossless: its id is a content hash)
-CODEC_VERSION = 23  # separate scene acquisition and independently corroborated layout boundaries
+CODEC_VERSION = 24  # bind exclusive scene feature-origin masks to source dimensions and policy
 MAX_ADJUST = 0.03  # a human calibration the court lines move by more than this (× frame width) is kept as is
 
 
@@ -1159,7 +1159,7 @@ class BadmintonSession:
         d = msgpack.unpackb(data, raw=False)
         ref_id = self.perception.ref_id
         if (
-            d.get("v", 1) not in {17, 18, 19, 20, 21, 22, CODEC_VERSION}
+            d.get("v", 1) not in {17, 18, 19, 20, 21, 22, 23, CODEC_VERSION}
             or d.get("cr") != ref_id
             or d.get("ci") != self._isolation_id()
         ):
@@ -1197,7 +1197,13 @@ class BadmintonSession:
         )
         try:
             camera_by_frame = {row["f"]: row.get("g") for row in d["frames"]}
+            foreground_by_frame = {row["f"]: row.get("fg") for row in d["frames"]}
             for frame in d["frames"]:
+                if d["v"] < 24 and (
+                    (frame.get("cc") or {}).get("version") == "foreground-scene-hypothesis:v5"
+                    or (frame.get("cd") or {}).get("version") == "detector-layout-scene-decision:v4"
+                ):
+                    raise ValueError("exclusive feature-origin proof cannot be downgraded to a legacy codec")
                 if d["v"] < 23 and (
                     (frame.get("cc") or {}).get("version") == "foreground-scene-hypothesis:v4"
                     or (frame.get("cd") or {}).get("version") == "detector-layout-scene-decision:v3"
@@ -1246,10 +1252,15 @@ class BadmintonSession:
                         validate_scene_decision_binding(
                             decision, scene_change_from_dict(raw_change, frame_idx=frame["f"])
                         )
-                        if (
-                            decision.version == "detector-layout-scene-decision:v3"
-                            and not decision.raw_hypothesis
-                            and decision.decision == "barrier"
+                        if decision.version in {
+                            "detector-layout-scene-decision:v3",
+                            "detector-layout-scene-decision:v4",
+                        } and (
+                            (not decision.raw_hypothesis and decision.decision == "barrier")
+                            or (
+                                decision.feature_origin_overlap_dependent
+                                and decision.decision in {"barrier", "no_barrier"}
+                            )
                         ):
                             format_context = cache_policy.get("layout_format_context")
                             if (
@@ -1262,7 +1273,11 @@ class BadmintonSession:
                                 raise ValueError(
                                     "weak scene proof contradicts the format known before source acquisition"
                                 )
-                        if decision.version == "detector-layout-scene-decision:v3" and decision.previous_to_current:
+                        if (
+                            decision.version
+                            in {"detector-layout-scene-decision:v3", "detector-layout-scene-decision:v4"}
+                            and decision.previous_to_current
+                        ):
                             current_camera = frame.get("g")
                             if current_camera is None or decision.previous_camera is None:
                                 raise ValueError("relative layout proof lacks adjacent camera observations")
@@ -1280,7 +1295,11 @@ class BadmintonSession:
                                 decision.previous_frame
                             ] != list(decision.previous_camera):
                                 raise ValueError("previous layout camera differs from its adjacent cached source")
-                        if decision.version == "detector-layout-scene-decision:v3" and decision.court_polygon:
+                        if (
+                            decision.version
+                            in {"detector-layout-scene-decision:v3", "detector-layout-scene-decision:v4"}
+                            and decision.court_polygon
+                        ):
                             # The polygon must be this source frame's target
                             # court, not merely a plausible convex shape that
                             # happens to contain convenient detector boxes.
@@ -1324,6 +1343,30 @@ class BadmintonSession:
                     if frame["cc"] is not None:
                         content_changes[frame["f"]] = scene_change_from_dict(frame["cc"], frame_idx=frame["f"])
                         change = content_changes[frame["f"]]
+                        if d["v"] >= 24 and requires_decision and change.version != "foreground-scene-hypothesis:v5":
+                            raise ValueError("current layout policy requires its exclusive feature-origin contract")
+                        if change.version == "foreground-scene-hypothesis:v5":
+                            if change.regions and change.previous_frame in foreground_by_frame:
+                                previous = foreground_by_frame[change.previous_frame]
+                                if not isinstance(previous, (list, tuple)):
+                                    raise ValueError("scene origins lack actual previous-frame foreground provenance")
+                                expected_regions = tuple(ForegroundRegion(**row) for row in previous)
+                                if tuple(row.region for row in change.regions) != expected_regions:
+                                    raise ValueError("scene origins omit or alter actual previous-frame foreground")
+                            size = cache_policy.get("frame_size")
+                            if (
+                                not isinstance(size, (list, tuple))
+                                or len(size) != 2
+                                or any(type(value) is not int or value <= 0 for value in size)
+                                or change.source_frame_size != tuple(size)
+                            ):
+                                raise ValueError("scene feature origins differ from actual source dimensions")
+                            width = content_choice.get("params", {}).get("analysis_width", 480)
+                            if type(width) is not int or not 96 <= width <= 1280:
+                                raise ValueError("scene feature-origin width differs from bounded producer policy")
+                            expected_size = (width, max(2, round(size[1] * (width / size[0]))))
+                            if change.analysis_frame_size != expected_size:
+                                raise ValueError("scene feature-origin raster differs from actual producer policy")
                         if change.witness_parameters is not None:
                             parameters = content_choice.get("params", {})
                             expected = (
@@ -1460,7 +1503,7 @@ class BadmintonSession:
 class BadmintonPlugin:
     name = "badminton"
     pipeline_id = "badminton-broadcast"
-    pipeline_version = "8"
+    pipeline_version = "9"
     stages = (
         (
             "perception",

@@ -249,7 +249,13 @@ def evaluate_components(run, output, completion_recovery=None, coordinate_bindin
     if coordinate_binding is not None:
         consumed[str(coordinate_binding)] = sha(coordinate_binding)
     chunks, frames = load_chunks(bound["cache_dir"], bound["cache_sha256"], consumed)
-    coverage, _ = audit_frames(frames, n)
+    from research.scene_epoch_audit_v3 import audit_completed_component_frames
+
+    coverage, _ = (
+        audit_completed_component_frames(frames, n, packets=chunks, consumed=consumed, producer_root=ROOT)
+        if any(chunk["v"] >= 24 for chunk in chunks)
+        else audit_frames(frames, n)
+    )
     predictions = read_csv(run / "predicted_rallies.csv", fps)
     events_path = bound["events_path"]
     consumed[str(events_path)] = sha(events_path)

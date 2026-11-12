@@ -18,14 +18,17 @@ from bai_badminton.perception.scene_change import (
     SCENE_CONTINUITY_VERSION,
     SCENE_CONTINUITY_VERSION_V3,
     SCENE_CONTINUITY_VERSION_V4,
+    SCENE_CONTINUITY_VERSION_V5,
+    FeatureOriginMask,
     ForegroundRegion,
     RegionContinuity,
     SceneChangeEvidence,
     SceneContinuityDetector,
     SceneContinuityDetectorV2,
-    SceneContinuityDetectorV4,
+    SceneContinuityDetectorV5,
     independent_scene_witnesses,
     scene_relative_cohorts,
+    validate_feature_origin_basis,
 )
 
 CONTENT_IMPLEMENTATION = "foreground-content-continuity-v1"
@@ -34,6 +37,7 @@ MAX_CONTENT_REGIONS = 8
 MAX_CONTENT_REASONS = 8
 MAX_CONTENT_TEXT = 160
 _SCENE_FIELDS = {field.name for field in fields(SceneChangeEvidence)}
+_ORIGIN_FIELDS = {"feature_origin_policy", "source_frame_size", "analysis_frame_size", "origin_masks"}
 _REGION_FIELDS = {field.name for field in fields(RegionContinuity)}
 _FOREGROUND_FIELDS = {field.name for field in fields(ForegroundRegion)}
 
@@ -68,6 +72,7 @@ class SceneDecisionEvidence:
     geometry_valid: bool | None = None
     previous_to_current: tuple[float, ...] | None = None
     previous_camera: tuple[float, ...] | None = None
+    feature_origin_overlap_dependent: bool = False
 
     def __post_init__(self) -> None:
         if (
@@ -77,12 +82,18 @@ class SceneDecisionEvidence:
             or self.previous_frame != self.frame - 1
         ):
             raise ValueError("scene decision requires adjacent canonical source frames")
+        if type(self.feature_origin_overlap_dependent) is not bool or (
+            self.feature_origin_overlap_dependent
+            and (self.version != "detector-layout-scene-decision:v4" or not self.raw_hypothesis)
+        ):
+            raise ValueError("exclusive-origin overlap authority requires the new strong decision contract")
         if (
             self.version
             not in {
                 "detector-layout-scene-decision:v1",
                 "detector-layout-scene-decision:v2",
                 "detector-layout-scene-decision:v3",
+                "detector-layout-scene-decision:v4",
             }
             or self.decision not in {"barrier", "no_barrier", "unknown"}
             or not isinstance(self.reason, str)
@@ -111,12 +122,17 @@ class SceneDecisionEvidence:
             or len(set(self.layout_indices)) != len(self.layout_indices)
             or any(type(i) is not int or not 0 <= i < len(self.detector_boxes) for i in self.layout_indices)
             or (
-                self.version in {"detector-layout-scene-decision:v2", "detector-layout-scene-decision:v3"}
+                self.version
+                in {
+                    "detector-layout-scene-decision:v2",
+                    "detector-layout-scene-decision:v3",
+                    "detector-layout-scene-decision:v4",
+                }
                 and self.layout_indices != tuple(range(len(self.detector_boxes)))
             )
         ):
             raise ValueError("scene layout candidates must preserve the full raw image proposals")
-        modern = self.version == "detector-layout-scene-decision:v3"
+        modern = self.version in {"detector-layout-scene-decision:v3", "detector-layout-scene-decision:v4"}
         if modern:
             if type(self.geometry_valid) is not bool or (
                 self.expected_participants is not None
@@ -212,7 +228,12 @@ class SceneDecisionEvidence:
                 or pair[1]
                 not in (
                     self.layout_indices
-                    if self.version in {"detector-layout-scene-decision:v2", "detector-layout-scene-decision:v3"}
+                    if self.version
+                    in {
+                        "detector-layout-scene-decision:v2",
+                        "detector-layout-scene-decision:v3",
+                        "detector-layout-scene-decision:v4",
+                    }
                     else self.admitted_indices
                 )
                 or pair[0] in previous
@@ -221,10 +242,30 @@ class SceneDecisionEvidence:
                 raise ValueError("scene correspondence must be one-to-one and source bound")
             previous.add(pair[0])
             current.add(pair[1])
+        if (
+            self.feature_origin_overlap_dependent
+            and self.decision != "unknown"
+            and not _complete_court_layout(
+                self.detector_boxes,
+                self.court_indices,
+                self.expected_participants,
+                self.previous_region_count,
+                self.geometry_valid,
+                self.court_polygon,
+                self.previous_to_current,
+                self.previous_camera,
+            )
+        ):
+            raise ValueError("overlap-dependent authority requires complete confirmed current court/camera proof")
         if self.decision != "unknown":
             witness_count = (
                 len(self.supporting_region_keys)
-                if self.version in {"detector-layout-scene-decision:v2", "detector-layout-scene-decision:v3"}
+                if self.version
+                in {
+                    "detector-layout-scene-decision:v2",
+                    "detector-layout-scene-decision:v3",
+                    "detector-layout-scene-decision:v4",
+                }
                 else self.previous_region_count
             )
             maximum = 4 if self.version.endswith(":v1") else 8
@@ -254,6 +295,10 @@ class SceneDecisionEvidence:
 
 
 def scene_decision_from_dict(value: dict[str, Any], *, frame_idx: int | None = None) -> SceneDecisionEvidence:
+    if isinstance(value, dict) and value.get("version") != "detector-layout-scene-decision:v4":
+        if value.get("feature_origin_overlap_dependent", False) is not False:
+            raise ValueError("legacy decisions cannot acquire exclusive-origin overlap authority")
+        value = {"feature_origin_overlap_dependent": False, **value}
     if (
         isinstance(value, dict)
         and value.get("version") == "detector-layout-scene-decision:v1"
@@ -316,7 +361,10 @@ def scene_decision_from_dict(value: dict[str, Any], *, frame_idx: int | None = N
 def scene_decision_to_dict(value: SceneDecisionEvidence) -> dict[str, Any]:
     if not isinstance(value, SceneDecisionEvidence):
         raise TypeError("scene decision cache requires typed evidence")
-    return asdict(scene_decision_from_dict(asdict(value)))
+    result = asdict(scene_decision_from_dict(asdict(value)))
+    if value.version != "detector-layout-scene-decision:v4":
+        result.pop("feature_origin_overlap_dependent")
+    return result
 
 
 def validate_scene_decision_binding(decision: SceneDecisionEvidence, raw: SceneChangeEvidence) -> None:
@@ -329,17 +377,21 @@ def validate_scene_decision_binding(decision: SceneDecisionEvidence, raw: SceneC
     """
     if not isinstance(decision, SceneDecisionEvidence) or not isinstance(raw, SceneChangeEvidence):
         raise TypeError("scene decision binding requires typed source evidence")
-    if raw.version == SCENE_CONTINUITY_VERSION_V4:
-        raw = scene_change_from_dict(asdict(raw))
+    if raw.version in {SCENE_CONTINUITY_VERSION_V4, SCENE_CONTINUITY_VERSION_V5}:
+        raw = scene_change_from_dict(scene_change_to_dict(raw))
     expected_version = (
-        "detector-layout-scene-decision:v3"
-        if raw.version == SCENE_CONTINUITY_VERSION_V4
+        "detector-layout-scene-decision:v4"
+        if raw.version == SCENE_CONTINUITY_VERSION_V5
+        else "detector-layout-scene-decision:v3"
+        if raw.version in {SCENE_CONTINUITY_VERSION_V4, SCENE_CONTINUITY_VERSION_V5}
         else "detector-layout-scene-decision:v2"
         if raw.version == SCENE_CONTINUITY_VERSION_V3
         else "detector-layout-scene-decision:v1"
     )
     if decision.version != expected_version:
         raise ValueError("scene decision contract differs from the raw evidence version")
+    if decision.feature_origin_overlap_dependent != feature_origin_overlap_dependent(raw):
+        raise ValueError("scene overlap authority differs from its raw full-box witness geometry")
     if (
         decision.frame != raw.frame
         or decision.previous_frame != raw.previous_frame
@@ -347,17 +399,24 @@ def validate_scene_decision_binding(decision: SceneDecisionEvidence, raw: SceneC
         or decision.previous_region_count != len(raw.regions)
     ):
         raise ValueError("scene decision differs from its exact source-frame raw hypothesis")
-    modern = decision.version in {"detector-layout-scene-decision:v2", "detector-layout-scene-decision:v3"}
+    modern = decision.version in {
+        "detector-layout-scene-decision:v2",
+        "detector-layout-scene-decision:v3",
+        "detector-layout-scene-decision:v4",
+    }
     if modern and decision.supporting_region_keys != raw.supporting_region_keys:
         raise ValueError("scene decision witnesses differ from its raw image hypothesis")
-    if decision.version == "detector-layout-scene-decision:v3" and (
+    if decision.version in {"detector-layout-scene-decision:v3", "detector-layout-scene-decision:v4"} and (
         decision.acquisition_region_keys != raw.acquisition_region_keys
         or decision.relative_region_keys != raw.relative_region_keys
     ):
         raise ValueError("relative decision witnesses differ from their raw image evidence")
     if decision.decision == "unknown":
         return
-    if decision.version == "detector-layout-scene-decision:v3" and not raw.hypothesis:
+    if (
+        decision.version in {"detector-layout-scene-decision:v3", "detector-layout-scene-decision:v4"}
+        and not raw.hypothesis
+    ):
         if not _weak_court_replacement(
             raw,
             decision.detector_boxes,
@@ -386,6 +445,72 @@ def validate_scene_decision_binding(decision: SceneDecisionEvidence, raw: SceneC
     expected = tuple((indices[a], int(candidates[b])) for a, b in zip(*np.nonzero(overlap), strict=True))
     if decision.matched_pairs != expected:
         raise ValueError("scene detector correspondences disagree with recorded source-region geometry")
+    if (
+        decision.feature_origin_overlap_dependent
+        and decision.decision == "barrier"
+        and _camera_explains_witness_layout(raw, decision.detector_boxes, decision.previous_to_current)
+    ):
+        raise ValueError("overlap-dependent barrier contradicts complete camera-aligned source correspondence")
+    if (
+        decision.feature_origin_overlap_dependent
+        and decision.decision == "barrier"
+        and _positive_nonwitness_court_correspondence(
+            raw, decision.detector_boxes, decision.court_indices, decision.previous_to_current
+        )
+    ):
+        raise ValueError("overlap-dependent barrier contradicts positive nonwitness court correspondence")
+
+
+def feature_origin_overlap_dependent(raw):
+    """New authority is needed only if the old full-box rule cannot qualify."""
+    if raw.version != SCENE_CONTINUITY_VERSION_V5 or not raw.hypothesis:
+        return False
+    ratio, floor = raw.witness_parameters
+    reliable = (
+        raw.background_features >= 6
+        and raw.background_consistent_fraction is not None
+        and raw.background_consistent_fraction >= 0.5
+    )
+    for ratio_name, value_name in (
+        ("adaptive_ratio", "discontinuity"),
+        ("appearance_adaptive_ratio", "median_patch_error"),
+    ):
+        if independent_scene_witnesses(
+            raw.regions,
+            reliable=reliable,
+            adaptive_ratio=ratio,
+            minimum_discontinuity=floor,
+            ratio_name=ratio_name,
+            value_name=value_name,
+        ):
+            return False
+    return True
+
+
+def _complete_court_layout(
+    boxes, court_indices, expected, previous_count, geometry_valid, polygon, previous_to_current, previous_camera
+):
+    from bai_badminton.perception.players import _box_iou, strict_court_indices
+
+    if (
+        geometry_valid is not True
+        or type(expected) is not int
+        or expected not in (2, 4)
+        or previous_count < expected
+        or len(court_indices) != expected
+        or not polygon
+        or previous_to_current is None
+        or previous_camera is None
+    ):
+        return False
+    _camera_matrix(previous_to_current)
+    _camera_matrix(previous_camera)
+    if court_indices != strict_court_indices(boxes, polygon):
+        return False
+    current = np.asarray([boxes[i] for i in court_indices], dtype=np.float64)
+    overlap = _box_iou(current, current) >= 0.3
+    np.fill_diagonal(overlap, False)
+    return not overlap.any()
 
 
 def _camera_matrix(values):
@@ -425,6 +550,36 @@ def _camera_aligned_boxes(previous, values):
             return None
         aligned.append(box)
     return np.asarray(aligned, dtype=np.float64)
+
+
+def _camera_explains_witness_layout(raw, boxes, previous_to_current):
+    from bai_badminton.perception.players import _box_iou
+
+    previous = [r.region.bbox for r in raw.regions if r.region.key in raw.supporting_region_keys]
+    aligned = _camera_aligned_boxes(previous, previous_to_current)
+    if aligned is None or not len(previous) or not len(boxes):
+        return False
+    overlap = _box_iou(aligned, np.asarray(boxes, dtype=np.float64)) >= 0.3
+    return bool((overlap.sum(axis=1) == 1).all() and (overlap.sum(axis=0) <= 1).all())
+
+
+def _positive_nonwitness_court_correspondence(raw, boxes, court_indices, previous_to_current):
+    """A retained court actor may expose multiple innovations as one actor's parts.
+
+    Only current strict-court boxes matter here; outside static officials cannot
+    veto. Nonwitness means unavailable innovation, not verified static identity.
+    This conservative ambiguity gate applies only to new overlap authority.
+    """
+    from bai_badminton.perception.players import _box_iou
+
+    previous = [r.region.bbox for r in raw.regions if r.region.key not in raw.supporting_region_keys]
+    if not previous or not court_indices:
+        return False
+    current = np.asarray([boxes[i] for i in court_indices], dtype=np.float64)
+    if (_box_iou(np.asarray(previous, dtype=np.float64), current) >= 0.3).any():
+        return True
+    aligned = _camera_aligned_boxes(previous, previous_to_current)
+    return bool(aligned is not None and (_box_iou(aligned, current) >= 0.3).any())
 
 
 def _weak_court_replacement(
@@ -490,6 +645,19 @@ def scene_change_from_dict(value: dict[str, Any], *, frame_idx: int | None = Non
         value = {"acquisition_region_keys": (), "relative_region_keys": (), **value}
     if isinstance(value, dict) and value.get("version") == SCENE_CONTINUITY_VERSION:
         value = {"supporting_region_keys": (), "witness_parameters": None, **value}
+    if isinstance(value, dict) and value.get("version") != SCENE_CONTINUITY_VERSION_V5:
+        # In-process dataclasses expose newly added optional fields through
+        # asdict(). Empty defaults grant no measurement authority; historical
+        # wire serialization below still omits them exactly.
+        if any(value.get(key) is not None for key in _ORIGIN_FIELDS - {"origin_masks"}) or value.get("origin_masks"):
+            raise ValueError("legacy scene measurements cannot acquire exclusive feature-origin authority")
+        value = {
+            "feature_origin_policy": None,
+            "source_frame_size": None,
+            "analysis_frame_size": None,
+            "origin_masks": (),
+            **value,
+        }
     if not isinstance(value, dict) or set(value) != _SCENE_FIELDS:
         raise ValueError("invalid or unsupported scene evidence fields")
     row = dict(value)
@@ -501,7 +669,13 @@ def scene_change_from_dict(value: dict[str, Any], *, frame_idx: int | None = Non
     if previous is not None and (type(previous) is not int or not 0 <= previous < frame):
         raise ValueError("scene evidence cannot reference current/future source as previous")
     if (
-        row["version"] not in {SCENE_CONTINUITY_VERSION, SCENE_CONTINUITY_VERSION_V3, SCENE_CONTINUITY_VERSION_V4}
+        row["version"]
+        not in {
+            SCENE_CONTINUITY_VERSION,
+            SCENE_CONTINUITY_VERSION_V3,
+            SCENE_CONTINUITY_VERSION_V4,
+            SCENE_CONTINUITY_VERSION_V5,
+        }
         or row["source_basis"] != "observed_pixels_and_previous_frame_regions"
     ):
         raise ValueError("unknown scene evidence version or source basis")
@@ -572,6 +746,35 @@ def scene_change_from_dict(value: dict[str, Any], *, frame_idx: int | None = Non
     if len({item.region.key for item in converted}) != len(converted):
         raise ValueError("scene regions cannot duplicate an episode")
     row["regions"] = tuple(converted)
+    exclusive_origins = row["version"] == SCENE_CONTINUITY_VERSION_V5
+    if exclusive_origins:
+        records = row["origin_masks"]
+        if not isinstance(records, (tuple, list)) or len(records) != len(converted):
+            raise ValueError("exclusive feature origins require a record for every measured prior ROI")
+        parsed = []
+        for record in records:
+            if (
+                not isinstance(record, dict)
+                or set(record) != {"key", "pixels", "sha256"}
+                or not isinstance(record["key"], str)
+                or type(record["pixels"]) is not int
+                or record["pixels"] < 0
+                or not isinstance(record["sha256"], str)
+                or len(record["sha256"]) != 64
+                or any(c not in "0123456789abcdef" for c in record["sha256"])
+            ):
+                raise ValueError("invalid exclusive feature-origin mask record")
+            parsed.append(FeatureOriginMask(**record))
+        row["origin_masks"] = tuple(parsed)
+        validate_feature_origin_basis(
+            converted,
+            row["feature_origin_policy"],
+            row["source_frame_size"],
+            row["analysis_frame_size"],
+            row["origin_masks"],
+        )
+        row["source_frame_size"] = tuple(row["source_frame_size"])
+        row["analysis_frame_size"] = tuple(row["analysis_frame_size"])
     keys = row["supporting_region_keys"]
     if (
         not isinstance(keys, (tuple, list))
@@ -580,14 +783,14 @@ def scene_change_from_dict(value: dict[str, Any], *, frame_idx: int | None = Non
         or any(key not in {item.region.key for item in converted} for key in keys)
         or (row["version"] == SCENE_CONTINUITY_VERSION and keys)
         or (
-            row["version"] in {SCENE_CONTINUITY_VERSION_V3, SCENE_CONTINUITY_VERSION_V4}
+            row["version"] in {SCENE_CONTINUITY_VERSION_V3, SCENE_CONTINUITY_VERSION_V4, SCENE_CONTINUITY_VERSION_V5}
             and row["hypothesis"] != (len(keys) >= 2)
         )
     ):
         raise ValueError("invalid independent scene witness provenance")
     row["supporting_region_keys"] = tuple(keys)
     parameters = row["witness_parameters"]
-    if row["version"] in {SCENE_CONTINUITY_VERSION_V3, SCENE_CONTINUITY_VERSION_V4}:
+    if row["version"] in {SCENE_CONTINUITY_VERSION_V3, SCENE_CONTINUITY_VERSION_V4, SCENE_CONTINUITY_VERSION_V5}:
         if (
             not isinstance(parameters, (tuple, list))
             or len(parameters) != 2
@@ -601,7 +804,12 @@ def scene_change_from_dict(value: dict[str, Any], *, frame_idx: int | None = Non
             and row["background_consistent_fraction"] is not None
             and row["background_consistent_fraction"] >= 0.5
         )
-        policy = dict(reliable=reliable, adaptive_ratio=parameters[0], minimum_discontinuity=parameters[1])
+        policy = dict(
+            reliable=reliable,
+            adaptive_ratio=parameters[0],
+            minimum_discontinuity=parameters[1],
+            exclusive_feature_origins=exclusive_origins,
+        )
         correspondence = independent_scene_witnesses(
             converted, **policy, ratio_name="adaptive_ratio", value_name="discontinuity"
         )
@@ -627,7 +835,7 @@ def scene_change_from_dict(value: dict[str, Any], *, frame_idx: int | None = Non
         ):
             raise ValueError("invalid relative scene cohort")
         row[name] = tuple(keys)
-    if row["version"] == SCENE_CONTINUITY_VERSION_V4:
+    if row["version"] in {SCENE_CONTINUITY_VERSION_V4, SCENE_CONTINUITY_VERSION_V5}:
         # A claimed ratio without a recorded history baseline cannot authorize
         # even a detector request; check arithmetic on this new evidence schema.
         for region in converted:
@@ -653,7 +861,9 @@ def scene_change_from_dict(value: dict[str, Any], *, frame_idx: int | None = Non
                     ratio is not None and not isclose(ratio, value / max(1.0, history), rel_tol=1e-9, abs_tol=1e-9)
                 ):
                     raise ValueError("relative scene ratio disagrees with recorded prior history")
-        acquisition, relative = scene_relative_cohorts(converted, reliable=reliable, adaptive_ratio=parameters[0])
+        acquisition, relative = scene_relative_cohorts(
+            converted, reliable=reliable, adaptive_ratio=parameters[0], exclusive_feature_origins=exclusive_origins
+        )
         if row["acquisition_region_keys"] != acquisition or row["relative_region_keys"] != relative:
             raise ValueError("relative scene cohorts disagree with channel measurements")
     elif row["acquisition_region_keys"] or row["relative_region_keys"]:
@@ -665,7 +875,22 @@ def scene_change_to_dict(value: SceneChangeEvidence) -> dict[str, Any]:
     """Detach and validate before any diagnostic enters a cache or event."""
     if not isinstance(value, SceneChangeEvidence):
         raise TypeError("scene cache requires typed SceneChangeEvidence")
-    return asdict(scene_change_from_dict(asdict(value)))
+    wire = asdict(value)
+    if value.version != SCENE_CONTINUITY_VERSION_V5:
+        if (
+            value.feature_origin_policy is not None
+            or value.source_frame_size is not None
+            or value.analysis_frame_size is not None
+            or value.origin_masks
+        ):
+            raise ValueError("legacy typed scene evidence cannot carry exclusive feature-origin fields")
+        wire = {key: item for key, item in wire.items() if key not in _ORIGIN_FIELDS}
+    result = asdict(scene_change_from_dict(wire))
+    return (
+        result
+        if value.version == SCENE_CONTINUITY_VERSION_V5
+        else {key: item for key, item in result.items() if key not in _ORIGIN_FIELDS}
+    )
 
 
 class ContentContinuityProvider:
@@ -756,7 +981,7 @@ class ContentContinuityProviderV2(ContentContinuityProvider):
         super().__init__(mode="diagnostic", **observer_parameters)
         self._mode = mode
         self._observer = (
-            SceneContinuityDetectorV4(**observer_parameters)
+            SceneContinuityDetectorV5(**observer_parameters)
             if self.requires_detector_layout
             else SceneContinuityDetectorV2(**observer_parameters)
         )
@@ -815,8 +1040,8 @@ class ContentContinuityProviderV2(ContentContinuityProvider):
             matched_pairs=(),
             previous_region_count=len(evidence.regions),
         )
-        v4 = evidence.version == SCENE_CONTINUITY_VERSION_V4
-        v3 = evidence.version in {SCENE_CONTINUITY_VERSION_V3, SCENE_CONTINUITY_VERSION_V4}
+        v4 = evidence.version in {SCENE_CONTINUITY_VERSION_V4, SCENE_CONTINUITY_VERSION_V5}
+        v3 = evidence.version in {SCENE_CONTINUITY_VERSION_V3, SCENE_CONTINUITY_VERSION_V4, SCENE_CONTINUITY_VERSION_V5}
         indices = (
             [i for i, item in enumerate(evidence.regions) if item.region.key in evidence.supporting_region_keys]
             if v3
@@ -828,11 +1053,16 @@ class ContentContinuityProviderV2(ContentContinuityProvider):
             )
         if v4:
             metadata.update(
-                version="detector-layout-scene-decision:v3",
+                version=(
+                    "detector-layout-scene-decision:v4"
+                    if evidence.version == SCENE_CONTINUITY_VERSION_V5
+                    else "detector-layout-scene-decision:v3"
+                ),
                 acquisition_region_keys=evidence.acquisition_region_keys,
                 relative_region_keys=evidence.relative_region_keys,
                 expected_participants=expected_participants,
                 geometry_valid=geometry_valid,
+                feature_origin_overlap_dependent=feature_origin_overlap_dependent(evidence),
                 previous_to_current=previous_to_current,
                 previous_camera=previous_camera,
             )
@@ -859,6 +1089,19 @@ class ContentContinuityProviderV2(ContentContinuityProvider):
         if not geometry_valid:
             return SceneDecisionEvidence(
                 decision="unknown", reason="geometry_unavailable_raw_barrier_fallback", **metadata
+            )
+        if metadata.get("feature_origin_overlap_dependent") and not _complete_court_layout(
+            probe.boxes,
+            probe.court_indices,
+            expected_participants,
+            len(evidence.regions),
+            geometry_valid,
+            probe.court_polygon,
+            previous_to_current,
+            previous_camera,
+        ):
+            return SceneDecisionEvidence(
+                decision="unknown", reason="overlap_origins_require_complete_current_court_layout", **metadata
             )
         if v4 and not evidence.hypothesis:
             if _weak_court_replacement(
@@ -892,6 +1135,24 @@ class ContentContinuityProviderV2(ContentContinuityProvider):
             (indices[a], int(candidates[b])) for a, b in zip(*np.nonzero(overlap), strict=True)
         )
         same = len(metadata["matched_pairs"]) == len(indices)
+        if (
+            metadata.get("feature_origin_overlap_dependent")
+            and not same
+            and _positive_nonwitness_court_correspondence(
+                evidence, probe.boxes, probe.court_indices, previous_to_current
+            )
+        ):
+            return SceneDecisionEvidence(
+                decision="unknown", reason="nonwitness_court_region_preserves_overlap_continuity", **metadata
+            )
+        if (
+            metadata.get("feature_origin_overlap_dependent")
+            and not same
+            and _camera_explains_witness_layout(evidence, probe.boxes, previous_to_current)
+        ):
+            return SceneDecisionEvidence(
+                decision="unknown", reason="camera_aligned_layout_preserves_overlap_continuity", **metadata
+            )
         return SceneDecisionEvidence(
             decision="no_barrier" if same else "barrier",
             reason="complete_current_layout_correspondence" if same else "raw_change_and_current_layout_discontinuity",
@@ -906,7 +1167,12 @@ class ContentContinuityProviderV2(ContentContinuityProvider):
         previously detected edits. The explicit reason and content epoch retain
         both the uncertainty and the actual tracking action.
         """
+        if decision.feature_origin_overlap_dependent:
+            return self.requires_detector_layout and decision.decision == "barrier"
         return self.requires_detector_layout and (
             (decision.raw_hypothesis and decision.decision != "no_barrier")
-            or (decision.version == "detector-layout-scene-decision:v3" and decision.decision == "barrier")
+            or (
+                decision.version in {"detector-layout-scene-decision:v3", "detector-layout-scene-decision:v4"}
+                and decision.decision == "barrier"
+            )
         )
