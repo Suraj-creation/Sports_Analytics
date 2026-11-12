@@ -43,6 +43,24 @@ def _point(value: Any) -> tuple[float, float] | None:
     return float(value[0]), float(value[1])
 
 
+def _provider_point(value: Any) -> tuple[float, float] | None:
+    """Canonicalize provided numeric scalars before the strict wire contract.
+
+    The real heatmap summarizer's unravelled masked argmax contains NumPy
+    scalars. Converting those values preserves coordinates; it does not infer
+    a target from another peak, a centroid or a forecast. Wire parsing remains
+    strict, including rejection of booleans, strings and nonfinite values.
+    """
+    if value is None:
+        return None
+    if len(value) != 2 or any(
+        isinstance(v, (bool, np.bool_)) or not isinstance(v, (int, float, np.integer, np.floating)) or not isfinite(v)
+        for v in value
+    ):
+        raise ValueError("provider coordinates must be finite numeric image-pixel pairs")
+    return _point(tuple(float(v) for v in value))
+
+
 @dataclass(frozen=True, slots=True)
 class ShuttleObservationEvidence:
     frame_idx: int
@@ -356,7 +374,11 @@ class CausalShuttleAssociation:
                 status,
                 association,
                 raw,
-                alternative.peak_xy if alternative is not None else raw if status == "observed" else None,
+                _provider_point(alternative.peak_xy)
+                if alternative is not None
+                else raw
+                if status == "observed"
+                else None,
                 raw_support,
                 candidates,
                 tuple(f for f in proof.witnesses if f < frame) if proof else (),
@@ -380,7 +402,7 @@ class CausalShuttleAssociation:
                 selection_model_threshold=threshold,
                 selection_witness_frames=witnesses,
                 selection_hypothesis_id=selection_id,
-                raw_masked_peak_xy=getattr(diagnostic, "selected_masked_peak_xy", None),
+                raw_masked_peak_xy=_provider_point(getattr(diagnostic, "selected_masked_peak_xy", None)),
             )
 
         if not image_valid:

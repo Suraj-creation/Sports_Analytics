@@ -3,6 +3,7 @@
 from collections import deque
 from dataclasses import replace
 
+import msgpack
 import numpy as np
 import pytest
 
@@ -12,7 +13,12 @@ from bai_badminton.perception.association import (
     ShuttleObservationEvidence,
     _Hypothesis,
 )
-from bai_badminton.perception.diagnostics import HeatmapCandidate, ShuttleDiagnostic
+from bai_badminton.perception.diagnostics import (
+    DiagnosticSelection,
+    HeatmapCandidate,
+    ShuttleDiagnostic,
+    summarize_heatmap,
+)
 
 FLOOR = (500.0, 400.0)
 
@@ -252,7 +258,7 @@ def test_missing_diagnostic_keeps_unknown_raw_mask_target_and_legacy_cannot_clai
         ShuttleObservationEvidence.from_dict({**legacy.to_dict(), "raw_masked_peak_xy": None})
 
 
-@pytest.mark.parametrize("point", [(True, 3.0), (float("nan"), 3.0), (1.0, 2.0, 3.0)])
+@pytest.mark.parametrize("point", [(True, 3.0), (float("nan"), 3.0), ("1", 2.0), (1.0, 2.0, 3.0)])
 def test_invalid_retained_mask_target_refuses(point):
     value = update(CausalShuttleAssociation(fps=30), 0, FLOOR)
     with pytest.raises(ValueError):
@@ -271,12 +277,59 @@ def test_current_wire_cannot_drop_explicit_mask_target_or_duplicate_motion_proof
 
 def test_current_masked_global_max_support_cannot_be_exceeded_by_forged_alternative():
     _, value = recovered()
-    candidates = tuple(replace(c, peak_support=.99) if c.rank == 2 else c for c in value.candidates)
+    candidates = tuple(replace(c, peak_support=0.99) if c.rank == 2 else c for c in value.candidates)
     with pytest.raises(ValueError):
-        replace(value, candidates=candidates, selected_model_support=.99)
+        replace(value, candidates=candidates, selected_model_support=0.99)
 
 
 def test_alternative_cannot_drop_actual_masked_raw_target_needed_by_its_static_proof():
     _, value = recovered()
     with pytest.raises(ValueError):
         replace(value, raw_masked_peak_xy=None)
+
+
+def test_actual_heatmap_summarizer_numpy_masked_target_enters_canonical_v3_wire():
+    heatmap = np.zeros((24, 32), np.float32)
+    heatmap[7, 9] = 0.9
+    diagnostic = summarize_heatmap(
+        heatmap, 0.5, None, scale=(2.5, 2.5), selection=DiagnosticSelection(), window_votes=1
+    )
+    assert isinstance(diagnostic.selected_masked_peak_xy[0], np.floating)
+    value = CausalShuttleAssociation(fps=30).update(
+        0,
+        epoch=0,
+        raw_xy=(22.5, 17.5),
+        raw_support=diagnostic.masked_peak,
+        diagnostic=diagnostic,
+        image_valid=True,
+    )
+    assert value.raw_masked_peak_xy == diagnostic.selected_masked_peak_xy
+    assert all(type(v) is float for v in value.raw_masked_peak_xy)
+    wire = msgpack.unpackb(msgpack.packb(value.to_dict(), use_bin_type=True), raw=False)
+    assert ShuttleObservationEvidence.from_dict(wire) == value
+
+
+def test_real_summarizer_alternative_peak_preserves_exact_values_and_serializes():
+    provider = CausalShuttleAssociation(fps=30)
+    result = None
+    for frame in range(16):
+        heatmap = np.zeros((90, 110), np.float32)
+        # Fixed spread is actual connected-component mass, not a new gate.
+        heatmap[77:84, 97:104] = 0.2
+        heatmap[80, 100] = 0.9 if frame == 15 else 0.7
+        x = 20 + frame * 2
+        heatmap[17:24, x - 3 : x + 4] = 0.2
+        heatmap[20, x] = 0.7 if frame == 15 else 0.95
+        d = summarize_heatmap(
+            heatmap, 0.5, None, scale=(5.0, 5.0), selection=DiagnosticSelection(top_k=8), window_votes=1
+        )
+        raw = (500.0, 400.0) if frame == 15 else (float(x * 5), 100.0)
+        result = provider.update(frame, epoch=0, raw_xy=raw, raw_support=d.masked_peak, diagnostic=d, image_valid=True)
+    assert result.selection_coordinate_source == "current_candidate_peak"
+    selected = next(c for c in d.candidates if c.rank == result.selected_candidate_rank)
+    assert result.selected_xy == selected.peak_xy == (250.0, 100.0)
+    assert result.selected_model_support == selected.peak_support
+    assert all(type(v) is float for v in result.selected_xy)
+    assert result.raw_masked_peak_xy == (500.0, 400.0)
+    wire = msgpack.unpackb(msgpack.packb(result.to_dict(), use_bin_type=True), raw=False)
+    assert ShuttleObservationEvidence.from_dict(wire) == result
