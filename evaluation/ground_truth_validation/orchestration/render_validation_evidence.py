@@ -264,7 +264,7 @@ def verify_run(run, source, pipeline_root=None):
         ci = c["ci"]
         header = {key: c.get(key) for key in ("v", "start", "end", "cr", "ci", "models")}
         if (
-            c["v"] not in (20, 21, 22, 23, 24)
+            c["v"] not in (20, 21, 22, 23, 24, 25)
             or c["v"] != row["codec_version"]
             or c["start"] != frontier
             or c["start"] != row["start"]

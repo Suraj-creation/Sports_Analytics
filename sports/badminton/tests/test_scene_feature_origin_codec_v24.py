@@ -55,9 +55,11 @@ def session(tmp_path):
     value.close()
 
 
-def test_new_origin_measurement_roundtrips_actual_source_and_analysis_dimensions(session):
-    assert CODEC_VERSION == 24
+@pytest.mark.parametrize("version", [24, 25])
+def test_new_origin_measurement_roundtrips_actual_source_and_analysis_dimensions(session, version):
+    assert CODEC_VERSION == 25
     value = record(session)
+    value["v"] = version
     result = decode(value).frames[0]
     assert result.content_change.version == "foreground-scene-hypothesis:v5"
     assert result.content_change.source_frame_size == (1280, 720)

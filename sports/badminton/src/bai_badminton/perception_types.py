@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 import numpy as np
 from numpy.typing import NDArray
 
+from bai_badminton.perception.acquisition import MotionAcquisitionProof
 from bai_badminton.perception.association import ShuttleObservationEvidence
 from bai_badminton.perception.calibration_state import CalibrationState
 from bai_badminton.perception.content import SceneDecisionEvidence, validate_scene_decision_binding
@@ -113,8 +114,15 @@ class FramePerception:
     content_change: SceneChangeEvidence | None = None
     content_decision: SceneDecisionEvidence | None = None
     foreground_regions: tuple[ForegroundRegion, ...] = ()
+    acquisition_request: MotionAcquisitionProof | None = None
 
     def __post_init__(self) -> None:
+        if self.acquisition_request is not None and (
+            not isinstance(self.acquisition_request, MotionAcquisitionProof)
+            or self.acquisition_request.decision_frame > self.frame_idx
+            or self.acquisition_request.epoch != (self.shot_id << 32) | self.content_epoch
+        ):
+            raise ValueError("acquisition request differs from its frame or temporal epoch")
         if (
             len(self.foreground_regions) > 8
             or any(

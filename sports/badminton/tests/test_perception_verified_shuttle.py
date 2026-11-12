@@ -36,7 +36,7 @@ def test_shuttle_application_load_consumes_snapshot_and_scopes_provider_to_graph
         stream = kwargs["checkpoint_stream"]
         observed.update(path=weights, data=stream.read(), digest=kwargs["expected_sha256"], stream=stream)
         assert kwargs["provider_factory"]("f" * 64) == ["CPUExecutionProvider"]
-        return SimpleNamespace(runtime={"backend_fallback": False})
+        return SimpleNamespace(runtime={"backend_fallback": False}, threshold=kwargs["threshold"])
 
     def providers(_choice, _cache, *, model_digest=None):
         observed["graph_digest"] = model_digest
@@ -49,6 +49,7 @@ def test_shuttle_application_load_consumes_snapshot_and_scopes_provider_to_graph
     assert observed["path"] == path and observed["data"] == b"trusted checkpoint"
     assert observed["digest"] == digest and observed["graph_digest"] == "f" * 64
     assert observed["stream"].closed
+    assert perception.runtimes["shuttle"]["inference_threshold"] == 0.5
 
 
 def test_changed_checkpoint_is_degraded_before_shuttle_deserialization(monkeypatch, tmp_path):

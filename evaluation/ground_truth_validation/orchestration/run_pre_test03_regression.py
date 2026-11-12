@@ -346,8 +346,8 @@ def require_helper_compatibility(root):
                 for key, value in zip(node.value.keys, node.value.values, strict=True):
                     if isinstance(key, ast.Constant) and key.value == "accepted_codec_versions":
                         values = [element.value for element in value.elts]
-                        if values == [20, 21, 22, 23, 24]:
-                            value.elts.pop()
+                        if values == [20, 21, 22, 23, 24, 25]:
+                            value.elts = value.elts[:-2]
                             self.codec_changes += 1
             return self.generic_visit(node)
 
@@ -361,19 +361,32 @@ def require_helper_compatibility(root):
                 versions, label = values.get("accepted_versions"), values.get("context_label")
                 if (
                     isinstance(versions, ast.Tuple)
-                    and [value.value for value in versions.elts] == [21, 22, 23, 24]
+                    and [value.value for value in versions.elts] == [21, 22, 23, 24, 25]
                     and isinstance(label, ast.Constant)
-                    and label.value == "completed codec21/22/23/24"
+                    and label.value == "completed codec21/22/23/24/25"
                 ):
-                    versions.elts.pop()
+                    versions.elts = versions.elts[:-2]
                     label.value = "completed codec21/22/23"
                     self.codec_changes += 1
             return self.generic_visit(node)
 
         def visit_Compare(self, node):
-            expected = ast.parse("value['v'] in (21,22,23,24)", mode="eval").body
+            expected = ast.parse("value['v'] in (21,22,23,24,25)", mode="eval").body
             if self.name == "research/production_external_stress.py" and ast.dump(node) == ast.dump(expected):
-                node.comparators[0].elts.pop()
+                node.comparators[0].elts = node.comparators[0].elts[:-2]
+                self.codec_changes += 1
+            return self.generic_visit(node)
+
+        def visit_For(self, node):
+            expected = ast.parse(
+                "for historical_versions in ([20],[20,21],[20,21,22],[20,21,22,23],[20,21,22,23,24]): pass"
+            ).body[0]
+            if (
+                self.name == "research/production_external_stress.py"
+                and ast.dump(node.target) == ast.dump(expected.target)
+                and ast.dump(node.iter) == ast.dump(expected.iter)
+            ):
+                node.iter.elts = node.iter.elts[:-2]
                 self.codec_changes += 1
             return self.generic_visit(node)
 
@@ -395,10 +408,10 @@ def require_helper_compatibility(root):
                 raise ValueError("Matching/arithmetic or unreviewed helper AST change: " + name)
             if name in component_paths and normalizer.dispatches != 1:
                 raise ValueError("Exactly one reviewed structural component dispatch required: " + name)
-            expected_codec_changes = 1 if name == "research/pipeline_repair_completion.py" else 2
+            expected_codec_changes = 1 if name == "research/pipeline_repair_completion.py" else 3
             if name not in component_paths and normalizer.codec_changes != expected_codec_changes:
-                raise ValueError("Exactly the reviewed codec24 schema extensions are required")
-            mode = "exact_AST_except_explicit_codec24_structural_dispatch"
+                raise ValueError("Exactly the reviewed codec25 schema extensions are required")
+            mode = "exact_AST_except_explicit_codec25_structural_dispatch"
         receipt[name] = {"primary_workspace_sha256": previous_sha, "native_sha256": current_sha, "compatibility": mode}
     return receipt
 

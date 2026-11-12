@@ -12,7 +12,7 @@ from hashlib import sha256
 import msgpack
 import numpy as np
 
-AUDIT_VERSION = "source-native-scene-epoch-audit:v4"
+AUDIT_VERSION = "source-native-scene-epoch-audit:v5"
 
 
 def validate_scene_epoch_proofs(frames, packets, *, decode_packet):
@@ -30,8 +30,18 @@ def validate_scene_epoch_proofs(frames, packets, *, decode_packet):
             typed[f.frame_idx] = f
     actual = {}
     weak, camera, cross_chunk, abstained = [], [], [], []
+    acquisition_frames, verified_acquisitions = [], set()
+    packets_by_end = {packet["end"]: packet for packet in packets}
     previous_epoch = None
     for packet in packets:
+        acquisition_context_alive = True
+        has_acquisition = any(
+            getattr(typed[row["f"]], "acquisition_request", None) is not None for row in packet["frames"]
+        )
+        first_context = (
+            (packet["frames"][0]["sh"], packet["frames"][0]["ce"])
+            if packet["frames"] and has_acquisition else None
+        )
         for f in packet["frames"]:
             index = f["f"]
             raw, d = f.get("cc"), f.get("cd")
@@ -39,6 +49,52 @@ def validate_scene_epoch_proofs(frames, packets, *, decode_packet):
             barrier = previous_epoch is not None and f["ce"] > previous_epoch
             previous_epoch = f["ce"]
             t = typed[index]
+            if has_acquisition and (
+                f.get("r") or f.get("v") != "main" or f.get("cs") != "VALID"
+                or (f["sh"], f["ce"]) != first_context
+            ):
+                acquisition_context_alive = False
+            acquisition = getattr(t, "acquisition_request", None)
+            if acquisition is not None:
+                if not acquisition_context_alive:
+                    raise ValueError("Sampling request resumed after an invalidated chunk context")
+                prior_chunk = packets_by_end.get(acquisition.completed_chunk_end)
+                if (
+                    prior_chunk is None or prior_chunk["start"] != acquisition.completed_chunk_start
+                    or acquisition.decision_frame != packet["start"]
+                    or prior_chunk["end"] >= packet["start"]
+                ):
+                    raise ValueError("Sampling proof lacks its actual previously completed source chunk")
+                identity = (
+                    acquisition.decision_frame, acquisition.epoch, acquisition.source_frames,
+                    acquisition.reference_xy, acquisition.minimum_motion_px_per_frame,
+                    acquisition.maximum_age_frames,
+                )
+                if identity not in verified_acquisitions:
+                    for source_frame, claimed_point in zip(
+                        acquisition.source_frames, acquisition.reference_xy, strict=True
+                    ):
+                        source_raw = actual.get(source_frame)
+                        source = typed.get(source_frame)
+                        evidence = getattr(source, "shuttle_observation", None)
+                        if (
+                            source_raw is None or source is None or evidence is None
+                            or evidence.status != "observed"
+                            or evidence.association_status not in {"tracked", "reacquisition"}
+                            or evidence.selected_xy is None
+                            or source.cam is None or source.replay or source.view != "main"
+                            or source.calibration_state is None or source.calibration_state.value != "VALID"
+                            or ((source.shot_id << 32) | source.content_epoch) != acquisition.epoch
+                        ):
+                            raise ValueError("Sampling proof lacks actual observed source and registered context")
+                        point = np.linalg.inv(source.cam) @ np.r_[evidence.selected_xy, 1.0]
+                        if (
+                            not np.isfinite(point).all() or abs(point[2]) < 1e-12
+                            or not np.allclose(point[:2] / point[2], claimed_point, rtol=0, atol=1e-9)
+                        ):
+                            raise ValueError("Sampling proof alters its actual observed source coordinates")
+                    verified_acquisitions.add(identity)
+                acquisition_frames.append(index)
             if raw and raw.get("version") == "foreground-scene-hypothesis:v5" and t.content_change.regions:
                 prior = actual.get(raw.get("previous_frame"))
                 if prior is None:
@@ -137,6 +193,7 @@ def validate_scene_epoch_proofs(frames, packets, *, decode_packet):
         "overlap_dependent_abstentions": abstained,
         "relative_camera_proof_frames": camera,
         "cross_chunk_camera_proof_frames": cross_chunk,
+        "motion_acquisition_proof_frames": acquisition_frames,
         "packet_population_sha256": sha256(msgpack.packb(packets, use_bin_type=True)).hexdigest(),
         "raw_hypothesis_values_preserved": True,
         "accuracy_validated": False,

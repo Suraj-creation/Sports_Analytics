@@ -56,7 +56,7 @@ from bai_engine.store import EventStore, TrackStore
 log = get_logger(__name__)
 AUTO_CALIBRATION_MIN_SCORE = 0.6
 REF_FILE = "camera_ref.png"  # the frame the calibration was made on (lossless: its id is a content hash)
-CODEC_VERSION = 24  # bind exclusive scene feature-origin masks to source dimensions and policy
+CODEC_VERSION = 25  # bind associated current-candidate selections without replacing raw observations
 MAX_ADJUST = 0.03  # a human calibration the court lines move by more than this (× frame width) is kept as is
 
 
@@ -1068,6 +1068,7 @@ class BadmintonSession:
                 "state_restore": "recompute_in_canonical_frame_order",
             }
         policy["runtimes"] = getattr(self.perception, "runtimes", {})
+        policy["motion_acquisition"] = getattr(self.perception, "motion_acquisition_policy", None)
         size = getattr(self.perception, "frame_size", None)
         policy["frame_size"] = list(size) if size else None
         policy["fps"] = getattr(self.perception, "fps", None)
@@ -1102,6 +1103,7 @@ class BadmintonSession:
                     "ps": fp.pose_stride,
                     "dg": fp.diagnostic.to_dict() if fp.diagnostic is not None else None,
                     "sa": fp.shuttle_observation.to_dict() if fp.shuttle_observation is not None else None,
+                    "aq": fp.acquisition_request.to_dict() if fp.acquisition_request is not None else None,
                     "ce": fp.content_epoch,
                     "cc": scene_change_to_dict(fp.content_change) if fp.content_change is not None else None,
                     "cd": scene_decision_to_dict(fp.content_decision) if fp.content_decision is not None else None,
@@ -1159,7 +1161,7 @@ class BadmintonSession:
         d = msgpack.unpackb(data, raw=False)
         ref_id = self.perception.ref_id
         if (
-            d.get("v", 1) not in {17, 18, 19, 20, 21, 22, 23, CODEC_VERSION}
+            d.get("v", 1) not in {17, 18, 19, 20, 21, 22, 23, 24, CODEC_VERSION}
             or d.get("cr") != ref_id
             or d.get("ci") != self._isolation_id()
         ):
@@ -1184,10 +1186,25 @@ class BadmintonSession:
         content_changes = {}
         content_decisions = {}
         foreground_regions = {}
+        acquisition_requests = {}
+        from bai_badminton.perception.acquisition import MOTION_ACQUISITION_VERSION, MotionAcquisitionProof
         from bai_badminton.perception.scene_change import ForegroundRegion
 
         foreground_fields = {"frame", "key", "bbox", "detector_matched", "detector_observed"}
         cache_policy = d.get("ci") if isinstance(d.get("ci"), dict) else {}
+        association_contract = (
+            cache_policy.get("components", {}).get("shuttle_association", {}).get("contract", {})
+        )
+        requires_candidate_selection = association_contract.get("output_schema") == "badminton-shuttle-association:v3"
+        shuttle_configuration = cache_policy.get("components", {}).get("shuttle", {}).get("configuration", {})
+        declared_threshold = cache_policy.get("runtimes", {}).get("shuttle", {}).get("inference_threshold")
+        configured_threshold = (
+            shuttle_configuration.get("params", {}).get("threshold", 0.5)
+            if shuttle_configuration.get("model") == "tracknetv3"
+            else None
+        )
+        if declared_threshold is None:
+            declared_threshold = configured_threshold
         profile_policy = cache_policy.get("profile")
         components_policy = profile_policy.get("components", {}) if isinstance(profile_policy, dict) else {}
         content_choice = components_policy.get("content_continuity", {})
@@ -1196,9 +1213,38 @@ class BadmintonSession:
             and content_choice.get("params", {}).get("mode") == "barrier_detector_layout_v2"
         )
         try:
+            if (
+                configured_threshold is not None
+                and declared_threshold is not None
+                and configured_threshold != declared_threshold
+            ):
+                raise ValueError("producer model threshold sources disagree")
             camera_by_frame = {row["f"]: row.get("g") for row in d["frames"]}
             foreground_by_frame = {row["f"]: row.get("fg") for row in d["frames"]}
             for frame in d["frames"]:
+                if d["v"] >= 25 and isinstance(cache_policy.get("motion_acquisition"), dict) and "aq" not in frame:
+                    raise ValueError("configured sampling policy requires explicit acquisition availability")
+                if frame.get("aq") is not None:
+                    if d["v"] < 25:
+                        raise ValueError("sampling acquisition proof cannot be downgraded to a legacy codec")
+                    acquisition_request = MotionAcquisitionProof.from_dict(frame["aq"])
+                    acquisition_policy = cache_policy.get("motion_acquisition")
+                    if (
+                        not isinstance(acquisition_policy, dict)
+                        or acquisition_policy.get("version") != MOTION_ACQUISITION_VERSION
+                        or acquisition_request.minimum_motion_px_per_frame
+                        != acquisition_policy.get("minimum_motion_px_per_frame")
+                        or acquisition_request.maximum_age_frames != acquisition_policy.get("maximum_age_frames")
+                        or acquisition_request.decision_frame != d["start"]
+                        or acquisition_request.epoch != (frame["sh"] << 32) | frame["ce"]
+                        or frame.get("r") or frame.get("v") != "main" or frame.get("cs") != "VALID"
+                    ):
+                        raise ValueError("sampling request differs from its producer policy, chunk or frame context")
+                    acquisition_requests[frame["f"]] = acquisition_request
+                if d["v"] >= 25 and requires_candidate_selection and frame.get("sa") is None:
+                    raise ValueError("configured association requires explicit observed or unavailable evidence")
+                if d["v"] < 25 and (frame.get("sa") or {}).get("schema") == "badminton-shuttle-association:v3":
+                    raise ValueError("current-candidate selection proof cannot be downgraded to a legacy codec")
                 if d["v"] < 24 and (
                     (frame.get("cc") or {}).get("version") == "foreground-scene-hypothesis:v5"
                     or (frame.get("cd") or {}).get("version") == "detector-layout-scene-decision:v4"
@@ -1377,6 +1423,17 @@ class BadmintonSession:
                                 raise ValueError("scene witness parameters differ from the producer configuration")
                     if frame["sa"] is not None:
                         observation = ShuttleObservationEvidence.from_dict(frame["sa"])
+                        if d["v"] >= 25 and requires_candidate_selection and (
+                            observation.schema != "badminton-shuttle-association:v3"
+                        ):
+                            raise ValueError("association evidence differs from the declared component output")
+                        if (
+                            observation.schema == "badminton-shuttle-association:v3"
+                            and observation.selection_model_threshold is not None
+                            and declared_threshold is not None
+                            and observation.selection_model_threshold != declared_threshold
+                        ):
+                            raise ValueError("associated selection threshold differs from the producer model policy")
                         raw_xy = tuple(frame["s"]) if frame["s"] is not None else None
                         if (
                             observation.frame_idx != frame["f"]
@@ -1390,6 +1447,25 @@ class BadmintonSession:
                     if d["v"] < 18:
                         raise ValueError("legacy diagnostic cache cannot carry the new schema")
                     diagnostic = FrameDiagnostic.from_dict(frame["dg"])
+                    observation = associations.get(frame["f"])
+                    if (
+                        observation is not None
+                        and observation.schema == "badminton-shuttle-association:v3"
+                        and diagnostic.shuttle is not None
+                    ):
+                        if observation.selection_model_threshold != diagnostic.shuttle.threshold:
+                            raise ValueError("associated selection threshold differs from its actual model diagnostic")
+                        if observation.raw_masked_peak_xy != diagnostic.shuttle.selected_masked_peak_xy:
+                            raise ValueError("raw masked peak differs from its actual model diagnostic")
+                        if observation.selection_coordinate_source == "current_candidate_peak":
+                            # Public diagnostics may retain fewer candidates than
+                            # the association input. Bind every shared rank without
+                            # requiring an unavailable truncated candidate.
+                            rank = observation.selected_candidate_rank
+                            public = next((c for c in diagnostic.shuttle.candidates if c.rank == rank), None)
+                            retained = next((c for c in observation.candidates if c.rank == rank), None)
+                            if public is not None and public != retained:
+                                raise ValueError("associated candidate differs from the current model diagnostic")
                     if diagnostic.frame_idx != frame["f"] or diagnostic.shot_id != frame["sh"]:
                         raise ValueError("diagnostic frame/context identity differs from its observation")
                     fps = d["ci"].get("fps")
@@ -1463,6 +1539,7 @@ class BadmintonSession:
                 pose_stride=f["ps"],
                 diagnostic=diagnostics.get(f["f"]),
                 shuttle_observation=associations.get(f["f"]),
+                acquisition_request=acquisition_requests.get(f["f"]),
                 content_epoch=f.get("ce", 0),
                 content_change=content_changes.get(f["f"]),
                 content_decision=content_decisions.get(f["f"]),
@@ -1503,7 +1580,7 @@ class BadmintonSession:
 class BadmintonPlugin:
     name = "badminton"
     pipeline_id = "badminton-broadcast"
-    pipeline_version = "9"
+    pipeline_version = "10"
     stages = (
         (
             "perception",

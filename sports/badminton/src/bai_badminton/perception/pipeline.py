@@ -31,6 +31,7 @@ from typing import Any
 import numpy as np
 
 from bai_badminton.court import REFERENCE_POINTS, WIDTH_DOUBLES, Homography
+from bai_badminton.perception.acquisition import MOTION_ACQUISITION_VERSION, ObservedMotionAcquisition
 from bai_badminton.perception.calibration_state import CalibrationLifecycle
 from bai_badminton.perception.camera import CameraTracker, project
 from bai_badminton.perception.components import (
@@ -203,6 +204,13 @@ class BadmintonPerception:
         }
         self.shuttle = self._create_component("shuttle", context, identity)
         self.shuttle_association = self._create_component("shuttle_association", context, identity)
+        motion_scale = getattr(self.shuttle_association, "minimum_motion_px_per_frame", None)
+        motion_age = getattr(self.shuttle_association, "maximum_age_frames", None)
+        self._motion_acquisition = (
+            ObservedMotionAcquisition(minimum_motion_px_per_frame=motion_scale, maximum_age_frames=motion_age)
+            if motion_scale is not None and motion_age is not None
+            else None
+        )
         self.content_continuity = self._create_component("content_continuity", context, identity)
         self._content_epoch = 0
         self._content_previous: tuple[int, _PlayerFrame, bool, np.ndarray | None, bool] | None = None
@@ -317,10 +325,30 @@ class BadmintonPerception:
             handle.reset()
         self._content_previous = None
         self._content_epoch = 0
+        acquisition = getattr(self, "_motion_acquisition", None)
+        if acquisition is not None:
+            acquisition.reset()
+
+    @property
+    def motion_acquisition_policy(self) -> dict[str, Any] | None:
+        acquisition = getattr(self, "_motion_acquisition", None)
+        if acquisition is None:
+            return None
+        return {
+            "version": MOTION_ACQUISITION_VERSION,
+            "minimum_motion_px_per_frame": acquisition.minimum_motion_px_per_frame,
+            "maximum_age_frames": acquisition.maximum_age_frames,
+            "decision_scope": "next_chunk_start_only;cancel_on_context_change",
+            "authority": "configured_sampling_request_only",
+            "state_restore": "recompute_in_frame_order",
+        }
 
     def close(self) -> None:
         for handle in reversed(list(self.component_handles.values())):
             handle.close()
+        acquisition = getattr(self, "_motion_acquisition", None)
+        if acquisition is not None:
+            acquisition.reset()
 
     @property
     def identity_policy(self) -> dict[str, Any]:
@@ -374,7 +402,7 @@ class BadmintonPerception:
                     batch=c.batch,
                     precision=c.precision,
                 )
-            self._record_runtime("shuttle", m.runtime)
+            self._record_runtime("shuttle", {**m.runtime, "inference_threshold": m.threshold})
             self.models["shuttle"] = reg.get(c.model).ref
             return m
         except (ModelError, OSError, ValueError, ImportError, RuntimeError) as e:
@@ -673,6 +701,39 @@ class BadmintonPerception:
 
         rates_det = p.detector_rates.in_play if in_play else p.detector_rates.idle
         rates_pose = p.pose_rates.in_play if in_play else p.pose_rates.idle
+        acquisition = getattr(self, "_motion_acquisition", None)
+        motion_request = (
+            acquisition.request(chunk.start, (shots[0] << 32) | self._content_epoch)
+            if acquisition is not None and n
+            else None
+        )
+        frame_rates = [(rates_det, rates_pose)] * n
+        frame_requests = [None] * n
+
+        def sampling_rates(index: int) -> tuple[int, int]:
+            nonlocal motion_request
+            base = rates_det, rates_pose
+            if motion_request is not None and (
+                replay[index] or states[index].value != "VALID"
+                or motion_request.epoch != (shots[index] << 32) | content_epochs[index]
+            ):
+                # Once revoked, a batch-start request cannot resume merely
+                # because a later frame happens to recover the old geometry.
+                motion_request = None
+            if (
+                in_play or motion_request is None
+            ):
+                return base
+            active = p.detector_rates.in_play, p.pose_rates.in_play
+            # An acquisition hint may increase measurement frequency, but may
+            # neither enable a disabled model nor reduce the configured rate.
+            requested = (
+                min(base[0], active[0]) if base[0] > 0 and active[0] > 0 else base[0],
+                min(base[1], active[1]) if base[1] > 0 and active[1] > 0 else base[1],
+            )
+            if requested != base:
+                frame_requests[index] = motion_request
+            return requested
 
         shuttle = [None] * n
         diagnostic_selection = getattr(self, "diagnostic_selection", DiagnosticSelection())
@@ -751,6 +812,7 @@ class BadmintonPerception:
                 if barrier:
                     self._content_epoch += 1
                 content_epochs[i] = self._content_epoch
+                frame_rates[i] = sampling_rates(i)
                 if acquire_layout or i in diagnostic_indices:
                     content_evidence[i] = evidence
                 people = self._people_at(
@@ -760,7 +822,7 @@ class BadmintonPerception:
                     poly=polys[i],
                     G=poses[i] if poses is not None else None,
                     replay=replay[i],
-                    strides=(rates_det, rates_pose),
+                    strides=frame_rates[i],
                     selection=diagnostic_selection,
                     diagnostics=i in diagnostic_indices,
                     detection_probe=probe,
@@ -833,6 +895,8 @@ class BadmintonPerception:
         with timed("players"):
             for i, img in enumerate(chunk.frames):
                 fidx = chunk.start + i
+                if pre_people is None:
+                    frame_rates[i] = sampling_rates(i)
                 people = (
                     pre_people[i]
                     if pre_people is not None
@@ -843,7 +907,7 @@ class BadmintonPerception:
                         poly=polys[i],
                         G=poses[i] if poses is not None else None,
                         replay=replay[i],
-                        strides=(rates_det, rates_pose),
+                        strides=frame_rates[i],
                         selection=diagnostic_selection,
                         diagnostics=i in diagnostic_indices,
                     )
@@ -854,6 +918,7 @@ class BadmintonPerception:
                 # there); camera mode: only analysed frames (another camera's pose is not measured)
                 G = poses[i] if poses is not None and (self.mode == "lines" or not replay[i]) else None
                 association_evidence = None
+                image_to_reference = np.linalg.inv(G) if G is not None and states[i].value == "VALID" else None
                 if association is not None:
                     association_evidence = association.update(
                         fidx,
@@ -862,7 +927,26 @@ class BadmintonPerception:
                         raw_support=s.conf if s is not None else 0.0,
                         diagnostic=shuttle_diagnostics[i],
                         image_valid=not replay[i],
-                        image_to_reference=np.linalg.inv(G) if G is not None and states[i].value == "VALID" else None,
+                        image_to_reference=image_to_reference,
+                    )
+                if acquisition is not None:
+                    context_valid = image_to_reference is not None and not replay[i]
+                    observed = (
+                        context_valid and association_evidence is not None
+                        and association_evidence.status == "observed"
+                        and association_evidence.association_status in {"tracked", "reacquisition"}
+                        and association_evidence.selected_xy is not None
+                    )
+                    registered = None
+                    if observed:
+                        point = image_to_reference @ np.r_[association_evidence.selected_xy, 1.0]
+                        if np.isfinite(point).all() and abs(point[2]) >= 1e-12:
+                            registered = tuple(float(value) for value in point[:2] / point[2])
+                        else:
+                            context_valid, observed = False, False
+                    acquisition.observe(
+                        fidx, (shots[i] << 32) | content_epochs[i], registered,
+                        context_valid=context_valid, observed=observed,
                     )
                 public_diagnostic = shuttle_diagnostics[i]
                 if public_diagnostic is not None and association is not None:
@@ -884,7 +968,7 @@ class BadmintonPerception:
                         head=scene.heads[i],
                         court_q=scene.quality[i],
                         calibration_state=states[i],
-                        pose_stride=int(rates_pose)
+                        pose_stride=int(frame_rates[i][1])
                         if not replay[i] and getattr(self.players, "pose", None) is not None
                         else 0,
                         detector_observed=people.detector_observed,
@@ -892,6 +976,7 @@ class BadmintonPerception:
                         content_change=content_evidence[i],
                         content_decision=content_decisions[i],
                         foreground_regions=people.foreground_regions,
+                        acquisition_request=frame_requests[i],
                         diagnostic=FrameDiagnostic(
                             frame_idx=fidx,
                             canonical_time_sec=fidx / self.fps,
@@ -915,6 +1000,8 @@ class BadmintonPerception:
                 )
         self._rate("players", n, t0)
         ocr = self._read_scoreboard(chunk, replay, in_play, scene.views, scene.broadcast_replay_status)
+        if acquisition is not None and n:
+            acquisition.complete_chunk(chunk.start, chunk.end)
         self.stats.frames += n
         self.stats.shuttle_frames += sum(1 for s in shuttle if s is not None)
         return ChunkPerception(

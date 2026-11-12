@@ -106,7 +106,10 @@ def publish(catalogue, output, bindings, versions=None, other_limit=False):
 
 @pytest.mark.parametrize(
     "codec,versions",
-    [(20, [20]), (20, [20, 21]), (21, [20, 21]), (22, [20, 21, 22]), (23, None), (24, None)],
+    [
+        (20, [20]), (20, [20, 21]), (21, [20, 21]), (22, [20, 21, 22]),
+        (23, [20, 21, 22, 23]), (24, [20, 21, 22, 23, 24]), (25, None),
+    ],
 )
 def test_original_catalogue_limits_are_preserved_for_matching_population(api, closed_cache, codec, versions):
     catalog, _ = api
@@ -116,7 +119,7 @@ def test_original_catalogue_limits_are_preserved_for_matching_population(api, cl
     path = output / catalog.PERCEPTION_CATALOG_NAME
     original = path.read_bytes()
     checked = catalog.verify_perception_catalog(output, receipt, **bindings)
-    assert checked["limits"]["accepted_codec_versions"] == (versions or [20, 21, 22, 23, 24])
+    assert checked["limits"]["accepted_codec_versions"] == (versions or [20, 21, 22, 23, 24, 25])
     assert checked["frame_count"] == 100 and path.read_bytes() == original
 
 
@@ -196,7 +199,7 @@ def test_valid24_is_normal_completed_only_never_historical21_recovery(api, close
 def test_unsupported_versions_stay_rejected(api, closed_cache):
     catalog, completed = api
     output, cache, bindings, save = closed_cache
-    record = save(25)
+    record = save(26)
     with pytest.raises(ValueError, match="unsupported cache codec"):
         catalog.perception_catalog(output, **bindings)
     for validator in [completed.validate_cache21, completed.validate_completed_cache]:

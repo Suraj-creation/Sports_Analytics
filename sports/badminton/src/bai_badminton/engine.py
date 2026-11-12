@@ -972,7 +972,22 @@ class BadmintonMatchEngine:
             self._sx.append(np.nan)
             self._sy.append(np.nan)
             self._svis.append(False)
-        self._sconf.append(fp.shuttle_conf)
+        # A selected current heatmap alternative has its own model support.
+        # Keep the argmax support on FramePerception as raw provenance; do not
+        # lend that different peak's confidence to the associated trajectory.
+        selected_support = fp.shuttle_conf
+        selected_evidence = fp.shuttle_observation
+        associated_selection = (
+            selected_evidence is not None
+            and selected_evidence.schema == "badminton-shuttle-association:v3"
+        )
+        if associated_selection:
+            selected_support = (
+                selected_evidence.selected_model_support
+                if selected_evidence.selected_model_support is not None
+                else 0.0
+            )
+        self._sconf.append(selected_support)
         self._temporal_valid.append(
             fp.scene == "main" and (not tracked or G is not None) and (sxy is None or bool(np.isfinite(sxy).all()))
         )
@@ -1152,9 +1167,11 @@ class BadmintonMatchEngine:
                 and (detector_coverage_valid or participant_frame.participants)
                 else None,
                 moving=movement,
-                shuttle_visible=True if fp.shuttle_xy is not None and fp.shuttle_conf >= 0.5 else None,
+                shuttle_visible=True
+                if (sxy if associated_selection else fp.shuttle_xy) is not None and selected_support >= 0.5
+                else None,
                 shuttle_position=(sxy[0] / self.cfg.frame_width, sxy[1] / self.cfg.frame_height)
-                if geometry_valid and sxy is not None and fp.shuttle_conf >= 0.5 and np.isfinite(sxy).all()
+                if geometry_valid and sxy is not None and selected_support >= 0.5 and np.isfinite(sxy).all()
                 else None,
             )
         )

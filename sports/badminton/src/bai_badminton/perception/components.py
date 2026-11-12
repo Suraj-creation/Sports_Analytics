@@ -457,7 +457,7 @@ def register_perception_components(registry: ComponentRegistry) -> None:
 
     def association(context: PerceptionContext, configuration: dict[str, Any]) -> ShuttleAssociationPort:
         result = CausalShuttleAssociation(fps=context.fps, **configuration.get("params", {}))
-        context.record_model("shuttle_association", "coobserved-static-hypotheses-v1@1")
+        context.record_model("shuttle_association", "coobserved-static-hypotheses-v1@2")
         context.record_runtime("shuttle_association", {"backend": "numpy-cpu", "weights": None})
         return result
 
@@ -465,9 +465,9 @@ def register_perception_components(registry: ComponentRegistry) -> None:
         ComponentContract(
             kind="shuttle_association",
             implementation=BASELINE_IMPLEMENTATIONS["shuttle_association"],
-            version="1",
+            version="2",
             input_schema="badminton-shuttle-candidates:v1",
-            output_schema="badminton-shuttle-association:v2",
+            output_schema="badminton-shuttle-association:v3",
             interface=ShuttleAssociationPort,
             context_type=PerceptionContext,
             supported_formats=frozenset({"singles", "doubles", "unknown"}),
@@ -480,6 +480,7 @@ def register_perception_components(registry: ComponentRegistry) -> None:
                 "backends": ["numpy-cpu"],
                 "required_evidence": ["bounded_heatmap_candidates"],
                 "optional_evidence": ["current_verified_image_registration"],
+                "selection": "retain_raw_argmax;unique_current_observed_alternative_after_static_contradiction",
                 "state_restore": "checkpoint_or_recompute_in_frame_order",
                 "score_semantics": "heuristic_support_not_calibrated_probability;experimental",
             },
