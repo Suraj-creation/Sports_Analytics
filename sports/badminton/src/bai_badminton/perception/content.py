@@ -631,12 +631,24 @@ def scene_change_from_dict(value: dict[str, Any], *, frame_idx: int | None = Non
         # A claimed ratio without a recorded history baseline cannot authorize
         # even a detector request; check arithmetic on this new evidence schema.
         for region in converted:
+            if region.features < 6 and any(
+                value is not None
+                for value in (region.discontinuity, region.adaptive_ratio, region.appearance_adaptive_ratio)
+            ):
+                raise ValueError("relative scene ratios require sufficient current feature support")
             for ratio_name, value_name, history_name in (
                 ("adaptive_ratio", "discontinuity", "previous_mean"),
                 ("appearance_adaptive_ratio", "median_patch_error", "appearance_previous_mean"),
             ):
                 ratio = getattr(region, ratio_name)
                 value, history = getattr(region, value_name), getattr(region, history_name)
+                # LK may retain a raw patch residual with too few features to
+                # support appearance continuity. Preserve that measurement,
+                # but match the observer's existing six-feature support gate:
+                # an unsupported current value has no adaptive ratio even
+                # when a sufficient prior history is still recorded.
+                if value_name == "median_patch_error" and region.features < 6:
+                    value = None
                 if (ratio is None) != (value is None or history is None) or (
                     ratio is not None and not isclose(ratio, value / max(1.0, history), rel_tol=1e-9, abs_tol=1e-9)
                 ):
