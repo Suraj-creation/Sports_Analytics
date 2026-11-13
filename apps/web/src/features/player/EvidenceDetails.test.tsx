@@ -1,11 +1,19 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EventLog } from "@/lib/events";
 import { usePlayback } from "@/stores/playback";
 import { useSession } from "@/stores/session";
 import { ev, SESSION } from "@/test/fixtures";
 import { playEvidence } from "./clip";
 import { EvidenceDetails } from "./EvidenceDetails";
+
+const sessionState = useSession.getState();
+const playbackState = usePlayback.getState();
+afterEach(() => {
+  cleanup();
+  useSession.setState(sessionState);
+  usePlayback.setState(playbackState);
+});
 
 describe("evidence directly below the player", () => {
   beforeEach(() => {
@@ -33,7 +41,7 @@ describe("evidence directly below the player", () => {
     usePlayback.getState().setFrame(100);
     render(<EvidenceDetails session={SESSION} />);
     expect(screen.getByText(/Analysis proxy frame 100/)).toHaveTextContent("Momota");
-    expect(screen.getByText(/Rally 3 · Not counted/)).toHaveTextContent("Winner unresolved");
+    expect(screen.getByText(/Candidate 1 · Not counted/)).toHaveTextContent("Winner unresolved");
     expect(screen.getByText(/frames 70–145/)).toBeVisible();
     expect(screen.getByRole("button", { name: "Next shot" })).toBeDisabled();
   });
@@ -51,4 +59,30 @@ describe("evidence directly below the player", () => {
     expect(listener).toHaveBeenCalledTimes(2);
     window.removeEventListener("bai:play-clip", listener);
   });
+});
+it("labels the actual second zero-number interval without treating the shared number as identity", () => {
+  const events = new EventLog();
+  events.apply([
+    ev("rally_end", 10, {
+      event_id: "candidate-a",
+      frame_end: 30,
+      payload: { official: false, rally_no: 0 },
+    }),
+    ev("rally_end", 100, {
+      event_id: "candidate-b",
+      frame_end: 120,
+      payload: { official: false, rally_no: 0 },
+    }),
+  ]);
+  useSession.setState({ events, eventsVersion: events.version });
+  usePlayback.setState({
+    frame: 110,
+    selection: { start: 100, end: 120, eventId: "candidate-b", label: "Candidate 2" },
+    clip: null,
+    video: null,
+  });
+  render(<EvidenceDetails session={SESSION} />);
+  expect(screen.getByText(/Candidate 2 · Not counted/)).toBeVisible();
+  expect(screen.getByText(/Now showing · Candidate 2/)).toBeVisible();
+  expect(screen.queryByText(/Rally 0/)).not.toBeInTheDocument();
 });

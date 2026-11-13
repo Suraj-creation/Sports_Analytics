@@ -1308,10 +1308,12 @@ class BadmintonMatchEngine:
                     )
                 )
         assigned_track_ids = {person.track_id for person in assigned.values()}
-        if geometry_valid:
+        if not fp.replay:
             # Missing/partial singles identity is independent of the number of
             # people previously seen. Preserve each unassigned visual track for
             # overlays, disjoint from named rows and named-player statistics.
+            # Image boxes remain observations while calibration is unavailable;
+            # only their court projection and participant claims are withheld.
             snapshots_by_track = {snapshot.track_id: snapshot for snapshot in snapshots.values()}
             for p in fp.persons:
                 if (
@@ -1323,7 +1325,11 @@ class BadmintonMatchEngine:
                 ):
                     continue
                 snapshot = snapshots_by_track.get(p.track_id)
-                court_xy = snapshot.court_xy if snapshot is not None and has_target_court_provenance(snapshot) else None
+                court_xy = (
+                    snapshot.court_xy
+                    if geometry_valid and snapshot is not None and has_target_court_provenance(snapshot)
+                    else None
+                )
                 self._track_out.append(
                     TrackSample(
                         frame_idx=fp.frame_idx,

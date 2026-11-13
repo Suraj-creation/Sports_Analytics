@@ -79,7 +79,11 @@ it("hides old cached counts and isolates a late old-generation response after re
     .mockResolvedValue({ rallies: 2 } as Analytics);
   useSession.setState({ session: { ...SESSION, meta: { analysis_revision: 1 } }, analyticsVersion: 0 });
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  client.setQueryData(analysisQueryKey("analytics", SESSION.session_id, 1), { rallies: 77 });
+  client.setQueryData(
+    analysisQueryKey("analytics", SESSION.session_id, 1),
+    { rallies: 77 },
+    { updatedAt: Date.now() - 3000 },
+  );
   const view = render(
     <QueryClientProvider client={client}>
       <Counts />
@@ -96,7 +100,8 @@ it("hides old cached counts and isolates a late old-generation response after re
   await act(async () => oldRequest.resolve({ rallies: 99 } as Analytics));
   await waitFor(() =>
     expect(client.getQueryData(analysisQueryKey("analytics", SESSION.session_id, 1))).toEqual({
-      rallies: 99,
+      // The abandoned observer's AbortSignal now cancels its pending result.
+      rallies: 77,
     }),
   );
   expect(screen.getByText("Waiting for current analysis")).toBeVisible();

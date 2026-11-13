@@ -2,6 +2,14 @@ import type { MediaInfo, PlayerId, Session } from "./types";
 
 export const fps = (m: MediaInfo | null | undefined) => (m ? m.fps_num / m.fps_den : 30);
 
+/** Candidate ordinals are presentation labels, never official scoring rally numbers. */
+export function rallyLabel(no: unknown, official = true, ordinal?: number): string {
+  if (official && typeof no === "number" && Number.isInteger(no) && no > 0) return `Rally ${no}`;
+  return ordinal != null && Number.isInteger(ordinal) && ordinal > 0
+    ? `Candidate ${ordinal}`
+    : "Rally candidate";
+}
+
 /** Display clock for a frame — the only place frames become human time in the UI. */
 export function clock(frame: number, m: MediaInfo | null | undefined, millis = false): string {
   const t = Math.max(0, frame) / fps(m);

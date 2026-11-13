@@ -159,9 +159,12 @@ def build(store: EventStore, tracks: TrackStore | None, fps: float) -> MatchAnal
     end = max((r.end for r in records), default=0)
     camera_contexts: dict[int, str | None] = {}
     detector_runs: dict[int, bool | None] = {}
+    # Spatial facts are consumed only by official strokes/rallies below. A
+    # provisional-only session must not scan Parquet camera history while
+    # holding the API's consistent event snapshot and blocking its writer.
     camera = _camera_validity(
         tracks, 0, end, contexts=camera_contexts, detector_runs=detector_runs
-    ) if tracks is not None else {}
+    ) if tracks is not None and any(r.official for r in records) else {}
     official = {s.get("event_id") for r in records if r.official for s in r.shots}
     # A stroke hypothesis is a match statistic only once an official rally owns it.
     for ev in store.query(types=["stroke"]):

@@ -1,6 +1,5 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
-import { useAnalysisQueryKey } from "@/lib/analysisQuery";
+import { useQuery } from "@tanstack/react-query";
+import { ANALYSIS_REFRESH_MS, useLiveAnalysisQueryKey } from "@/lib/analysisRefresh";
 import { api, req } from "@/lib/api";
 import type { PlayerId, Session } from "@/lib/types";
 import { useSession } from "@/stores/session";
@@ -28,30 +27,21 @@ interface SessionInsights {
 }
 
 export function useInsights(id: string) {
-  const version = useSession((s) => s.analyticsVersion);
-  const qc = useQueryClient();
-  useEffect(() => {
-    if (version > 0) void qc.invalidateQueries({ queryKey: ["insights", id] });
-  }, [id, qc, version]);
   return useQuery({
-    queryKey: useAnalysisQueryKey("insights", id),
-    queryFn: () => req<SessionInsights>(`/api/sessions/${encodeURIComponent(id)}/insights`),
+    queryKey: useLiveAnalysisQueryKey("insights", id),
+    queryFn: ({ signal }) =>
+      req<SessionInsights>(`/api/sessions/${encodeURIComponent(id)}/insights`, { signal }),
+    staleTime: ANALYSIS_REFRESH_MS,
   });
 }
 
 /** A zero default distance is not a measurement unless court-position samples exist. */
 export function useMeasuredMovement(session: Session, player: PlayerId) {
   const calibrated = useSession((s) => s.calibration !== null);
-  const version = useSession((s) => s.analyticsVersion);
-  const qc = useQueryClient();
-  useEffect(() => {
-    if (version > 0)
-      void qc.invalidateQueries({ queryKey: ["movement-evidence", session.session_id, player] });
-  }, [session.session_id, player, qc, version]);
   return useQuery({
-    queryKey: useAnalysisQueryKey("movement-evidence", session, player),
-    queryFn: () => api.heatmap(session.session_id, player, "presence"),
+    queryKey: useLiveAnalysisQueryKey("movement-evidence", session, player),
+    queryFn: ({ signal }) => api.heatmap(session.session_id, player, "presence", signal),
+    staleTime: ANALYSIS_REFRESH_MS,
     enabled: calibrated,
-    refetchInterval: session.status === "analysing" ? 5000 : false,
   });
 }

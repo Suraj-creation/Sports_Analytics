@@ -59,6 +59,11 @@ export function CalibratePage() {
   const H = prop.data?.height ?? session.data?.media?.height ?? 720;
   const ref = prop.data?.reference_points ?? {};
   const viewport = videoViewport(W, H, presentation?.width ?? W, presentation?.height ?? H, W, H);
+  const editingReady =
+    hls === "ready" &&
+    prop.data != null &&
+    !prop.isPending &&
+    seeded.current === `${sessionId}:${prop.data.frame}`;
 
   useEffect(() => {
     if (!video) return;
@@ -208,9 +213,8 @@ export function CalibratePage() {
         <div>
           <h1 className="text-lg font-semibold">Calibrate the court</h1>
           <p className="text-sm text-line-2">
-            The court is found automatically from its painted lines in every frame, for every camera. Adjust
-            it here only if the overlay is wrong: click each point on the floor where the lines meet, or drag
-            a point.
+            Inspect the proposed court against this frame. Automatic geometry can be incomplete or wrong.
+            Adjust it by clicking floor-line intersections or dragging a point.
           </p>
         </div>
       </div>
@@ -228,12 +232,12 @@ export function CalibratePage() {
               }
               const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
               setCursor({ x: p[0], y: p[1], px: e.clientX - r.left, py: e.clientY - r.top });
-              if (drag) setPoints((cur) => ({ ...cur, [drag]: p }));
+              if (editingReady && drag) setPoints((cur) => ({ ...cur, [drag]: p }));
             }}
             onPointerLeave={() => setCursor(null)}
             onPointerUp={() => setDrag(null)}
             onPointerDown={(e) => {
-              if (drag) return;
+              if (!editingReady || drag) return;
               const p = toImage(e.clientX, e.clientY);
               if (!p) return;
               const next = { ...points, [active]: p };
@@ -295,6 +299,7 @@ export function CalibratePage() {
                   className="cursor-grab"
                   onPointerDown={(e) => {
                     e.stopPropagation();
+                    if (!editingReady) return;
                     setHistory((h) => [...h.slice(-30), points]);
                     setDrag(id);
                     setActive(id);

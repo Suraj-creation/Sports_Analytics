@@ -1,14 +1,13 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import { Download, Play } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Empty, ErrorNote, PlayerDot, Spinner } from "@/components/ui";
 import { playEvidence } from "@/features/player/clip";
-import { useAnalysisQueryKey } from "@/lib/analysisQuery";
+import { ANALYSIS_REFRESH_MS, useLiveAnalysisQueryKey } from "@/lib/analysisRefresh";
 import { api, exportUrl } from "@/lib/api";
-import { CATEGORY_LABEL, clock, shortName } from "@/lib/format";
+import { CATEGORY_LABEL, clock, rallyLabel, shortName } from "@/lib/format";
 import type { PlayerId, Session } from "@/lib/types";
-import { useSession } from "@/stores/session";
 
 const REASON_LABEL: Record<string, string> = {
   length: "long rally",
@@ -26,14 +25,10 @@ const REASON_LABEL: Record<string, string> = {
 export function HighlightsTab({ session, selectedPlayer }: { session: Session; selectedPlayer?: PlayerId }) {
   const [localPlayer, setPlayer] = useState<PlayerId | undefined>();
   const player = selectedPlayer ?? localPlayer;
-  const v = useSession((s) => s.analyticsVersion);
-  const qc = useQueryClient();
-  useEffect(() => {
-    if (v > 0) void qc.invalidateQueries({ queryKey: ["highlights", session.session_id, player] });
-  }, [qc, session.session_id, player, v]);
   const q = useQuery({
-    queryKey: useAnalysisQueryKey("highlights", session, player),
-    queryFn: () => api.highlights(session.session_id, 12, player),
+    queryKey: useLiveAnalysisQueryKey("highlights", session, player),
+    queryFn: ({ signal }) => api.highlights(session.session_id, 12, player, signal),
+    staleTime: ANALYSIS_REFRESH_MS,
   });
 
   return (
@@ -82,7 +77,7 @@ export function HighlightsTab({ session, selectedPlayer }: { session: Session; s
                 ))}
               </div>
               <p className="text-sm text-line-2">
-                Rally {h.rally_no} · {clock(h.frame_start, session.media)}
+                {rallyLabel(h.rally_no)} · {clock(h.frame_start, session.media)}
                 {h.player && (
                   <>
                     {" · "}
@@ -117,10 +112,10 @@ export function HighlightsTab({ session, selectedPlayer }: { session: Session; s
               <div className="flex gap-1">
                 <button
                   type="button"
-                  aria-label={`Play rally ${h.rally_no}`}
+                  aria-label={`Play ${rallyLabel(h.rally_no).toLowerCase()}`}
                   className="grid size-8 place-items-center rounded-lg bg-line text-mat-deep hover:bg-white"
                   onClick={() => {
-                    playEvidence(h.frame_start, h.frame_end, `Rally ${h.rally_no}`, h.rally_id);
+                    playEvidence(h.frame_start, h.frame_end, rallyLabel(h.rally_no), h.rally_id);
                   }}
                 >
                   <Play className="size-4" />

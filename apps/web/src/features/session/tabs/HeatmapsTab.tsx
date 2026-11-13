@@ -1,9 +1,9 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Empty, ErrorNote, Spinner } from "@/components/ui";
 import { CourtView, prepareCanvas } from "@/features/court/geometry";
-import { useAnalysisQueryKey } from "@/lib/analysisQuery";
+import { ANALYSIS_REFRESH_MS, useLiveAnalysisQueryKey } from "@/lib/analysisRefresh";
 import { api } from "@/lib/api";
 import { PLAYER_HEX, shortName } from "@/lib/format";
 import type { Heatmap, PlayerId, Session } from "@/lib/types";
@@ -41,7 +41,6 @@ export function HeatmapsTab({
   const [kind, setKind] = useState(
     initialKind && KINDS.some((k) => k.id === initialKind) ? initialKind : "presence",
   );
-  const v = useSession((s) => s.analyticsVersion);
   const calibrated = useSession((s) => s.calibration != null);
   if (!calibrated) {
     return (
@@ -75,31 +74,18 @@ export function HeatmapsTab({
       <p className="text-sm text-line-2">{k?.hint}</p>
       <div className="grid gap-4 lg:grid-cols-2">
         {(selectedPlayer ? [selectedPlayer] : (["P1", "P2"] as PlayerId[])).map((pid) => (
-          <HeatmapCard key={pid} session={session} pid={pid} kind={kind} version={v} />
+          <HeatmapCard key={pid} session={session} pid={pid} kind={kind} />
         ))}
       </div>
     </div>
   );
 }
 
-function HeatmapCard({
-  session,
-  pid,
-  kind,
-  version,
-}: {
-  session: Session;
-  pid: PlayerId;
-  kind: string;
-  version: number;
-}) {
-  const qc = useQueryClient();
-  useEffect(() => {
-    if (version > 0) void qc.invalidateQueries({ queryKey: ["heatmap", session.session_id, pid, kind] });
-  }, [qc, session.session_id, pid, kind, version]);
+function HeatmapCard({ session, pid, kind }: { session: Session; pid: PlayerId; kind: string }) {
   const q = useQuery({
-    queryKey: useAnalysisQueryKey("heatmap", session, pid, kind),
-    queryFn: () => api.heatmap(session.session_id, pid, kind),
+    queryKey: useLiveAnalysisQueryKey("heatmap", session, pid, kind),
+    queryFn: ({ signal }) => api.heatmap(session.session_id, pid, kind, signal),
+    staleTime: ANALYSIS_REFRESH_MS,
   });
   return (
     <figure className="min-w-0 space-y-2">

@@ -10,7 +10,7 @@ import {
 } from "@/features/analytics/evidence";
 import { playEvidence } from "@/features/player/clip";
 import { api } from "@/lib/api";
-import { clock, fps as fpsOf, STROKE_LABEL, shortName } from "@/lib/format";
+import { clock, fps as fpsOf, rallyLabel, STROKE_LABEL, shortName } from "@/lib/format";
 import type { PlayerId, Session } from "@/lib/types";
 import { usePlayback } from "@/stores/playback";
 import { useSession } from "@/stores/session";
@@ -107,7 +107,7 @@ export function RalliesTab({
           key={r.id}
           rally={r}
           session={session}
-          label={r.official && r.no > 0 ? `Rally ${r.no}` : `Candidate ${rows.indexOf(r) + 1}`}
+          label={rallyLabel(r.no, r.official, rows.indexOf(r) + 1)}
           open={r.official && r.no > 0 && selectedRally === r.no}
         />
       ))}

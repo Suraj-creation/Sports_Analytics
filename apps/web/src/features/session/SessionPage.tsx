@@ -22,7 +22,7 @@ import { VideoStage } from "@/features/player/VideoStage";
 import { Timeline } from "@/features/timeline/Timeline";
 import { analysisRevision } from "@/lib/analysisQuery";
 import { api } from "@/lib/api";
-import { clock, fps as fpsOf, STATUS_LABEL, shortName } from "@/lib/format";
+import { clock, fps as fpsOf, rallyLabel, STATUS_LABEL, shortName } from "@/lib/format";
 import { frameClock } from "@/lib/frameClock";
 import type { PlayerId, Session } from "@/lib/types";
 import { usePlayback } from "@/stores/playback";
@@ -232,7 +232,13 @@ function SessionWorkspace({ session, search }: { session: Session; search: Analy
           event.key.toLowerCase() === "l"
             ? events.find((r) => r.frame_start > player.frame + 1)
             : events.filter((r) => r.frame_start < player.frame - 1).at(-1);
-        if (rally) playEvidence(rally.frame_start, rally.frame_end, `Rally ${rally.payload.rally_no}`);
+        if (rally)
+          playEvidence(
+            rally.frame_start,
+            rally.frame_end,
+            rallyLabel(rally.payload.rally_no, rally.payload.official !== false, events.indexOf(rally) + 1),
+            rally.event_id,
+          );
       }
       if (event.key.toLowerCase() === "f") {
         if (videoMode === "collapsed") flushSync(() => setVideoMode("standard"));

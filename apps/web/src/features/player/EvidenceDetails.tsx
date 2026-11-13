@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { evidenceRallies } from "@/features/analytics/evidence";
-import { clock, fps as fpsOf, shortName, strokeLabel } from "@/lib/format";
+import { clock, fps as fpsOf, rallyLabel, shortName, strokeLabel } from "@/lib/format";
 import type { Session } from "@/lib/types";
 import { usePlayback } from "@/stores/playback";
 import { useSession } from "@/stores/session";
@@ -60,7 +60,8 @@ export function EvidenceDetails({ session }: { session: Session }) {
           </p>
           {selectedRally && (
             <p className="mt-1 text-sm text-line-2">
-              Rally {selectedRally.no} · {selectedRally.official ? "Counted" : "Not counted"} ·{" "}
+              {rallyLabel(selectedRally.no, selectedRally.official, rows.indexOf(selectedRally) + 1)} ·{" "}
+              {selectedRally.official ? "Counted" : "Not counted"} ·{" "}
               {selectedRally.winner ? `${shortName(session, selectedRally.winner)} won` : "Winner unresolved"}
             </p>
           )}
@@ -110,7 +111,7 @@ export function EvidenceDetails({ session }: { session: Session }) {
       </div>
       {rally && (
         <p className="mt-3 border-t border-seam pt-3 text-xs text-line-2">
-          Now showing · Rally {rally.no}
+          Now showing · {rallyLabel(rally.no, rally.official, rows.indexOf(rally) + 1)}
           {current ? ` · ${strokeLabel(current.payload)}` : " · before the first recorded shot"}
           {current?.actors.player_id ? ` · ${shortName(session, current.actors.player_id)}` : ""}
         </p>

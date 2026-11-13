@@ -9,6 +9,7 @@ import {
   fps as fpsOf,
   OUTCOME_LABEL,
   playerColor,
+  rallyLabel,
   shortName,
   strokeLabel,
 } from "@/lib/format";
@@ -55,7 +56,13 @@ export function LiveFeed({ session }: { session: Session }) {
         <li key={e.event_id}>
           <button
             type="button"
-            onClick={() => playEventEvidence(e, session.media)}
+            onClick={() =>
+              playEventEvidence(
+                e,
+                session.media,
+                events.ofType("rally_end").findIndex((r) => r.event_id === e.event_id) + 1,
+              )
+            }
             aria-current={selection?.eventId === e.event_id ? "true" : undefined}
             className={clsx(
               "flex w-full items-start gap-3 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-stand-raised",
@@ -89,7 +96,7 @@ function FeedItem({ e, session }: { e: BaiEvent; session: Session }) {
             <span className="font-medium">
               {e.payload.official === false
                 ? "Exchange · match status unconfirmed"
-                : `Rally ${e.payload.rally_no} · ${w ? `${shortName(session, w)} wins` : "winner unclear"}`}
+                : `${rallyLabel(e.payload.rally_no)} · ${w ? `${shortName(session, w)} wins` : "winner unclear"}`}
             </span>
             {corrected && <span className="text-xs text-signal">corrected</span>}
             <span className="text-xs text-line-3">
@@ -97,7 +104,7 @@ function FeedItem({ e, session }: { e: BaiEvent; session: Session }) {
             </span>
           </span>
           <span className="block text-xs text-line-2">
-            {e.payload.n_shots ?? 0} shots
+            {e.payload.n_shots ?? 0} shot events
             {outcome && ` · shuttle ${OUTCOME_LABEL[outcome] ?? outcome}`}
             {e.band !== "confirmed" && ` · ${e.band}`}
           </span>

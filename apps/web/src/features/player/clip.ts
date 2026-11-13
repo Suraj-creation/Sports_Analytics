@@ -1,4 +1,4 @@
-import { fps as fpsOf, strokeLabel } from "@/lib/format";
+import { fps as fpsOf, rallyLabel, strokeLabel } from "@/lib/format";
 import type { BaiEvent, MediaInfo } from "@/lib/types";
 import { type EvidenceSelection, usePlayback } from "@/stores/playback";
 
@@ -37,12 +37,12 @@ export function playEvidence(start: number, end: number, label: string, eventId?
 }
 
 /** Known event previews retain identity, uncertainty and the canonical source interval. */
-export function playEventEvidence(event: BaiEvent, media: MediaInfo | null) {
+export function playEventEvidence(event: BaiEvent, media: MediaInfo | null, ordinal?: number) {
   const label =
     event.type === "stroke"
       ? strokeLabel(event.payload)
       : event.type === "rally_end"
-        ? `Rally ${event.payload.rally_no ?? ""}`.trim()
+        ? rallyLabel(event.payload.rally_no, event.payload.official !== false, ordinal)
         : event.type.replaceAll("_", " ");
   const end =
     event.frame_end > event.frame_start

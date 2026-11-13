@@ -1,22 +1,17 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { Empty, ErrorNote, Spinner } from "@/components/ui";
 import { useMeasuredMovement } from "@/features/analytics/useInsights";
-import { useAnalysisQueryKey } from "@/lib/analysisQuery";
+import { ANALYSIS_REFRESH_MS, useLiveAnalysisQueryKey } from "@/lib/analysisRefresh";
 import { api } from "@/lib/api";
 import { STROKE_LABEL, shortName } from "@/lib/format";
 import type { Analytics, PlayerId, PlayerStats, Session } from "@/lib/types";
-import { useSession } from "@/stores/session";
 
 export function useAnalytics(sessionId: string) {
-  const v = useSession((s) => s.analyticsVersion);
-  const qc = useQueryClient();
-  useEffect(() => {
-    if (v > 0) void qc.invalidateQueries({ queryKey: ["analytics", sessionId] });
-  }, [qc, sessionId, v]);
   return useQuery({
-    queryKey: useAnalysisQueryKey("analytics", sessionId),
-    queryFn: () => api.analytics(sessionId),
+    queryKey: useLiveAnalysisQueryKey("analytics", sessionId),
+    queryFn: ({ signal }) => api.analytics(sessionId, signal),
+    staleTime: ANALYSIS_REFRESH_MS,
   });
 }
 

@@ -1,4 +1,15 @@
-import type { EstimatedIndividualAnalyticsData, IndividualAnalyticsData, Analytics, AskAnswer, BaiEvent, Calibration, Heatmap, Highlight, Session, SessionRoster } from "./types";
+import type {
+  Analytics,
+  AskAnswer,
+  BaiEvent,
+  Calibration,
+  EstimatedIndividualAnalyticsData,
+  Heatmap,
+  Highlight,
+  IndividualAnalyticsData,
+  Session,
+  SessionRoster,
+} from "./types";
 
 let csrf: string | null = null;
 export const setCsrf = (t: string | null) => {
@@ -66,14 +77,18 @@ export const api = {
     req<{ last_seq: number; events: BaiEvent[] }>(
       `/api/sessions/${id}/events?${new URLSearchParams(Object.entries(q).map(([k, v]) => [k, String(v)]))}`,
     ),
-  estimatedIndividualAnalytics: (id: string) => req<EstimatedIndividualAnalyticsData>(`/api/sessions/${id}/estimated-individual-analytics`),
-  individualAnalytics: (id: string) => req<IndividualAnalyticsData>(`/api/sessions/${id}/individual-analytics`),
-  analytics: (id: string) => req<Analytics>(`/api/sessions/${id}/analytics`),
-  heatmap: (id: string, player: string, kind: string) =>
-    req<Heatmap>(`/api/sessions/${id}/heatmap?player=${player}&kind=${kind}`),
-  highlights: (id: string, k = 10, player?: string) =>
+  estimatedIndividualAnalytics: (id: string) =>
+    req<EstimatedIndividualAnalyticsData>(`/api/sessions/${id}/estimated-individual-analytics`),
+  individualAnalytics: (id: string) =>
+    req<IndividualAnalyticsData>(`/api/sessions/${id}/individual-analytics`),
+  analytics: (id: string, signal?: AbortSignal) =>
+    req<Analytics>(`/api/sessions/${id}/analytics`, { signal }),
+  heatmap: (id: string, player: string, kind: string, signal?: AbortSignal) =>
+    req<Heatmap>(`/api/sessions/${id}/heatmap?player=${player}&kind=${kind}`, { signal }),
+  highlights: (id: string, k = 10, player?: string, signal?: AbortSignal) =>
     req<{ highlights: Highlight[] }>(
       `/api/sessions/${id}/highlights?k=${k}${player ? `&player=${player}` : ""}`,
+      { signal },
     ),
   /** The court detected on one frame (`frame`; default: the first frame of `segment`). */
   calibrationProposal: (id: string, segment = 0, frame?: number) =>

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import { api } from "@/lib/api";
@@ -36,6 +36,53 @@ const reference: Record<string, [number, number]> = {
 const detected = Object.fromEntries(
   Object.entries(reference).map(([id, [x, y]]) => [id, [x * 20 + 10, y * 20 + 10]]),
 ) as Record<string, [number, number]>;
+
+it("ignores edits while a proposal is loading so initialization cannot erase a user's new history", async () => {
+  vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
+  vi.spyOn(api, "session").mockResolvedValue(SESSION);
+  let resolve!: (value: Awaited<ReturnType<typeof api.calibrationProposal>>) => void;
+  vi.spyOn(api, "calibrationProposal").mockImplementation(
+    () =>
+      new Promise((done) => {
+        resolve = done;
+      }),
+  );
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  clients.push(client);
+  const view = render(
+    <QueryClientProvider client={client}>
+      <CalibratePage />
+    </QueryClientProvider>,
+  );
+  await waitFor(() => expect(api.calibrationProposal).toHaveBeenCalled());
+  const svg = view.container.querySelector('svg[preserveAspectRatio="none"]');
+  const box = view.container.querySelector(".cursor-crosshair");
+  if (!svg || !box) throw new Error("Missing image editor");
+  vi.spyOn(svg, "getBoundingClientRect").mockReturnValue({
+    left: 0,
+    top: 0,
+    width: 1000,
+    height: 500,
+  } as DOMRect);
+  fireEvent(box, new MouseEvent("pointerdown", { bubbles: true, clientX: 250, clientY: 200 }));
+  expect(svg.querySelectorAll("circle")).toHaveLength(0);
+  await act(async () =>
+    resolve({
+      frame: 0,
+      width: 320,
+      height: 240,
+      reference_points: reference,
+      proposal: null,
+      current: null,
+    }),
+  );
+  await waitFor(() => expect(svg).toHaveAttribute("viewBox", "0 0 320 240"));
+  fireEvent(box, new MouseEvent("pointerdown", { bubbles: true, clientX: 250, clientY: 200 }));
+  expect(svg.querySelector("circle")).toHaveAttribute("cx", "80");
+  expect(view.getByRole("button", { name: /^Undo$/ })).toBeEnabled();
+  fireEvent.click(view.getByRole("button", { name: /^Undo$/ }));
+  expect(svg.querySelectorAll("circle")).toHaveLength(0);
+});
 
 it("maps calibration clicks into raw pixels and ignores presentation letterboxes", async () => {
   vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
