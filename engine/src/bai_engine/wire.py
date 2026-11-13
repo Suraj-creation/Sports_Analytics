@@ -38,7 +38,7 @@ def encode_tracks(samples: list[TrackSample], frame_from: int, frame_to: int) ->
     # Temporary visual tracks are deliberately separate from P1/P2 score identities.
     # Doubles and uncertain singles identities still have real boxes and poses.
     anonymous: dict[str, dict[str, list[Any]]] = {}
-    cam: dict[str, list[Any]] = {"f": [], "g": [], "h": [], "q": []}
+    cam: dict[str, list[Any]] = {"f": [], "g": [], "h": [], "q": [], "ctx": []}
     rackets: dict[str, list[Any]] = {key: [] for key in ("f", "t", "x", "y", "b", "c", "obs")}
     for s in samples:
         if s.obj is TrackObject.SHUTTLE:
@@ -60,17 +60,21 @@ def encode_tracks(samples: list[TrackSample], frame_from: int, frame_to: int) ->
             cam["g"].extend(s.cam if s.cam is not None else (0.0,) * 9)
             cam["h"].append(s.track_id)
             cam["q"].append(_r(s.conf, 3))
+            cam["ctx"].append(s.context_id)
         elif s.obj is TrackObject.PLAYER and s.visible and s.bbox is not None:
             target = players if s.player_id else anonymous
             identity = s.player_id or f"{s.participant_observation_id or 'track'}:{s.track_id}"
             p = target.setdefault(
                 identity,
-                {key: [] for key in ("f", "b", "k", "pf", "cx", "cy", "t", "c", "obs", "d", "m", "raw", "method")},
+                {key: [] for key in (
+                    "f", "b", "k", "pf", "cx", "cy", "t", "c", "obs", "d", "m", "raw", "method", "ctx"
+                )},
             )
             p["f"].append(s.frame_idx)
             p["t"].append(s.track_id)
             p["c"].append(_r(s.conf, 2))
             p["obs"].append(s.participant_observation_id)
+            p["ctx"].append(s.context_id)
             p["d"].append(s.detector_observed)
             p["m"].append(s.detector_matched)
             p["raw"].append(s.raw_track_id)

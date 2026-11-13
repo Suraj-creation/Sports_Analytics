@@ -15,6 +15,7 @@ Model definition vendored from qaz812345/TrackNetV3 (MIT License, Copyright (c) 
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import marshal
@@ -245,6 +246,10 @@ class TrackNetV3:
             raise ValueError(f"unsupported TrackNet backend {backend!r}")
         if precision not in ("fp32", "fp16"):
             raise ValueError(f"unsupported TrackNet precision {precision!r}")
+        if not np.isfinite(threshold) or not 0 <= threshold <= 1:
+            raise ValueError("TrackNet threshold must be finite and in [0, 1]")
+        if type(batch) is not int or batch < 1:
+            raise ValueError("TrackNet batch must be a positive integer")
         # Registry callers supply their verified private snapshot. Direct callers
         # retain the legacy path API and may require an expected integrity pin.
         # Hashing is not publisher authentication or protection from unsafe pickle
@@ -271,12 +276,14 @@ class TrackNetV3:
             ckpt = torch.load(weights, map_location="cpu", weights_only=False)
         p = ckpt.get("param_dict", {})
         self.seq_len = int(p.get("seq_len", 8))
+        if self.seq_len < 1:
+            raise ValueError("TrackNet checkpoint sequence length must be positive")
         self.bg_mode = str(p.get("bg_mode", "concat"))
         if self.bg_mode != "concat":
             raise ValueError(f"unsupported TrackNetV3 bg_mode {self.bg_mode!r} (expected 'concat')")
         self.in_dim = (self.seq_len + 1) * 3
         self.threshold = threshold
-        self.batch = max(1, batch)
+        self.batch = batch
         self.backend = backend
         self.bg = BackgroundModel()
         model = _build_torch_model(self.in_dim, self.seq_len)
@@ -449,7 +456,10 @@ class TrackNetV3:
         path.parent.mkdir(parents=True, exist_ok=True)
         dummy = torch.zeros(1, self.in_dim, HEIGHT, WIDTH)
         torch.onnx.export(
-            self._torch.float().cpu(),
+            # Module.float()/cpu() mutate in place. Exporting an active CUDA
+            # detector must not silently move subsequent inference to CPU or
+            # invalidate its recorded precision/device provenance.
+            copy.deepcopy(self._torch).float().cpu(),
             dummy,
             str(path),
             input_names=["frames"],
@@ -538,6 +548,11 @@ class TrackNetV3:
             raise ValueError("one shuttle mask is required per frame")
         if shots is not None and len(shots) != len(frames_bgr):
             raise ValueError("one camera-shot ID is required per frame")
+        shape = frames_bgr[0].shape
+        if len(shape) != 3 or shape[2] != 3 or min(shape[:2]) < 1:
+            raise ValueError("TrackNet frames must be nonempty HWC BGR images")
+        if any(frame.shape != shape or frame.dtype != np.uint8 for frame in frames_bgr):
+            raise ValueError("TrackNet frames must have one resolution and uint8 BGR storage")
         L = self.seq_len
         step = L if step is None else max(1, min(step, L))
         shots = shots or [0] * len(frames_bgr)
@@ -548,7 +563,7 @@ class TrackNetV3:
         n = len(small)
         acc = np.zeros((n, HEIGHT, WIDTH), np.float32)
         cnt = np.zeros(n, np.float32)
-        windows, spans = [], []
+        spans = []
         # A temporal network must never see frames from different camera shots
         # in one input. Pad only within each shot, including very short tails.
         boundaries = [0, *[i for i in range(1, n) if shots[i] != shots[i - 1]], n]
@@ -558,14 +573,25 @@ class TrackNetV3:
                 starts.append(max(lo, hi - L))
             for s0 in starts:
                 idx = [min(s0 + j, hi - 1) for j in range(L)]
-                bg = self.bg.get(shots[s0], small[s0])
+                spans.append(idx)
+        for b in range(0, len(spans), self.batch):
+            batch_spans = spans[b : b + self.batch]
+            # Construct only the current batch. Retaining every RGB temporal
+            # stack until all forwards finish defeats the configured batch's
+            # host-memory bound, especially during overlapping refinement.
+            windows = []
+            for idx in batch_spans:
+                bg = self.bg.get(shots[idx[0]], small[idx[0]])
                 stack = np.concatenate([bg[None], np.stack([small[i] for i in idx])], axis=0)
                 windows.append(np.moveaxis(stack, -1, 1).reshape(self.in_dim, HEIGHT, WIDTH))
-                spans.append(idx)
-        for b in range(0, len(windows), self.batch):
-            x = np.stack(windows[b : b + self.batch]).astype(np.float32) / 255.0
+            x = np.stack(windows).astype(np.float32) / 255.0
             hms = self._forward(x)  # (B, L, H, W)
-            for win, idx in zip(hms, spans[b : b + self.batch], strict=True):
+            expected_shape = (len(batch_spans), L, HEIGHT, WIDTH)
+            if hms.shape != expected_shape or not np.isfinite(hms).all():
+                raise ValueError(
+                    f"TrackNet returned invalid heatmaps; expected finite {expected_shape}, got {hms.shape}"
+                )
+            for win, idx in zip(hms, batch_spans, strict=True):
                 seen: set[int] = set()
                 for j, i in enumerate(idx):
                     if i in seen:  # padded tail repeats the last frame

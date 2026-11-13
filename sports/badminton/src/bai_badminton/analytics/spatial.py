@@ -9,12 +9,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from itertools import pairwise
+from typing import Any
 
 import numpy as np
 
 from bai_badminton.court import HALF_LEN, WIDTH_DOUBLES
 
-METHOD = "court_path_v2"
+METHOD = "court_path_v3_observed_context"
 MIN_COURT_QUALITY = 0.6
 MAX_GAP_S = 0.25
 MAX_SPEED_M_S = 12.0
@@ -24,6 +25,23 @@ JITTER_M = 0.05
 
 def court_point_valid(x: float, y: float) -> bool:
     return bool(np.isfinite([x, y]).all() and abs(x) <= WIDTH_DOUBLES / 2 + 0.35 and abs(y) <= HALF_LEN + 0.75)
+
+
+def observed_player_row(row: dict[str, Any]) -> bool:
+    """A current person match, never a visible tracker carry or legacy unknown."""
+    score = row.get("conf")
+    x, y = row.get("court_x"), row.get("court_y")
+    return bool(
+        row.get("visible") is True
+        and row.get("detector_observed") is True
+        and row.get("detector_matched") is True
+        and isinstance(score, (float, int))
+        and not isinstance(score, bool)
+        and np.isfinite(score)
+        and 0.5 <= score <= 1
+        and x is not None and y is not None
+        and court_point_valid(x, y)
+    )
 
 
 @dataclass
@@ -74,11 +92,18 @@ def movement(
     track_ids: list[int],
     valid: list[bool],
     fps: float,
+    *,
+    contexts: list[object] | None = None,
+    continuous_from_previous: list[bool] | None = None,
 ) -> Movement:
     """Return a median-smoothed, 5 Hz path with explicit continuous observation support."""
     pts = np.asarray(xy, dtype=float).reshape(-1, 2)
     if not (len(pts) == len(frames) == len(track_ids) == len(valid)):
         raise ValueError("spatial sample arrays must have equal lengths")
+    if contexts is not None and len(contexts) != len(pts):
+        raise ValueError("spatial contexts must align with sample arrays")
+    if continuous_from_previous is not None and len(continuous_from_previous) != len(pts):
+        raise ValueError("spatial continuity must align with sample arrays")
     if not np.isfinite(fps) or fps <= 0:
         raise ValueError("fps must be finite and positive")
     out = Movement(np.empty((0, 2)), [])
@@ -95,7 +120,11 @@ def movement(
             continuous = (
                 accepted
                 and track_ids[i] == track_ids[j]
-                and frames[i] == frames[j] + 1
+                and (contexts is None or (contexts[i] is not None and contexts[i] == contexts[j]))
+                and (
+                    frames[i] == frames[j] + 1
+                    or (continuous_from_previous is not None and continuous_from_previous[i])
+                )
                 and 0 < dt <= MAX_GAP_S
                 and float(np.linalg.norm(pts[i] - pts[j])) <= MAX_SPEED_M_S * dt
             )

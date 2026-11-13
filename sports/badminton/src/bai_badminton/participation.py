@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections import Counter, deque
 from dataclasses import dataclass
+from math import isfinite
 from uuid import uuid4
 
 import numpy as np
@@ -108,12 +109,22 @@ class ParticipantTracker:
         instance_id: str | None = None,
     ) -> None:
         if (
-            frame_height <= 0
+            isinstance(frame_height, bool)
+            or not isfinite(frame_height)
+            or frame_height <= 0
+            or type(entry_frames) is not int
             or entry_frames < 1
+            or type(exit_frames) is not int
             or exit_frames < 1
+            or type(substitution_window_frames) is not int
             or substitution_window_frames < 0
+            or isinstance(fps, bool)
+            or not isfinite(fps)
             or fps <= 0
+            or isinstance(min_confidence, bool)
+            or not isfinite(min_confidence)
             or not 0 <= min_confidence <= 1
+            or type(max_tracks) is not int
             or max_tracks < 4
         ):
             raise ValueError("invalid participation tracker configuration")
@@ -132,6 +143,7 @@ class ParticipantTracker:
         self._first_coverage_frame: int | None = None
         self._tracks: dict[int, _Track] = {}
         self._pending: dict[int, tuple[int, int, int]] = {}
+        self._observation_index = 0
         self._recent_exits: deque[_Exit] = deque(maxlen=max_tracks)
         self._recent_entries: deque[_Entry] = deque(maxlen=max_tracks)
         # Ephemeral visual descriptors, bounded and never emitted in events.
@@ -228,9 +240,20 @@ class ParticipantTracker:
     ) -> ParticipantFrame:
         """Only count absence on frames that actually ran a reliable detector.
 
+        Explicit detector-matched false rows are estimates: they can display an
+        existing episode but cannot establish entry, renew appearance or reset
+        observed absence. Entry counts consecutive detector observations rather
+        than consecutive video frames, so scheduled carries do not confirm or
+        break a pending entry. Legacy rows with an absent freshness flag retain
+        their historical caller-supplied coverage semantics.
+
         If absence_valid is omitted, coverage_valid supplies the legacy behavior.
         A true absence flag never overrides unavailable overall coverage.
         """
+        if type(frame_idx) is not int or frame_idx < 0:
+            raise ValueError("frame must be a nonnegative canonical integer")
+        if type(coverage_valid) is not bool or (absence_valid is not None and type(absence_valid) is not bool):
+            raise ValueError("participation coverage flags must be booleans")
         if frame_idx <= self._last_frame:
             raise ValueError("frames must be strictly increasing")
         self._last_frame = frame_idx
@@ -243,8 +266,6 @@ class ParticipantTracker:
             return ParticipantFrame(
                 frame_idx, self.instance_id, ambiguous_track_ids=ambiguous, capacity_limited=limited
             )
-        if self._first_coverage_frame is None:
-            self._first_coverage_frame = frame_idx
         seen_ids = set(counts)
         # Untracked or contradictory observations might be any missing person.
         # They do not prove that any participant left the selected court.
@@ -263,11 +284,19 @@ class ParticipantTracker:
             and p.bbox[2] > p.bbox[0]
             and p.bbox[3] > p.bbox[1]
         }
+        fresh = {tid: p for tid, p in valid.items() if p.detector_matched is not False}
+        # A detector-run empty frame is also a lifecycle observation. Unknown
+        # coverage and carry-only calls are never extra positive/negative votes.
+        observed_call = absence_valid is True or bool(fresh)
+        if observed_call:
+            if self._first_coverage_frame is None:
+                self._first_coverage_frame = frame_idx
+            self._observation_index += 1
         events: list[ParticipationEvent] = []
         exited = False
         for track_id, track in list(self._tracks.items()):
-            if track_id in valid:
-                p = valid[track_id]
+            if track_id in fresh:
+                p = fresh[track_id]
                 track.side, track.confidence, track.missing = self._side(p), float(p.conf), 0
                 signature = self._appearance(p)
                 if signature is not None:
@@ -284,21 +313,26 @@ class ParticipantTracker:
                         )
                     del self._tracks[track_id]
                     exited = True
-        # Only consecutive confident observations can establish a new hypothesis.
-        self._pending = {tid: item for tid, item in self._pending.items() if tid in valid and tid not in self._tracks}
+        # Only consecutive confident detector observations establish a birth.
+        # Retain candidates unchanged through scheduled carry frames, but a
+        # current detector miss/contradiction breaks their observation streak.
+        if observed_call:
+            self._pending = {
+                tid: item for tid, item in self._pending.items() if tid in fresh and tid not in self._tracks
+            }
         entered: list[_Track] = []
-        for tid in sorted(valid):
+        for tid in sorted(fresh):
             if tid in self._tracks:
                 continue
-            count, last, first = self._pending.get(tid, (0, frame_idx - 1, frame_idx))
-            if last == frame_idx - 1:
+            count, last, first = self._pending.get(tid, (0, self._observation_index - 1, frame_idx))
+            if last == self._observation_index - 1:
                 count += 1
             else:
                 count, first = 1, frame_idx
-            self._pending[tid] = (count, frame_idx, first)
+            self._pending[tid] = (count, self._observation_index, first)
             if count < self.entry_frames or len(self._tracks) >= self.max_tracks:
                 continue
-            p = valid[tid]
+            p = fresh[tid]
             pid = f"participant-{self.instance_id}-{self._next_id:06d}"
             self._next_id += 1
             track = _Track(
@@ -351,7 +385,9 @@ class ParticipantTracker:
                     self._recent_entries.remove(new[0])
                     self._recent_exits.remove(old[0])
         observations = tuple(
-            ParticipantObservation(t.participant_id, tid, t.side, t.confidence, t.user_identity)
+            ParticipantObservation(
+                t.participant_id, tid, self._side(valid[tid]), float(valid[tid].conf), t.user_identity
+            )
             for tid, t in sorted(self._tracks.items())
             if tid in valid
         )

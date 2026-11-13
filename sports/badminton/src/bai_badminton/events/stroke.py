@@ -218,34 +218,50 @@ def _sig(z: float) -> float:
 
 
 def jump_features(
-    ankles_y: np.ndarray, hips_y: np.ndarray, heights: np.ndarray, contact_idx: int
+    ankles_y: np.ndarray, hips_y: np.ndarray, heights: np.ndarray, contact_idx: int, *, fps: float = 30.0
 ) -> dict[str, float] | None:
     """Jump evidence from pose around a contact.
 
     ``ankles_y``: (n, 2) left/right ankle image y; ``hips_y``: (n,) hip-centre y; ``heights``: (n,)
-    body heights (px). Window convention: baseline = frames [-20, -8] before contact, jump window
-    = [-6, +6].  Image y grows downward, so a lift is ``baseline_y - y``.
+    body heights (px). At 30 FPS the baseline is [-20, -8) frames and the action
+    window is [-6, +6]; the same durations are preserved at other FPS values.
+    Image y grows downward, so a lift is ``baseline_y - y``.
     """
+    ankles_y = np.asarray(ankles_y, dtype=float)
+    hips_y = np.asarray(hips_y, dtype=float)
+    heights = np.asarray(heights, dtype=float)
     n = len(hips_y)
-    b0, b1 = max(0, contact_idx - 20), max(0, contact_idx - 8)
-    w0, w1 = max(0, contact_idx - 6), min(n, contact_idx + 7)
-    if b1 - b0 < 3 or w1 - w0 < 3:
+    if ankles_y.shape != (n, 2) or hips_y.shape != (n,) or heights.shape != (n,):
+        raise ValueError("jump features require aligned ankle, hip and body-height arrays")
+    if type(contact_idx) is not int or not 0 <= contact_idx < n:
         return None
-    h = float(np.nanmedian(heights[b0:w1]))
-    if not np.isfinite(h) or h <= 1:
+    if not math.isfinite(fps) or fps <= 0:
+        raise ValueError("jump evidence FPS must be positive and finite")
+    baseline_far = max(1, round(20 * fps / 30))
+    baseline_near = max(1, round(8 * fps / 30))
+    action_half = max(1, round(6 * fps / 30))
+    b0, b1 = max(0, contact_idx - baseline_far), max(0, contact_idx - baseline_near)
+    w0, w1 = max(0, contact_idx - action_half), min(n, contact_idx + action_half + 1)
+    observed = np.isfinite(ankles_y).all(axis=1) & np.isfinite(hips_y) & np.isfinite(heights) & (heights > 1)
+    baseline = np.flatnonzero(observed[b0:b1]) + b0
+    action = np.flatnonzero(observed[w0:w1]) + w0
+    # Window length alone cannot supply a baseline. Require actual complete
+    # anatomy in both intervals, using the existing three-sample minimum.
+    if len(baseline) < 3 or len(action) < 3:
         return None
-    base_l = np.nanmedian(ankles_y[b0:b1, 0])
-    base_r = np.nanmedian(ankles_y[b0:b1, 1])
-    lift_l = (base_l - np.nanmin(ankles_y[w0:w1, 0])) / h
-    lift_r = (base_r - np.nanmin(ankles_y[w0:w1, 1])) / h
+    h = float(np.median(heights[np.concatenate((baseline, action))]))
+    base_l = np.median(ankles_y[baseline, 0])
+    base_r = np.median(ankles_y[baseline, 1])
+    lift_l = (base_l - np.min(ankles_y[action, 0])) / h
+    lift_r = (base_r - np.min(ankles_y[action, 1])) / h
     if not (np.isfinite(lift_l) and np.isfinite(lift_r)):
         return None
-    hip_base = np.nanmedian(hips_y[b0:b1])
-    hip_lift = (hip_base - np.nanmin(hips_y[w0:w1])) / h
+    hip_base = np.median(hips_y[baseline])
+    hip_lift = (hip_base - np.min(hips_y[action])) / h
     return {
         "lift_min": float(min(lift_l, lift_r)),
         "lift_max": float(max(lift_l, lift_r)),
-        "hip_lift": float(hip_lift) if np.isfinite(hip_lift) else 0.0,
+        "hip_lift": float(hip_lift),
     }
 
 

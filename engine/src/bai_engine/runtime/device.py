@@ -129,6 +129,10 @@ def ort_runtime(backend: str, session: Any) -> dict[str, Any]:
             (key for key, provider in expected.items() if providers and providers[0] == provider), None
         ),
         "backend_fallback": not providers or providers[0] != expected[backend],
+        # Providers report initialized priority, not the placement of every
+        # graph node. CPU partitioning may coexist with an active CUDA/TRT EP.
+        "node_placement_verified": False,
+        "execution_evidence": "initialized_provider_priority",
     }
 
 

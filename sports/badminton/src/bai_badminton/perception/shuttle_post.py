@@ -13,6 +13,7 @@ on a window that extends ``MAX_GAP + ANCHOR`` frames beyond the frames it finali
 from __future__ import annotations
 
 from dataclasses import dataclass
+from itertools import pairwise
 
 import numpy as np
 from numpy.typing import NDArray
@@ -40,10 +41,17 @@ class Track:
     def from_arrays(cls, x: F, y: F, vis: B, conf: F | None = None) -> Track:
         x = np.asarray(x, np.float64).copy()
         y = np.asarray(y, np.float64).copy()
-        vis = np.asarray(vis, bool) & np.isfinite(x) & np.isfinite(y)
+        visible = np.asarray(vis, bool)
+        if x.ndim != 1 or y.shape != x.shape or visible.shape != x.shape:
+            raise ValueError("shuttle coordinates and visibility must be aligned one-dimensional frame arrays")
+        vis = visible & np.isfinite(x) & np.isfinite(y)
         x[~vis] = np.nan
         y[~vis] = np.nan
         c = np.zeros_like(x) if conf is None else np.asarray(conf, np.float64).copy()
+        if c.shape != x.shape:
+            raise ValueError("shuttle support must contain one value per frame")
+        if not np.isfinite(c[vis]).all() or np.any((c[vis] < 0) | (c[vis] > 1)):
+            raise ValueError("visible shuttle support must be finite and in [0, 1]")
         c[~vis] = 0.0
         return cls(x=x, y=y, vis=vis, conf=c, interp=np.zeros_like(vis))
 
@@ -135,11 +143,27 @@ def fill_gaps(
         else:
             fx = np.interp(targets, ks, t.x[before + after])
             fy = np.interp(targets, ks, t.y[before + after])
+        # A plausible endpoint average does not bound a cubic spline's local
+        # overshoot. Apply the same configured speed gate to every proposed
+        # edge, including both observed anchors, before exposing any context.
+        path_x = np.concatenate(([t.x[b]], fx, [t.x[a]]))
+        path_y = np.concatenate(([t.y[b]], fy, [t.y[a]]))
+        if (
+            not np.isfinite(path_x).all()
+            or not np.isfinite(path_y).all()
+            or np.any(np.hypot(np.diff(path_x), np.diff(path_y)) > max_speed)
+        ):
+            continue
+        support = t.conf[before + after]
+        if not np.isfinite(support).all():
+            continue
         x[s : e + 1] = fx
         y[s : e + 1] = fy
         vis[s : e + 1] = True
         interp[s : e + 1] = True
-        conf[s : e + 1] = filled_conf
+        # This remains an estimated support score, never another observation;
+        # reconstruction cannot manufacture stronger evidence than its anchors.
+        conf[s : e + 1] = min(filled_conf, float(support.min()))
     return Track(x=x, y=y, vis=vis, conf=conf, interp=interp)
 
 
@@ -183,7 +207,7 @@ def process(t: Track, *, break_before: B | None = None) -> Track:
 
     result = Track(t.x.copy(), t.y.copy(), t.vis.copy(), t.conf.copy(), t.interp.copy())
     edges = [0, *starts.tolist(), len(t)]
-    for lo, hi in zip(edges[:-1], edges[1:], strict=True):
+    for lo, hi in pairwise(edges):
         part = Track(t.x[lo:hi], t.y[lo:hi], t.vis[lo:hi], t.conf[lo:hi], t.interp[lo:hi])
         filtered = fill_gaps(remove_spikes(part))
         result.x[lo:hi] = filtered.x

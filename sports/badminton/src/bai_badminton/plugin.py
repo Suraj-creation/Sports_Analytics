@@ -56,7 +56,7 @@ from bai_engine.store import EventStore, TrackStore
 log = get_logger(__name__)
 AUTO_CALIBRATION_MIN_SCORE = 0.6
 REF_FILE = "camera_ref.png"  # the frame the calibration was made on (lossless: its id is a content hash)
-CODEC_VERSION = 25  # bind associated current-candidate selections without replacing raw observations
+CODEC_VERSION = 26  # observed player lifecycle, bounded reconstruction and temporal-context policy
 MAX_ADJUST = 0.03  # a human calibration the court lines move by more than this (× frame width) is kept as is
 
 
@@ -639,12 +639,18 @@ class BadmintonSession:
                     TrackSample(
                         frame_idx=fp.frame_idx,
                         obj=TrackObject.PLAYER,
+                        context_id=f"{fp.shot_id}:{fp.content_epoch}:preview",
                         track_id=person.track_id,
                         player_id=None,
                         x=float((person.bbox[0] + person.bbox[2]) / 2),
                         y=float(person.bbox[3]),
                         bbox=box_tuple(person.bbox),
                         keypoints=keypoint_rows(person.kps),
+                        pose_frame_idx=person.pose_frame_idx,
+                        detector_observed=fp.detector_observed,
+                        detector_matched=person.detector_matched,
+                        raw_track_id=person.raw_track_id,
+                        identity_method=person.identity_method,
                         conf=person.conf,
                     )
                 )
@@ -1040,6 +1046,7 @@ class BadmintonSession:
     # ------------------------------------------------------------------ cache codec
     def _isolation_id(self) -> dict[str, Any]:
         policy = {
+            "engineering_policy": "observed-context-v1",
             "court": lines_ref_id(self.calibration.H) if self.calibration is not None else None,
             "mode": self.perception.mode,
             "fixed_camera": self._fixed_camera,
@@ -1161,7 +1168,7 @@ class BadmintonSession:
         d = msgpack.unpackb(data, raw=False)
         ref_id = self.perception.ref_id
         if (
-            d.get("v", 1) not in {17, 18, 19, 20, 21, 22, 23, 24, CODEC_VERSION}
+            d.get("v", 1) not in {17, 18, 19, 20, 21, 22, 23, 24, 25, CODEC_VERSION}
             or d.get("cr") != ref_id
             or d.get("ci") != self._isolation_id()
         ):

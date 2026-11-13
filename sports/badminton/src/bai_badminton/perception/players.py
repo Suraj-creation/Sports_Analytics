@@ -329,13 +329,39 @@ class PoseEstimator:
         self.tool = RTMPose(str(onnx_path), model_input_size=input_size)
         _swap_session(self.tool, onnx_path, providers)
 
-    def __call__(self, img: NDArray[np.uint8], boxes: list[NDArray[np.float64]]) -> list[NDArray[np.float64]]:
+    def __call__(
+        self, img: NDArray[np.uint8], boxes: list[NDArray[np.float64]]
+    ) -> list[NDArray[np.float64] | None]:
         if not boxes:
             return []
+        # Keep person order even when one upstream box is unusable. Never let a
+        # malformed crop shift the poses onto another doubles participant.
+        crops = [np.asarray(box, dtype=np.float64) for box in boxes]
+        selected = [
+            i
+            for i, box in enumerate(crops)
+            if box.shape == (4,) and np.isfinite(box).all() and (box[2:] > box[:2]).all()
+        ]
+        result: list[NDArray[np.float64] | None] = [None] * len(boxes)
+        if not selected:
+            return result
         # The checkpoint's MMDeploy pipeline specifies Normalize(to_rgb=True).
         # rtmlib performs the affine crop and normalisation, but no colour swap.
-        kps, scores = self.tool(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), bboxes=[b.tolist() for b in boxes])
-        return [np.concatenate([kps[i], scores[i][:, None]], axis=1).astype(np.float64) for i in range(len(boxes))]
+        kps, scores = self.tool(
+            cv2.cvtColor(img, cv2.COLOR_BGR2RGB), bboxes=[crops[i].tolist() for i in selected]
+        )
+        kps, scores = np.asarray(kps, dtype=np.float64), np.asarray(scores, dtype=np.float64)
+        if kps.shape != (len(selected), 17, 2) or scores.shape != (len(selected), 17):
+            raise ValueError(f"RTMPose expected COCO17 outputs per crop, got {kps.shape}, {scores.shape}")
+        for row, person_index in enumerate(selected):
+            pose = np.concatenate([kps[row], scores[row, :, None]], axis=1)
+            valid = np.isfinite(pose).all(axis=1) & (pose[:, 2] > 0)
+            if valid.any():
+                # A missing joint has zero support and no coordinates. Positive
+                # SimCC support is preserved as emitted, never calibrated/clipped.
+                pose[~valid] = [np.nan, np.nan, 0.0]
+                result[person_index] = pose
+        return result
 
 
 class PlayerTracker:
@@ -451,6 +477,7 @@ class PlayerPerception:
             "tracking_activation": TRACKER_ACTIVATION_POLICY,
             "court_membership": "court_origin_observed_continuity_v3",
             "scene_foreground": "court_origin_image_continuity_v2",
+            "pose_output": "coco17_per_crop_validated_v2",
         }
 
     def set_roi(self, roi: CourtROI | None) -> None:

@@ -204,6 +204,8 @@ class MatchAnalytics:
         track_ids: list[int] | None = None,
         valid: list[bool] | None = None,
         expected_frames: int | None = None,
+        contexts: list[object] | None = None,
+        continuous_from_previous: list[bool] | None = None,
     ) -> None:
         import numpy as np
 
@@ -213,7 +215,10 @@ class MatchAnalytics:
         if frames is None or track_ids is None or valid is None:
             return
         arr = np.asarray(court_xy, dtype=float).reshape(-1, 2)
-        measured = movement(arr, frames, track_ids, valid, self.fps)
+        measured = movement(
+            arr, frames, track_ids, valid, self.fps,
+            contexts=contexts, continuous_from_previous=continuous_from_previous,
+        )
         stats.distance_samples += measured.accepted_samples
         stats.distance_m += measured.distance_m
         stats.distance_observed_s += measured.observed_s
@@ -301,7 +306,10 @@ class MatchAnalytics:
         stroke_set = {s.get("stroke") for s in r.shots} - {None, "unknown"}
         reasons["variety"] = min(1.5, 0.3 * len(stroke_set))
         last = r.shots[-1] if r.shots else {}
-        if last.get("stroke") == "smash" and last.get("player_id") == r.winner:
+        if (
+            r.score_available and r.winner is not None
+            and last.get("stroke") == "smash" and last.get("player_id") == r.winner
+        ):
             reasons["smash_winner"] = 1.5
             cats.append("smash_winner")
         if any(s.get("subtype") == "jump_smash" for s in r.shots):

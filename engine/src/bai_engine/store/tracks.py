@@ -44,7 +44,7 @@ class TrackStore:
         if frame_end < frame_start:
             raise ValueError("frame_end < frame_start")
         if not table.schema.equals(TRACK_ARROW_SCHEMA, check_metadata=False):
-            table = table.cast(TRACK_ARROW_SCHEMA)
+            table = _conform(table)
         if table.num_rows:
             fmin = pc.min(table["frame_idx"]).as_py()
             fmax = pc.max(table["frame_idx"]).as_py()

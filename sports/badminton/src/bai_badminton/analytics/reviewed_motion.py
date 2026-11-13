@@ -9,11 +9,9 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from typing import Any
 
-import numpy as np
-
 from bai_badminton.analytics.match import MatchAnalytics
-from bai_badminton.analytics.rebuild import _camera_validity, rally_records
-from bai_badminton.analytics.spatial import court_point_valid
+from bai_badminton.analytics.rebuild import _camera_validity, _path_continuity, rally_records
+from bai_badminton.analytics.spatial import observed_player_row
 from bai_badminton.identity_review import IdentityReviewLedger
 from bai_engine.schema import TrackObject
 from bai_engine.schema.session import ParticipantRoster
@@ -30,7 +28,12 @@ def reviewed_motion(
         event.event_id for event in store.query(types=["rally_end"]) if event.payload.get("official") is True
     }
     records = [record for record in rally_records(store) if record.rally_id in official_ids]
-    camera = _camera_validity(tracks, 0, max((record.end for record in records), default=0))
+    camera_contexts: dict[int, str | None] = {}
+    detector_runs: dict[int, bool | None] = {}
+    camera = _camera_validity(
+        tracks, 0, max((record.end for record in records), default=0),
+        contexts=camera_contexts, detector_runs=detector_runs,
+    )
     positions: dict[int, dict[str, tuple[float, float]]] = defaultdict(dict)
     observed: dict[str, set[int]] = defaultdict(set)
     for record in records:
@@ -38,6 +41,8 @@ def reviewed_motion(
         groups: dict[tuple[str, str], list[dict]] = defaultdict(list)
         matches = []
         for row in rows:
+            if row.get("detector_observed") is False:
+                continue
             matching = [
                 review
                 for review in reviews
@@ -55,13 +60,9 @@ def reviewed_motion(
             valid = bool(
                 counts[person, frame] == 1
                 and camera.get(frame, False)
-                and row["visible"]
-                and row["conf"] is not None
-                and np.isfinite(row["conf"])
-                and row["conf"] >= 0.5
-                and row["court_x"] is not None
-                and row["court_y"] is not None
-                and court_point_valid(row["court_x"], row["court_y"])
+                and observed_player_row(row)
+                and row.get("context_id") is not None
+                and row["context_id"] == camera_contexts.get(frame)
             )
             groups[person, review.event_id].append({**row, "eligible": valid})
             if valid:
@@ -75,6 +76,8 @@ def reviewed_motion(
                 frames=[row["frame_idx"] for row in group],
                 track_ids=[row["track_id"] for row in group],
                 valid=[row["eligible"] for row in group],
+                contexts=[row.get("context_id") for row in group],
+                continuous_from_previous=_path_continuity(group, camera, camera_contexts, detector_runs),
             )
     expected = sum(record.end - record.start + 1 for record in records)
     movement = {}

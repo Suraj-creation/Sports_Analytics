@@ -64,12 +64,15 @@ class IdentityResolver:
 
         ``unresolved_tracks`` describes only the current frame, and is cleared on
         every call. Known tracks take precedence over side and detection confidence.
+        Explicit carried estimates can display an existing binding but cannot
+        initialize/rebind identity, renew its spatial lease or teach appearance.
+        Legacy observations with no freshness flag retain the older contract.
         """
         side_to_player = {v: k for k, v in ends.items()}
         out: dict[str, PersonObs] = {}
         counts = Counter(p.track_id for p in persons)
         self.unresolved_tracks = {track_id: "ambiguous" for track_id, n in counts.items() if n > 1}
-        persons = [p for p in persons if counts[p.track_id] == 1]
+        persons = [p for p in persons if counts[p.track_id] == 1 and p.track_id >= 0]
         # Preserve continuity even if the player crosses the net or changes ends.
         for p in persons:
             pid = self._track_to_player.get(p.track_id)
@@ -80,7 +83,11 @@ class IdentityResolver:
         # only a provisional hypothesis, never a user-confirmed identity.
         unbound = [p for p in persons if p.track_id not in self._track_to_player]
         if frame is not None and self.rebind_gap_frames > 0:
-            self._rebind(unbound, {p.track_id for p in persons}, frame)
+            self._rebind(
+                [p for p in unbound if p.detector_matched is not False],
+                {p.track_id for p in persons},
+                frame,
+            )
             for p in unbound:
                 pid = self._track_to_player.get(p.track_id)
                 if pid is not None and (pid not in out or p.conf > out[pid].conf):
@@ -90,7 +97,12 @@ class IdentityResolver:
         side_counts = Counter(self.side_of(p) for p in persons)
         for side, p in self.select_players(unbound).items():
             pid = side_to_player.get(side)
-            if pid is not None and pid not in bound_pids and side_counts[side] == 1:
+            if (
+                pid is not None
+                and pid not in bound_pids
+                and side_counts[side] == 1
+                and p.detector_matched is not False
+            ):
                 self._track_to_player[p.track_id] = pid
                 bound_pids.add(pid)
                 out[pid] = p
@@ -101,10 +113,10 @@ class IdentityResolver:
         for p in out.values():
             if p.track_id in self.rebound_tracks:
                 p.identity_method = "spatial_rebind_v1"
-            if frame is not None:
-                self._last_box[p.track_id] = (frame, np.asarray(p.bbox, dtype=np.float64))
+            if frame is not None and p.detector_matched is not False:
+                self._last_box[p.track_id] = (frame, np.asarray(p.bbox, dtype=np.float64).copy())
         for pid, p in out.items():
-            if p.appearance is not None:
+            if p.appearance is not None and p.detector_matched is not False:
                 prev = self._sig.get(pid)
                 self._sig[pid] = p.appearance if prev is None else (0.9 * prev + 0.1 * p.appearance).astype(np.float32)
         return out
@@ -142,7 +154,9 @@ class IdentityResolver:
         if len(self._sig) < 2:
             return None
         by_side = self.select_players(persons)
-        if len(by_side) < 2 or any(p.appearance is None for p in by_side.values()):
+        if len(by_side) < 2 or any(
+            p.appearance is None or p.detector_matched is False for p in by_side.values()
+        ):
             return None
 
         def d(a: NDArray[np.float32], b: NDArray[np.float32]) -> float:

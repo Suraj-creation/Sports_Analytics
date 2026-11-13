@@ -636,7 +636,10 @@ def register_domain_components(registry: ComponentRegistry) -> None:
             ComponentContract(
                 kind=kind,
                 implementation=BASELINE_IMPLEMENTATIONS[kind],
-                version="2" if kind in {"rally", "contact"} else "1",
+                version=(
+                    "3" if kind in {"rally", "contact"}
+                    else "2" if kind in {"identity", "stroke", "analytics"} else "1"
+                ),
                 input_schema=f"badminton-{kind}-input:v1",
                 output_schema=f"badminton-{kind}-output:v3" if kind == "contact" else f"badminton-{kind}-output:v1",
                 interface=interface,
@@ -684,7 +687,7 @@ def register_domain_components(registry: ComponentRegistry) -> None:
         ComponentContract(
             kind="contact",
             implementation="contact-motion-reliability-v1",
-            version="2",
+            version="3",
             input_schema="badminton-contact-input:v1",
             output_schema="badminton-contact-output:v3",
             interface=ContactInference,
@@ -704,7 +707,7 @@ def register_domain_components(registry: ComponentRegistry) -> None:
         ComponentContract(
             kind="contact",
             implementation="contact-evidence-v1",
-            version="1",
+            version="2",
             input_schema="badminton-contact-input:v1",
             output_schema="badminton-contact-output:v3",
             interface=ContactInference,
@@ -724,7 +727,7 @@ def register_domain_components(registry: ComponentRegistry) -> None:
         ComponentContract(
             kind="rally",
             implementation="rally-evidence-tracklets-v1",
-            version="2",
+            version="3",
             input_schema="badminton-rally-evidence:v2",
             output_schema="badminton-rally-output:v1",
             interface=AssociatedExitRallySegmentation,
@@ -754,7 +757,7 @@ def register_domain_components(registry: ComponentRegistry) -> None:
         ComponentContract(
             kind="rally",
             implementation="rally-evidence-v2",
-            version="3",
+            version="4",
             input_schema="badminton-rally-evidence:v2",
             output_schema="badminton-rally-output:v1",
             interface=EvidenceRallySegmentation,

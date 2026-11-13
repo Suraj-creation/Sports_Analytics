@@ -208,7 +208,7 @@ def score_frame(
     w: WindowObs, i: int, half: int = 3, *, motion_reliability: ContactMotionReliability | None = None
 ) -> ContactCandidate | None:
     t = w.shuttle
-    ok = t.vis & ~t.interp
+    ok = t.vis & ~t.interp & np.isfinite(t.x) & np.isfinite(t.y)
     if w.replay[i] or not ok[i]:
         return None
     lo, hi = _context_bounds(w, i, half)

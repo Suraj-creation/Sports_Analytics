@@ -59,7 +59,12 @@ from bai_badminton.events.contact import (
     ContactCandidate,
     build_contact_evidence,
 )
-from bai_badminton.events.contact_evidence import ContactEvidenceInputs, assess_contact_evidence
+from bai_badminton.events.contact_evidence import (
+    ContactEvidenceInputs,
+    Reliability,
+    assess_contact_evidence,
+    assess_flight_endpoint,
+)
 from bai_badminton.events.exchange_evidence import ContactParticipantContext, ContactParticipantObservation
 from bai_badminton.events.match_phase import (
     MatchPhaseTracker,
@@ -184,7 +189,7 @@ def _usable_camera_pose(fp: FramePerception, *, allow_alternate: bool = False) -
     return cam
 
 
-def camera_sample(fp: FramePerception) -> TrackSample:
+def camera_sample(fp: FramePerception, *, context_id: str | None = None) -> TrackSample:
     """The per-frame CAMERA track row: pose (reference px → frame px; ``None``: no court in view), the physical
     camera that shot the frame (``track_id``: 0 = the main camera, -1 = none) and the court-line fit's
     precision (``conf``)."""
@@ -192,6 +197,8 @@ def camera_sample(fp: FramePerception) -> TrackSample:
     return TrackSample(
         frame_idx=fp.frame_idx,
         obj=TrackObject.CAMERA,
+        context_id=context_id or f"{fp.shot_id}:{fp.content_epoch}",
+        detector_observed=fp.detector_observed,
         visible=cam is not None,
         cam=tuple(float(v) for v in cam.ravel()) if cam is not None else None,
         track_id=(
@@ -1257,10 +1264,10 @@ class BadmintonMatchEngine:
         for pid, buf in self._players.items():
             a = assigned.get(pid)
             buf["bbox"].append(a.bbox if a is not None else None)
-            buf["kps"].append(a.kps if a is not None and a.kps is not None else None)
+            buf["kps"].append(a.kps if a is not None and a.pose_frame_idx == fp.frame_idx else None)
             buf["court"].append(a.court_xy if a is not None else None)
             buf["track_id"].append(a.track_id if a is not None and a.track_id >= 0 else None)
-            buf["racket"].append(a.racket if a is not None else None)
+            buf["racket"].append(a.racket if a is not None and a.racket_frame_idx == fp.frame_idx else None)
         # identity-resolved track samples for the track store / live overlays (raw frame pixels)
         self._track_out.append(
             TrackSample(
@@ -1277,7 +1284,10 @@ class BadmintonMatchEngine:
         if geometry_valid and not fp.replay:
             for person in fp.persons:
                 racket = person.racket
-                if racket is None or person.track_id < 0 or person.detector_matched is not True:
+                if (
+                    racket is None or person.track_id < 0 or person.detector_matched is not True
+                    or person.racket_frame_idx != fp.frame_idx
+                ):
                     continue
                 radius = max(racket.axes) / 2
                 x, y = racket.center
@@ -1285,6 +1295,7 @@ class BadmintonMatchEngine:
                     TrackSample(
                         frame_idx=fp.frame_idx,
                         obj=TrackObject.RACKET,
+                        context_id=f"{fp.shot_id}:{fp.content_epoch}:{self._coordinate_epoch}",
                         track_id=person.track_id,
                         participant_observation_id=observation_by_track.get(person.track_id),
                         detector_matched=True,
@@ -1316,6 +1327,7 @@ class BadmintonMatchEngine:
                     TrackSample(
                         frame_idx=fp.frame_idx,
                         obj=TrackObject.PLAYER,
+                        context_id=f"{fp.shot_id}:{fp.content_epoch}:{self._coordinate_epoch}",
                         track_id=p.track_id if p.track_id >= 0 else -int(p.raw_track_id) - 2,
                         raw_track_id=p.raw_track_id,
                         detector_matched=p.detector_matched,
@@ -1340,6 +1352,7 @@ class BadmintonMatchEngine:
                 TrackSample(
                     frame_idx=fp.frame_idx,
                     obj=TrackObject.PLAYER,
+                    context_id=f"{fp.shot_id}:{fp.content_epoch}:{self._coordinate_epoch}",
                     track_id=p.track_id,
                     raw_track_id=p.raw_track_id,
                     detector_matched=p.detector_matched,
@@ -1359,7 +1372,10 @@ class BadmintonMatchEngine:
                 )
             )
         if tracked:
-            self._track_out.append(camera_sample(fp if reference_matches else replace(fp, cam=None, cam_lost=True)))
+            self._track_out.append(camera_sample(
+                fp if reference_matches else replace(fp, cam=None, cam_lost=True),
+                context_id=f"{fp.shot_id}:{fp.content_epoch}:{self._coordinate_epoch}",
+            ))
         self.scenes.add(fp.frame_idx, fp.scene, fp.head, fp.court_q)
 
     def _raw_xy(self, frame: int, xy: tuple[float, float] | None) -> tuple[float, float] | None:
@@ -1972,15 +1988,36 @@ class BadmintonMatchEngine:
         # Even an untrusted next-hit link remains an upper bound: its sample
         # must never be used to estimate the preceding shot's outgoing speed.
         motion_next_frame = next_frame
+        endpoint = assess_flight_endpoint(receiver.evidence if receiver is not None else None)
+        endpoint_frame = next_frame
+        endpoint_event = next(
+            (item.event.event_id for item in reversed(self._open_contacts) if item.cand is receiver), None
+        ) if receiver is not None else None
         if next_frame is not None and not self._same_segment(cand.frame, next_frame):
             next_frame, receiver = None, None
         elif receiver is not None and not self._same_segment(cand.frame, receiver.frame):
             receiver = None
+        if (
+            receiver is None or next_frame != receiver.frame or next_frame <= cand.frame
+            or receiver.evidence is None or receiver.evidence.inputs.frame != receiver.frame
+            or endpoint.reliability not in {Reliability.CONFIRMED, Reliability.PROBABLE}
+        ):
+            next_frame, receiver = None, None
         serve, serve_evidence = self._serve_context(cand.frame, initial=is_serve)
         bbox, _, court_xy = self._player_at(cand.player_id, cand.frame)
         context_source = "named_player" if cand.player_id is not None else None
         index = cand.frame - self._buf0
         current_snapshots = self._participant_frames[index] if 0 <= index < len(self._participant_frames) else {}
+        if cand.player_id is not None:
+            named = self._players.get(cand.player_id)
+            track = named["track_id"][index] if named is not None and 0 <= index < len(named["track_id"]) else None
+            matches = [snapshot for snapshot in current_snapshots.values() if snapshot.track_id == track]
+            if (
+                len(matches) != 1 or matches[0].detector_observed is not True
+                or matches[0].detector_matched is not True or not has_target_court_provenance(matches[0])
+                or not 0 <= index < len(self._geometry_valid) or not self._geometry_valid[index]
+            ):
+                bbox, court_xy, context_source = None, None, None
         # A camera cut can withhold P1/P2 identity while two current court
         # observations still support shot geometry. Use that evidence only for
         # classification; never restore names, score slots or credited players.
@@ -1997,7 +2034,7 @@ class BadmintonMatchEngine:
             and all(
                 has_target_court_provenance(snapshot)
                 and snapshot.detector_observed is True
-                and snapshot.detector_matched is not False
+                and snapshot.detector_matched is True
                 and np.asarray(snapshot.bbox).shape == (4,)
                 and np.isfinite(snapshot.bbox).all()
                 and snapshot.bbox[2] > snapshot.bbox[0]
@@ -2015,13 +2052,20 @@ class BadmintonMatchEngine:
                 snapshot = self._participant_frames[index].get(hypothesis.get("participant_id"))
                 if (
                     snapshot is not None
+                    and 0 <= index < len(self._geometry_valid) and self._geometry_valid[index]
+                    and 0 <= index < len(self._participant_identity_unresolved)
+                    and not self._participant_identity_unresolved[index]
+                    and has_target_court_provenance(snapshot)
                     and snapshot.detector_observed is True
-                    and snapshot.detector_matched is not False
+                    and snapshot.detector_matched is True
                     and snapshot.track_id == hypothesis.get("track_id")
                     and snapshot.observation_id is not None
                     and snapshot.observation_id == hypothesis.get("observation_id")
                 ):
-                    if np.asarray(snapshot.bbox).shape == (4,) and np.isfinite(snapshot.bbox).all():
+                    if (
+                        np.asarray(snapshot.bbox).shape == (4,) and np.isfinite(snapshot.bbox).all()
+                        and (snapshot.bbox[2:] > snapshot.bbox[:2]).all()
+                    ):
                         bbox = snapshot.bbox
                     if snapshot.court_xy is not None and np.isfinite(snapshot.court_xy).all():
                         court_xy = snapshot.court_xy
@@ -2059,6 +2103,14 @@ class BadmintonMatchEngine:
             vy_after_px_s=vy,
             hitter_side=hitter_side,
             contact_above_head=above_head,
+            extra={"flight_endpoint": {
+                "candidate_frame": endpoint_frame,
+                "event_id": endpoint_event,
+                "status": endpoint.reliability.value,
+                "reasons": list(endpoint.reasons),
+                "used": next_frame is not None,
+                "semantics": "supported_endpoint_estimate;not_verified_flight",
+            }},
         )
         pred = self.stroke_clf.predict(ctx)
         stroke, p = pred.top
@@ -2078,6 +2130,7 @@ class BadmintonMatchEngine:
             "hitter_court_xy": list(court_xy) if court_xy else None,
             "speed_px_s": speed,
             "flight_time_s": flight,
+            "flight_endpoint": ctx.extra["flight_endpoint"],
             "contact_event_id": c.event.event_id,
             "receiver_id": receiver.player_id if receiver else None,
         }
@@ -2086,7 +2139,7 @@ class BadmintonMatchEngine:
         if context_source is not None:
             payload["classification_context_source"] = context_source
             if context_source == "provisional_track_episode":
-                payload["classification_context_detector_scope"] = "frame_only_not_person_match"
+                payload["classification_context_detector_scope"] = "unique_current_person_match"
         if "participant_hypothesis" in c.event.payload:
             payload["participant_hypothesis"] = c.event.payload["participant_hypothesis"]
         if cand.attribution_reason is not None:
@@ -2234,7 +2287,8 @@ class BadmintonMatchEngine:
     def _jump_features(self, pid: str | None, frame: int) -> dict[str, float] | None:
         if pid is None:
             return None
-        lo, hi = frame - 22, frame + 8
+        lo = frame - max(1, round(22 * self.cfg.fps / 30))
+        hi = frame + max(1, round(8 * self.cfg.fps / 30))
         a, b = lo - self._buf0, hi - self._buf0
         buf = self._players[pid]
         if a < 0 or b > len(buf["kps"]):
@@ -2245,17 +2299,32 @@ class BadmintonMatchEngine:
         ank = np.full((n, 2), np.nan)
         hips = np.full(n, np.nan)
         hts = np.full(n, np.nan)
+        episodes: set[tuple[int, str]] = set()
         for i in range(n):
             k = buf["kps"][a + i]
             bb = buf["bbox"][a + i]
             if k is None or bb is None:
                 continue
+            source = a + i
+            tid = buf["track_id"][source]
+            snapshots = self._participant_frames[source] if source < len(self._participant_frames) else {}
+            matches = [s for s in snapshots.values() if s.track_id == tid]
+            joints = np.asarray(k)[[KP.L_ANKLE, KP.R_ANKLE, KP.L_HIP, KP.R_HIP]]
+            if (
+                len(matches) != 1 or matches[0].pose_frame_idx != self._buf0 + source
+                or matches[0].detector_matched is not True or matches[0].detector_observed is not True
+                or matches[0].track_id < 0 or matches[0].observation_id is None
+                or not np.isfinite(joints).all() or not (joints[:, 2] >= 0.3).all()
+                or not np.isfinite(bb).all() or bb[3] <= bb[1]
+            ):
+                continue
+            episodes.add((matches[0].track_id, matches[0].observation_id))
             ank[i] = (k[KP.L_ANKLE, 1], k[KP.R_ANKLE, 1])
             hips[i] = (k[KP.L_HIP, 1] + k[KP.R_HIP, 1]) / 2
             hts[i] = bb[3] - bb[1]
-        if np.isnan(hips).mean() > 0.5:
+        if len(episodes) != 1 or np.isnan(hips).mean() > 0.5:
             return None
-        return jump_features(ank, hips, hts, frame - lo)
+        return jump_features(ank, hips, hts, frame - lo, fps=self.cfg.fps)
 
     # ================================================================== rally end → point
     @contextmanager

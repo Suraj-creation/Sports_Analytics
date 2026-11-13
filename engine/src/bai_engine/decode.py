@@ -42,6 +42,10 @@ class Decoder(Protocol):
 
 class SegmentDecoder:
     def __init__(self, media: MediaPaths, frames_per_segment: int, threads: int = 2) -> None:
+        if type(frames_per_segment) is not int or frames_per_segment < 1:
+            raise ValueError("frames_per_segment must be a positive integer")
+        if type(threads) is not int or threads < 1:
+            raise ValueError("decoder threads must be a positive integer")
         self.media = media
         self.F = frames_per_segment
         self.threads = threads
@@ -81,6 +85,8 @@ class SegmentDecoder:
 
     def keyframe(self, k: int) -> Frame:
         """First frame of segment ``k`` only (cheap: decodes one IDR)."""
+        if k < 0:
+            raise ValueError("segment index must be non-negative")
         data = self._init_bytes() + segment_path(self.media, k).read_bytes()
         with av.open(io.BytesIO(data), format="mp4") as container:
             for fr in container.decode(container.streams.video[0]):
@@ -92,6 +98,8 @@ class FileDecoder:
     """Sequential decoder over an arbitrary file (used for live/raw sources and tests)."""
 
     def __init__(self, path: Path, chunk_frames: int) -> None:
+        if type(chunk_frames) is not int or chunk_frames < 1:
+            raise ValueError("chunk_frames must be a positive integer")
         self.path = path
         self.chunk = chunk_frames
 

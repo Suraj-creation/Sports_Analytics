@@ -58,9 +58,14 @@ def participant_window(
         raise ValueError("participant observations must align with the window")
 
     def usable(snapshot: ParticipantSnapshot) -> bool:
-        if not restrict_target_court:
-            return True
-        return has_target_court_provenance(snapshot)
+        box = np.asarray(snapshot.bbox)
+        return bool(
+            snapshot.track_id >= 0
+            and box.shape == (4,)
+            and np.isfinite(box).all()
+            and (box[2:] > box[:2]).all()
+            and (not restrict_target_court or has_target_court_provenance(snapshot))
+        )
 
     track_ids: dict[str, set[int]] = {}
     births: dict[str, set[str | None]] = {}
@@ -80,8 +85,16 @@ def participant_window(
             if item is None or not usable(snapshot):
                 continue
             item.bbox[i] = snapshot.bbox
-            item.racket[i] = snapshot.racket if snapshot.detector_matched is True else None
-            if snapshot.kps is not None:
+            frame_idx = window.frame0 + i
+            # A snapshot may retain an older pose/equipment result. Preserve it
+            # on the snapshot, but never turn it into current temporal evidence.
+            # Missing source stamps remain unavailable for motion/contact use.
+            item.racket[i] = (
+                snapshot.racket
+                if snapshot.detector_matched is True and snapshot.racket_frame_idx == frame_idx
+                else None
+            )
+            if snapshot.kps is not None and snapshot.pose_frame_idx == frame_idx:
                 item.kps[i] = snapshot.kps
             if snapshot.court_xy is not None:
                 item.court_xy[i] = snapshot.court_xy

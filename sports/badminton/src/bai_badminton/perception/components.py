@@ -135,7 +135,7 @@ class ForegroundContinuityPort(Protocol):
 class PosePort(Protocol):
     """BGR image and xyxy boxes to COCO17 image-coordinate x/y/confidence."""
 
-    def __call__(self, image: NDArray[np.uint8], boxes: NDArray[Any]) -> list[NDArray[Any]]: ...
+    def __call__(self, image: NDArray[np.uint8], boxes: NDArray[Any]) -> list[NDArray[Any] | None]: ...
 
 
 @runtime_checkable
@@ -411,7 +411,10 @@ def register_perception_components(registry: ComponentRegistry) -> None:
             ComponentContract(
                 kind=kind,
                 implementation=BASELINE_IMPLEMENTATIONS[kind],
-                version="5" if kind == "tracking" else "3" if kind == "ocr" else "1",
+                version=(
+                    "6" if kind == "tracking" else "3" if kind == "ocr"
+                    else "2" if kind in {"pose", "shuttle"} else "1"
+                ),
                 input_schema=f"badminton-{kind}-input:v1",
                 output_schema=f"badminton-{kind}-output:v1",
                 interface=interface,

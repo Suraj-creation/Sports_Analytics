@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import heapq
+import math
 import queue
 import subprocess
 import threading
@@ -275,8 +276,10 @@ def probe(path: Path, tools: Tools, timeout: float = 30.0) -> ProbeResult:
 def validate(p: ProbeResult, max_duration_s: float) -> None:
     if p.container not in ALLOWED_CONTAINERS:
         raise MediaError(f"unsupported container {p.container!r}")
-    if p.duration_s <= 0:
-        raise MediaError("video has no duration")
+    if not math.isfinite(p.duration_s) or p.duration_s <= 0:
+        raise MediaError("video has no finite positive duration")
+    if not math.isfinite(max_duration_s) or max_duration_s <= 0:
+        raise MediaError("duration limit must be finite and positive")
     if p.duration_s > max_duration_s:
         raise MediaError(f"video is {p.duration_s / 60:.0f} min long; the limit is {max_duration_s / 60:.0f} min")
     if not (MIN_DIM <= p.width <= MAX_DIM and MIN_DIM <= p.height <= MAX_DIM):

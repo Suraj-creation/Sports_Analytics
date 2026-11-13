@@ -259,6 +259,42 @@ def _assessment(reliability: Reliability, *reasons: str) -> ReliabilityAssessmen
     return ReliabilityAssessment(reliability, tuple(reasons))
 
 
+def assess_flight_endpoint(evidence: ContactEvidence | None) -> ReliabilityAssessment:
+    """Assess whether a candidate can bound the preceding physical flight.
+
+    A selected numerical peak remains a useful motion cutoff even when its
+    physical impact is unresolved. It is not then an observed flight duration
+    or a receiver. This policy shares the existing contact evidence levels;
+    no new heuristic score threshold or identity requirement is introduced.
+    """
+    if evidence is None:
+        return _assessment(Reliability.INSUFFICIENT, "next_contact_evidence_unavailable")
+    inputs = evidence.inputs
+    if (
+        inputs.context_valid is False
+        or inputs.observation_status in {"invalid", "rejected"}
+        or inputs.association_status == "rejected"
+        or evidence.impact.reliability is Reliability.REJECTED
+    ):
+        return _assessment(Reliability.REJECTED, "next_contact_context_or_impact_rejected")
+    if evidence.impact.reliability is Reliability.CONFIRMED:
+        return _assessment(Reliability.CONFIRMED, "source_reviewed_next_impact")
+    if (
+        inputs.context_valid is True
+        and inputs.observation_status == "fresh_observed"
+        and inputs.association_status in {"tracked", "static_candidate"}
+        and evidence.impact.reliability is Reliability.PROBABLE
+        and evidence.trajectory.reliability is Reliability.PROBABLE
+    ):
+        return _assessment(Reliability.PROBABLE, "coherent_next_motion_and_fresh_contact_cue")
+    return _assessment(
+        Reliability.AMBIGUOUS
+        if evidence.impact.reliability is Reliability.AMBIGUOUS
+        else Reliability.INSUFFICIENT,
+        "next_candidate_not_a_supported_flight_endpoint",
+    )
+
+
 def assess_contact_evidence(inputs: ContactEvidenceInputs) -> ContactEvidence:
     """Keep independent trajectory, physical-impact and attribution conclusions.
 

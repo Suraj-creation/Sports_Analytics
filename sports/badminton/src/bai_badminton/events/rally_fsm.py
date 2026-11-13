@@ -200,6 +200,11 @@ class RallyFSM:
                 if self._run_visible >= p.start_visible and self._run_start is not None:
                     self._open(self._run_start, upd)
         if self.state is RallyState.IN_PLAY:
+            if upd.started is not None:
+                # A motion-started exchange must build its own terminal
+                # history. Idle rest cannot immediately close the new rally.
+                self._recent.clear()
+                self._recent.append((visible, speed))
             # A motion-driven open/reopen or an ENDING resume consumes this
             # frame as in-play evidence too. Retain it if the next callback
             # is a cut; the previous active frontier predates the recovery.
@@ -258,6 +263,7 @@ class RallyFSM:
 
     def _open(self, start: int, upd: RallyUpdate) -> None:
         self.state, self.start, self.serve, self.tentative_end = RallyState.IN_PLAY, start, None, None
+        self._recent.clear()
         self._last_contact_frame = None
         self._last_in_play_frame = start
         upd.started = start

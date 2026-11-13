@@ -84,6 +84,8 @@ class WindowObs:
 
     def __post_init__(self) -> None:
         n = len(self.shuttle)
+        if type(self.frame0) is not int or self.frame0 < 0 or not np.isfinite(self.fps) or self.fps <= 0:
+            raise ValueError("window requires a nonnegative canonical frame and finite positive fps")
         if self.shuttle_evidence is not None and (
             len(self.shuttle_evidence) != n
             or any(e is not None and e.frame_idx != self.frame0 + i for i, e in enumerate(self.shuttle_evidence))
@@ -112,8 +114,10 @@ class WindowObs:
         ):
             raise ValueError("pose schedule must contain one integer >= -1 per frame")
         for pid, s in self.players.items():
-            if s.bbox.shape[0] != n:
-                raise ValueError(f"player {pid} series length {s.bbox.shape[0]} != {n}")
+            if s.bbox.shape != (n, 4) or s.kps.shape != (n, 17, 3) or s.court_xy.shape != (n, 2):
+                raise ValueError(f"player {pid} requires aligned xyxy, COCO17 and floor-coordinate arrays")
+            if s.racket and len(s.racket) != n:
+                raise ValueError(f"player {pid} racket series must align with canonical window frames")
 
     @property
     def n(self) -> int:

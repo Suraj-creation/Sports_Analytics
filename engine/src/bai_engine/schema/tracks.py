@@ -33,6 +33,7 @@ class TrackSample(BaseModel):
     track_id: int = -1  # -1 for the shuttle (single object)
     player_id: str | None = None
     participant_observation_id: str | None = None  # Exact emitted episode-birth evidence, not a person ID.
+    context_id: str | None = None  # Producer-defined temporal/coordinate epoch; None means legacy/unknown.
     detector_observed: bool | None = None  # Whether the player detector ran on this frame; not a person-level match.
     raw_track_id: int | None = None  # Source tracker before optional canonical association.
     detector_matched: bool | None = None  # Unique current detection match for this person.
@@ -67,6 +68,7 @@ TRACK_ARROW_SCHEMA = pa.schema(
         pa.field("track_id", pa.int32(), nullable=False),
         pa.field("player_id", pa.dictionary(pa.int8(), pa.string())),
         pa.field("participant_observation_id", pa.string()),
+        pa.field("context_id", pa.string()),
         pa.field("detector_observed", pa.bool_()),
         pa.field("raw_track_id", pa.int32()),
         pa.field("detector_matched", pa.bool_()),
@@ -95,6 +97,7 @@ def samples_to_table(samples: list[TrackSample]) -> pa.Table:
         cols["track_id"].append(s.track_id)
         cols["player_id"].append(s.player_id)
         cols["participant_observation_id"].append(s.participant_observation_id)
+        cols["context_id"].append(s.context_id)
         cols["detector_observed"].append(s.detector_observed)
         cols["raw_track_id"].append(s.raw_track_id)
         cols["detector_matched"].append(s.detector_matched)
@@ -127,6 +130,7 @@ def table_to_samples(table: pa.Table) -> list[TrackSample]:
                 track_id=row["track_id"],
                 player_id=row["player_id"],
                 participant_observation_id=row.get("participant_observation_id"),
+                context_id=row.get("context_id"),
                 detector_observed=row.get("detector_observed"),
                 raw_track_id=row.get("raw_track_id"),
                 detector_matched=row.get("detector_matched"),

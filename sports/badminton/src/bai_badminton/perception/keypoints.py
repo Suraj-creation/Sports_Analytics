@@ -59,7 +59,9 @@ Keypoints = NDArray[np.float32]  # shape (17, 3): x, y, score
 
 def point(kps: Keypoints, kp: KP, min_score: float = 0.3) -> NDArray[np.float32] | None:
     x, y, s = kps[kp]
-    return None if s < min_score else np.array([x, y], dtype=np.float32)
+    # NaN compares false to a confidence threshold and previously escaped as a
+    # usable joint, contaminating contact distances and movement summaries.
+    return None if not np.isfinite((x, y, s)).all() or s < min_score else np.array([x, y], dtype=np.float32)
 
 
 def midpoint(kps: Keypoints, a: KP, b: KP, min_score: float = 0.3) -> NDArray[np.float32] | None:
@@ -104,10 +106,14 @@ def lr_consistency_fix(kps: Keypoints, prev: Keypoints | None) -> Keypoints:
     if prev is None:
         return kps
     flipped = kps[list(FLIP)]
-    valid = (kps[:, 2] > 0.3) & (prev[:, 2] > 0.3)
+    valid = (kps[:, 2] > 0.3) & (prev[:, 2] > 0.3) & np.isfinite(kps).all(axis=1) & np.isfinite(prev).all(axis=1)
     if valid.sum() < 4:
         return kps
-    d_keep = np.linalg.norm(kps[valid, :2] - prev[valid, :2], axis=1).mean()
-    valid_f = (flipped[:, 2] > 0.3) & (prev[:, 2] > 0.3)
-    d_flip = np.linalg.norm(flipped[valid_f, :2] - prev[valid_f, :2], axis=1).mean() if valid_f.any() else np.inf
+    # Compare both labelings on the same anatomical support. Otherwise an
+    # occluded joint could make the flipped candidate win on fewer/easier joints.
+    valid_f = valid & (flipped[:, 2] > 0.3) & np.isfinite(flipped).all(axis=1)
+    if valid_f.sum() < 4:
+        return kps
+    d_keep = np.linalg.norm(kps[valid_f, :2] - prev[valid_f, :2], axis=1).mean()
+    d_flip = np.linalg.norm(flipped[valid_f, :2] - prev[valid_f, :2], axis=1).mean()
     return flipped if d_flip < 0.7 * d_keep else kps

@@ -95,7 +95,7 @@ def _continuous(
             if intersection / union >= MAX_COMPETING_BOX_IOU:
                 return False
     if require_detector_runs:
-        if any(row.get("detector_observed") is True and row.get("detector_matched") is False for row in rows):
+        if any(row.get("detector_observed") is True and row.get("detector_matched") is not True for row in rows):
             return False
         # None is legacy/unknown provenance; False means the detector explicitly did not run.
         flags = [row.get("detector_observed") for row in rows]
@@ -106,6 +106,11 @@ def _continuous(
         detector_frames = [row["frame_idx"] for row in rows if row["detector_observed"] is True]
         if any(b - a > MAX_TRACK_SAMPLE_GAP_FRAMES for a, b in pairwise(detector_frames)):
             return False
+    contexts = [row.get("context_id") for row in rows]
+    if any(context is not None for context in contexts) and (
+        contexts[0] is None or any(context != contexts[0] for context in contexts)
+    ):
+        return False
     for before, after in pairwise(rows):
         a, b = before["bbox"], after["bbox"]
         height_a, height_b = a[3] - a[1], b[3] - b[1]
@@ -339,7 +344,7 @@ def build_estimated_individual_analytics(
             "observation_id": obs.event_id,
             "status": "estimated",
             "detector_observed": True,
-            "detector_observation_scope": "frame_only_not_person_match",
+            "detector_observation_scope": "unique_current_person_match",
             "hypothesis_reason": h.get("reason"),
             "hypothesis_policy": h.get("policy"),
         }
@@ -456,6 +461,7 @@ def build_estimated_individual_analytics(
             "max_track_sample_gap_frames": MAX_TRACK_SAMPLE_GAP_FRAMES,
             "named_requires_detector_run_at_seed_and_shot": True,
             "named_rejects_recorded_unmatched_person": True,
+            "named_requires_person_match_on_detector_frames": True,
             "max_detector_run_gap_frames": MAX_TRACK_SAMPLE_GAP_FRAMES,
             "detector_run_scope": "frame_only_not_person_match",
             "min_track_confidence": MIN_TRACK_CONFIDENCE,

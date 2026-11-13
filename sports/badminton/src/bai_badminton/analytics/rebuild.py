@@ -8,7 +8,7 @@ from typing import Any
 import numpy as np
 
 from bai_badminton.analytics.match import MatchAnalytics, RallyRecord
-from bai_badminton.analytics.spatial import MIN_COURT_QUALITY
+from bai_badminton.analytics.spatial import MIN_COURT_QUALITY, observed_player_row
 from bai_badminton.rules import PLAYERS
 from bai_engine.schema import Event, EventStatus, TrackObject
 from bai_engine.store import EventStore, TrackStore
@@ -98,9 +98,22 @@ def rally_records(store: EventStore) -> list[RallyRecord]:
     return out
 
 
-def _camera_validity(tracks: TrackStore, start: int, end: int) -> dict[int, bool]:
+def _camera_validity(
+    tracks: TrackStore, start: int, end: int, *, contexts: dict[int, str | None] | None = None,
+    detector_runs: dict[int, bool | None] | None = None,
+) -> dict[int, bool]:
     rows = tracks.read([TrackObject.CAMERA], start, end).to_pylist()
     counts = Counter(row["frame_idx"] for row in rows)
+    if contexts is not None:
+        contexts.update({
+            row["frame_idx"]: row.get("context_id") if counts[row["frame_idx"]] == 1 else None
+            for row in rows
+        })
+    if detector_runs is not None:
+        detector_runs.update({
+            row["frame_idx"]: row.get("detector_observed") if counts[row["frame_idx"]] == 1 else None
+            for row in rows
+        })
     return {
         row["frame_idx"]: bool(
             counts[row["frame_idx"]] == 1
@@ -116,11 +129,39 @@ def _camera_validity(tracks: TrackStore, start: int, end: int) -> dict[int, bool
     }
 
 
+def _path_continuity(
+    rows: list[dict[str, Any]], camera: dict[int, bool], contexts: dict[int, str | None],
+    detector_runs: dict[int, bool | None],
+) -> list[bool]:
+    """Only bridge explicitly unsampled frames with continuous valid geometry.
+
+    No person row on a detector tick is missing evidence, not a sampling gap.
+    Missing camera/freshness metadata is likewise a barrier, including legacy data.
+    """
+    result = [False] * len(rows)
+    for i in range(1, len(rows)):
+        previous, current = rows[i - 1], rows[i]
+        context = current.get("context_id")
+        result[i] = bool(
+            context is not None and context == previous.get("context_id")
+            and current["frame_idx"] > previous["frame_idx"]
+            and all(
+                camera.get(frame, False) and contexts.get(frame) == context and detector_runs.get(frame) is False
+                for frame in range(previous["frame_idx"] + 1, current["frame_idx"])
+            )
+        )
+    return result
+
+
 def build(store: EventStore, tracks: TrackStore | None, fps: float) -> MatchAnalytics:
     a = MatchAnalytics(fps)
     records = rally_records(store)
     end = max((r.end for r in records), default=0)
-    camera = _camera_validity(tracks, 0, end) if tracks is not None else {}
+    camera_contexts: dict[int, str | None] = {}
+    detector_runs: dict[int, bool | None] = {}
+    camera = _camera_validity(
+        tracks, 0, end, contexts=camera_contexts, detector_runs=detector_runs
+    ) if tracks is not None else {}
     official = {s.get("event_id") for r in records if r.official for s in r.shots}
     # A stroke hypothesis is a match statistic only once an official rally owns it.
     for ev in store.query(types=["stroke"]):
@@ -133,7 +174,12 @@ def build(store: EventStore, tracks: TrackStore | None, fps: float) -> MatchAnal
             # Calibration rows are read once above, then shared by contacts and paths.
             # Preserve missing and rejected rows so a path can never bridge them.
             for player in sorted({row["player_id"] for row in rows if row["player_id"] is not None}):
-                selected = [row for row in rows if row["player_id"] == player]
+                # Scheduled carries are renderable estimates, not new feet samples.
+                # Explicit failed detector matches stay as path barriers.
+                selected = [
+                    row for row in rows
+                    if row["player_id"] == player and row.get("detector_observed") is not False
+                ]
                 counts = Counter(row["frame_idx"] for row in selected)
                 a.on_presence(
                     player,
@@ -143,14 +189,21 @@ def build(store: EventStore, tracks: TrackStore | None, fps: float) -> MatchAnal
                     valid=[
                         bool(
                             counts[row["frame_idx"]] == 1
-                            and row["visible"]
-                            and np.isfinite(row["conf"])
-                            and row["conf"] >= 0.5
+                            and observed_player_row(row)
                             and camera.get(row["frame_idx"], False)
+                            and row.get("context_id") is not None
+                            and row["context_id"] == camera_contexts.get(row["frame_idx"])
                         )
                         for row in selected
                     ],
                     expected_frames=rec.end - rec.start + 1,
+                    contexts=[
+                        (row["context_id"], row["participant_observation_id"])
+                        if row.get("context_id") is not None and row.get("participant_observation_id") is not None
+                        else None
+                        for row in selected
+                    ],
+                    continuous_from_previous=_path_continuity(selected, camera, camera_contexts, detector_runs),
                 )
         a.on_rally(rec)
     # Include official intervals with no player rows in the availability denominator.
