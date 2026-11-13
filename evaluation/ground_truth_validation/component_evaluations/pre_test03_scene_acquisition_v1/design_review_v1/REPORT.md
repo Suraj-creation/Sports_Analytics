@@ -1,0 +1,69 @@
+# Relative scene acquisition: independent design review
+
+The proposal is suitable for an **isolated, versioned experiment** if relative acquisition stays separate from the existing strong reset policy and the weak path requires complete positive source/format/geometry proof. It is not established scene accuracy or a reason to accept the rejected 182-row athlete loss. No production code, model, profile threshold or evaluation rule was changed by this review.
+
+## Why5958 is a legitimate acquisition case
+
+The closed 5b6d429 prefix records Test2 frame5958 with80 reliable background features, consistency1.0, and two nonoverlapping prior regions with30/40 features. Their correspondence innovations are3.312612 and14.806637, each with prior mean0 and ratio3.312612/14.806637 under the existing denominator floor1. Their mean9.059625 is below the existing15 intensity floor. Appearance ratios2.320320/2.405027 do not independently reach3. Thus the existing strong screen correctly returns false, while a **same-channel relative correspondence acquisition** would qualify. No one-appearance-plus-one-correspondence pooling is needed.
+
+The source-reviewed5957→5958 edited jump is diagnostic evidence, not independently labelled scene GT. [Exact5957 source/prediction panel](../../pre_test03_scene_foreground_v1/prefix_v2/test2_05505_06510_frame_05957.png), [5958](../../pre_test03_scene_foreground_v1/prefix_v2/test2_05505_06510_frame_05958.png), and [closed case JSON](../../pre_test03_scene_foreground_v1/prefix_v2/test2_05505_06510.json) retain original source hashes, PTS, raw detector proposals and all prior image regions. Ground truth for a new aggregate scene metric remains null.
+
+A read-only [two-witness relative-screen scan](fixed_prefix_relative_scan.json) of the existing ten windows finds five additional relative-only quorum instants: one in Test2[300,365], two in[5505,6510], two in[25206,25540]. Three lack a retained current raw detector observation. Applying the actual captured V4 cohort helper separately produces [19 single-region-or-greater acquisition requests](relative_acquisition_scan_v2.json), only five same-channel two-witness weak-reset quorums; 11 of the 19 instants lack a retained current raw proposal. One relative witness can request acquisition; it cannot authorize weak reset. This is a diagnostic scan of the old fixed stream, **not** the new provider's actual reset count, added-call count or full-video false-positive estimate: new barriers change subsequent histories and tracking.
+
+## Required separation of decisions
+
+1. **Strong image hypothesis:** retain its existing same-channel independent witnesses, ratio/history/features/background and intensity conditions and its historical policy. A new weak signal must not silently change this behavior.
+2. **Acquisition request:** relative-only innovation may request one exact-current-frame raw detector observation. It remains image evidence and grants no tracking, participant, identity or scoring authority by itself.
+3. **Weak reset permission:** require at least two independent same-channel relative witnesses, confirmed prior formatN=2/4, valid current target geometry, exactlyN distinct strict-current-court raw boxes, and zero existing0.3-IoU correspondence between **every** strict current box and **all** prior foreground regions. Unknown evidence cannot authorize this reset.
+
+Current `tracking_barrier_for_decision()` treats an unknown layout as the experimental raw-hypothesis fallback. Therefore setting the existing `hypothesis=True` for relative-only acquisition would be unsafe. V4 needs separate acquisition/relative keys and explicit decision kind. In the weak branch, unavailable probe, unknown/unconfirmed format, partial doubles visibility, missing geometry, ambiguous boxes or incomplete proof must mean **no reset**, not the strong fallback.
+
+## Critical pitfalls and their disposition
+
+| Pitfall | Required behavior / proof |
+|---|---|
+| `admitted_indices` includes inherited outside continuity and padding | Weak proof uses independently recomputed strict polygon-foot indices. Never count an inherited official as an in-court observation. |
+| ExactlyN boxes is not a confirmed format | Use a decision/configuration established before acquisition, not the current detector count. Preserve unknown; confirmed doubles with2 visible people cannot become singles. |
+| Bare default `match_format='singles'` grants new authority | The root's proposed `match_format_confirmed=False` default prevents this. Session configuration/prior applied decision must explicitly set it. |
+| Current-frame probe self-confirms format | Session applies configured format or preceding-chunk ingestion decisions; capture that prior decision state. A mid-chunk target/calibration change must invalidate incompatible prior format/context. |
+| Two duplicate/overlapping boxes masquerade asN people | Require image-distinct current boxes and independent prior witnesses; IDs or score ranking cannot prove distinct people. Do not select the bestN from extra strict boxes. |
+| One witness per channel is pooled | Require a quorum inside one channel; keep each qualified cohort explicit. |
+| Small baseline makes ratios look large | Preserve feature count, valid prior history, denominator floor and background checks. Relative qualification is an acquisition cue only. Do not describe ratios as calibrated edit probability. |
+| Pan/zoom moves every raw box while LK remains reversible | Reliable background flow is not proof of a stationary camera. Positive camera-aligned layout correspondence must veto the weak reset; missing/incompatible transforms must abstain. |
+| Valid but foreign convex polygon is supplied | Shape and indices prove internal geometry only. Bind court polygon to exact current frame, referenceH/court hash and currentG, and recompute at frame/codec/producer binding. |
+| A stale/carried prior box looks like an adjacent observation | Preserve its source freshness/age semantics. Test strided carries and rapid ordinary motion; a frame stamp alone is not a fresh detector observation. |
+| Weak probe changes scheduling even without reset | Count/version extra current observations and detector calls, reuse the probe once, preserve real detector freshness and downstream feedback. Avoid a second same-frame model call. |
+| Reset reuses old inherited probe admission | Reset all origins before processing; recompute admission from raw boxes. The old probe's `admitted_indices` cannot bootstrap an outside official. |
+| Outside continuity is called renewed court authority | Keep fresh image-hypothesis time separate from last actual ROI-supported anchor. Publish that basis/provenance where downstream consumers need it; no name/team/point follows. |
+
+Independent source inspection confirms the new implementation separates strong hypotheses from acquisition requests and weak permission, checks all prior raw regions plus their camera-aligned boxes, recomputes strict indices, binds current court-reference/G geometry and uses prior confirmed format. `BadmintonPerception(match_format_confirmed=False)` prevents the default singles placeholder from authorizing weak resets; session configuration or a preceding applied format decision supplies confirmation, captured before chunk processing. These contracts are appropriate responses to the hazards; this review does not replace source-bound tests of actual behavior. Current box distinctness is the existing pairwise IoU0.3 exclusion, an operational distinct-detection rule, not proof of N different humans. Body fragments and crowded/overlapping doubles remain required negative controls.
+
+A camera-aligned veto must use the immediately preceding frame's actual transform, including across chunk boundaries; an initial/reference transform is not interchangeable. Singular/nonfinite or different-target transforms are unknown. Applying plane registration to body boxes is itself an approximation, so it is a conservative positive-continuity veto, not physical athlete identity proof.
+
+## Schema and reproducibility proof needed
+
+V4 should preserve raw per-region measurements, prior means, feature counts, each channel's relative witness keys, strong supporting keys, and actual ratio/floor/history parameter identities. The validator must recompute claimed cohorts and ratio arithmetic from recorded values/means; it cannot trust forged booleans or key lists. Legacy evidence lacking acquisition fields must decode as **no weak authorization**, not be retroactively reclassified.
+
+The current detached probe adds `court_polygon` and `court_indices`. Validate finite nondegenerate convex geometry with bounded3–16 vertices, finite source coordinates, canonical integer indices, unique/in-range ordering and exact polygon-foot recomputation. A constructor alone cannot establish that a mathematically consistent polygon belongs to this target court. The containing frame/provenance binding must verify the polygon against sourceH/currentG and its calibration reference/hash.
+
+A weak decision needs exact current source frame/image SHA, detector model/checkpoint/crop, all raw boxes/scores, strict indices, expectedN and format-confirmed decision/revision/context, all prior regions and source freshness, current/prior camera transforms, complete IoU comparison and the rejection/abstention reason. Do not retain only the selectedN boxes or only supporting prior witnesses: the all-prior condition must be independently reproducible. Metadata must distinguish acquisition from reset and weak from strong fallback. Version component, tracking continuity, pipeline/cache identities and codec fields together; preserve historical decoders/reports.
+
+## Focused implementation tests
+
+The new exclusively owned [player/probe test](/home/administrator/Desktop/sport-analytics/test03-scene-acquisition-20261112/sports/badminton/tests/test_player_continuity_contract_v4.py) isolates weightless model/tracker state. Its initial run is [3 failed /20 passed](player_contract_first_run.log). The three genuine failures are new `court_indices` type aliases: `(True,)`, `(1.0,)` and `(np.int64(1),)` compare equal to `(1,)` and were accepted without the canonical type guard already used for `admitted_indices`. This was a concrete metadata-validation defect. The root added explicit canonical integer, tuple, uniqueness and bounds checks before geometric comparison. The same exclusively owned test file then passed [23/23 controls](player_contract_GREEN.log); captured tested bytes and source hashes are in [implementation binding](implementation_binding.json). The root separately reports 29/29 combined focused tests, including six root-owned controls; that broader result is attributed rather than claimed as an independently executed run.
+
+Passing controls already establish fresh outside hypotheses beyond one second while actual anchors remain unchanged, singles/doubles carry expiry, empty-model expiry/no outside resurrection, reset plus inherited-probe re-admission, strict-vs-inherited indices, probe read-only/one-call reuse, inclusive boundary semantics and malformed/changed polygon rejection. They do **not** establish that outside hypotheses reject an official without source-change acquisition.
+
+Required additional source/integration regressions are:
+
+- Weak low-intensity evidence with two independent witnesses inside the same channel requests acquisition once. A valid one-region relative innovation may also request acquisition, but cannot authorize weak reset. One-per-different-channel, overlapping, featureless, history-less or invalid-view evidence must not manufacture a two-witness weak-reset quorum.
+- Unknown format, unconfirmed default singles, and confirmed doubles with2/3/5 strict boxes never use weak reset. Exact4 independent doubles boxes are preserved; no silent topN truncation.
+- Any strict current box matching **any** prior foreground region at the existing0.3 gate vetoes the weak reset. Padded/inherited outside boxes never satisfy strict count.
+- Natural fast motion, one-person occlusion, exposure change, camera pan/zoom and strided box carry remain negative controls. Test correct previousG both within and across chunks, missing/singular transforms and stale calibration/format contexts.
+- Source-bound forged indices/polygon/H/G/format flags cannot manufacture weak permission; invalid boolean/numeric aliases are rejected. Legacy payloads remain strict historical behavior.
+- Keep strong5958=false, preserve strong6151/6307 and Test1 cuts7857/8106, and preserve no-reset7703/23639. Recover5958 only through the newly documented weak proof. Observe every extra acquisition, not just successful resets.
+- After source controls pass, run complete fresh Test1 and Test2 through unchanged evaluators. Verify all182 gross loss rows, missing-vs-fresh hypothesis provenance and5958–6492 official rejection. Runtime/call counts, new/missed cuts, contact/class/rally effects and all original references remain required. No unit success or one edited frame establishes full acceptance.
+
+A verified edit at5958 does not establish rejection of every official handover. A same-camera athlete/official crossover or occlusion without two independent innovations may remain unresolved; fresh outside continuity remains a target-participant hypothesis, not a named identity or accepted point authority.
+
+No full new-prefix or fresh full-video acceptance is claimed here. Source-bound broad-window replay and full Test1/Test2 regression remain pending at sealing. No new numerical thresholds, appearance cutoffs, names, points, physical scene GT or class labels are proposed by this review. The engineering hypothesis is that stronger **source and geometry contracts** can support targeted acquisition without promoting weak image evidence to blanket reset authority.

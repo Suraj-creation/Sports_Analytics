@@ -1,0 +1,585 @@
+"""Versioned, sport-owned ports and factories for image perception.
+
+The baseline providers adapt the existing loaders. A component implementation
+selects behavior; ``ModelChoice.model`` selects its artifact. Alternative
+providers receive explicit dependencies and must meet the same observation
+contract. Positions are canonical analysis-frame pixels, not 3D measurements.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Protocol, runtime_checkable
+
+import numpy as np
+from numpy.typing import NDArray
+
+from bai_badminton.perception.association import CausalShuttleAssociation, ShuttleObservationEvidence
+from bai_badminton.perception.content import (
+    CONTENT_IMPLEMENTATION,
+    CONTENT_IMPLEMENTATION_V2,
+    ContentContinuityProvider,
+    ContentContinuityProviderV2,
+)
+from bai_badminton.perception.diagnostics import DiagnosticSelection, ShuttleDiagnostic
+from bai_badminton.perception.players import CourtROI, PlayerPerception
+from bai_badminton.perception.scene_change import SCENE_CONTINUITY_VERSION, ForegroundRegion, SceneChangeEvidence
+from bai_badminton.perception.tracknet import BackgroundModel, ShuttleDetection
+from bai_badminton.perception_types import PersonObs, RacketObservation, ScoreReading
+from bai_engine.components import ComponentContract, ComponentRegistry
+from bai_engine.config import ModelChoice
+from bai_engine.runtime.registry import ModelRegistry
+
+
+@runtime_checkable
+class ShuttlePort(Protocol):
+    """BGR frame sequence to image observations; missing detections stay None.
+
+    Backgrounds and flight masks use the baseline 512x288 RGB image convention.
+    A different tensor convention needs an adapter or a different port version.
+    """
+
+    seq_len: int
+    bg: BackgroundModel
+
+    def detect(
+        self,
+        frames_bgr: list[NDArray[np.uint8]],
+        shots: list[int],
+        *,
+        step: int,
+        masks: list[NDArray[np.uint8]] | None,
+    ) -> list[ShuttleDetection | None]: ...
+
+
+@runtime_checkable
+class DiagnosticShuttlePort(ShuttlePort, Protocol):
+    """Optional summaries; legacy independent shuttle providers remain valid."""
+
+    supports_diagnostics: bool
+
+    def detect_with_diagnostics(
+        self,
+        frames_bgr: list[NDArray[np.uint8]],
+        shots: list[int],
+        *,
+        step: int,
+        masks: list[NDArray[np.uint8]] | None,
+        selection: DiagnosticSelection,
+        indices: set[int],
+    ) -> tuple[list[ShuttleDetection | None], list[ShuttleDiagnostic | None]]: ...
+
+
+@runtime_checkable
+class ShuttleAssociationPort(Protocol):
+    def update(
+        self,
+        frame: int,
+        *,
+        epoch: int,
+        raw_xy: tuple[float, float] | None,
+        raw_support: float,
+        diagnostic: ShuttleDiagnostic | None,
+        image_valid: bool,
+        image_to_reference: np.ndarray | None = None,
+    ) -> ShuttleObservationEvidence: ...
+
+    def reset(self) -> None: ...
+
+    def close(self) -> None: ...
+
+
+@runtime_checkable
+class ContentContinuityPort(Protocol):
+    """Current image + prior-frame regions to a nonauthoritative hypothesis."""
+
+    barrier_enabled: bool
+
+    def observe(
+        self,
+        frame: int,
+        pixels: NDArray[np.uint8],
+        *,
+        previous_regions: Sequence[ForegroundRegion],
+        previous_view_valid: bool,
+        current_view_valid: bool,
+        hard_cut: bool = False,
+    ) -> SceneChangeEvidence: ...
+
+    def reset(self) -> None: ...
+
+    def close(self) -> None: ...
+
+    def checkpoint(self) -> object: ...
+
+    def restore(self, checkpoint: object) -> None: ...
+
+
+@runtime_checkable
+class PlayerDetectorPort(Protocol):
+    """BGR image to image-coordinate xyxy boxes and uncalibrated scores."""
+
+    def __call__(self, image: NDArray[np.uint8]) -> tuple[NDArray[Any], NDArray[Any]]: ...
+
+
+@runtime_checkable
+class ForegroundContinuityPort(Protocol):
+    """Optional scene-only image evidence, separate from participant outputs."""
+
+    def foreground_regions(self, frame_idx: int) -> tuple[ForegroundRegion, ...]: ...
+
+
+@runtime_checkable
+class PosePort(Protocol):
+    """BGR image and xyxy boxes to COCO17 image-coordinate x/y/confidence."""
+
+    def __call__(self, image: NDArray[np.uint8], boxes: NDArray[Any]) -> list[NDArray[Any]]: ...
+
+
+@runtime_checkable
+class PlayerReIDPort(Protocol):
+    """Appearance features support episode linking, not a named identity."""
+
+    fingerprint: str
+
+    def embed(self, image: NDArray[np.uint8], boxes: NDArray[Any]) -> NDArray[Any]: ...
+
+
+@runtime_checkable
+class RacketPort(Protocol):
+    """Image equipment observations indexed by the supplied track episodes."""
+
+    def detect(self, image: NDArray[np.uint8], persons: list[PersonObs]) -> dict[int, RacketObservation]: ...
+
+
+@runtime_checkable
+class OCRPort(Protocol):
+    """Canonical-frame source-board readings, independent of point decisions."""
+
+    calls: int
+
+    def maybe_read(self, frame_idx: int, image: NDArray[np.uint8]) -> ScoreReading | None: ...
+
+
+@runtime_checkable
+class TrackingPort(Protocol):
+    detector: PlayerDetectorPort | None
+    pose: PosePort | None
+    reid: PlayerReIDPort | None
+    max_players: int
+    last_detector_observed: bool
+    last_capacity_limited: bool
+    last_identity_error: str | None
+    identity_policy: dict[str, Any]
+
+    def process(self, frame_idx: int, image: NDArray[np.uint8], strides: tuple[int, int]) -> list[PersonObs]: ...
+
+    def set_roi(self, roi: CourtROI | None) -> None: ...
+
+    def on_cut(self) -> None: ...
+
+    def reset(self) -> None: ...
+
+    def close(self) -> None: ...
+
+
+@dataclass(frozen=True, slots=True)
+class TrackingContext:
+    registry: ModelRegistry
+    cache: Path
+    fps: float
+    frame_size: tuple[int, int] | None
+    detector: PlayerDetectorPort | None
+    pose: PosePort | None
+    reid: PlayerReIDPort | None
+    max_players: int
+    det_stride: int
+    pose_stride: int
+    identity_retention_s: float
+    record_model: Callable[[str, str], None]
+    record_runtime: Callable[[str, dict[str, Any]], None]
+
+
+class _Tracking(PlayerPerception):
+    def reset(self) -> None:
+        self.on_cut()
+
+    def close(self) -> None:
+        self.on_cut()
+        self.detector = self.pose = self.reid = self.tracker = self._associator = None
+
+
+def _tracking_factory(context: TrackingContext, configuration: dict[str, Any]) -> TrackingPort:
+    params = configuration.get("params", {})
+    if params.keys() - {"identity_retention_s"}:
+        raise ValueError("unsupported tracking provider parameters")
+    result = _Tracking(
+        context.detector,
+        context.pose,
+        context.fps,
+        det_stride=context.det_stride,
+        pose_stride=context.pose_stride,
+        max_players=context.max_players,
+        reid=context.reid,
+        identity_retention_s=float(params.get("identity_retention_s", context.identity_retention_s)),
+    )
+    context.record_model("tracking", "court-player-episodes-v1@5")
+    return result
+
+
+PERCEPTION_PORTS: dict[str, type[Any]] = {
+    "shuttle": ShuttlePort,
+    "player_detector": PlayerDetectorPort,
+    "pose": PosePort,
+    "player_reid": PlayerReIDPort,
+    "racket": RacketPort,
+    "ocr": OCRPort,
+    "tracking": TrackingPort,
+    "shuttle_association": ShuttleAssociationPort,
+    "content_continuity": ContentContinuityPort,
+}
+
+BASELINE_IMPLEMENTATIONS = {
+    "shuttle": "tracknet-v3",
+    "player_detector": "person-onnx-v1",
+    "pose": "rtmpose-v1",
+    "player_reid": "osnet-appearance-v1",
+    "racket": "racket-geometry-v1",
+    "ocr": "rapidocr-v1",
+    "tracking": "court-player-episodes-v1",
+    "shuttle_association": "coobserved-static-hypotheses-v1",
+    "content_continuity": CONTENT_IMPLEMENTATION,
+}
+
+
+@dataclass(frozen=True, slots=True)
+class PerceptionContext:
+    """Per-session model dependencies, with no global registry or hidden loader.
+
+    The six loader callbacks preserve existing verified artifact loading. Custom
+    providers can use the registry directly and record actual artifact/runtime
+    evidence after construction. No factory receives score or reference labels.
+    """
+
+    registry: ModelRegistry
+    cache: Path
+    fps: float
+    frame_size: tuple[int, int] | None
+    load_shuttle: Callable[[ModelChoice, ModelRegistry, Path], Any]
+    load_detector: Callable[[ModelChoice, ModelRegistry, Path], Any]
+    load_pose: Callable[[ModelChoice, ModelRegistry, Path], Any]
+    load_reid: Callable[[ModelChoice, ModelRegistry], Any]
+    load_racket: Callable[[ModelChoice], Any]
+    load_ocr: Callable[[ModelChoice, ModelRegistry, float], Any]
+    record_model: Callable[[str, str], None]
+    record_runtime: Callable[[str, dict[str, Any]], None]
+
+
+class _ShuttleAdapter:
+    """Own TrackNet's background lifetime without replacing its verified model."""
+
+    def __init__(self, model: Any) -> None:
+        self._raw_model = model
+
+    @property
+    def raw_model(self) -> Any:
+        if self._raw_model is None:
+            raise RuntimeError("shuttle component is closed")
+        return self._raw_model
+
+    @property
+    def seq_len(self) -> int:
+        return int(self.raw_model.seq_len)
+
+    @property
+    def bg(self) -> BackgroundModel:
+        return self.raw_model.bg
+
+    @property
+    def runtime(self) -> dict[str, Any]:
+        return self.raw_model.runtime
+
+    @property
+    def model_ref(self) -> str:
+        return str(self.raw_model.model_ref)
+
+    def detect(self, frames_bgr, shots, *, step, masks):  # type: ignore[no-untyped-def]
+        return self.raw_model.detect(frames_bgr, shots, step=step, masks=masks)
+
+    def detect_with_diagnostics(self, frames_bgr, shots, *, step, masks, selection, indices):  # type: ignore[no-untyped-def]
+        return self.raw_model.detect_with_diagnostics(
+            frames_bgr, shots, step=step, masks=masks, selection=selection, indices=indices
+        )
+
+    @property
+    def supports_diagnostics(self) -> bool:
+        return callable(getattr(self.raw_model, "detect_with_diagnostics", None))
+
+    def reset(self) -> None:
+        old = self.raw_model.bg
+        self.raw_model.bg = BackgroundModel(every=old.every, capacity=old.capacity, refresh=old.refresh)
+
+    def close(self) -> None:
+        model, self._raw_model = self._raw_model, None
+        close = getattr(model, "close", None)
+        if callable(close):
+            close()
+
+
+class _OCRAdapter:
+    """Reset reader search, cadence and ROI while retaining the loaded recognizer."""
+
+    def __init__(self, reader: Any) -> None:
+        self._raw_model = reader
+
+    @property
+    def raw_model(self) -> Any:
+        if self._raw_model is None:
+            raise RuntimeError("ocr component is closed")
+        return self._raw_model
+
+    @property
+    def calls(self) -> int:
+        return int(self.raw_model.calls)
+
+    @property
+    def runtime(self) -> dict[str, Any]:
+        return self.raw_model.runtime
+
+    @property
+    def model_ref(self) -> str:
+        return str(self.raw_model.model_ref)
+
+    def maybe_read(self, frame_idx, image):  # type: ignore[no-untyped-def]
+        return self.raw_model.maybe_read(frame_idx, image)
+
+    def reset(self) -> None:
+        reader = self.raw_model
+        reader.roi, reader._corner, reader._misses = None, 0, 0
+        reader._last, reader.calls = -(10**9), 0
+
+    def close(self) -> None:
+        reader, self._raw_model = self._raw_model, None
+        close = getattr(reader, "close", None)
+        if callable(close):
+            close()
+
+
+def _baseline_factory(kind: str) -> Callable[[PerceptionContext, dict[str, Any]], Any]:
+    def create(context: PerceptionContext, configuration: dict[str, Any]) -> Any:
+        choice = ModelChoice.model_validate(configuration)
+        if kind == "shuttle":
+            model = context.load_shuttle(choice, context.registry, context.cache)
+        elif kind == "player_detector":
+            model = context.load_detector(choice, context.registry, context.cache)
+        elif kind == "pose":
+            model = context.load_pose(choice, context.registry, context.cache)
+        elif kind == "player_reid":
+            model = context.load_reid(choice, context.registry)
+        elif kind == "racket":
+            model = context.load_racket(choice)
+        else:
+            model = context.load_ocr(choice, context.registry, context.fps)
+        if model is None:
+            raise RuntimeError(f"baseline {kind} provider is unavailable")
+        runtime = getattr(model, "runtime", None)
+        if isinstance(runtime, dict):
+            context.record_runtime(kind, runtime)
+        if kind == "shuttle":
+            return _ShuttleAdapter(model)
+        if kind == "ocr":
+            return _OCRAdapter(model)
+        return model
+
+    return create
+
+
+def register_perception_components(registry: ComponentRegistry) -> None:
+    """Register compatible model and tracking baseline ports in a caller-supplied registry.
+
+    Registration is explicit; duplicate providers are rejected by the registry.
+    Baseline providers support two/four/uncertain acquisition. This capability
+    does not infer a format or claim that a downstream singles model is valid
+    for doubles. Backend/artifact verification remains in each existing loader.
+    """
+    for kind, interface in PERCEPTION_PORTS.items():
+        if kind in {"shuttle_association", "content_continuity"}:
+            continue
+        registry.register(
+            ComponentContract(
+                kind=kind,
+                implementation=BASELINE_IMPLEMENTATIONS[kind],
+                version="5" if kind == "tracking" else "3" if kind == "ocr" else "1",
+                input_schema=f"badminton-{kind}-input:v1",
+                output_schema=f"badminton-{kind}-output:v1",
+                interface=interface,
+                context_type=TrackingContext if kind == "tracking" else PerceptionContext,
+                supported_formats=frozenset({"singles", "doubles", "unknown"}),
+                failure_policy="unavailable",
+                stateful=kind in {"shuttle", "ocr", "tracking"},
+                declaration={
+                    "devices": (["cpu"] if kind in {"racket", "tracking"} else ["cpu", "cuda"]),
+                    "backends": {
+                        "shuttle": ["torch-cpu", "torch-cuda", "onnx-cpu", "onnx-cuda", "tensorrt"],
+                        "player_detector": ["onnx-cpu", "onnx-cuda", "tensorrt"],
+                        "pose": ["onnx-cpu", "onnx-cuda", "tensorrt"],
+                        "player_reid": ["torch-cpu", "torch-cuda"],
+                        "racket": ["opencv-cpu"],
+                        "ocr": ["onnx-cpu", "onnx-cuda"],
+                        "tracking": ["none"],
+                    }[kind],
+                    "timeline": "canonical_cfr_frame_index",
+                    "coordinates": "analysis_proxy_image_pixels;BGR_input;shuttle_masks_512x288",
+                    "required_evidence": ["view_eligible_image"],
+                    "optional_evidence": ["verified_target_court", "current_person_and_pose_for_racket"],
+                    **(
+                        {
+                            "scene_foreground": {
+                                "interface": "ForegroundContinuityPort",
+                                "schema": "court-origin-image-regions:v2",
+                                "maximum_regions": 8,
+                                "authority": "image_continuity_only;never_participant_pose_or_identity",
+                                "failure": "overflow_abstains_until_reset;other_providers_use_person_regions",
+                            }
+                        }
+                        if kind == "tracking"
+                        else {}
+                    ),
+                    "state_restore": "recompute_in_frame_order"
+                    if kind in {"shuttle", "ocr", "tracking"}
+                    else "stateless",
+                },
+            ),
+            _tracking_factory if kind == "tracking" else _baseline_factory(kind),
+        )
+
+    def association(context: PerceptionContext, configuration: dict[str, Any]) -> ShuttleAssociationPort:
+        result = CausalShuttleAssociation(fps=context.fps, **configuration.get("params", {}))
+        context.record_model("shuttle_association", "coobserved-static-hypotheses-v1@1")
+        context.record_runtime("shuttle_association", {"backend": "numpy-cpu", "weights": None})
+        return result
+
+    registry.register(
+        ComponentContract(
+            kind="shuttle_association",
+            implementation=BASELINE_IMPLEMENTATIONS["shuttle_association"],
+            version="1",
+            input_schema="badminton-shuttle-candidates:v1",
+            output_schema="badminton-shuttle-association:v2",
+            interface=ShuttleAssociationPort,
+            context_type=PerceptionContext,
+            supported_formats=frozenset({"singles", "doubles", "unknown"}),
+            failure_policy="abstain",
+            stateful=True,
+            declaration={
+                "timeline": "canonical_cfr_frame_index;causal_current_and_prior_observations",
+                "coordinates": "raw_analysis_image_pixels;optional_registered_reference_for_association_only",
+                "devices": ["cpu"],
+                "backends": ["numpy-cpu"],
+                "required_evidence": ["bounded_heatmap_candidates"],
+                "optional_evidence": ["current_verified_image_registration"],
+                "state_restore": "checkpoint_or_recompute_in_frame_order",
+                "score_semantics": "heuristic_support_not_calibrated_probability;experimental",
+            },
+        ),
+        association,
+    )
+
+    def content(context: PerceptionContext, configuration: dict[str, Any]) -> ContentContinuityPort:
+        choice = ModelChoice.model_validate(configuration)
+        if choice.model != "none" or choice.backend not in {"none", "opencv-cpu"}:
+            raise ValueError("content continuity is explicitly weightless OpenCV CPU perception")
+        upgraded = choice.implementation == CONTENT_IMPLEMENTATION_V2
+        result = (ContentContinuityProviderV2 if upgraded else ContentContinuityProvider)(**choice.params)
+        context.record_model(
+            "content_continuity", f"{CONTENT_IMPLEMENTATION_V2}@5" if upgraded else f"{CONTENT_IMPLEMENTATION}@1"
+        )
+        context.record_runtime(
+            "content_continuity",
+            {
+                "backend": "opencv-cpu",
+                "weights": None,
+                "input_dtype": "uint8",
+                "mode": result.mode,
+                "barrier_enabled": result.barrier_enabled,
+                "evidence_schema": "foreground-scene-hypothesis:v5"
+                if upgraded and result.requires_detector_layout
+                else SCENE_CONTINUITY_VERSION,
+                "score_semantics": "uncalibrated_pixel_and_ratio_evidence",
+            },
+        )
+        return result
+
+    registry.register(
+        ComponentContract(
+            kind="content_continuity",
+            implementation=CONTENT_IMPLEMENTATION,
+            version="1",
+            input_schema="badminton-content-continuity-input:v1",
+            output_schema=SCENE_CONTINUITY_VERSION,
+            interface=ContentContinuityPort,
+            context_type=PerceptionContext,
+            supported_formats=frozenset({"singles", "doubles", "unknown"}),
+            failure_policy="abstain",
+            stateful=True,
+            declaration={
+                "timeline": "canonical_cfr_frame_index;current_pixels_and_immediately_previous_regions_only",
+                "coordinates": "analysis_proxy_image_pixels;prior_region_boxes_not_player_identity",
+                "devices": ["cpu"],
+                "backends": ["opencv-cpu"],
+                "weights": None,
+                "required_evidence": ["current_image", "frame_minus_one_target_regions", "explicit_view_validity"],
+                "optional_evidence": ["fresh_carried_or_unknown_detector_provenance"],
+                "state_restore": "owner_bound_checkpoint_or_recompute_in_frame_order",
+                "score_semantics": "uncalibrated_hypothesis;authority_is_explicit_separate_experimental_policy",
+                "modes": ["diagnostic", "barrier_hypothesis_v1"],
+                "default_enabled": False,
+                "bounded_evidence": {"regions": 8, "reasons": 8, "text_characters": 160, "stored_pixel_arrays": 0},
+            },
+        ),
+        content,
+    )
+    registry.register(
+        ComponentContract(
+            kind="content_continuity",
+            implementation=CONTENT_IMPLEMENTATION_V2,
+            version="5",
+            input_schema="badminton-content-continuity-input:v1",
+            output_schema="foreground-scene-hypothesis:v2-or-v5",
+            interface=ContentContinuityPort,
+            context_type=PerceptionContext,
+            supported_formats=frozenset({"singles", "doubles", "unknown"}),
+            failure_policy="abstain",
+            stateful=True,
+            declaration={
+                "timeline": "canonical_cfr_frame_index;current_pixels_and_immediately_previous_regions_only",
+                "coordinates": "analysis_proxy_image_pixels;prior_region_boxes_not_player_identity",
+                "devices": ["cpu"],
+                "weights": None,
+                "required_evidence": ["current_image", "frame_minus_one_target_regions", "explicit_view_validity"],
+                "optional_evidence": ["fresh_carried_or_unknown_detector_provenance"],
+                "state_restore": "owner_bound_checkpoint_or_recompute_in_frame_order",
+                "score_semantics": "uncalibrated_hypothesis;correspondence_barrier_separate_from_appearance",
+                "modes": [
+                    "diagnostic",
+                    "barrier_correspondence_v2",
+                    "barrier_hypothesis_cadence_v2",
+                    "barrier_detector_layout_v2",
+                ],
+                "default_enabled": False,
+                "appearance_history": "detector_layout_preserves_v1_raw_hypotheses;other_modes_are_rejected_controls",
+                "barrier_authority": "explicit_mode;strong_image_policy_or_complete_relative_court_replacement",
+                "acquisition": "relative_image_innovation_requests_one_reusable_current_source_detector_probe",
+                "weak_reset_requires": [
+                    "two_independent_same_channel_relative_witnesses",
+                    "confirmed_preacquisition_format_and_complete_two_or_four_current_court_proposals",
+                    "all_prior_raw_and_verified_camera_aligned_layout_displacement",
+                ],
+                "weak_reset_unknown_policy": "abstain_without_promoting_relative_acquisition_to_raw_fallback",
+                "rejected_controls": ["barrier_correspondence_v2", "barrier_hypothesis_cadence_v2"],
+            },
+        ),
+        content,
+    )

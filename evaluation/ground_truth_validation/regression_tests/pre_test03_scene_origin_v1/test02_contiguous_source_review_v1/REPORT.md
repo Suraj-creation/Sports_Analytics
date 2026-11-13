@@ -1,0 +1,39 @@
+# Test 2: complete contiguous source review
+
+All 111 frames at **800–910 (26.667–30.333 s)** and all 86 at **11690–11775 (389.667–392.500 s)** were visually inspected with their preserved baseline and current overlays: 197 distinct source positions and 591 panels across 25 aspect-preserving sheets. Selected original-size sources (904, 11715, 11718, 11740) and two closer source-crop sequences supplement the sheets. This is an independent agent diagnostic review; physical contact, class, winner and exact boundary ground truth remain unavailable.
+
+Here “baseline” means the completed Test 2 `improved_v1` fresh neural run; “current” means the completed `2418ab8` candidate-v4 neural run. These are the actual two producer caches used by the closed renderer. They are **not** outputs from the newer frozen `5ae6148` candidate whose Test 1 validation is underway. The retained model metadata identifies TrackNetV3@3.0, RF-DETR small@1.4.2, RTMPose@1.0 and the geometric racket observer. The current scene/tracking policy versions differ from the baseline, as recorded per frame. Appearance, track numbers and scoreboard row names do not establish physical named identity.
+
+The closed packages pass all **2,263 artifact hashes**, **2,030 recorded input bindings**, and **591 image pixel/shape receipts**. Every source/canonical proxy timestamp agrees at the rational frame time; each original cache segment agrees with its frozen snapshot. The two packages bind the same source SHA256 `4d687b4240fd501fb723c50588ecd095b9d9863299108c9d43b77c9587ba3c0a`. PNG pixels were read back and hashed as BGR arrays, consistent with the original decoder receipt. This review performs no new video decoding, neural inference, numeric evaluation or pipeline edit. See [input verification](input_verification.json), [frame register](frame_register.json) and [sheet index](sheet_index.json).
+
+## Window 800–910: preparation and later action
+
+Across every frame, court/background and both athletes evolve continuously; there is no visible temporal edit. At 800–823 the athletes take small settling steps. From about 824 onward, the near red athlete holds the service posture while the far blue athlete waits. Frame 809 remains part of that preparation. A high contact-fusion value there is insufficient to establish physical impact or rally onset.
+
+The near athlete's forward racket movement and departing bright trace become apparent around 904–907, with the far athlete in a receiving posture and subsequently reacting. A deliberately broad **draft action-onset review range of 900–907** is reasonable for a future labelled review. It is not an exact service/contact label, accepted benchmark correction or calibrated confidence interval. See [all final service frames](row03_13.jpg), [904–910](row03_14.jpg) and [closer source sequence](row03_service_detail.jpg). The independent source review does not determine the full rally end because this source window stops at 910.
+
+The recorded metric difference must remain visible. Against generated rally row 3 `[807,1040)`, baseline `[809,1039)` has IoU **0.9871244635**, while current `[904,1039)` has **0.5793991416**; start error increases from +2 to +97 frames. Against coarse row 3 `[900,1080)`, the same predictions have IoU **0.5129151292 → 0.75**, with start error −91 → +4 frames. These conflicting reference agreements are preserved, rather than redefining reference start 807 from visual interpretation. The source sequence explains why agreement with the earlier generated boundary need not measure physical service accuracy.
+
+## Window 11690–11775: edit, preparation, short exchange
+
+The transition **11690→11691** abruptly relocates both athletes while court and broadcast layout remain fixed. It is a real same-camera temporal edit. Current scene epoch changes **20→21**, invokes fresh detection, removes the old near-position context and returns two athlete boxes. Baseline stays in epoch 13 at that instant, with the old near box over the previous location. This is a scene-state distinction; it does not prove that either subsequent contact timestamp is correct. See [edit and immediate continuation](short_01.jpg).
+
+From 11691 through roughly 11712, the near blue athlete prepares/holds the racket and the far red athlete moves into readiness. Around 11713–11718 the near athlete's action is followed by a small bright airborne trace departing toward the far athlete. A broad **draft first-action review range of 11710–11716** preserves uncertainty about the exact impact. The source at 11715 already contains a small free bright trace above the near athlete; accepting that frame as exact impact solely because an older fusion score peaked there would be unjustified. See [launch source detail](short_launch_detail.jpg) and [11714–11721](short_04.jpg).
+
+Through 11722–11745 the far athlete adjusts and makes a return-like racket movement as the near athlete reacts forward. Frame 11740 gives useful full-size evidence of this action and a nearby bright projectile. The original raw observations remain missing at 11732–11733, followed by reacquisition at 11734; this review does not turn those frames into observed coordinates. The near athlete then continues toward the net and the athletes settle near the front court through 11775. **There is no further visible temporal edit anywhere in 11691–11775.** Exact impacts, number of valid shots, shot classes, point winner and legal rally end remain unlabelled. See [reply](short_06.jpg), [return movement](short_07.jpg) and [aftermath](short_08.jpg).
+
+The coarse reference row 33 `[11700,11760)` was matched by baseline `[11715,11751)` at IoU **0.6** and is missed by current. The source supports a genuine short action sequence in this region, so the lost coarse event remains a material diagnostic limitation. It does not justify promoting the unreliable 11715 candidate to a physically probable impact or lowering a global candidate threshold. Existing bounded probes show its score **0.905434 → 0.282427**, below unchanged 0.35 selection; old incoming direction was below measured localization uncertainty. Current later candidates alone do not provide the old two-opponent short-exchange proof. This review adds visual chronology to that causal investigation and leaves the physical contact verdict unknown.
+
+## Retained metrics and review coverage
+
+| Reference | Baseline F1 → current F1 | Mean matched IoU before → after |
+|---|---:|---:|
+| Coarse `Test2_Full.csv` | 0.920000 → 0.912752 | 0.830665 → 0.838095 |
+| Generated `Test2_Full_rally.csv` | 0.918919 → 0.925170 | 0.849311 → 0.830790 |
+| Generated `win_predictions.csv` interval agreement | 0.918919 → 0.925170 | 0.849311 → 0.830790 |
+
+These are copied from the completed comparison, with original matching policy and conditional IoU denominators; no metric was recalculated or relabelled. Winner accuracy is not inferred from the interval agreement. Exact detection counts, per-row boundary/duration errors and source JSON hashes are in [preserved metric extract](preserved_metric_extract.json).
+
+The separate sealed reviews cover the 75 initial controls and all four pending batches (128+128+128+66). Adding this actual contiguous review closes the earlier visual-coverage gap. Their seven package frame sets contain 722 rendered rows but **719 distinct positions**, covering all **664 requested plan positions** plus 55 additional context positions. This is set-based coverage of a diagnostic selection, not 664 independent labelled examples, exhaustive video review or aggregate physical accuracy. Existing review receipts and artifact hashes were checked; [coverage reconciliation](coverage_reconciliation.json) preserves their separate authorship and lineage.
+
+No original annotation, rendered evidence, candidate source, active worker output or previous result changed. The newer Test 1/Test 2 acceptance and eventual merge/cleanup remain separate gates.

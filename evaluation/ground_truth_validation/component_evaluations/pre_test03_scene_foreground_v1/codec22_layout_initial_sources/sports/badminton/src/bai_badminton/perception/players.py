@@ -1,0 +1,733 @@
+"""Player detection, tracking and pose.
+
+* **Detection** — RF-DETR (Apache-2.0, ONNX via ``rtmlib``; YOLOX-humanart as an alternative) on
+  a court region of interest; person class only; boxes whose feet fall outside the (padded)
+  court polygon are discarded (umpires, line judges, coaches, crowd).
+* **Tracking** — ByteTrack (Roboflow ``trackers``, Apache-2.0).  The detector runs every
+  ``stride`` frames; in between, the last observed boxes are carried forward without a new detection.
+* **Pose** — RTMPose (Apache-2.0) top-down on full-resolution crops of court-player candidates.
+* **Appearance** — an HSV torso signature per box for identity re-linking after cuts.
+
+ONNX Runtime sessions are created by the platform (``ort_providers``) so TensorRT / CUDA / CPU
+execution providers and the TensorRT engine cache are controlled per profile.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from hashlib import sha256
+from pathlib import Path
+from typing import Any
+
+import cv2
+import numpy as np
+from numpy.typing import NDArray
+
+from bai_badminton.court import HALF_LEN, WIDTH_DOUBLES, Homography
+from bai_badminton.identity import hsv_signature
+from bai_badminton.perception.foreground import CourtForegroundMemory
+from bai_badminton.perception.player_association import PersistentPlayerAssociator
+from bai_badminton.perception.scene_change import ForegroundRegion
+from bai_badminton.perception_types import PersonObs
+
+PERSON = 0
+TRACKER_ACTIVATION_POLICY = "initial_observation_counts_v2"
+
+
+@dataclass(frozen=True, slots=True)
+class PlayerDetectionProbe:
+    """Detached detector outputs tied to one exact decoded source image.
+
+    Probing does not advance ByteTrack, participant identity, or pose. The same
+    outputs may subsequently be consumed once by the normal tracking step.
+    """
+
+    frame_idx: int
+    image_shape: tuple[int, int, int]
+    image_sha256: str
+    boxes: tuple[tuple[float, float, float, float], ...]
+    scores: tuple[float, ...]
+    crop_box: tuple[int, int, int, int]
+    admitted_indices: tuple[int, ...]
+
+    def __post_init__(self) -> None:
+        if type(self.frame_idx) is not int or self.frame_idx < 0:
+            raise ValueError("detector probe requires a canonical source frame")
+        if (
+            len(self.image_shape) != 3
+            or any(type(v) is not int or v <= 0 for v in self.image_shape)
+            or self.image_shape[2] != 3
+        ):
+            raise ValueError("detector probe requires a valid source image shape")
+        if (
+            len(self.image_sha256) != 64
+            or any(c not in "0123456789abcdef" for c in self.image_sha256)
+            or len(self.boxes) != len(self.scores)
+            or len(self.boxes) > 4096
+        ):
+            raise ValueError("detector probe source or bounded output is invalid")
+        for box, score in zip(self.boxes, self.scores, strict=True):
+            if len(box) != 4 or not np.isfinite([*box, score]).all() or not 0 <= score <= 1:
+                raise ValueError("detector probe requires finite boxes and supports")
+            if box[2] <= box[0] or box[3] <= box[1]:
+                raise ValueError("detector probe boxes must have positive extent")
+        if len(set(self.admitted_indices)) != len(self.admitted_indices) or any(
+            type(i) is not int or not 0 <= i < len(self.boxes) for i in self.admitted_indices
+        ):
+            raise ValueError("invalid detector probe region admission")
+
+
+def _swap_session(tool: Any, onnx_path: Path, providers: list[Any]) -> None:
+    """Replace an rtmlib tool's ORT session with one using the platform's providers."""
+    import onnxruntime as ort
+
+    so = ort.SessionOptions()
+    so.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+    tool.session = ort.InferenceSession(str(onnx_path), sess_options=so, providers=providers)
+
+
+@dataclass
+class CourtROI:
+    """Court polygon in image px (padded) used to crop detection and gate boxes by their feet."""
+
+    polygon: NDArray[np.float32]  # (N, 2)
+    pad_px: float = 60.0
+    homography: Homography | None = None
+    side_margin_m: float = 0.35
+    end_margin_m: float = 0.75
+
+    def contains_feet(self, bbox: NDArray[np.float64], *, allow_runoff: bool = True) -> bool:
+        feet = (float((bbox[0] + bbox[2]) / 2), float(bbox[3]))
+        if self.homography is not None:
+            x, y = self.homography.image_to_court(np.array([feet]))[0]
+            return bool(
+                np.isfinite([x, y]).all()
+                and abs(x) <= WIDTH_DOUBLES / 2 + (self.side_margin_m if allow_runoff else 0.0)
+                and abs(y) <= HALF_LEN + (self.end_margin_m if allow_runoff else 0.0)
+            )
+        return cv2.pointPolygonTest(self.polygon.reshape(-1, 1, 2), feet, True) >= (
+            -self.pad_px if allow_runoff else 0.0
+        )
+
+    def crop_box(self, w: int, h: int, top_margin: float = 0.25) -> tuple[int, int, int, int]:
+        """Axis-aligned crop around the court, extended upwards for the far player's body/jumps."""
+        x1, y1 = self.polygon.min(axis=0)
+        x2, y2 = self.polygon.max(axis=0)
+        ext = (y2 - y1) * top_margin
+        return (
+            int(max(0, x1 - self.pad_px)),
+            int(max(0, y1 - ext - self.pad_px)),
+            int(min(w, x2 + self.pad_px)),
+            int(min(h, y2 + self.pad_px)),
+        )
+
+
+class PlayerDetector:
+    def set_diagnostics(self, enabled: bool, top_k: int = 3) -> None:
+        self._diagnostic_top_k = top_k if enabled else 0
+        self.last_diagnostic = None
+
+    def __init__(
+        self,
+        onnx_path: Path,
+        input_size: tuple[int, int],
+        providers: list[Any],
+        score_thr: float = 0.35,
+        kind: str = "rfdetr",
+    ) -> None:
+        if kind == "rfdetr":
+            from rtmlib import RFDETR
+
+            self.tool = RFDETR(str(onnx_path), model_input_size=(input_size[1], input_size[0]), score_thr=score_thr)
+        else:
+            from rtmlib import YOLOX
+
+            self.tool = YOLOX(str(onnx_path), model_input_size=(input_size[1], input_size[0]), score_thr=score_thr)
+        _swap_session(self.tool, onnx_path, providers)
+        self.kind = kind
+
+    def __call__(self, img: NDArray[np.uint8]) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+        """Person boxes (N,4) xyxy and scores (N,) in ``img`` coordinates."""
+        if self.kind == "rfdetr":
+            return self._rfdetr(img)
+        return self._yolox(img)
+
+    def _yolox(self, img: NDArray[np.uint8]) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+        # rtmlib's human-mode postprocessor discards scores. Decode the existing
+        # export directly instead of replacing all detector confidences with 1.
+        pre, ratio = self.tool.preprocess(img)
+        output = np.asarray(self.tool.inference(pre)[0], dtype=np.float64)
+        if output.ndim != 3 or output.shape[0] != 1 or output.shape[-1] < 5:
+            raise ValueError(f"YOLOX expected (1, queries, >=5) output shape, got {output.shape}")
+        if not np.isfinite(ratio) or ratio <= 0:
+            raise ValueError(f"YOLOX invalid preprocessing scale {ratio}")
+        prediction = output[0].copy()
+        person = np.ones(len(prediction), bool)
+        if prediction.shape[1] == 5:  # HumanArt export with embedded NMS: xyxy + score
+            boxes, scores = prediction[:, :4] / ratio, prediction[:, 4]
+        else:
+            height, width = self.tool.model_input_size
+            grids, scales = [], []
+            for stride in (8, 16, 32):
+                yy, xx = np.mgrid[: height // stride, : width // stride]
+                grids.append(np.column_stack((xx.ravel(), yy.ravel())))
+                scales.append(np.full(xx.size, stride))
+            grid, scale = np.concatenate(grids), np.concatenate(scales)[:, None]
+            if len(grid) != len(prediction):
+                raise ValueError(f"YOLOX grid/query shape mismatch: {len(grid)} != {len(prediction)}")
+            centres = (prediction[:, :2] + grid) * scale
+            sizes = np.exp(np.clip(prediction[:, 2:4], -50, 50)) * scale
+            boxes = np.concatenate((centres - sizes * 0.5, centres + sizes * 0.5), axis=1) / ratio
+            scores = prediction[:, 4] * prediction[:, 5 + PERSON]
+            person = prediction[:, 5:].argmax(axis=1) == PERSON
+        h, w = img.shape[:2]
+        boxes[:, (0, 2)] = np.clip(boxes[:, (0, 2)], 0, w)
+        boxes[:, (1, 3)] = np.clip(boxes[:, (1, 3)], 0, h)
+        valid = (
+            person
+            & np.isfinite(prediction).all(axis=1)
+            & np.isfinite(scores)
+            & (scores >= self.tool.score_thr)
+            & (scores <= 1)
+            & (boxes[:, 2:] > boxes[:, :2]).all(axis=1)
+        )
+        return _nms(boxes[valid], scores[valid], self.tool.nms_thr)
+
+    def _rfdetr(self, img: NDArray[np.uint8]) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+        # rtmlib's "human" mode drops scores, which ByteTrack needs — decode the raw DETR outputs:
+        # boxes (1, Q, 4) normalised cxcywh, logits (1, Q, C) with background at index 0.
+        # RF-DETR's exported backbone expects RGB. rtmlib only normalises and
+        # transposes its input; decoded frames and court crops here are BGR.
+        pre, ori = self.tool.preprocess(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+        outs = self.tool.inference(pre)
+        if len(outs) != 2:
+            raise ValueError(f"RF-DETR expected two output tensors, got {len(outs)}")
+        outs = [np.asarray(output) for output in outs]
+        if any(output.ndim != 3 for output in outs):
+            raise ValueError(f"RF-DETR expected (1, queries, channels) shapes, got {[o.shape for o in outs]}")
+        boxes, logits = (outs[0], outs[1]) if outs[0].shape[-1] == 4 else (outs[1], outs[0])
+        if boxes.shape[0] != 1 or boxes.shape[2] != 4 or logits.shape[:2] != boxes.shape[:2] or logits.shape[2] < 2:
+            raise ValueError(f"RF-DETR incompatible box/logit shapes: {boxes.shape}, {logits.shape}")
+        prob = 1.0 / (1.0 + np.exp(-np.clip(logits[0].astype(np.float64), -700, 700)))
+        person = prob[:, PERSON + 1]
+        best = prob[:, 1:].argmax(axis=1)
+        keep = (
+            (person >= self.tool.score_thr)
+            & (best == PERSON)
+            & np.isfinite(logits[0]).all(axis=1)
+            & np.isfinite(boxes[0]).all(axis=1)
+            & (boxes[0, :, 2:] > 0).all(axis=1)
+        )
+        b = boxes[0][keep].astype(np.float64)
+        h, w = float(ori[0]), float(ori[1])
+        xyxy = np.stack(
+            [
+                (b[:, 0] - b[:, 2] / 2) * w,
+                (b[:, 1] - b[:, 3] / 2) * h,
+                (b[:, 0] + b[:, 2] / 2) * w,
+                (b[:, 1] + b[:, 3] / 2) * h,
+            ],
+            axis=1,
+        )
+        xyxy[:, (0, 2)] = np.clip(xyxy[:, (0, 2)], 0, w)
+        xyxy[:, (1, 3)] = np.clip(xyxy[:, (1, 3)], 0, h)
+        valid = (xyxy[:, 2:] > xyxy[:, :2]).all(axis=1)
+        result = _nms(xyxy[valid], person[keep][valid], 0.6)
+        top_k = getattr(self, "_diagnostic_top_k", 0)
+        if top_k:
+            rejected = []
+            for index in np.argsort(-person, kind="stable"):
+                if keep[index]:
+                    continue
+                box = boxes[0, index].astype(np.float64)
+                reason = (
+                    "invalid_query"
+                    if not np.isfinite(box).all() or not np.isfinite(logits[0, index]).all() or min(box[2:]) <= 0
+                    else "wrong_class"
+                    if best[index] != PERSON
+                    else "below_threshold"
+                )
+                rejected.append(
+                    {
+                        "query": int(index),
+                        "person_support": float(person[index]) if np.isfinite(person[index]) else None,
+                        "normalized_cxcywh": box.tolist() if np.isfinite(box).all() else None,
+                        "reason": reason,
+                    }
+                )
+                if len(rejected) == top_k:
+                    break
+            self.last_diagnostic = {
+                "schema": "player-detector-diagnostics:v1",
+                "provider": "rfdetr",
+                "coordinate_space": "normalized_cxcywh_of_detector_crop",
+                "queries": len(person),
+                "below_threshold_count": int((person < self.tool.score_thr).sum()),
+                "wrong_class_count": int((best != PERSON).sum()),
+                "query_counts_overlap": True,
+                "pre_clip_admitted": int(keep.sum()),
+                "pre_nms_admitted": int(valid.sum()),
+                "post_nms_admitted": len(result[0]),
+                "nms_suppressed_count": int(valid.sum()) - len(result[0]),
+                "rejected_queries": rejected,
+            }
+        return result
+
+
+def _nms(
+    boxes: NDArray[np.float64], scores: NDArray[np.float64], iou: float
+) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    if len(boxes) == 0:
+        return boxes.reshape(0, 4), scores
+    xywh = np.concatenate([boxes[:, :2], boxes[:, 2:] - boxes[:, :2]], axis=1)
+    idx = cv2.dnn.NMSBoxes(xywh.tolist(), scores.tolist(), 0.0, iou)
+    idx = np.asarray(idx).reshape(-1)
+    return boxes[idx], scores[idx]
+
+
+class PoseEstimator:
+    def __init__(self, onnx_path: Path, input_size: tuple[int, int], providers: list[Any]) -> None:
+        from rtmlib import RTMPose
+
+        self.tool = RTMPose(str(onnx_path), model_input_size=input_size)
+        _swap_session(self.tool, onnx_path, providers)
+
+    def __call__(self, img: NDArray[np.uint8], boxes: list[NDArray[np.float64]]) -> list[NDArray[np.float64]]:
+        if not boxes:
+            return []
+        # The checkpoint's MMDeploy pipeline specifies Normalize(to_rgb=True).
+        # rtmlib performs the affine crop and normalisation, but no colour swap.
+        kps, scores = self.tool(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), bboxes=[b.tolist() for b in boxes])
+        return [np.concatenate([kps[i], scores[i][:, None]], axis=1).astype(np.float64) for i in range(len(boxes))]
+
+
+class PlayerTracker:
+    """ByteTrack over detector outputs using elapsed video time between detections."""
+
+    def __init__(self, fps: float) -> None:
+        from bai_badminton.perception._bytetrack import ObservationCountByteTrack
+
+        self._tracker = ObservationCountByteTrack(
+            frame_rate=fps,
+            lost_track_buffer=30,  # expressed in 30-FPS frames: one second at any source rate
+            track_activation_threshold=0.4,
+            minimum_consecutive_frames=1,
+            high_conf_det_threshold=0.5,
+        )
+        self.fps = fps
+
+    def reset(self) -> None:
+        self.__init__(self.fps)  # type: ignore[misc]
+
+    def update(
+        self, boxes: NDArray[np.float64], scores: NDArray[np.float64], frame_idx: int
+    ) -> list[tuple[int, NDArray[np.float64], float]]:
+        import supervision as sv
+
+        det = sv.Detections(
+            xyxy=boxes.astype(np.float32).reshape(-1, 4),
+            confidence=scores.astype(np.float32),
+            class_id=np.zeros(len(boxes), int),
+        )
+        # Detector cadence changes with rally state. Timestamp mode gives the
+        # motion model and lost-track expiry elapsed video time, not call count.
+        tracked = self._tracker.update(det, timestamp=frame_idx / self.fps)
+        out = []
+        for i in range(len(tracked)):
+            tid = int(tracked.tracker_id[i]) if tracked.tracker_id is not None else -1
+            if tid < 0:
+                continue
+            conf = float(tracked.confidence[i]) if tracked.confidence is not None else 1.0
+            out.append((tid, np.asarray(tracked.xyxy[i], dtype=np.float64), conf))
+        return out
+
+
+class PlayerPerception:
+    """Detection (strided) → tracking → court gating → pose → appearance, per frame."""
+
+    def __init__(
+        self,
+        detector: PlayerDetector | None,
+        pose: PoseEstimator | None,
+        fps: float,
+        det_stride: int = 2,
+        pose_stride: int = 1,
+        max_players: int = 2,
+        reid: Any | None = None,
+        identity_retention_s: float = 1.0,
+    ) -> None:
+        self.detector, self.pose = detector, pose
+        self.last_detector_observed = False
+        self.last_capacity_limited = False
+        self.tracker = PlayerTracker(fps) if detector is not None else None
+        self.det_stride, self.pose_stride = max(1, det_stride), max(1, pose_stride)
+        self.max_players = max_players
+        self.reid = reid
+        self._reid_fingerprint = getattr(reid, "fingerprint", None)
+        self._associator = (
+            PersistentPlayerAssociator(fps, retention_seconds=identity_retention_s) if reid is not None else None
+        )
+        self.last_identity_error: str | None = None
+        self.roi: CourtROI | None = None
+        self._last: list[PersonObs] = []
+        self._admitted: dict[int, int] = {}
+        # Last court-supported anchor time and latest matched continuity box.
+        # An outside observation may move the box but cannot renew membership.
+        self._court_tracks: dict[int, tuple[int, NDArray[np.float64]]] = {}
+        self._last_detection_frame: int | None = None
+        self.fps = fps
+        self._diagnostic_top_k = 0
+        self.last_diagnostic: dict[str, Any] | None = None
+        self._force_detection = False
+        self._foreground = CourtForegroundMemory(fps)
+
+    def foreground_regions(self, frame_idx: int) -> tuple[ForegroundRegion, ...]:
+        """Detached scene-only regions; these never authorize participants."""
+        return self._foreground.at(frame_idx)
+
+    def reset_foreground(self) -> None:
+        self._foreground.reset()
+
+    def set_diagnostics(self, enabled: bool, top_k: int = 3) -> None:
+        if type(enabled) is not bool or type(top_k) is not int or not 1 <= top_k <= 8:
+            raise ValueError("invalid bounded player diagnostic configuration")
+        self._diagnostic_top_k = top_k if enabled else 0
+        self.last_diagnostic = None
+        configure = getattr(self.detector, "set_diagnostics", None)
+        if callable(configure):
+            configure(enabled, top_k)
+
+    @property
+    def identity_policy(self) -> dict[str, Any]:
+        """Cache provenance for association behavior; no neural features leave this object."""
+        return {
+            "state": "degraded"
+            if self.last_identity_error is not None
+            else "enabled"
+            if self._associator
+            else "disabled",
+            "model": self._reid_fingerprint,
+            "policy": self._associator.policy_fingerprint if self._associator else "bytetrack_birth_activation_v2",
+            "tracking_activation": TRACKER_ACTIVATION_POLICY,
+            "court_membership": "observed_court_anchor_lease_v2",
+            "scene_foreground": "court_origin_image_continuity_v1",
+        }
+
+    def set_roi(self, roi: CourtROI | None) -> None:
+        self.roi = roi
+
+    def on_cut(self) -> None:
+        self.last_diagnostic = None
+        if self.tracker is not None:
+            self.tracker.reset()
+        self._last = []
+        self._admitted.clear()
+        self._court_tracks.clear()
+        self._foreground.reset()
+        self._last_detection_frame = None
+        self._force_detection = True
+        if self._associator is not None:
+            self._associator.reset()
+
+    def probe_detection(self, frame_idx: int, img: NDArray[np.uint8]) -> PlayerDetectionProbe | None:
+        """Acquire current pixels without changing tracker/identity state."""
+        if self.detector is None:
+            return None
+        h, w = img.shape[:2]
+        crop = self.roi.crop_box(w, h) if self.roi is not None else (0, 0, w, h)
+        x0, y0, x1, y1 = crop
+        boxes, scores = self.detector(img[y0:y1, x0:x1])
+        boxes = np.asarray(boxes, dtype=np.float64).reshape(-1, 4)
+        scores = np.asarray(scores, dtype=np.float64).reshape(-1)
+        if len(boxes):
+            boxes = boxes + np.asarray([x0, y0, x0, y0], dtype=np.float64)
+        keep, _ = self._roi_admission(boxes, frame_idx)
+        return PlayerDetectionProbe(
+            frame_idx,
+            tuple(img.shape),
+            sha256(img.tobytes()).hexdigest(),
+            tuple(tuple(float(v) for v in box) for box in boxes),
+            tuple(float(v) for v in scores),
+            crop,
+            tuple(int(i) for i in np.flatnonzero(keep)),
+        )
+
+    def _roi_admission(self, boxes: NDArray, frame_idx: int) -> tuple[NDArray[np.bool_], set[int]]:
+        keep = np.ones(len(boxes), dtype=bool)
+        continuing: set[int] = set()
+        if self.roi is not None and len(boxes):
+            keep = np.asarray([self.roi.contains_feet(box) for box in boxes], dtype=bool)
+            history = [(tid, value) for tid, value in self._court_tracks.items() if frame_idx - value[0] <= self.fps]
+            if history:
+                overlap = _box_iou(boxes, np.asarray([value[1][1] for value in history])) >= 0.3
+                for i in range(len(boxes)):
+                    matches = np.flatnonzero(overlap[i])
+                    if len(matches) == 1 and overlap[:, matches[0]].sum() == 1:
+                        continuing.add(history[int(matches[0])][0])
+                        keep[i] = True
+        return keep, continuing
+
+    def process(
+        self,
+        frame_idx: int,
+        img: NDArray[np.uint8],
+        strides: tuple[int, int] | None = None,
+        *,
+        detection_probe: PlayerDetectionProbe | None = None,
+    ) -> list[PersonObs]:
+        self.last_detector_observed = False
+        self.last_capacity_limited = False
+        det_stride, pose_stride = strides or (self.det_stride, self.pose_stride)
+        if getattr(self, "_diagnostic_top_k", 0):
+            self.last_diagnostic = {
+                "schema": "player-tracking-diagnostics:v1",
+                "frame_idx": frame_idx,
+                "detector_stride": det_stride,
+                "pose_stride": pose_stride,
+                "detector_executed": False,
+                "reason": "provider_unavailable"
+                if self.detector is None
+                else "detector_disabled"
+                if det_stride == 0
+                else "scheduled_carry",
+            }
+        if self.detector is None or det_stride == 0:
+            self._foreground.reset()
+            return []
+        if detection_probe is not None and self._last_detection_frame == frame_idx:
+            raise ValueError("current detector probe was already consumed by tracking")
+        if frame_idx % det_stride != 0 and detection_probe is None and not self._force_detection:
+            return self._carry(frame_idx, img, pose_stride, det_stride)
+        h, w = img.shape[:2]
+        x0, y0 = 0, 0
+        view = img
+        if self.roi is not None:
+            x0, y0, x1, y1 = self.roi.crop_box(w, h)
+            view = img[y0:y1, x0:x1]
+        if detection_probe is not None:
+            if (
+                detection_probe.frame_idx != frame_idx
+                or detection_probe.image_shape != tuple(img.shape)
+                or detection_probe.image_sha256 != sha256(img.tobytes()).hexdigest()
+            ):
+                raise ValueError("detector probe differs from the current source frame/image")
+            boxes = np.asarray(detection_probe.boxes, dtype=np.float64).reshape(-1, 4)
+            scores = np.asarray(detection_probe.scores, dtype=np.float64)
+            # Probe boxes already use full-image coordinates.
+            boxes = boxes - [x0, y0, x0, y0]
+        else:
+            boxes, scores = self.detector(view)
+        self.last_detector_observed = True
+        self._last_detection_frame = frame_idx
+        self._force_detection = False
+        if len(boxes):
+            boxes = boxes + np.array([x0, y0, x0, y0], dtype=np.float64)
+        self._foreground.update(
+            frame_idx,
+            np.asarray(boxes, dtype=float).reshape(-1, 4),
+            np.asarray([self.roi is not None and self.roi.contains_feet(box) for box in boxes], dtype=bool),
+        )
+        if self.last_diagnostic is not None:
+            self.last_diagnostic.update(
+                detector_executed=True,
+                reason="detector_ran",
+                crop_origin=[x0, y0],
+                pre_roi_count=len(boxes),
+                detector=getattr(self.detector, "last_diagnostic", None),
+            )
+        self._court_tracks = {
+            tid: (last, box) for tid, (last, box) in self._court_tracks.items() if frame_idx - last <= self.fps
+        }
+        keep, continuing = self._roi_admission(boxes, frame_idx)
+        if self.roi is not None and len(boxes):
+            # Bbox bottoms are ground-plane feet only while grounded. A known
+            # athlete can jump above a baseline or run beyond a sideline. Keep
+            # a uniquely overlapping current detection of that existing track;
+            # do not admit unrelated spectators by expanding the court mask.
+            if self.last_diagnostic is not None:
+                self.last_diagnostic["roi_rejected_count"] = int((~keep).sum())
+                self.last_diagnostic["roi_rejected"] = [
+                    {
+                        "bbox": boxes[i].tolist(),
+                        "support": float(scores[i]),
+                        "reason": "outside_court_and_no_unique_continuity",
+                    }
+                    for i in np.flatnonzero(~keep)[: self._diagnostic_top_k]
+                ]
+            boxes, scores = boxes[keep], scores[keep]
+        if self.last_diagnostic is not None:
+            self.last_diagnostic["post_roi_count"] = len(boxes)
+        if self.tracker is None:
+            self.tracker = PlayerTracker(self.fps)
+        tracks = self.tracker.update(boxes, scores, frame_idx)
+        if self.last_diagnostic is not None:
+            self.last_diagnostic["tracker_count"] = len(tracks)
+        self._admitted = {tid: last for tid, last in self._admitted.items() if frame_idx - last <= 2 * self.fps}
+        if self.roi is not None:
+            tracks = [
+                t
+                for t in tracks
+                if self.roi.contains_feet(t[1], allow_runoff=t[0] in self._admitted) or t[0] in continuing
+            ]
+        # A doubles overflow is ambiguous: dropping a lower-ranked track could
+        # discard a player. Withhold all participant evidence for this frame
+        # and its carried frames rather than treating the survivors as certain.
+        if self.max_players >= 4 and len(tracks) > self.max_players + 2:
+            if self.last_diagnostic is not None:
+                self.last_diagnostic.update(
+                    reason="capacity_withheld", post_track_roi_count=len(tracks), returned_count=0
+                )
+            self.last_capacity_limited = True
+            self.last_detector_observed = False
+            self._last = []
+            return []
+        self._admitted.update({t[0]: frame_idx for t in tracks})
+        tracks.sort(key=lambda t: -t[2] * (t[1][3] - t[1][1]))
+        tracks = tracks[: self.max_players + 2]
+        observed = _unique_detection_matches(tracks, boxes)
+        for (tid, box, _), matched in zip(tracks, observed, strict=True):
+            if matched and self.roi is not None:
+                if self.roi.contains_feet(box):
+                    self._court_tracks[tid] = (frame_idx, box.copy())
+                elif tid in self._court_tracks:
+                    # Retain spatial continuity during a moving jump/runoff,
+                    # while the original court observation's one-second lease
+                    # remains unchanged. Otherwise a spectator handover could
+                    # refresh its own authority forever outside the court.
+                    anchor, _ = self._court_tracks[tid]
+                    self._court_tracks[tid] = (anchor, box.copy())
+        canonical = [tid for tid, _, _ in tracks]
+        reasons = ["bytetrack_v1"] * len(tracks)
+        if self._associator is not None:
+            features = None
+            selected = [
+                i
+                for i, (_, box, conf) in enumerate(tracks)
+                if observed[i]
+                and conf >= 0.5
+                and np.isfinite(box).all()
+                and 0 <= box[0] < box[2] <= w
+                and 0 <= box[1] < box[3] <= h
+            ]
+            if self.reid is not None and selected:
+                try:
+                    features = np.zeros((len(tracks), 512), dtype=np.float32)
+                    features[selected] = self.reid.embed(img, [tracks[i][1] for i in selected])
+                except (OSError, ValueError, RuntimeError, ImportError) as exc:
+                    # Keep the canonical namespace after failure. Reverting to raw
+                    # ByteTrack IDs could silently re-use another person's identity.
+                    self.last_identity_error = f"{type(exc).__name__}: {exc}"[:300]
+                    self.reid, features = None, None
+            canonical = self._associator.update(frame_idx, tracks, features, observed=observed)
+            reasons = self._associator.last_reason
+        persons = [
+            PersonObs(
+                track_id=canonical[i],
+                bbox=b,
+                conf=c,
+                raw_track_id=tid,
+                detector_matched=observed[i],
+                identity_method=reasons[i],
+            )
+            for i, (tid, b, c) in enumerate(tracks)
+        ]
+        self._attach(frame_idx, img, persons, pose_stride)
+        self._last = persons
+        if self.last_diagnostic is not None:
+            self.last_diagnostic.update(
+                returned_count=len(persons),
+                fresh_matched_count=sum(p.detector_matched is True for p in persons),
+                pose_rows=sum(p.kps is not None for p in persons),
+            )
+        return persons
+
+    def _carry(self, frame_idx: int, img: NDArray[np.uint8], pose_stride: int, det_stride: int) -> list[PersonObs]:
+        self._foreground.carry(frame_idx)
+        # Membership time is measured on every source frame, including frames
+        # between detector ticks. A carried box cannot extend an expired lease.
+        self._court_tracks = {
+            tid: value for tid, value in self._court_tracks.items() if frame_idx - value[0] <= self.fps
+        }
+        if self._last_detection_frame is None or frame_idx - self._last_detection_frame > det_stride:
+            self._foreground.reset()
+            # Scene gating can skip process() for a long interval. Returning to
+            # the main camera between detector ticks must not revive old boxes.
+            if self.last_diagnostic is not None:
+                self.last_diagnostic.update(reason="stale_carry_rejected", returned_count=0)
+            return []
+        persons = [
+            PersonObs(
+                track_id=p.track_id,
+                bbox=p.bbox.copy(),
+                conf=p.conf * 0.98,
+                raw_track_id=p.raw_track_id,
+                detector_matched=False,
+                identity_method=p.identity_method,
+            )
+            for p in self._last
+            if self.roi is None or self.roi.contains_feet(p.bbox) or p.raw_track_id in self._court_tracks
+        ]
+        if self._associator is not None:
+            canonical = self._associator.update(
+                frame_idx,
+                [(int(p.raw_track_id), p.bbox, p.conf) for p in persons],
+                None,
+                observed=[False] * len(persons),
+            )
+            for i, person in enumerate(persons):
+                person.track_id = canonical[i]
+                person.identity_method = self._associator.last_reason[i]
+        self._attach(frame_idx, img, persons, pose_stride)
+        if self.last_diagnostic is not None:
+            self.last_diagnostic.update(
+                returned_count=len(persons),
+                fresh_matched_count=0,
+                pose_rows=sum(p.kps is not None for p in persons),
+            )
+        return persons
+
+    def _attach(self, frame_idx: int, img: NDArray[np.uint8], persons: list[PersonObs], pose_stride: int) -> None:
+        # A scheduled tick, non-null coordinates or carried box is not evidence
+        # that this person's pose was inferred on the current source image.
+        for p in persons:
+            p.pose_frame_idx = None
+        if self.pose is not None and pose_stride > 0 and frame_idx % pose_stride == 0 and persons:
+            for p, k in zip(persons, self.pose(img, [p.bbox for p in persons]), strict=True):
+                p.kps = k.copy() if isinstance(k, np.ndarray) else k
+                if k is not None:
+                    values = np.asarray(k)
+                    try:
+                        observed = values.shape == (17, 3) and bool(
+                            (np.isfinite(values).all(axis=1) & (values[:, 2] > 0)).any()
+                        )
+                    except (TypeError, ValueError):
+                        observed = False
+                    if observed:
+                        p.pose_frame_idx = frame_idx
+        for p in persons:
+            x1, y1, x2, y2 = (int(v) for v in p.bbox)
+            crop = img[max(0, y1) : max(0, y2), max(0, x1) : max(0, x2)]
+            p.appearance = hsv_signature(crop) if crop.size else None
+
+
+def _unique_detection_matches(tracks: list[tuple[int, NDArray, float]], boxes: NDArray) -> list[bool]:
+    """A tracker output is fresh only when one current detection uniquely supports it.
+
+    ByteTrack can return predictions on a detector-run frame. Neither a raw ID nor
+    the frame-level detector flag establishes that this individual was observed.
+    """
+    if not tracks or len(boxes) == 0:
+        return [False] * len(tracks)
+    a = np.asarray([box for _, box, _ in tracks], dtype=np.float64)
+    b = np.asarray(boxes, dtype=np.float64).reshape(-1, 4)
+    iou = _box_iou(a, b)
+    valid = np.isfinite(iou) & (iou >= 0.5)
+    return [bool(valid[i].sum() == 1 and valid[:, int(valid[i].argmax())].sum() == 1) for i in range(len(tracks))]
+
+
+def _box_iou(a: NDArray, b: NDArray) -> NDArray[np.float64]:
+    intersection = np.prod(
+        np.maximum(0, np.minimum(a[:, None, 2:], b[None, :, 2:]) - np.maximum(a[:, None, :2], b[None, :, :2])), axis=2
+    )
+    union = np.prod(a[:, 2:] - a[:, :2], axis=1)[:, None] + np.prod(b[:, 2:] - b[:, :2], axis=1)[None, :] - intersection
+    return np.divide(intersection, union, out=np.zeros_like(intersection), where=union > 0)

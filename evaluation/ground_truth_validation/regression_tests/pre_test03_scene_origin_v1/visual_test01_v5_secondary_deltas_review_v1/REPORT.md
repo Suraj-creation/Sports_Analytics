@@ -1,0 +1,33 @@
+# Test 1 V5: secondary2418 delta source review
+
+The requested **18source positions** were rendered using the frozen5ae `render_validation_evidence.py` and the **actual** original Test1 source and PTS. Current is the completed fresh5ae run; baseline is the completed secondary2418 Test1 run at its recorded producer ROOT. This is a different comparator from the original20261110 fullNN baseline. No source/profile/model changed, no ROOT was rebased and no neural inference ran. The renderer used CPU source/proxy decoding, with two codec threads; this work did not access the active Test2 worker.
+
+All **245rendered artifact hashes**, **612input bindings** and **54source/proxy pixel and shape receipts** verify. Rational PTS agrees across the original1080p source and both canonical1280×720proxies. Every original cache hash agrees with its retained snapshot; actual producer/model/config declarations remain bound in the package. All18frames were visually inspected as source/baseline/current, giving54panels on six aspect-preserving sheets, with source-only enlarged neighborhoods at14242/14306. See [verification](verification.json), [full frame register](frame_register.json) and the [closed rendered bundle](../visual_test01_v5_secondary_deltas_v1/index.md).
+
+## Player cadence at2378–2385
+
+The source is continuous active play without a visible edit. At2381, the new near and far boxes still cover the respective visible athletes. They are somewhat behind the current body position; this is visible ordinary carry lag, not a box over an empty unrelated court area or an obvious athlete-hypothesis break. The next frame2382 has identical fresh detector boxes and current-source pose in both runs. See [2378–2380](sheet_01.jpg), [2381–2383](sheet_02.jpg) and [2384–2385](sheet_03.jpg).
+
+Raw evidence independently confirms the cadence difference. At2381 secondary2418 has `detector_observed=True` and both people `detector_matched=True`;5ae has `detector_observed=False` and both people carried with `detector_matched=False`. Both use perception stride6 and scene epoch1. The new boxes are exactly the preceding2378–2380carried boxes; at2382botharms refresh to the same coordinates. The near bottom centre changes from `[514.972321,525.010437]` to `[528.726166,539.665527]` canonical pixels at2381. The far bottom centre also changes, from `[536.255905,381.379120]` to `[532.077026,394.778778]`.
+
+The existing generated-point reference agreement gets worse at2381: near error1.202456→19.545251px (**+18.342795px**), and far error5.087830→18.887236px (+13.799406px). Those measured regressions remain recorded even though this selected source sequence shows no obvious empty-region carry break. These generated points do not certify physical feet locations. The raw shuttle coordinates and support are exactly equal in the inspected2378–2385window. This cadence change occurs **before**14114, so it cannot be attributed to that later reset. This small review does not reproduce the earlier scheduling decision that caused the extra/missing detector query.
+
+## Shuttle presence at14240–14244
+
+The source shows a continuous far-athlete racket action; no visible edit occurs within these fiveframes. At14242 the same top raw peak `[732.5,315]` exists in both runs. Its support changes **0.46923828125→0.50830078125**, crossing the unchanged0.5inference threshold. Secondary therefore has no accepted raw observation; current accepts `[732.5,315]` with tracked association. This is a raw model-support threshold crossing, not an association-policy suppression/recovery or proof of a new physical true positive. At14243 bothruns have no accepted raw observation;14244both reacquire.
+
+The source projection at14242 overlaps the far athlete's arm/racket/net neighborhood. The small bright/blurred structure does not independently resolve a shuttle centre at that coordinate. A frame-level physical TP/FP verdict remains **unknown**; the new coordinate must not be described as verified recall recovery. See [14241–14243](sheet_04.jpg), [14244](sheet_05.jpg) and [source-only enlarged neighborhood](source_neighborhood_14242.png). The crop is centred on the model coordinate for inspection, which is not a GT location annotation; resizing adds no source detail.
+
+## Shuttle location at14304–14308
+
+The far athlete makes a continuous reaching/racket action and the near athlete reacts. Both runs' player boxes agree exactly at every inspected14304–14308frame, with the same observed/carried schedule; episode numbers and scene epochs differ following the earlier real reset. No visible edit or obvious person-box break appears within this window.
+
+At14306 the accepted shuttle coordinates are secondary `[738.225815,292.964621]` and current `[741.246241,293.779783]`, a **3.1284914953px** canonical displacement (about4.69source pixels), with support0.592285→0.542969. Both remain tracked. The two nearby motion-blurred source projections cannot be reliably adjudicated to that precision from this footage without reviewed localization labels. This source review therefore establishes neither improvement nor deterioration of physical shuttle accuracy. See [14304–14305](sheet_05.jpg), [14306–14308](sheet_06.jpg) and [source-only neighborhood](source_neighborhood_14306.png).
+
+## Full-run correction retained
+
+The independently measured whole Test1 secondary comparison has **109raw-XY differences**, not identical shuttle output:108both-present coordinates differ (mean0.191492px, max3.128491px at14306), plus the one14242presence change. All lie within14219–14331;107support values also differ according to the independent full-timeline audit. This18frame package is targeted visual context for those findings, not an independent remeasurement of the whole population.
+
+The secondary generated-point comparison has33,706commonpairs:33,670equal errors,17worse and19better, giving36changedpairs and no coverage additions/losses. The maximum increase is the2381cadence case above. [Copied global context](secondary_global_context.json) binds the independent numeric source files. These are generated-reference agreements; physical player/shuttle ground truth remains null. The earlier original-baseline metric comparison remains a separate preserved record.
+
+No physical GT was created, no metrics were recalculated and no inference/test rerun was performed. These selected visual controls show no obvious athlete-hypothesis break; they do not establish aggregate physical accuracy, eliminate carry-lag limitations or imply full Test2 acceptance. All source videos, annotations, original results, frozen candidate files and active Test2 outputs remain untouched.

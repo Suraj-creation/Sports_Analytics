@@ -6,6 +6,7 @@
 *.jpeg
 *.npz
 *.msgpack
+*.csv
 *.txt
 *.patch
 *.executed
@@ -31,3 +32,24 @@ test_*/fixes/pre_fix_source/
 test_*/fixes/semantic_effect_evidence/
 test_*/regression/*_semantic_regression_v*
 test_*/retention/
+
+# Preserve investigation snapshots and third-party source evidence locally;
+# publish canonical tools/tests and authored human-readable reports.
+component_evaluations/**/birth_only_source_snapshot/
+component_evaluations/**/final_candidate_source*/
+component_evaluations/**/primary_sources/
+component_evaluations/**/executed*/
+failure_cases/**/source_snapshots/
+regression_tests/**/executed*/
+
+# Generated execution evidence stays available locally, outside source publication.
+*.sqlite
+*.sqlite-*
+*.xml
+*.source
+*.diff
+*.html
+*.yaml
+regression_tests/**/execution.lock
+component_evaluations/**/source_snapshots/
+regression_tests/**/source_snapshots/

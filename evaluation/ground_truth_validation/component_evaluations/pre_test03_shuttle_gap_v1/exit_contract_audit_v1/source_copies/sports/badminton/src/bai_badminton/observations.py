@@ -1,0 +1,132 @@
+"""Dense per-window observation arrays consumed by the temporal engine.
+
+Perception emits per-frame results; the temporal engine assembles them into a ``WindowObs`` —
+dense numpy arrays over a contiguous frame range — so every temporal component is a vectorised,
+deterministic function of arrays (easy to test, to replay from recorded fixtures, and to run on
+recorded perception without a GPU).
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+
+import numpy as np
+from numpy.typing import NDArray
+
+from bai_badminton.perception.association import ShuttleObservationEvidence
+from bai_badminton.perception.shuttle_post import Track
+from bai_badminton.perception_types import RacketObservation
+
+PLAYER_IDS = ("P1", "P2")
+
+
+def temporal_segment_bounds(break_before: NDArray[np.bool_], index: int) -> tuple[int, int]:
+    """Half-open relative bounds of the contiguous segment containing ``index``.
+
+    A true entry starts a new segment at that frame. Index zero has no preceding
+    frame inside the supplied window, so its marker is ignored. Ordinary missing
+    observations do not create a temporal boundary by themselves.
+    """
+    boundaries = np.asarray(break_before)
+    if boundaries.ndim != 1 or boundaries.dtype != np.bool_:
+        raise ValueError("break_before must contain one boolean per frame")
+    if not 0 <= index < len(boundaries):
+        raise IndexError("segment index is outside the window")
+    starts = np.flatnonzero(boundaries[1:]) + 1
+    position = int(np.searchsorted(starts, index, side="right"))
+    lo = int(starts[position - 1]) if position else 0
+    hi = int(starts[position]) if position < len(starts) else len(boundaries)
+    return lo, hi
+
+
+@dataclass
+class PlayerSeries:
+    """Per-frame observations of one *identified* player (``player_id``) over a window."""
+
+    bbox: NDArray[np.float64]  # (n, 4) x1,y1,x2,y2 — NaN rows when not observed
+    kps: NDArray[np.float64]  # (n, 17, 3) — NaN when pose not run / not observed
+    court_xy: NDArray[np.float64]  # (n, 2) feet position in court metres — NaN without calibration
+    racket: list[RacketObservation | None] = field(default_factory=list)
+
+    @classmethod
+    def empty(cls, n: int) -> PlayerSeries:
+        return cls(
+            bbox=np.full((n, 4), np.nan),
+            kps=np.full((n, 17, 3), np.nan),
+            court_xy=np.full((n, 2), np.nan),
+            racket=[None] * n,
+        )
+
+    @property
+    def present(self) -> NDArray[np.bool_]:
+        return np.isfinite(self.bbox[:, 0])
+
+    @property
+    def height(self) -> NDArray[np.float64]:
+        return self.bbox[:, 3] - self.bbox[:, 1]
+
+    def feet(self) -> NDArray[np.float64]:
+        """Bottom-centre of the box (ground contact point in the image)."""
+        return np.stack([(self.bbox[:, 0] + self.bbox[:, 2]) / 2, self.bbox[:, 3]], axis=1)
+
+
+@dataclass
+class WindowObs:
+    frame0: int
+    fps: float
+    shuttle: Track
+    players: dict[str, PlayerSeries]
+    replay: NDArray[np.bool_] = field(default_factory=lambda: np.zeros(0, bool))
+    pose_stride: NDArray[np.int64] | None = None  # -1 unknown; 0 disabled; >0 actual schedule
+    # True at an index whose preceding frame belongs to another temporal context.
+    break_before: NDArray[np.bool_] | None = None
+    shuttle_evidence: tuple[ShuttleObservationEvidence | None, ...] | None = None
+
+    def __post_init__(self) -> None:
+        n = len(self.shuttle)
+        if self.shuttle_evidence is not None and (
+            len(self.shuttle_evidence) != n
+            or any(e is not None and e.frame_idx != self.frame0 + i for i, e in enumerate(self.shuttle_evidence))
+        ):
+            raise ValueError("shuttle evidence must align with canonical window frames")
+        if self.replay.shape[0] == 0:
+            self.replay = np.zeros(n, bool)
+        elif self.replay.shape != (n,):
+            raise ValueError("replay must contain one value per frame")
+        if self.break_before is None:
+            self.break_before = np.zeros(n, dtype=bool)
+        else:
+            boundaries = np.asarray(self.break_before)
+            if boundaries.shape != (n,) or boundaries.dtype != np.bool_:
+                raise ValueError("break_before must contain one boolean per frame")
+            self.break_before = boundaries.copy()
+        if n:
+            self.break_before[0] = False  # no predecessor inside this window
+            self.break_before[1:] |= self.replay[1:] != self.replay[:-1]
+        if self.pose_stride is None:
+            self.pose_stride = np.full(n, -1, dtype=np.int64)
+        elif (
+            self.pose_stride.shape != (n,)
+            or not np.issubdtype(self.pose_stride.dtype, np.integer)
+            or (self.pose_stride < -1).any()
+        ):
+            raise ValueError("pose schedule must contain one integer >= -1 per frame")
+        for pid, s in self.players.items():
+            if s.bbox.shape[0] != n:
+                raise ValueError(f"player {pid} series length {s.bbox.shape[0]} != {n}")
+
+    @property
+    def n(self) -> int:
+        return len(self.shuttle)
+
+    @property
+    def frames(self) -> NDArray[np.int64]:
+        return np.arange(self.frame0, self.frame0 + self.n, dtype=np.int64)
+
+    def idx(self, frame: int) -> int:
+        return frame - self.frame0
+
+    def segment_bounds(self, index: int) -> tuple[int, int]:
+        """Contiguous temporal context for a relative frame index, half-open."""
+        assert self.break_before is not None
+        return temporal_segment_bounds(self.break_before, index)

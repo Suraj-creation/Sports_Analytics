@@ -1,40 +1,24 @@
 # Current annotation-driven validation index
 
-These records are separate from the historical eight-video rally benchmark.
-Different annotation populations, pipeline versions and exposed development
-videos must not be pooled into a final independent generalisation score.
+Latest complete consolidation: [All results, including completed Test10](CONSOLIDATED_EVALUATION_ALL_RESULTS_20261113_v2.md).
 
-| Test | Current workflow | Evidence |
+| Test | Latest completed evidence | Version / scope |
 |---|---|---|
-| 1 | Three verified code repairs integrated; full fresh baseline/post-fix comparison complete; annotation and identity limitations remain | [Fix disposition](test_01_code_fix_status.md), [matrix](test_01_evaluation_matrix.md), [regression](test_01_fixes_and_regression.md) |
-| 2 | Complete fresh baseline/post-fix evaluation and source-bound diagnosis; one verified semantic admission repair; mixed timing changes and unresolved physical-accuracy limitations | [Consolidated report](test_02_consolidated_v1.md), [baseline matrix](test_02_baseline_v1/matrix.md), [post-fix matrix](test_02_improved_v1/matrix.md), [workspace](../test_02/README.md) |
-| 3–10 | No new component-validation run started in this Test 2 workflow | Earlier rally records remain in `research/test_video_benchmarks/`; Tests 5 and 8 remain excluded from that historical evaluated population |
+| 1 | [Consolidated Test1 details](CONSOLIDATED_EVALUATION_ALL_RESULTS_20261113_v2.md#test-1) | Fresh V7 on88aa0ad; separate visual-acceptance limitation retained |
+| 2 | [Consolidated Test2 details](CONSOLIDATED_EVALUATION_ALL_RESULTS_20261113_v2.md#test-2) | Latest V5 on5ae6148; mixed reference metrics, no all-reference nonregression claim |
+| 3 | [Complete annotation/component report](test_03_evaluation_only_v1.md) | Fresh88aa0ad; every supporting annotation accounted for |
+| 4 | [Complete annotation/component report](test_04_evaluation_only_v1.md) | Fresh88aa0ad; every supporting annotation accounted for |
+| 6 | [Complete annotation/component report](test_06_evaluation_only_v1.md) | Fresh88aa0ad; every supporting annotation accounted for |
+| 7 | [Complete annotation/component report](test_07_evaluation_only_v1.md) | Fresh88aa0ad; every supporting annotation accounted for |
+| 9 | [Complete annotation/component report](test_09_evaluation_only_v1.md) | Fresh88aa0ad; every supporting annotation accounted for |
+| 10 | [Complete annotation/component report](test_10_evaluation_only_v1.md) | Fresh88aa0ad; every supporting annotation accounted for |
 
-Test 2 uses a video hash and source snapshots verified independently against its
-original supplied file. All seven local annotation originals are inventoried.
-Generated trajectory/player/winner tables remain diagnostic references, rather
-than becoming independent physical labels. Score reset/identity conventions and
-missing box, joint and contact labels remain explicit metric limitations.
+Tests5/8 remain excluded. Generated-reference agreement, source-reviewed coordinate diagnostics and independently labelled physical accuracy remain distinct. Winner-file timing F1 is not winner accuracy; unsupported metrics remain unavailable.
 
-The source-snapshot comparison between the completed Test 1 run and the fresh
-Test 2 baseline found no changed snapshotted production files and the same source
-numerical profile. Any later candidate fix requires a distinct run and recorded
-regression comparison; this index does not overwrite either earlier matrix.
+Test10 completed all37133frames and all six annotation evaluations. The initial300-second frame-count failure and older benchmark remain immutable separate records. Only preparation execution deadline was extended for the new retry; no production code, model, numeric thresholds, matching or annotations changed.
 
-The Test 2 repair preserves raw racket observations while withholding anatomical
-aliases from semantic equipment evidence. All three reference F1 scores remain
-unchanged; generated timing IoU improves slightly while coarse-label IoU declines.
-The consolidated report includes both outcomes, all 221 source reference rows,
-component coverage, unavailable accuracy metrics and remaining diagnoses.
-Test 1's subsequent regression preserves all six saved reference metric sets on
-immutable recorded perception, with equal observed scheduling drivers; it is not
-a second fresh Test 1 neural run. Cleanup is limited to the owned Test 2 download
-after the manifests and reports pass final retention verification.
+Final Test10 retention verification passed after the closed orchestration stdout log was separately finalized. Every prediction and metric retained its original hash. Owned raw/proxy media were removed only after the genuine native guard and all retained-artifact checks passed.
 
-Final retention verification passed on 2026-11-11. All 62 original Part2 files
-remain unchanged, and manifests preserve 23,761 external artifact files plus
-the Test 2 workspace evidence. Only the newly downloaded 2,453,914,397-byte
-Test 2 source was deleted; proxies and reusable visual artifacts remain.
-The [exact cleanup receipt](../test_02/retention/verification_20261111T164828_533280Z/cleanup_receipt.json)
-binds the retained manifests and lists the single removed path. No Test 3 was
-started by this workflow.
+[Test10 retention verification](../regression_tests/test10_completed_retry_retention_v1/README.md)
+
+[Historical index snapshot](/home/administrator/Desktop/sport-analytics/ground-truth-validation-artifacts-20261112/evaluation_only_v1/test10_retention_navigation_v1/previous_validation_index.md)
