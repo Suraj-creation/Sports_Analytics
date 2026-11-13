@@ -1,0 +1,1213 @@
+{
+  "schema": "single-video-residual-issues:v1",
+  "date": "2026-11-13",
+  "branch": "engineering/deep-pipeline-overhaul-20261113",
+  "scope": "Final integration review:five complete selected-video runs01..04/06 and preserved interruptedrun05; committedsource8110422. Scoped software validation is distinct from failed/unverified physical accuracy.",
+  "evidence_cutoff": "run06 completed and final real browser/API/saved-output checks passed",
+  "evidence_paths_resolve_from": "Sports_Analytics repository root; ../single-video-validation-20261113 is the external artifact directory",
+  "selected_source_sha256": "06a5cb888e58c64421114fecc582f60b85466900efec6db0bbf99420f4f6c010",
+  "status_semantics": {
+    "open": "Actionable limitation remains; causal certainty is stated separately.",
+    "investigating": "Specific observed problem remains under source/runtime diagnosis; latest empirical outcome is pending.",
+    "fixed": "Source or process change implemented; pending empirical scope is listed and not declared passed.",
+    "validated": "Only the explicitly completed checks for this issue passed; remaining limitations and unexercised scenarios still apply.",
+    "blocked": "Requested validation or accuracy claim requires unavailable annotations, scene content, assets or another external dependency."
+  },
+  "acceptance_note": "This register is not an overall production-readiness certificate. Unknown outcomes, all-unknown stroke labels, unresolved physical identity and incomplete physical-rally coverage remain visible. Neither counts of predictions nor generated references are physical ground truth.",
+  "documentation_only_execution": "Existing text/JSON/source files inspected; no tests, model calls, frame extraction, media decoding or new inference were executed while creating this register.",
+  "reviewed_workstream_reports": [
+    "docs/architecture/single-video-contracts-20261113.md",
+    "docs/architecture/single-video-perception-20261113.md",
+    "docs/architecture/single-video-frontend-20261113.md"
+  ],
+  "issues": [
+    {
+      "id": "SV-001",
+      "component": "Ground truth and acceptance coverage",
+      "evidence_kind": [
+        "selected_video_metadata",
+        "agent_visual_diagnostic",
+        "annotation_limitation"
+      ],
+      "evidence_paths": [
+        "../single-video-validation-20261113/selection/selection.json",
+        "docs/architecture/single-video-frontend-20261113.md"
+      ],
+      "root_cause_confirmed_or_hypothesis": {
+        "confirmed": [
+          "The approximate 15 exchanges are an agent-reviewed coarse draft, including partial first/last exchanges; independently reviewed dense rally/contact/shuttle/identity/outcome labels are unavailable."
+        ],
+        "hypotheses": []
+      },
+      "severity": "high",
+      "dependencies": [
+        "All perception components",
+        "Events",
+        "Analytics",
+        "Scoring"
+      ],
+      "required_improvement": "Create an explicitly reviewed subset from this same locked source, with annotation conventions and uncertainty, before reporting sporting precision, recall, F1 or complete rally recovery.",
+      "actual_change": "Source hash, source stream, canonical timeline and annotation provenance are retained; generated references are not promoted to physical ground truth.",
+      "validation_method": {
+        "completed": "Locked source metadata and existing draft intervals inspected; run01..03 outputs remain distinguishable from the draft.",
+        "pending": "No new annotations or accuracy calculation is performed by this documentation workstream."
+      },
+      "status": "blocked",
+      "remaining_limitation": "Runtime completion and synthetic contracts cannot establish sports accuracy; the exact physical rally total remains unverified."
+    },
+    {
+      "id": "SV-002",
+      "component": "Content continuity and tracking reset at frame 369",
+      "evidence_kind": [
+        "selected_video_visual_diagnostic",
+        "source_confirmed_defect",
+        "selected_video_before_after"
+      ],
+      "evidence_paths": [
+        "../single-video-validation-20261113/run01/visual_review/REVIEW.md",
+        "../single-video-validation-20261113/run01/visual_review/frame369_scene_fixture.json",
+        "../single-video-validation-20261113/run03/component-summary.json",
+        "sports/badminton/tests/test_scene_duplicate_witness_abstention.py"
+      ],
+      "root_cause_confirmed_or_hypothesis": {
+        "confirmed": [
+          "Visually continuous action at frame369 was converted into a raw-fallback content barrier because partial/full player proposals had ambiguous layout correspondence.",
+          "Two prior witnesses retained current overlap at the existing gate; one witness had duplicate qualifying proposals, which prevents a unique-match assertion."
+        ],
+        "hypotheses": []
+      },
+      "severity": "high",
+      "dependencies": [
+        "Player tracking",
+        "Participant episodes",
+        "Pose association",
+        "Shuttle windows",
+        "Rally state"
+      ],
+      "required_improvement": "Retain a source-bound reusable contradiction policy for duplicate-supported layout ambiguity without globally suppressing unknown barriers.",
+      "actual_change": "A narrow unknown-without-reset policy was implemented with positive/negative synthetic controls; no global unknown fallback or detector threshold was disabled.",
+      "validation_method": {
+        "completed": "Run02 had epochs0/1 split at369; run03 has one content epoch across all4462 frames. Exact selected-source diagnostic and synthetic policy cases support the bounded fix.",
+        "pending": "Exercise true cuts, independently changed content and other ambiguous layouts before generalizing the policy."
+      },
+      "status": "validated",
+      "remaining_limitation": "Validation is limited to the observed false barrier and controlled contracts; camera edits and every scene-change failure are not solved."
+    },
+    {
+      "id": "SV-003",
+      "component": "Player detection, spectator admission and physical-person handover",
+      "evidence_kind": [
+        "selected_video_visual_diagnostic",
+        "selected_video_runtime"
+      ],
+      "evidence_paths": [
+        "../single-video-validation-20261113/run01/visual_review/REVIEW.md",
+        "../single-video-validation-20261113/run03/component-summary.json",
+        "sports/badminton/src/bai_badminton/perception/players.py"
+      ],
+      "root_cause_confirmed_or_hypothesis": {
+        "confirmed": [
+          "Run01 selected frames show raw track4 on seated spectators at441/521 and later on a standing target athlete near599.",
+          "Run03 retains five-person outputs on710 frames and six-person outputs on81 frames; counts alone do not identify which boxes are false positives."
+        ],
+        "hypotheses": [
+          "Court-foot geometry, detector aliases and appearance-free association may contribute to the handover; their independent causal shares are not established."
+        ]
+      },
+      "severity": "high",
+      "dependencies": [
+        "Tracking",
+        "Participant identity",
+        "Contact attribution",
+        "Individual analytics"
+      ],
+      "required_improvement": "Inspect the same source around the known handover with current matched detections, court admission and appearance evidence; repair general association/admission mechanisms only when supported.",
+      "actual_change": "Current observation provenance and conservative participant gates remain enforced; controlled OSNet activation and new execution diagnostics are available for run04.",
+      "validation_method": {
+        "completed": "Historical selected-frame examples and run01..03 cache populations were inspected. Run04 bounded prefix shows seated-region canonical7249→unknown/transient8385→new8449 for moving athlete, rather than one persistent owner; near player also fragments2→6817. Source PNG/cache hashes in run04/identity-review. Finalrun06 confirms same selected-video modeloutputs asrun04, all4462frames; two unofficialcandidates/10unknownstrokes/zeroacceptedpoints. Software completion does not resolve physicalquality.",
+        "pending": "Independent source-bound physical labels and suitable camera/doubles perception assets/training evidence are required before tuning or claiming physicalaccuracy/generalization. No additionalvideo dataset is authorized in this task."
+      },
+      "status": "blocked",
+      "remaining_limitation": "Appearance embeddings cannot guarantee physical identity, especially for small crops, occlusion or similar clothing."
+    },
+    {
+      "id": "SV-004",
+      "component": "Optional OSNet loading, invocation and runtime evidence",
+      "evidence_kind": [
+        "source_confirmed_integration",
+        "synthetic_contract",
+        "external_model_provenance"
+      ],
+      "evidence_paths": [
+        "sports/badminton/src/bai_badminton/perception/offline_reid.py",
+        "sports/badminton/src/bai_badminton/perception/players.py",
+        "sports/badminton/tests/test_player_reid_configuration.py",
+        "models/manifest.yaml",
+        "../single-video-validation-20261113/external-research.json",
+        "../single-video-validation-20261113/run04/source_receipt.json",
+        "../single-video-validation-20261113/run06/saved-output-contracts.json"
+      ],
+      "root_cause_confirmed_or_hypothesis": {
+        "confirmed": [
+          "Prior relevant runs reported optional appearance unavailable; a profile or pinned manifest entry does not establish loading or execution.",
+          "Loaded parameter device is stronger evidence than requested device, but is still not an operator-level placement profile."
+        ],
+        "hypotheses": []
+      },
+      "severity": "medium",
+      "dependencies": [
+        "PersistentPlayerAssociator",
+        "Tracking diagnostics",
+        "Cache provenance"
+      ],
+      "required_improvement": "Verify pinned checkpoint initialization, embed calls, finite512D output and downstream consumption in the actual run; preserve explicit degradation on unavailable weights or invalid outputs.",
+      "actual_change": "Runtime metadata now uses loaded parameters, includes checkpoint/preprocessing/output semantics and backend fallback; appearance execution has bounded traces. Existing local-only verified loader and fail-closed association remain.",
+      "validation_method": {
+        "completed": "Synthetic loading/device/missing-artifact/precision/disabled-choice contracts passed in the root's focused checks; checkpoint provenance is recorded separately. Run04:1776 actual appearance calls,55.706982708 host-wall seconds; pinned CUDAfloat32 parameter metadata and neural_motion_match consumption observed. Identity accuracy remains unverified. Run061776appearancecalls/54.126s; exact cached frame outputs equalrun04; modelruntime CUDAfloat32/pinnedcheckpoint, no fallback and actual descriptor consumption.",
+        "pending": "Only the stated remaining limitations/unexercised scenarios remain; no full physical-accuracy claim."
+      },
+      "status": "validated",
+      "remaining_limitation": "No model-quality, identity accuracy, licensing suitability for every downstream use or GPU-kernel placement claim follows from these contracts."
+    },
+    {
+      "id": "SV-005",
+      "component": "Unresolved identity transport and frontend grouping",
+      "evidence_kind": [
+        "source_confirmed_defect",
+        "synthetic_contract"
+      ],
+      "evidence_paths": [
+        "engine/src/bai_engine/wire.py",
+        "engine/tests/test_unresolved_track_wire.py",
+        "apps/web/src/lib/tracks.ts",
+        "apps/web/src/features/player/overlay.ts",
+        "docs/architecture/single-video-frontend-20261113.md",
+        "../single-video-validation-20261113/run06/saved-output-contracts.json"
+      ],
+      "root_cause_confirmed_or_hypothesis": {
+        "confirmed": [
+          "Different observations sharing canonical ID-1 could collapse into one wire/display series or inherit another unresolved observation's display history.",
+          "Generic/preview producers can return multiple canonical IDs−1. The active badminton engine already used distinct negative display IDs−(raw+2), so no actual105 lost-box or recovered-box claim is supported."
+        ],
+        "hypotheses": []
+      },
+      "severity": "high",
+      "dependencies": [
+        "REST/WebSocket tracks",
+        "Player overlays",
+        "Pose holds",
+        "Reviewed identity",
+        "Court trails"
+      ],
+      "required_improvement": "Keep independent unresolved observations distinct using raw ownership/context or frame-local fallback, while preventing those display keys from becoming participant identity.",
+      "actual_change": "Wire grouping preserves separate unresolved raw/context ownership and duplicate rows; frontend rejects named bindings, pose holds and identity trails for negative canonical IDs while retaining current raw displays.",
+      "validation_method": {
+        "completed": "Root synthetic wire/ReID checks and frontend unresolved-group/name/pose/trail tests passed. Run04 prefix contains554 unresolved rows/105multiple-unresolved frames; actual wire keeps their raw/context-separated display evidence and browser frame420 shows Unresolved observation. Final browser renders two unresolved bodies atframe421 independently (raw8/display−10,raw3/display−5). Activebadminton already had distinctnegative IDs; generic transport repair does not imply105 recoveredboxes.",
+        "pending": "Only the stated remaining limitations/unexercised scenarios remain; no full physical-accuracy claim."
+      },
+      "status": "validated",
+      "remaining_limitation": "A stable display group is not a reviewed athlete or scoring slot; missing raw ownership remains frame-local."
+    },
+    {
+      "id": "SV-006",
+      "component": "Pose freshness versus uncertain person geometry",
+      "evidence_kind": [
+        "selected_video_cache_contract",
+        "synthetic_contract",
+        "source_confirmed_contract"
+      ],
+      "evidence_paths": [
+        "../single-video-validation-20261113/run01/visual_review/REVIEW.md",
+        "../single-video-validation-20261113/run03/component-summary.json",
+        "sports/badminton/src/bai_badminton/perception/players.py",
+        "sports/badminton/tests/test_overhaul_perception_contracts.py",
+        "apps/web/src/lib/tracks.ts"
+      ],
+      "root_cause_confirmed_or_hypothesis": {
+        "confirmed": [
+          "Run01 pose rows had exact current frame stamps, but3937 were current image inference on carried person boxes; run03 reports4252 such rows.",
+          "Current pose pixels do not prove a fresh detector-matched person box or correct physical actor."
+        ],
+        "hypotheses": [
+          "Some visual pose/actor failures may arise from carried crop geometry or upstream identity handover; dense per-joint correctness is not adjudicated."
+        ]
+      },
+      "severity": "high",
+      "dependencies": [
+        "Contact swing cues",
+        "Feet projection",
+        "Movement",
+        "Frontend pose holds"
+      ],
+      "required_improvement": "Preserve exact source ownership and unknown joints; independently inspect actor association and geometry before treating poses as player observations.",
+      "actual_change": "Array-box ambiguity and crop/output ordering safeguards have synthetic coverage; UI honors source stamps and context barriers. Current pose on a carried crop remains explicitly distinguishable from a current person match.",
+      "validation_method": {
+        "completed": "Finite shapes/source stamps and synthetic crop/order/malformed-output tests passed; selected visual samples were inspected. Finalrun06 confirms same selected-video modeloutputs asrun04, all4462frames; two unofficialcandidates/10unknownstrokes/zeroacceptedpoints. Software completion does not resolve physicalquality.",
+        "pending": "Independent source-bound physical labels and suitable camera/doubles perception assets/training evidence are required before tuning or claiming physicalaccuracy/generalization. No additionalvideo dataset is authorized in this task."
+      },
+      "status": "blocked",
+      "remaining_limitation": "Pose PCK/OKS and reliable movement from every visible player cannot be claimed without appropriate labels and geometry."
+    },
+    {
+      "id": "SV-007",
+      "component": "Court calibration and metric physical geometry",
+      "evidence_kind": [
+        "selected_video_metadata",
+        "selected_video_runtime",
+        "source_inspection"
+      ],
+      "evidence_paths": [
+        "../single-video-validation-20261113/selection/selection.json",
+        "../single-video-validation-20261113/run03/component-summary.json",
+        "docs/architecture/deep-pipeline-overhaul-20261113.md",
+        "sports/badminton/src/bai_badminton/engine.py"
+      ],
+      "root_cause_confirmed_or_hypothesis": {
+        "confirmed": [
+          "The selected recording has partial-court/multiple-court ambiguity.",
+          "Run03 calibration reportsVALID on4460/4462 frames, which establishes internal state, not independently correct physical corners, floor positions or orientation."
+        ],
+        "hypotheses": [
+          "Incorrect court selection or projection could contaminate speed, contact context and membership despite numerically finite homography."
+        ]
+      },
+      "severity": "high",
+      "dependencies": [
+        "Player admission",
+        "Format understanding",
+        "Individual movement",
+        "Stroke geometry",
+        "Outcome interpretation"
+      ],
+      "required_improvement": "Review physical court corners/orientation and feet projection on the locked source, preserving invalid/lost geometry as a downstream barrier.",
+      "actual_change": "Existing geometry/context gates and invalid-projection abstention are retained; calibration editor coordinate inversion was repaired without saving a manufactured calibration.",
+      "validation_method": {
+        "completed": "Numerical/context synthetic gates passed; run03 unsaved editor clicks/drags matched raw coordinates.",
+        "pending": "No independently reviewed full-video physical court calibration is available; accuracy acceptance remains pending."
+      },
+      "status": "blocked",
+      "remaining_limitation": "A floor homography cannot establish airborne shuttle height,3D speed, landing or line-call truth."
+    },
+    {
+      "id": "SV-008",
+      "component": "Raw shuttle sparsity and adjacent-court aliases",
+      "evidence_kind": [
+        "selected_video_runtime",
+        "selected_video_visual_diagnostic"
+      ],
+      "evidence_paths": [
+        "../single-video-validation-20261113/run01/visual_review/REVIEW.md",
+        "../single-video-validation-20261113/run03/component-summary.json",
+        "sports/badminton/src/bai_badminton/perception/tracknet.py"
+      ],
+      "root_cause_confirmed_or_hypothesis": {
+        "confirmed": [
+          "Run03 retains1416 raw observations and3046 missing frames out of4462; these are prediction populations, not recall or false-negative counts.",
+          "Selected run01 frame599 places the chosen raw shuttle mark over the adjacent court; the exact true target shuttle was not adjudicated.",
+          "The600..689 missing interval includes pickup/preparation and is not automatically a missed rally."
+        ],
+        "hypotheses": [
+          "Detector domain/camera limitations and competing-court candidate association may contribute to missing or wrong observations."
+        ]
+      },
+      "severity": "high",
+      "dependencies": [
+        "Trajectory",
+        "Contacts",
+        "Stroke endpoints",
+        "Rally completeness",
+        "Highlights"
+      ],
+      "required_improvement": "Use source-reviewed active-play examples to distinguish absent detector evidence, aliases and association rejection; improve the responsible reusable stage without inventing observations.",
+      "actual_change": "Raw detection versus observed association versus reconstructed/missing provenance is preserved; tensor/window/batch contracts have synthetic coverage.",
+      "validation_method": {
+        "completed": "Run01..03 cached observation populations and representative source diagnostics inspected. Finalrun06 confirms same selected-video modeloutputs asrun04, all4462frames; two unofficialcandidates/10unknownstrokes/zeroacceptedpoints. Software completion does not resolve physicalquality.",
+        "pending": "Independent source-bound physical labels and suitable camera/doubles perception assets/training evidence are required before tuning or claiming physicalaccuracy/generalization. No additionalvideo dataset is authorized in this task."
+      },
+      "status": "blocked",
+      "remaining_limitation": "Better code contracts do not establish stronger small-object detection under blur, occlusion or multiple courts."
+    },
+    {
+      "id": "SV-009",
+      "component": "Shuttle reconstruction plausibility and provenance",
+      "evidence_kind": [
+        "source_confirmed_numerical_mechanism",
+        "synthetic_contract"
+      ],
+      "evidence_paths": [
+        "docs/architecture/single-video-perception-20261113.md",
+        "sports/badminton/tests/test_overhaul_perception_contracts.py",
+        "sports/badminton/src/bai_badminton/perception/shuttle_post.py"
+      ],
+      "root_cause_confirmed_or_hypothesis": {
+        "confirmed": [
+          "Natural-spline interior motion can exceed a plausibility edge limit even when endpoint-average speed passes; the regression example has100px/frame average and161.75px/frame interior edge."
+        ],
+        "hypotheses": []
+      },
+      "severity": "high",
+      "dependencies": [
+        "Trajectory consumers",
+        "Contact windows",
+        "Rally continuation"
+      ],
+      "required_improvement": "Keep edge-level plausibility rejection and support bounded by observed anchors; estimates must never become independently observed detections.",
+      "actual_change": "Existing per-edge rejection and anchor-bounded support now have executed spline and ordinary-gap controls; rejected gaps remain missing.",
+      "validation_method": {
+        "completed": "Synthetic SciPy spline/support regression passed; no real-video accuracy inferred from it.",
+        "pending": "Inspect any reconstruction actually emitted by the final selected workflow; uninvoked reconstruction scenarios remain unexercised."
+      },
+      "status": "validated",
+      "remaining_limitation": "The validated claim is a numerical/provenance contract, not correctness of filled shuttle locations or every trajectory."
+    },
+    {
+      "id": "SV-010",
+      "component": "Racket geometry aliases and physical impact",
+      "evidence_kind": [
+        "selected_video_visual_diagnostic",
+        "selected_video_runtime"
+      ],
+      "evidence_paths": [
+        "../single-video-validation-20261113/run01/visual_review/REVIEW.md",
+        "../single-video-validation-20261113/run03/component-summary.json",
+        "docs/architecture/overhaul-events-20261113.md"
+      ],
+      "root_cause_confirmed_or_hypothesis": {
+        "confirmed": [
+          "Selected overlays show geometric racket ellipses on shoes/head/body or background anatomy.",
+          "Run03 has3356 source-stamped racket rows and394 live ambiguity events; a current source stamp establishes timing, not equipment identity."
+        ],
+        "hypotheses": [
+          "Geometric contour/pose extraction is insufficiently specific under the selected camera conditions."
+        ]
+      },
+      "severity": "high",
+      "dependencies": [
+        "Contact evidence",
+        "Actor attribution",
+        "Stroke classification"
+      ],
+      "required_improvement": "Adjudicate representative equipment/contact examples; preserve ambiguous geometry as supporting evidence and require independent physical evidence for impact.",
+      "actual_change": "Exact-frame racket ownership and uncertainty gates remain; no proximity-only impact assertion or fabricated learned detector was added.",
+      "validation_method": {
+        "completed": "Freshness/alias/missing-evidence synthetic contracts passed; selected visual aliases were documented. Finalrun06 confirms same selected-video modeloutputs asrun04, all4462frames; two unofficialcandidates/10unknownstrokes/zeroacceptedpoints. Software completion does not resolve physicalquality.",
+        "pending": "Independent source-bound physical labels and suitable camera/doubles perception assets/training evidence are required before tuning or claiming physicalaccuracy/generalization. No additionalvideo dataset is authorized in this task."
+      },
+      "status": "blocked",
+      "remaining_limitation": "No validated specialized racket/contact model or dense reviewed equipment/contact dataset is available."
+    },
+    {
+      "id": "SV-011",
+      "component": "Contact admission and physical-event reliability",
+      "evidence_kind": [
+        "selected_video_runtime",
+        "source_confirmed_contract",
+        "synthetic_contract"
+      ],
+      "evidence_paths": [
+        "../single-video-validation-20261113/run03/component-summary.json",
+        "sports/badminton/src/bai_badminton/events/contact_evidence.py",
+        "sports/badminton/tests/test_rally_terminal_admission.py",
+        "docs/architecture/single-video-contracts-20261113.md"
+      ],
+      "root_cause_confirmed_or_hypothesis": {
+        "confirmed": [
+          "Run03 retains14 contacts:9 ambiguous and5 insufficient physical impact.",
+          "Recorded unknown reasons include unresolved association4, unavailable fresh player observation5, unavailable coherent motion change4, and unavailable fresh swing/racket overlap1."
+        ],
+        "hypotheses": [
+          "Upstream shuttle/actor/equipment quality may limit physical contact evidence; counts do not isolate their independent effect."
+        ]
+      },
+      "severity": "high",
+      "dependencies": [
+        "Rally state",
+        "Stroke classification",
+        "Contact attribution",
+        "Scoring"
+      ],
+      "required_improvement": "Trace each suspicious contact to exact source and independent cues; improve upstream evidence rather than lower reliability gates to force confirmed impact.",
+      "actual_change": "Frame binding, rejected-context handling, endpoint qualification and terminal-rest admission have passing synthetic controls. Unsupported candidates cannot erase observed terminal rest.",
+      "validation_method": {
+        "completed": "Focused terminal-rest/admission tests and curated1216-test selection passed; run03 contact reasons are retained. Finalrun06 confirms same selected-video modeloutputs asrun04, all4462frames; two unofficialcandidates/10unknownstrokes/zeroacceptedpoints. Software completion does not resolve physicalquality.",
+        "pending": "Independent source-bound physical labels and suitable camera/doubles perception assets/training evidence are required before tuning or claiming physicalaccuracy/generalization. No additionalvideo dataset is authorized in this task."
+      },
+      "status": "blocked",
+      "remaining_limitation": "Candidate acceptance for temporal policy does not establish a racket-shuttle impact, actor name or true-positive contact."
+    },
+    {
+      "id": "SV-012",
+      "component": "Stroke classification and learned doubles capability",
+      "evidence_kind": [
+        "selected_video_runtime",
+        "source_inspection",
+        "external_asset_limitation"
+      ],
+      "evidence_paths": [
+        "../single-video-validation-20261113/run03/component-summary.json",
+        "docs/architecture/overhaul-events-20261113.md",
+        "sports/badminton/tests/endpoint_support.py",
+        "sports/badminton/tests/test_doubles_contact_fusion.py"
+      ],
+      "root_cause_confirmed_or_hypothesis": {
+        "confirmed": [
+          "All14 run03 stroke events remainunknown; existing code intentionally abstains when contact, actor or endpoint evidence is insufficient.",
+          "The active rule/evidence path is not a validated learned full doubles stroke classifier."
+        ],
+        "hypotheses": [
+          "Insufficient physical contacts, unreliable trajectories and actor uncertainty may jointly cause the unknown distribution; stronger learned classification would need suitable labels/weights and actual integration."
+        ]
+      },
+      "severity": "high",
+      "dependencies": [
+        "Contact evidence",
+        "Trajectory",
+        "Player attribution",
+        "Shot statistics",
+        "Highlights"
+      ],
+      "required_improvement": "Improve supported temporal features/endpoints and evaluate a suitable classifier only with compatible assets and reviewed class conventions; preserveunknown when evidence is insufficient.",
+      "actual_change": "Controlled synthetic positive fixtures now supply genuine typed endpoint evidence rather than forcing a class; missing/unreliable endpoint negatives still requireunknown.",
+      "validation_method": {
+        "completed": "Known-class synthetic positives and independent endpoint/actor/context negatives pass.",
+        "pending": "Finalrun06retains10unknownstrokeevents. Independent class/contact/endpoint labels and a validated learned doubles model are unavailable; no accuracy certification or forcedclass change."
+      },
+      "status": "blocked",
+      "remaining_limitation": "A green classifier contract is not shot-class accuracy, and enabling a newer model alone would not resolve upstream evidence failures."
+    },
+    {
+      "id": "SV-013",
+      "component": "Rally completeness, fragmentation and candidate semantics",
+      "evidence_kind": [
+        "agent_visual_diagnostic",
+        "selected_video_runtime",
+        "source_inspection"
+      ],
+      "evidence_paths": [
+        "../single-video-validation-20261113/selection/selection.json",
+        "../single-video-validation-20261113/run02/component-summary.json",
+        "../single-video-validation-20261113/run03/component-summary.json",
+        "sports/badminton/src/bai_badminton/events/rally_evidence.py"
+      ],
+      "root_cause_confirmed_or_hypothesis": {
+        "confirmed": [
+          "Run02 has2 live unofficial rally candidates/7unknown strokes; run03 has3 unofficial candidates/14unknown strokes after the frame369 repair.",
+          "The coarse agent draft suggests approximately15 exchanges, but is not complete independently reviewed ground truth."
+        ],
+        "hypotheses": [
+          "Sparse or aliased shuttle evidence, uncertain contacts, identity/court context and duration/state requirements may jointly suppress or fragment physical exchanges."
+        ]
+      },
+      "severity": "high",
+      "dependencies": [
+        "Shuttle",
+        "Contacts",
+        "Identity",
+        "Activity FSM",
+        "Final analytics"
+      ],
+      "required_improvement": "Review candidate and missing-action intervals causally on the same source; repair supported upstream/state defects without tuning arbitrary minimum durations to match the draft.",
+      "actual_change": "False content barrier was repaired; terminal history ownership and independent short-exchange witness rules remain. Unknown outcomes and unofficial candidate status are retained.",
+      "validation_method": {
+        "completed": "Existing FSM/temporal/short-exchange synthetic cases passed; run02/03 candidate intervals and source-aligned diagnostics were preserved. Finalrun06 confirms same selected-video modeloutputs asrun04, all4462frames; two unofficialcandidates/10unknownstrokes/zeroacceptedpoints. Software completion does not resolve physicalquality.",
+        "pending": "Independent source-bound physical labels and suitable camera/doubles perception assets/training evidence are required before tuning or claiming physicalaccuracy/generalization. No additionalvideo dataset is authorized in this task."
+      },
+      "status": "blocked",
+      "remaining_limitation": "Three candidates versus an approximate15 is a coverage warning, not a recall calculation; no complete physical-rally recovery claim is justified."
+    },
+    {
+      "id": "SV-014",
+      "component": "Rejected-rally cancellation evidence",
+      "evidence_kind": [
+        "source_confirmed_observability_gap",
+        "synthetic_contract"
+      ],
+      "evidence_paths": [
+        "sports/badminton/src/bai_badminton/events/rally_fsm.py",
+        "sports/badminton/src/bai_badminton/events/rally_evidence.py",
+        "sports/badminton/src/bai_badminton/engine.py",
+        "sports/badminton/tests/test_rally_cancellation_provenance.py",
+        "sports/badminton/tests/test_rally_cancellation_persistence.py",
+        "../single-video-validation-20261113/contract-tests/cancellation-policy-corrected.log",
+        "../single-video-validation-20261113/run06/saved-output-contracts.json"
+      ],
+      "root_cause_confirmed_or_hypothesis": {
+        "confirmed": [
+          "Previously a rejected short exchange exposed its start only, losing exact terminal interval/reason and policy evidence for backward tracing."
+        ],
+        "hypotheses": []
+      },
+      "severity": "medium",
+      "dependencies": [
+        "Append-only event ledger",
+        "Diagnostics",
+        "Rally review",
+        "Exports"
+      ],
+      "required_improvement": "Retain cancellation intervals without accepting an extra rally; explicitly mark boundary cancellations with no preceding interval as unavailable.",
+      "actual_change": "RallyUpdate appends optional cancelled_segment; base finalization preserves the segment and short-exchange acceptance clears both fields. Retractions persist interval/minimum/reason/admission and track-window references; short_exchange_evidence summarizes retained inputs.",
+      "validation_method": {
+        "completed": "Eight provenance cases and current persistence/terminal/streaming/short-exchange checks passed; focused56 and curated1216 cases passed. Run04 saved ledger:50 canceled starts all preserve valid source intervals/admission;38gap,11stationary,1flush;41motion_span_unavailable,9independent_pair_unavailable. Run06saved-output checks pass50full cancellationproofs, exactintervaladmission/original-event/track-window references and full864row historicalJSONL export.",
+        "pending": "Only the stated remaining limitations/unexercised scenarios remain; no full physical-accuracy claim."
+      },
+      "status": "validated",
+      "remaining_limitation": "These are rejected numerical candidates, not verified physical rallies; retained policy summaries are not exhaustive upstream rejection reasons."
+    },
+    {
+      "id": "SV-015",
+      "component": "OCR, winner evidence and legal scoring",
+      "evidence_kind": [
+        "selected_video_scene_limitation",
+        "selected_video_runtime",
+        "synthetic_contract"
+      ],
+      "evidence_paths": [
+        "../single-video-validation-20261113/run01/visual_review/REVIEW.md",
+        "../single-video-validation-20261113/run03/component-summary.json",
+        "docs/architecture/overhaul-events-20261113.md",
+        "docs/architecture/single-video-frontend-20261113.md"
+      ],
+      "root_cause_confirmed_or_hypothesis": {
+        "confirmed": [
+          "The selected scene has no usable visible scoreboard for positive score-transition validation.",
+          "Run01 accepted no raw score readings despite OCR execution; run03 candidates have null winners and UI remainsunknown."
+        ],
+        "hypotheses": []
+      },
+      "severity": "medium",
+      "dependencies": [
+        "Scoreboard OCR",
+        "Row mapping",
+        "Participant/scoring slots",
+        "Outcome cascade"
+      ],
+      "required_improvement": "Preserveunknown winner/score without physical outcome or reviewed row mapping; validate legal transactional transitions separately with meaningful synthetic controls.",
+      "actual_change": "Existing conservative outcome/scoring guards and unknown display remain; no near/far, OCR-total or missing-equality winner was invented.",
+      "validation_method": {
+        "completed": "Selected unknown states and synthetic scoring lifecycle/transition/row-provenance contracts were inspected/exercised.",
+        "pending": "Positive OCR acquisition, real row mapping and real legal score updates cannot be demonstrated in this scene."
+      },
+      "status": "blocked",
+      "remaining_limitation": "No scoreboard content, complete reviewed winners or physical identity-to-row labels are available in the selected video."
+    },
+    {
+      "id": "SV-016",
+      "component": "Individual doubles analytics and physical identity labels",
+      "evidence_kind": [
+        "source_confirmed_contract",
+        "selected_video_scene_limitation",
+        "synthetic_contract"
+      ],
+      "evidence_paths": [
+        "docs/architecture/overhaul-tracking-20261113.md",
+        "docs/architecture/single-video-contracts-20261113.md",
+        "apps/api/tests/test_four_player_review.py",
+        "sports/badminton/tests/test_automatic_individual.py"
+      ],
+      "root_cause_confirmed_or_hypothesis": {
+        "confirmed": [
+          "Tracker ID, participant episode, reviewed athlete and scoring slot have different semantics.",
+          "Without independent reviewed physical identity and valid current geometry, four visible bodies cannot safely become four named longitudinal analytics records."
+        ],
+        "hypotheses": []
+      },
+      "severity": "high",
+      "dependencies": [
+        "Tracking",
+        "Participant episodes",
+        "Court calibration",
+        "Movement",
+        "Heatmaps",
+        "Shot attribution"
+      ],
+      "required_improvement": "Keep four independent participant observations architecturally supported; require explicit review and geometry provenance for named physical-player aggregation.",
+      "actual_change": "Fresh detector-match/context gates, anonymous scopes and review guards remain. Four-player positive synthetic motion and missing-match/context/camera-quality negatives pass.",
+      "validation_method": {
+        "completed": "Curated four-player API, automatic-individual, movement-direction and point-acceptance cases passed.",
+        "pending": "Positive reviewed named-player movement/heatmaps and persistent four-person physical identity are not empirically established."
+      },
+      "status": "blocked",
+      "remaining_limitation": "Estimated or anonymous episode analytics must not be presented as verified athlete histories."
+    },
+    {
+      "id": "SV-017",
+      "component": "Highlights and evidence-backed output completeness",
+      "evidence_kind": [
+        "selected_video_runtime",
+        "synthetic_contract",
+        "unexercised_positive_path"
+      ],
+      "evidence_paths": [
+        "docs/architecture/single-video-frontend-20261113.md",
+        "../single-video-validation-20261113/run03/api/highlights.json",
+        "apps/web/src/features/session/tabs/HighlightsTab.tsx",
+        "../single-video-validation-20261113/run06/saved-output-contracts.json"
+      ],
+      "root_cause_confirmed_or_hypothesis": {
+        "confirmed": [
+          "Selected runs produced no eligible highlights; this is an exercised empty state, not validation of positive highlight ranking or source attribution."
+        ],
+        "hypotheses": []
+      },
+      "severity": "medium",
+      "dependencies": [
+        "Rallies",
+        "Contacts",
+        "Stroke reliability",
+        "Outcomes",
+        "Exports"
+      ],
+      "required_improvement": "Keep evidence IDs/status and ranking-score semantics; inspect positive real highlights only if supported source events exist.",
+      "actual_change": "Frontend preserves optional evidence fields and source event navigation, qualifies ranking as estimated, and prevents unavailable explicit sessions from silently selecting another recording.",
+      "validation_method": {
+        "completed": "Synthetic current/legacy highlight and missing/exact-session cases passed; real empty states passed through the actual UI. Run06ten actual tabs preserve empty highlights and honest estimates/evidence. Positivehighlight relevance remains not exercised.",
+        "pending": "Only the stated remaining limitations/unexercised scenarios remain; no full physical-accuracy claim."
+      },
+      "status": "validated",
+      "remaining_limitation": "Empty output is not a sports-quality pass or a reason to manufacture highlights."
+    },
+    {
+      "id": "SV-018",
+      "component": "CPU pools, content processing and measured latency",
+      "evidence_kind": [
+        "selected_video_before_after",
+        "source_confirmed_optimization",
+        "synthetic_contract"
+      ],
+      "evidence_paths": [
+        "../single-video-validation-20261113/run02/comparison-to-run01.json",
+        "../single-video-validation-20261113/run03/unaffected-prefix-trace-comparison.json",
+        "../single-video-validation-20261113/run03/trace-summary.json",
+        "docs/architecture/single-video-perception-20261113.md",
+        "engine/tests/test_native_thread_policy.py"
+      ],
+      "root_cause_confirmed_or_hypothesis": {
+        "confirmed": [
+          "Run01 default36-thread OpenCV pool had sampled server CPU mean about942%; run02 single-thread configuration had about346%, with identical cached observations.",
+          "Run02 content observation/validation were material host-wall costs. Duplicate validation and repeated per-group LK calls were confirmed source work."
+        ],
+        "hypotheses": []
+      },
+      "severity": "medium",
+      "dependencies": [
+        "Content observer",
+        "Feature-origin validation",
+        "Perception",
+        "Model scheduling",
+        "Resource contention"
+      ],
+      "required_improvement": "Prioritize measured dominant costs; preserve observation behavior and compare equivalent work rather than claim speed from configuration alone.",
+      "actual_change": "OpenCV thread setting is validated and applied before recovery/workers. Grouped LK retains original feature selections; immutable origin-record caching and duplicate-roundtrip removal preserve validation semantics.",
+      "validation_method": {
+        "completed": "Run01/02 analysis spans629.071/624.072seconds with exact4462-frame cached equality. Unaffected360-frame run02/03 content observation sums19.672/17.116seconds and validation5.765/1.433seconds are retained measurements.",
+        "pending": "Full run04→06 livecomparison is recorded; repeated trials/generalized performance and all-node GPU profiling remain unverified."
+      },
+      "status": "validated",
+      "remaining_limitation": "Do not attribute the entire run02/03 wall-time difference to one optimization or add nested stage totals; no broad throughput guarantee is established."
+    },
+    {
+      "id": "SV-019",
+      "component": "Provider/device evidence and remaining model lifecycle costs",
+      "evidence_kind": [
+        "source_inspection",
+        "selected_video_trace",
+        "synthetic_contract"
+      ],
+      "evidence_paths": [
+        "docs/architecture/single-video-perception-20261113.md",
+        "sports/badminton/src/bai_badminton/perception/offline_reid.py",
+        "../single-video-validation-20261113/run03/trace-summary.json",
+        "engine/src/bai_engine/trace.py"
+      ],
+      "root_cause_confirmed_or_hypothesis": {
+        "confirmed": [
+          "Configured ORT providers do not prove per-node GPU execution; trace spans are host wall time without forced CUDA synchronization.",
+          "RTMPose upstream construction can create a default session before adapter replacement, and configured batching does not replace the upstream per-crop loop."
+        ],
+        "hypotheses": [
+          "Reducing initialization duplication or batching pose may help, but benefit and memory/provider implications require measurement."
+        ]
+      },
+      "severity": "medium",
+      "dependencies": [
+        "RF-DETR",
+        "RTMPose",
+        "TrackNet",
+        "OSNet",
+        "Model registry",
+        "GPU/CPU resource use"
+      ],
+      "required_improvement": "Use actual loading/invocation/consumption evidence and explicit device metadata; optimize lifecycle/batching only after profiling the dominant path.",
+      "actual_change": "Bounded detector/tracker/pose/shuttle forward traces and honest placement metadata were added; no unsourced GPU-placement or speculative batch-throughput claim was introduced.",
+      "validation_method": {
+        "completed": "Runtime metadata and trace error/isolation contracts passed; run03 initialization7.005seconds and existing per-component host spans are recorded.",
+        "pending": "Run04 appearance/temporal spans and model-cost attribution are pending; operator-level GPU placement remains unprofiled."
+      },
+      "status": "open",
+      "remaining_limitation": "Provider initialization, loaded parameter location and kernel execution are separate; no GPU fallback defect is inferred solely from CPU preprocessing."
+    },
+    {
+      "id": "SV-020",
+      "component": "Frontend raw/presentation geometry and timeline mapping",
+      "evidence_kind": [
+        "selected_video_visual_validation",
+        "source_confirmed_defect",
+        "synthetic_contract"
+      ],
+      "evidence_paths": [
+        "docs/architecture/single-video-frontend-20261113.md",
+        "apps/web/src/lib/videoCoordinates.ts",
+        "apps/web/src/features/calibrate/CalibratePage.tsx",
+        "../single-video-validation-20261113/run06/saved-output-contracts.json"
+      ],
+      "root_cause_confirmed_or_hypothesis": {
+        "confirmed": [
+          "Analysis pixels762x720 and browser presentation763x720 differ because of sample aspect ratio; using intrinsic width for both axes displaced overlays.",
+          "Calibration border dimensions previously entered the pointer inverse."
+        ],
+        "hypotheses": []
+      },
+      "severity": "medium",
+      "dependencies": [
+        "Player/pose/shuttle overlays",
+        "Court editor",
+        "Evidence navigation"
+      ],
+      "required_improvement": "Use independent raw x/y scales and the actual SVG image rectangle; preserve canonical FPS for event navigation.",
+      "actual_change": "Shared video-coordinate transforms now drive overlays/editor; pointer inversion uses SVG bounds. Candidate labels and canonical event IDs are preserved.",
+      "validation_method": {
+        "completed": "Run02 canvas scales matched expected values; run03 unsaved click/drag coordinates had zero raw-pixel error and Undo worked, with no calibration save. Run06raw/displaySAR/frame/layer checks, exact editor coordinates/Undo and actual presented-frame candidate navigation pass.",
+        "pending": "Only the stated remaining limitations/unexercised scenarios remain; no full physical-accuracy claim."
+      },
+      "status": "validated",
+      "remaining_limitation": "Geometrically aligned drawing is not proof the underlying detections or calibrated court are physically correct."
+    },
+    {
+      "id": "SV-021",
+      "component": "Frontend uncertainty, capability and stale-session presentation",
+      "evidence_kind": [
+        "source_confirmed_product_defect",
+        "selected_video_before_state",
+        "synthetic_contract"
+      ],
+      "evidence_paths": [
+        "docs/architecture/single-video-frontend-20261113.md",
+        "apps/web/src/features/session/RecordingQuality.tsx",
+        "apps/web/src/features/session/SessionPage.tsx",
+        "apps/web/src/features/highlights/useCollection.ts",
+        "../single-video-validation-20261113/run06/saved-output-contracts.json"
+      ],
+      "root_cause_confirmed_or_hypothesis": {
+        "confirmed": [
+          "Previous quality wording implied court-side identities and omitted saved degradation/capability details.",
+          "Candidate counts were labelled as observed rallies/shots, and an unavailable explicit highlight session could silently fall back to another recording."
+        ],
+        "hypotheses": []
+      },
+      "severity": "medium",
+      "dependencies": [
+        "Session API metadata",
+        "Analytics wording",
+        "Recording selection",
+        "Highlights"
+      ],
+      "required_improvement": "Display real limitations and uncertainty; distinguish reported provider availability from accuracy and preserve explicit session identity.",
+      "actual_change": "New quality panel, candidate/event wording, exact recording selection, heatmap units and unresolved identity labels have passing synthetic coverage and a frozen production build.",
+      "validation_method": {
+        "completed": "Frontend253 tests, TypeScript and production build passed before run04; run03 old wording is retained as before evidence. Run06actualqualitymetadata/negativeIDlabel/twoscoringslotsvsfourparticipants/missingrecordingguard checks pass; no false names/movement.",
+        "pending": "Only the stated remaining limitations/unexercised scenarios remain; no full physical-accuracy claim."
+      },
+      "status": "validated",
+      "remaining_limitation": "A production build and synthetic rendering assertions are not empirical frontend/backend acceptance of these newest changes."
+    },
+    {
+      "id": "SV-022",
+      "component": "API latency outlier and completion-stage contention",
+      "evidence_kind": [
+        "selected_video_single_sample",
+        "observability_limitation"
+      ],
+      "evidence_paths": [
+        "docs/architecture/single-video-frontend-20261113.md",
+        "../single-video-validation-20261113/run03/trace-summary.json",
+        "../single-video-validation-20261113/run06/saved-output-contracts.json"
+      ],
+      "root_cause_confirmed_or_hypothesis": {
+        "confirmed": [
+          "Run03 single analytics response took1742ms versus17.2/16.2ms sampled in runs01/02; captures occurred near completion.",
+          "Run03 temporal-ingest max2525ms and track persistence/transport max809ms identify host-wall outliers but do not explain causation."
+        ],
+        "hypotheses": [
+          "Serialization, completion-stage resource contention, filesystem or repository snapshot work may contribute; no cause is confirmed."
+        ]
+      },
+      "severity": "medium",
+      "dependencies": [
+        "Analytics API",
+        "Persistence",
+        "Temporal engine",
+        "Frontend time to useful output"
+      ],
+      "required_improvement": "Trace the actual completion-stage requests and suboperations; compare repeated equivalent calls before changing caching or concurrency.",
+      "actual_change": "Finer temporal/identity/appearance instrumentation is included in the run04 committed source; existing API captures remain untouched.",
+      "validation_method": {
+        "completed": "Existing isolated samples and stage summaries were inspected, without calculating a percentile from one API observation. Run06actualSPAanalyticsn153/p5033.5ms/p95205.0ms; request-amplification mechanism repaired. Earlier singleoutlier retained, no historicalAPIp95 inferred.",
+        "pending": "Only the stated remaining limitations/unexercised scenarios remain; no full physical-accuracy claim."
+      },
+      "status": "validated",
+      "remaining_limitation": "These samples cannot establish an API regression, stable p95 or a frontend rendering bottleneck."
+    },
+    {
+      "id": "SV-023",
+      "component": "Validation scope and accidental historical fixture processing",
+      "evidence_kind": [
+        "confirmed_process_deviation",
+        "retained_test_log"
+      ],
+      "evidence_paths": [
+        "docs/architecture/single-video-perception-20261113.md",
+        "../single-video-validation-20261113/perception-tests/scene-suite-optimized.log",
+        "../single-video-validation-20261113/perception-tests/scene-synthetic-final.log"
+      ],
+      "root_cause_confirmed_or_hypothesis": {
+        "confirmed": [
+          "An overly broad test_scene*.py invocation included three source-bound grayscale cases: Test1 frames10766..10770 and15575..15579, and Test2 frames7699..7703.",
+          "Those15 retained grayscale images were processed by classical scene observers;51 retained scene-layout JSON cases also ran. This exceeded the single-video/synthetic-only instruction."
+        ],
+        "hypotheses": []
+      },
+      "severity": "high",
+      "dependencies": [
+        "Evidence provenance",
+        "Experiment discipline",
+        "Reported acceptance"
+      ],
+      "required_improvement": "Retain and disclose the deviation, exclude it from selected-video empirical claims, and use explicit inspected synthetic module lists with historical-image deselection.",
+      "actual_change": "The root was notified and disclosed the error to the user. The unchanged log is preserved; later curated scene runs explicitly deselect the source-bound images and do not rerun them.",
+      "validation_method": {
+        "completed": "Historical media was not decoded and no neural model ran in that invocation; the later230-case curated scene result explicitly excludes the three retained-image cases.",
+        "pending": "The prior deviation cannot be undone and must remain in the final report."
+      },
+      "status": "fixed",
+      "remaining_limitation": "Those historical fixture results are not permitted evidence that the selected-video workflow or its model accuracy passed."
+    },
+    {
+      "id": "SV-024",
+      "component": "Synthetic selection wrappers, CPU isolation and deferred suites",
+      "evidence_kind": [
+        "confirmed_harness_defect",
+        "retained_test_log",
+        "synthetic_contract"
+      ],
+      "evidence_paths": [
+        "docs/architecture/single-video-contracts-20261113.md",
+        "../single-video-validation-20261113/contract-tests/rejected-empty-module-selection-receipt.json",
+        "../single-video-validation-20261113/contract-tests/final_synthetic_selection_v2.json",
+        "../single-video-validation-20261113/contract-tests/final_synthetic_receipt_v2.json"
+      ],
+      "root_cause_confirmed_or_hypothesis": {
+        "confirmed": [
+          "An early broad selection indirectly requested generated media; the AV guard rejected it before open.",
+          "A later unavailable preflight python executable left an empty module list, triggering default collection; five generated-media lifecycle opens were again blocked before open.",
+          "Earlier broad runs were interrupted for CPU release or stopped on fixture/schema failures, so their partial counts were not complete-suite passes."
+        ],
+        "hypotheses": []
+      },
+      "severity": "medium",
+      "dependencies": [
+        "Controlled latency comparison",
+        "Test selection",
+        "Media prohibition",
+        "Regression claims"
+      ],
+      "required_improvement": "Require fail-fast wrappers, explicit inspected module arrays, exact nonempty counts, defensive media guard, distinct result paths and bounded native threads; keep CPU suites outside selected-video measurement runs.",
+      "actual_change": "Final wrapper uses set-euo-pipefail, explicit.venv/bin/python, exact105-module assertion, AV guard and thread env1. Stale positive fixtures gained truthful current evidence plus negatives; no production gates were weakened.",
+      "validation_method": {
+        "completed": "Final 105-module selection completed 1216 passing cases and 8 deprecation warnings in 108.33 seconds; per-node records and source hashes verify the outcome. CPU was released and production/test source frozen before run04.",
+        "pending": "Deferred 29 modules/scenarios and whole-suite empirical coverage remain outside this result; root owns final scope reconciliation."
+      },
+      "status": "validated",
+      "remaining_limitation": "The blocked-wrapper attempts and historical-image deviation remain disclosed; selected synthetic success is not a whole-repository, model-inference or browser accuracy pass."
+    },
+    {
+      "id": "SV-025",
+      "component": "Ingestion and cross-component scenarios not exercised by the locked source",
+      "evidence_kind": [
+        "selected_video_scope_limitation",
+        "source_inspection",
+        "unexercised_scenario"
+      ],
+      "evidence_paths": [
+        "../single-video-validation-20261113/selection/selection.json",
+        "../single-video-validation-20261113/selection/timeline-audit.json",
+        "docs/architecture/deep-pipeline-overhaul-20261113.md",
+        "docs/architecture/single-video-frontend-20261113.md"
+      ],
+      "root_cause_confirmed_or_hypothesis": {
+        "confirmed": [
+          "The selected source has a 30 FPS, 4462-frame canonical timeline; run01..03 caches are contiguous, but this does not exercise general VFR source-frame correspondence or every corrupt-stream/long-video condition.",
+          "One fixed-camera amateur recording cannot exercise every camera move/cut, extreme occlusion, reviewed re-entry identity, visible scoreboard transition, named-player heatmap and positive eligible-highlight scenario."
+        ],
+        "hypotheses": []
+      },
+      "severity": "medium",
+      "dependencies": [
+        "Video probing and decoding",
+        "Camera/calibration lifecycle",
+        "Tracking and identity",
+        "Scoring",
+        "Analytics",
+        "Frontend positive/empty/error states"
+      ],
+      "required_improvement": "Keep unexercised behavior explicit in component acceptance; use focused synthetic contract checks where meaningful and require separately authorized footage/evidence before claiming empirical coverage beyond this source.",
+      "actual_change": "Finite media and positive buffer/thread guards, source stamps, invalid geometry/missing-observation contracts and frontend empty states have synthetic coverage. The single source and its hash remain locked; no extra video was selected to fill scenario gaps.",
+      "validation_method": {
+        "completed": "Existing source/proxy timeline metadata, contiguous cached-frame checks and the workstream acceptance boundaries were inspected.",
+        "pending": "No additional empirical dataset is authorized by this register; these scenarios remain not exercised or blocked rather than passed."
+      },
+      "status": "blocked",
+      "remaining_limitation": "The selected workflow cannot certify universal VFR/camera/occlusion/scoring/model behavior or every component fallback, even if its exercised path completes successfully."
+    },
+    {
+      "id": "SV-026",
+      "component": "API startup and complete web bundle",
+      "evidence_kind": [
+        "source_confirmed_defect",
+        "startup_failure",
+        "synthetic_regression"
+      ],
+      "evidence_paths": [
+        "apps/api/src/bai_api/app.py",
+        "start-app.sh",
+        "apps/api/tests/test_web_bundle_contract.py",
+        "../single-video-validation-20261113/run06/saved-output-contracts.json"
+      ],
+      "root_cause_confirmed_or_hypothesis": {
+        "confirmed": [
+          "Existingdist root withoutassets caused StaticFiles construction failure during rebuild."
+        ],
+        "hypotheses": []
+      },
+      "severity": "medium",
+      "dependencies": [
+        "API factory",
+        "Built frontend"
+      ],
+      "required_improvement": "Mount only complete index+assets; explicit API-only warning and launcher guard.",
+      "actual_change": "Mount only complete index+assets; explicit API-only warning and launcher guard.",
+      "validation_method": {
+        "completed": "Five synthetic layout cases plus actual complete app startups. Completebuiltapplication started throughout testedworkflow; five incomplete-bundle layout cases pass.",
+        "pending": "Only the stated remaining limitations/unexercised scenarios remain; no full physical-accuracy claim."
+      },
+      "status": "validated",
+      "remaining_limitation": "Validation is scoped to the recorded contracts and one controlled recording; no physical accuracy or unexercised scenario is certified."
+    },
+    {
+      "id": "SV-027",
+      "component": "Live derived-query request amplification",
+      "evidence_kind": [
+        "source_confirmed_defect",
+        "selected_video_runtime",
+        "synthetic_regression"
+      ],
+      "evidence_paths": [
+        "apps/web/src/lib/analysisRefresh.ts",
+        "apps/web/src/lib/analysisRefresh.test.tsx",
+        "../single-video-validation-20261113/frontend/run04-live/browser-live-report.json",
+        "../single-video-validation-20261113/run06/saved-output-contracts.json"
+      ],
+      "root_cause_confirmed_or_hypothesis": {
+        "confirmed": [
+          "Multiple mounted query observers independently invalidated the same queries for event/frontier changes; run04 recorded3666API responses including1368analytics and2189heatmaps. Snapshot locks amplified writer wait."
+        ],
+        "hypotheses": []
+      },
+      "severity": "high",
+      "dependencies": [
+        "Browser derived analytics",
+        "API snapshots",
+        "Engine writer"
+      ],
+      "required_improvement": "OneQueryClient/session coordinator coalesces2s live refresh, terminal/revision/correction freshness, dirtyinflight followup andAbortSignal cancellation; rawWS remains immediate.",
+      "actual_change": "OneQueryClient/session coordinator coalesces2s live refresh, terminal/revision/correction freshness, dirtyinflight followup andAbortSignal cancellation; rawWS remains immediate.",
+      "validation_method": {
+        "completed": "Eight focused scheduler controls and full264frontend tests; complete run06 live comparison follows. Full live run04→06 pageAPIresponses3666→551, analytics1368→153, heatmaps2189→302; actualterminalfresh fetches return200, rawWS remains immediate; sourceframepayloads exactly equal.",
+        "pending": "Only the stated remaining limitations/unexercised scenarios remain; no full physical-accuracy claim."
+      },
+      "status": "validated",
+      "remaining_limitation": "Validation is scoped to the recorded contracts and one controlled recording; no physical accuracy or unexercised scenario is certified."
+    },
+    {
+      "id": "SV-028",
+      "component": "Unused analytics geometry I/O",
+      "evidence_kind": [
+        "source_confirmed_defect",
+        "selected_video_runtime",
+        "synthetic_regression"
+      ],
+      "evidence_paths": [
+        "sports/badminton/src/bai_badminton/analytics/rebuild.py",
+        "sports/badminton/tests/test_analytics_provisional_io.py",
+        "../single-video-validation-20261113/analytics-optimization/paired-comparison.json",
+        "../single-video-validation-20261113/run06/saved-output-contracts.json"
+      ],
+      "root_cause_confirmed_or_hypothesis": {
+        "confirmed": [
+          "Build read cameraParquet even when no official interval/shot could consume spatial facts; held consistent snapshot locks throughout."
+        ],
+        "hypotheses": []
+      },
+      "severity": "medium",
+      "dependencies": [
+        "Canonical analytics",
+        "Snapshot writer contention"
+      ],
+      "required_improvement": "Skip unusedgeometry scan only for empty/provisional-only folds; official path unchanged.",
+      "actual_change": "Skip unusedgeometry scan only for empty/provisional-only folds; official path unchanged.",
+      "validation_method": {
+        "completed": "34relevant tests; six alternating saved-run04 folds exactJSONequality, median135.0816→1.3212ms. complete E2E run06 comparison follows. Sixpaired CPUfolds exactJSONparity135.08→1.32ms median; liveanalysis771.019→645.284s with same modeloutputs (combinedchanges, not isolatedspeedup).",
+        "pending": "Only the stated remaining limitations/unexercised scenarios remain; no full physical-accuracy claim."
+      },
+      "status": "validated",
+      "remaining_limitation": "Validation is scoped to the recorded contracts and one controlled recording; no physical accuracy or unexercised scenario is certified."
+    },
+    {
+      "id": "SV-029",
+      "component": "Uncalibrated image observations dropped",
+      "evidence_kind": [
+        "source_confirmed_defect",
+        "selected_video_runtime",
+        "synthetic_regression"
+      ],
+      "evidence_paths": [
+        "sports/badminton/src/bai_badminton/engine.py",
+        "sports/badminton/tests/test_uncalibrated_image_observations.py",
+        "../single-video-validation-20261113/run06/saved-output-contracts.json"
+      ],
+      "root_cause_confirmed_or_hypothesis": {
+        "confirmed": [
+          "Anonymous image rows were gatedon geometry_valid. Run04 retained18522rawperson observations but wire18514; exactly4people×2REACQUIRING frames0/1 were dropped."
+        ],
+        "hypotheses": []
+      },
+      "severity": "medium",
+      "dependencies": [
+        "Image overlays",
+        "Track persistence",
+        "Geometry provenance"
+      ],
+      "required_improvement": "Preserve eligible imageboxes independently from court projection; null court/named/episode evidence while uncalibrated; replay still excluded.",
+      "actual_change": "Preserve eligible imageboxes independently from court projection; null court/named/episode evidence while uncalibrated; replay still excluded.",
+      "validation_method": {
+        "completed": "20focused image/camera/epoch/analytics checks; actual final initial-frame/API check follows. All18522cachedpersonrows now present inwire, including8frame0/1 image-onlyrows nullcourt/no participantbinding. Realbrowserframe0 showsfourboxes/poses with courtunavailable.",
+        "pending": "Only the stated remaining limitations/unexercised scenarios remain; no full physical-accuracy claim."
+      },
+      "status": "validated",
+      "remaining_limitation": "Validation is scoped to the recorded contracts and one controlled recording; no physical accuracy or unexercised scenario is certified."
+    },
+    {
+      "id": "SV-030",
+      "component": "Court editor initialization ownership",
+      "evidence_kind": [
+        "source_confirmed_defect",
+        "selected_video_runtime",
+        "synthetic_regression"
+      ],
+      "evidence_paths": [
+        "apps/web/src/features/calibrate/CalibratePage.tsx",
+        "apps/web/src/features/calibrate/CalibratePage.mutation-ordering.test.tsx",
+        "../single-video-validation-20261113/run06/saved-output-contracts.json"
+      ],
+      "root_cause_confirmed_or_hypothesis": {
+        "confirmed": [
+          "Realrun04attempt acceptedpointer edits while proposal initialization pending; late proposal cleared draft history/Undo. Retry after initialization passed mapping."
+        ],
+        "hypotheses": []
+      },
+      "severity": "medium",
+      "dependencies": [
+        "Calibration draft",
+        "Pointer coordinates",
+        "Undo history"
+      ],
+      "required_improvement": "Ignore editing until initialization seed is ready; preserve explicit proposal lifecycle.",
+      "actual_change": "Ignore editing until initialization seed is ready; preserve explicit proposal lifecycle.",
+      "validation_method": {
+        "completed": "Focused loadingguard + full264frontend tests; actual final editor capture follows. Actual delayed-real-networkproposal check ignorespending edits, then preservesrawcoordinates andUndo afterready; zero applicationmutations.",
+        "pending": "Only the stated remaining limitations/unexercised scenarios remain; no full physical-accuracy claim."
+      },
+      "status": "validated",
+      "remaining_limitation": "Validation is scoped to the recorded contracts and one controlled recording; no physical accuracy or unexercised scenario is certified."
+    },
+    {
+      "id": "SV-031",
+      "component": "Candidate labels and event identity",
+      "evidence_kind": [
+        "source_confirmed_defect",
+        "selected_video_runtime",
+        "synthetic_regression"
+      ],
+      "evidence_paths": [
+        "apps/web/src/features/player/EvidenceDetails.tsx",
+        "apps/web/src/features/player/clip.ts",
+        "apps/web/src/lib/format.ts",
+        "../single-video-validation-20261113/run06/saved-output-contracts.json"
+      ],
+      "root_cause_confirmed_or_hypothesis": {
+        "confirmed": [
+          "Residual evidence labels formatted rally_no0 asRally0; zero is not a unique candidate identity."
+        ],
+        "hypotheses": []
+      },
+      "severity": "medium",
+      "dependencies": [
+        "Evidence navigation",
+        "Keyboard/clip/feed labels"
+      ],
+      "required_improvement": "Shared conservative candidate label; preserve exact eventID/frame in keyboard/evidence navigation.",
+      "actual_change": "Shared conservative candidate label; preserve exact eventID/frame in keyboard/evidence navigation.",
+      "validation_method": {
+        "completed": "Synthetic candidate identity regression and full264frontend tests; final visual check follows. ActualCandidate2 keyboardeventID/frame1858 maps tovideo61.950s and Candidate2labels afterpresented-framereadiness; Candidate1 noRally0.",
+        "pending": "Only the stated remaining limitations/unexercised scenarios remain; no full physical-accuracy claim."
+      },
+      "status": "validated",
+      "remaining_limitation": "Validation is scoped to the recorded contracts and one controlled recording; no physical accuracy or unexercised scenario is certified."
+    }
+  ],
+  "source_commits": [
+    "e558fd9",
+    "ac0084f",
+    "8110422"
+  ],
+  "status_counts": {
+    "blocked": 12,
+    "validated": 17,
+    "open": 1,
+    "fixed": 1
+  },
+  "reviewed_utc": "2026-11-13T13:05:54.756695+00:00",
+  "completed_runs": [
+    "run01",
+    "run02",
+    "run03",
+    "run04",
+    "run06"
+  ],
+  "interrupted_runs": [
+    "run05"
+  ],
+  "final_session_id": "01M7AEZC82KAE6B152D6TWYJTB",
+  "final_overall_status": "Engineering integration and measured latency repairs demonstrated; production sporting accuracy acceptance not met.",
+  "final_measurements": {
+    "analysis_s": 645.284,
+    "browser_click_to_terminal_s": 648.574,
+    "completed_frames": 4462,
+    "rally_candidates": 2,
+    "unknown_stroke_events": 10,
+    "accepted_points": 0,
+    "cached_frame_payload_changes_vs_run04": 0,
+    "page_api_responses": 551,
+    "api_scope": "SPA/page responses; separate harness/observerstatuspolls excluded",
+    "accuracy_metrics_available": false
+  }
+}
