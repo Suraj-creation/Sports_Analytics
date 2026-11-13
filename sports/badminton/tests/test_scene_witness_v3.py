@@ -21,7 +21,10 @@ def measured(monkeypatch, changed, static=0, *, final_consistency=0.1):
         innovative = pair == 2 and region <= changed
         return 40, final_consistency if innovative else 0.95, 100.0 if innovative else 3.0, 0.1
 
-    monkeypatch.setattr(scene_change, "_flow", flow)
+    monkeypatch.setattr(
+        scene_change, "_flow_groups",
+        lambda previous, current, masks: [flow(previous, current, mask) for mask in masks],
+    )
     image = np.random.default_rng(761).integers(20, 220, (240, 600, 3), dtype=np.uint8)
     observer = cls()
     for frame in range(4):
@@ -87,7 +90,10 @@ def test_one_witness_per_different_channel_cannot_be_combined(monkeypatch):
         # The other region has appearance change with perfectly reversible flow.
         return 40, 1.0, 100.0 if pair == 2 else 3.0, 0.1
 
-    monkeypatch.setattr(scene_change, "_flow", flow)
+    monkeypatch.setattr(
+        scene_change, "_flow_groups",
+        lambda previous, current, masks: [flow(previous, current, mask) for mask in masks],
+    )
     source = np.random.default_rng(875).integers(20, 220, (240, 600, 3), dtype=np.uint8)
     observer = cls()
     for frame in range(4):
@@ -119,7 +125,10 @@ def test_two_overlapping_keys_are_not_independent_visual_witnesses(monkeypatch):
             (80, 1.0, 1.0, 0.0) if region == 0 else (40, 0.1 if pair == 2 else 0.95, 100.0 if pair == 2 else 3.0, 0.1)
         )
 
-    monkeypatch.setattr(scene_change, "_flow", flow)
+    monkeypatch.setattr(
+        scene_change, "_flow_groups",
+        lambda previous, current, masks: [flow(previous, current, mask) for mask in masks],
+    )
     source = np.random.default_rng(221).integers(20, 220, (240, 600, 3), dtype=np.uint8)
     observer = cls()
     for frame in range(4):
@@ -165,7 +174,10 @@ def test_missing_region_features_remain_unknown(monkeypatch):
         calls += 1
         return (80, 1.0, 1.0, 0.0) if region == 0 else (0, None, None, None)
 
-    monkeypatch.setattr(scene_change, "_flow", flow)
+    monkeypatch.setattr(
+        scene_change, "_flow_groups",
+        lambda previous, current, masks: [flow(previous, current, mask) for mask in masks],
+    )
     image = np.random.default_rng(912).integers(20, 220, (240, 600, 3), dtype=np.uint8)
     observer = scene_change.SceneContinuityDetectorV3()
     for frame in range(4):

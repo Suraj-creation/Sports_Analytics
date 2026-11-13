@@ -4,6 +4,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from endpoint_support import endpoint_position, supported_endpoint
 
 from bai_badminton.engine import BadmintonMatchEngine, EngineConfig
 from bai_badminton.events.contact import ContactCandidate, detect_contacts
@@ -12,6 +13,7 @@ from bai_badminton.participant_contact import ParticipantSnapshot
 from bai_badminton.perception.shuttle_post import Track
 from bai_badminton.perception_types import ChunkPerception, FramePerception
 from bai_badminton.rules.bwf import MatchConfig
+from bai_badminton.testing.synth import broadcast_homography
 from bai_engine.store import EventStore
 
 
@@ -30,15 +32,19 @@ def frames(*, tie=False):
         offset = 0 if i == 1 or (tie and i == 2) else i * 100
         rows[f"participant-epoch-{i:06d}"] = ParticipantSnapshot(
             track_id=i, bbox=np.array([90 + offset, 85, 110 + offset, 185], float),
-            kps=None, court_xy=(0.5, -3.0), observation_id=f"birth-{i}", detector_observed=True,
+            kps=None, court_xy=(0.5, -3.0 if i <= 2 else 3.0), observation_id=f"birth-{i}",
+            detector_observed=True, detector_matched=True,
         )
     return [dict(rows) for _ in range(7)]
 
 
 def classifier_timeline(engine, *, tie=False):
     """Hold flight context valid while testing participant evidence independently."""
-    engine.ingest(ChunkPerception(0, 35, [
-        FramePerception(frame_idx=f, shuttle_xy=None, shuttle_conf=0.0) for f in range(36)
+    engine.set_calibration(0, broadcast_homography(), emit=False)
+    engine.ingest(ChunkPerception(0, 37, [
+        FramePerception(frame_idx=f, shuttle_xy=endpoint_position(f),
+                        shuttle_conf=0.9 if endpoint_position(f) else 0.0)
+        for f in range(38)
     ]))
     engine._participant_frames[:7] = frames(tie=tie)
 
@@ -76,13 +82,13 @@ def test_classification_uses_unique_episode_context_without_naming_hitter(tmp_pa
     classifier_timeline(engine)
     engine._post_contact_kinematics = lambda _, next_frame=None: (800.0, -30.0)
     engine._on_contact(ContactCandidate(frame=3, player_id=None, p=0.9, shuttle_xy=(100., 100.)), window())
-    engine._classify(engine._open_contacts[-1], next_frame=35, is_serve=False, receiver=None)
+    engine._classify(engine._open_contacts[-1], next_frame=35, is_serve=False, receiver=supported_endpoint())
     stroke = store.query(types=["stroke"])[0]
     assert stroke.actors.player_id is None
     assert stroke.payload["participant_hypothesis"]["participant_id"] == "participant-epoch-000001"
     assert stroke.payload["hitter_court_xy"] == [0.5, -3.0]
     assert stroke.payload["classification_context_source"] == "provisional_track_episode"
-    assert stroke.payload["classification_context_detector_scope"] == "frame_only_not_person_match"
+    assert stroke.payload["classification_context_detector_scope"] == "unique_current_person_match"
     assert stroke.payload["stroke"] != "unknown"
 
 
@@ -101,11 +107,38 @@ def test_classifier_abstains_when_episode_box_has_no_detector_run(tmp_path: Path
     )
     engine._post_contact_kinematics = lambda _, next_frame=None: (800.0, -30.0)
     engine._on_contact(ContactCandidate(frame=3, player_id=None, p=0.9, shuttle_xy=(100., 100.)), window())
-    engine._classify(engine._open_contacts[-1], next_frame=35, is_serve=False, receiver=None)
+    engine._classify(engine._open_contacts[-1], next_frame=35, is_serve=False, receiver=supported_endpoint())
     stroke = store.query(types=["stroke"])[0]
     assert stroke.payload["participant_hypothesis"]["participant_id"] == key
     assert stroke.payload["hitter_court_xy"] is None
     assert "classification_context_source" not in stroke.payload
+    assert stroke.payload["stroke"] == "unknown"
+
+
+@pytest.mark.parametrize("missing", ["unmatched", "unknown_match", "geometry", "birth"])
+def test_delayed_doubles_classification_revalidates_current_observation_proof(tmp_path, missing):
+    store = EventStore(tmp_path / "current-proof.sqlite", "S1")
+    engine = BadmintonMatchEngine(
+        "S1", EngineConfig(fps=30, frame_width=1280, frame_height=720, match=MatchConfig(discipline="doubles")), store
+    )
+    classifier_timeline(engine)
+    engine._post_contact_kinematics = lambda _, next_frame=None: (800.0, -30.0)
+    engine._on_contact(ContactCandidate(frame=3, player_id=None, p=0.9, shuttle_xy=(100., 100.)), window())
+    selected = engine._open_contacts[-1].event.payload["participant_hypothesis"]["participant_id"]
+    assert selected is not None
+    snapshot = engine._participant_frames[3][selected]
+    if missing == "geometry":
+        engine._geometry_valid[3] = False
+    else:
+        changes = {
+            "unmatched": {"detector_matched": False},
+            "unknown_match": {"detector_matched": None},
+            "birth": {"observation_id": None},
+        }[missing]
+        engine._participant_frames[3][selected] = replace(snapshot, **changes)
+    engine._classify(engine._open_contacts[-1], next_frame=35, is_serve=False, receiver=supported_endpoint())
+    stroke = store.query(types=["stroke"])[0]
+    assert stroke.payload["hitter_court_xy"] is None
     assert stroke.payload["stroke"] == "unknown"
 
 def test_ambiguous_episode_never_supplies_classifier_context(tmp_path: Path):
@@ -115,7 +148,7 @@ def test_ambiguous_episode_never_supplies_classifier_context(tmp_path: Path):
     classifier_timeline(engine, tie=True)
     engine._post_contact_kinematics = lambda _, next_frame=None: (800.0, -30.0)
     engine._on_contact(ContactCandidate(frame=3, player_id=None, p=0.9, shuttle_xy=(100., 100.)), window())
-    engine._classify(engine._open_contacts[-1], next_frame=35, is_serve=False, receiver=None)
+    engine._classify(engine._open_contacts[-1], next_frame=35, is_serve=False, receiver=supported_endpoint())
     stroke = store.query(types=["stroke"])[0]
     assert stroke.payload["participant_hypothesis"]["status"] == "unresolved"
     assert stroke.payload["hitter_court_xy"] is None
@@ -157,7 +190,7 @@ def test_ambiguous_singles_does_not_enable_doubles_classification_context(tmp_pa
     classifier_timeline(engine)
     engine._post_contact_kinematics = lambda _, next_frame=None: (800.0, -30.0)
     engine._on_contact(ContactCandidate(frame=3, player_id=None, p=0.9, shuttle_xy=(100., 100.)), window())
-    engine._classify(engine._open_contacts[-1], next_frame=35, is_serve=False, receiver=None)
+    engine._classify(engine._open_contacts[-1], next_frame=35, is_serve=False, receiver=supported_endpoint())
     stroke = store.query(types=["stroke"])[0]
     assert stroke.actors.player_id is None
     assert stroke.payload["participant_hypothesis"]["participant_id"] == "participant-epoch-000001"

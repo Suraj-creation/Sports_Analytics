@@ -5,6 +5,7 @@ from dataclasses import replace
 
 import numpy as np
 import pytest
+from endpoint_support import endpoint_position, supported_endpoint
 
 from bai_badminton.analytics.individual import build_individual_analytics
 from bai_badminton.engine import BadmintonMatchEngine, EngineConfig
@@ -66,8 +67,10 @@ def contact(engine, window):
     # Retain compatible future frames in every classifier case, so negative
     # person-evidence tests cannot pass merely because flight context is absent.
     engine._last_frame = 6
-    engine.ingest(ChunkPerception(7, 35, [
-        FramePerception(frame_idx=f, shuttle_xy=None, shuttle_conf=0.0, shot_id=1) for f in range(7, 36)
+    engine.ingest(ChunkPerception(7, 37, [
+        FramePerception(frame_idx=f, shuttle_xy=endpoint_position(f),
+                        shuttle_conf=0.9 if endpoint_position(f) else 0.0, shot_id=1)
+        for f in range(7, 38)
     ]))
     engine._on_contact(
         ContactCandidate(
@@ -84,7 +87,7 @@ def test_post_cut_singles_geometry_classifies_without_assigning_a_named_player(t
     engine, store, window = setup(tmp_path)
     item = contact(engine, window)
     before = deepcopy(engine._players)
-    engine._classify(item, next_frame=35, is_serve=False, receiver=None)
+    engine._classify(item, next_frame=35, is_serve=False, receiver=supported_endpoint())
     stroke = store.query(types=["stroke"])[0]
     assert stroke.payload["classification_context_source"] == "provisional_track_episode"
     assert stroke.payload["hitter_court_xy"] == [0.5, -3.0]
@@ -129,11 +132,26 @@ def test_new_visual_people_block_singles_context_before_episode_admission(tmp_pa
     assert engine._participant_visible_counts[3] == 2 + new_people
     assert engine._participant_identity_unresolved[3] is False
     item = contact(engine, window)
-    engine._classify(item, next_frame=35, is_serve=False, receiver=None)
+    engine._classify(item, next_frame=35, is_serve=False, receiver=supported_endpoint())
     stroke = store.query(types=["stroke"])[0]
     assert stroke.actors.player_id is None
     assert stroke.payload["hitter_court_xy"] is None
     assert "classification_context_source" not in stroke.payload
+    assert stroke.payload["stroke"] == "unknown"
+
+
+@pytest.mark.parametrize("next_candidate", [None, "unobserved"])
+def test_valid_singles_geometry_does_not_manufacture_a_physical_next_endpoint(tmp_path, next_candidate):
+    engine, store, window = setup(tmp_path)
+    item = contact(engine, window)
+    receiver = supported_endpoint() if next_candidate else None
+    if receiver is not None:
+        receiver = replace(receiver, evidence=None)
+    engine._classify(item, next_frame=35, is_serve=False, receiver=receiver)
+    stroke = store.query(types=["stroke"])[0]
+    assert stroke.payload["hitter_court_xy"] == [0.5, -3.0]
+    assert stroke.payload["flight_time_s"] is None
+    assert stroke.payload["flight_endpoint"]["used"] is False
     assert stroke.payload["stroke"] == "unknown"
 
 
@@ -192,7 +210,7 @@ def test_singles_context_requires_two_supported_current_people_and_matching_birt
         current[selected] = replace(current[selected], observation_id="another-birth")
     else:
         current[selected] = replace(current[selected], track_id=99)
-    engine._classify(item, next_frame=35, is_serve=False, receiver=None)
+    engine._classify(item, next_frame=35, is_serve=False, receiver=supported_endpoint())
     stroke = store.query(types=["stroke"])[0]
     assert stroke.actors.player_id is None
     assert stroke.payload["hitter_court_xy"] is None

@@ -1,5 +1,6 @@
 """Processing boundaries must not create shots or service evidence."""
 
+from dataclasses import replace
 from itertools import pairwise
 from pathlib import Path
 
@@ -7,9 +8,11 @@ import pytest
 from synthetic_support import bind_labelled_synthetic_singles
 
 from bai_badminton.analytics.match import MatchAnalytics, RallyRecord
+from bai_badminton.components import _ContactEvidence
 from bai_badminton.engine import BadmintonMatchEngine, EngineConfig
 from bai_badminton.events.contact import detect_contacts
 from bai_badminton.events.rally_fsm import RallyFSM, RallyParams, RallySegment, RallyState, RallyUpdate
+from bai_badminton.perception.association import ShuttleObservationEvidence
 from bai_badminton.perception_types import ChunkPerception
 from bai_badminton.testing.synth import make_rally, to_frames
 from bai_engine.schema import ConfidenceBand
@@ -32,8 +35,26 @@ def test_contextual_peaks_are_independent_of_requested_partition(size: int) -> N
 def run_rally(path: Path, *, chunk_size: int, lead_in: int = 30, labelled_identity: bool = False):
     rally = make_rally(lead_in=lead_in)
     frames = to_frames(rally, 0)
+    # The generator supplies exact current-image joints and shuttle locations.
+    # Declare those sources rather than leave them as legacy unstamped data.
+    frames = [replace(
+        frame,
+        persons=[replace(person, pose_frame_idx=frame.frame_idx) for person in frame.persons],
+        shuttle_observation=ShuttleObservationEvidence(
+            frame_idx=frame.frame_idx, epoch=0,
+            status="observed" if frame.shuttle_xy is not None else "missing",
+            association_status="tracked" if frame.shuttle_xy is not None else "unknown",
+            raw_xy=frame.shuttle_xy, selected_xy=frame.shuttle_xy, raw_model_support=frame.shuttle_conf,
+            reasons=("controlled_synthetic_current_observation",),
+        ),
+    ) for frame in frames]
     store = EventStore(path, "S1")
-    engine = BadmintonMatchEngine("S1", EngineConfig(fps=30, frame_width=1280, frame_height=720), store)
+    engine = BadmintonMatchEngine(
+        "S1", EngineConfig(fps=30, frame_width=1280, frame_height=720), store,
+        # A declared synthetic image sensitivity permits physical endpoint
+        # assessment; it does not assert calibrated real-camera error.
+        contact_inference=_ContactEvidence({"spatial_sigma_px": 0.5}),
+    )
     if labelled_identity:
         bind_labelled_synthetic_singles(engine)
     engine.set_calibration(0, rally.homography)

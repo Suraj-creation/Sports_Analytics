@@ -91,7 +91,7 @@ export function CourtMinimap({ session }: { session: Session }) {
         g.arc(x, y, 5, 0, Math.PI * 2);
         g.fill();
         g.font = "10px system-ui";
-        g.fillText(`T${player.track}`, x + 7, y + 3);
+        g.fillText(player.track < 0 ? "Unresolved" : `T${player.track}`, x + 7, y + 3);
       }
     });
   }, [width, tracks, events, fps]);

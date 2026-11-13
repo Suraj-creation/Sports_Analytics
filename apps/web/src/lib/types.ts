@@ -170,6 +170,9 @@ export interface Highlight {
   categories: string[];
   reasons: Record<string, number>;
   player: PlayerId | null;
+  evidence_ids?: string[];
+  evidence_status?: string;
+  score_semantics?: string;
 }
 
 export interface Analytics {

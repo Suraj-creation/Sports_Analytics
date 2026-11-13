@@ -37,16 +37,16 @@ export function RalliesTab({
   };
   if (!rows.length)
     return (
-      <Empty title="No completed rallies yet">
+      <Empty title="No completed rally candidates yet">
         The real event log fills this view as processing finishes.
       </Empty>
     );
   return (
     <section>
-      <h2 className="text-xl font-semibold">Every rally, and how it unfolded</h2>
+      <h2 className="text-xl font-semibold">Recorded rally candidates</h2>
       <p className="analysis-panel-hint mb-5">
-        {rows.length} observed rallies. Warm-up and excluded exchanges stay visible and do not enter the
-        score.
+        {rows.length} recorded rally candidates. Warm-up and excluded exchanges stay visible and do not enter
+        the score.
       </p>
       <div className="analysis-filters">
         <label>
@@ -103,7 +103,13 @@ export function RalliesTab({
       </div>
       {shown.length === 0 && <Empty title="No rallies match these filters">Try clearing a filter.</Empty>}
       {shown.slice(0, limit).map((r) => (
-        <RallyRow key={r.id} rally={r} session={session} open={selectedRally === r.no} />
+        <RallyRow
+          key={r.id}
+          rally={r}
+          session={session}
+          label={r.official && r.no > 0 ? `Rally ${r.no}` : `Candidate ${rows.indexOf(r) + 1}`}
+          open={r.official && r.no > 0 && selectedRally === r.no}
+        />
       ))}
       {shown.length > limit && (
         <button type="button" className="rally-action mt-5" onClick={() => setLimit((n) => n + 50)}>
@@ -114,7 +120,17 @@ export function RalliesTab({
   );
 }
 
-function RallyRow({ rally: r, session, open }: { rally: EvidenceRally; session: Session; open: boolean }) {
+function RallyRow({
+  rally: r,
+  session,
+  open,
+  label,
+}: {
+  rally: EvidenceRally;
+  session: Session;
+  open: boolean;
+  label: string;
+}) {
   const selection = usePlayback((s) => s.selection);
   const selected = selection && selection.start >= r.start && selection.start <= r.end;
   const qc = useQueryClient();
@@ -141,9 +157,9 @@ function RallyRow({ rally: r, session, open }: { rally: EvidenceRally; session: 
   return (
     <details className="rally-row" open={open || selected || undefined}>
       <summary>
-        <span className="font-semibold">Rally {r.no}</span>
+        <span className="font-semibold">{label}</span>
         <span className="text-sm text-line-2">
-          {clock(r.start, session.media)} · {r.shotCount ?? "—"} shots
+          {clock(r.start, session.media)} · {r.shotCount ?? "—"} shot events
         </span>
         <span className="text-sm">
           {!r.official
@@ -156,7 +172,7 @@ function RallyRow({ rally: r, session, open }: { rally: EvidenceRally; session: 
       </summary>
       <div className="rally-row-body">
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          <Watch start={r.start} end={r.end} label={`Rally ${r.no}`} />
+          <Watch start={r.start} end={r.end} label={label} />
           <span className="text-xs text-line-3">
             Event {r.id.slice(0, 12)} · {r.event.status.replaceAll("_", " ")}
           </span>

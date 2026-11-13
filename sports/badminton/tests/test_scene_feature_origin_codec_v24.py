@@ -55,9 +55,9 @@ def session(tmp_path):
     value.close()
 
 
-@pytest.mark.parametrize("version", [24, 25])
+@pytest.mark.parametrize("version", [24, 25, 26])
 def test_new_origin_measurement_roundtrips_actual_source_and_analysis_dimensions(session, version):
-    assert CODEC_VERSION == 25
+    assert CODEC_VERSION == 26
     value = record(session)
     value["v"] = version
     result = decode(value).frames[0]

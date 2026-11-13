@@ -55,16 +55,19 @@ export function HighlightsTab({ session, selectedPlayer }: { session: Session; s
               )}
             >
               {p && <PlayerDot pid={p} />}
-              {p ? shortName(session, p) : "Both players"}
+              {p ? shortName(session, p) : "Both scoring sides"}
             </button>
           ))}
-          <span className="ml-auto text-xs text-line-3">Ranked by excitement, kept varied</span>
+          <span className="ml-auto text-xs text-line-3">Estimated event rankings, kept varied</span>
         </fieldset>
       )}
       {q.isPending && <Spinner />}
       <ErrorNote error={q.error} />
       {q.data?.highlights.length === 0 && (
-        <Empty title="No highlights yet">The best rallies are picked as soon as they finish.</Empty>
+        <Empty title="No eligible highlights">
+          Rankings require eligible rally evidence. Uncounted or ambiguous exchanges may remain available in
+          Rallies.
+        </Empty>
       )}
       <ol className="grid gap-2 md:grid-cols-2">
         {q.data?.highlights.map((h, i) => (
@@ -89,6 +92,19 @@ export function HighlightsTab({ session, selectedPlayer }: { session: Session; s
                 )}
               </p>
               <p className="text-xs text-line-3">
+                {h.evidence_status
+                  ? `Evidence: ${h.evidence_status.replaceAll("_", " ")}`
+                  : "Evidence status unavailable for this saved ranking"}
+                {h.evidence_ids
+                  ? ` · ${h.evidence_ids.length} linked source events`
+                  : " · Source event list unavailable"}
+              </p>
+              <p className="text-xs text-line-3">
+                {h.score_semantics === "ranking_score_not_probability"
+                  ? "Ranking score, not a probability"
+                  : "Ranking estimate; calibrated confidence was not supplied"}
+              </p>
+              <p className="text-xs text-line-3">
                 Why:{" "}
                 {Object.entries(h.reasons)
                   .sort((a, b) => b[1] - a[1])
@@ -104,7 +120,7 @@ export function HighlightsTab({ session, selectedPlayer }: { session: Session; s
                   aria-label={`Play rally ${h.rally_no}`}
                   className="grid size-8 place-items-center rounded-lg bg-line text-mat-deep hover:bg-white"
                   onClick={() => {
-                    playEvidence(h.frame_start, h.frame_end, `Rally ${h.rally_no}`);
+                    playEvidence(h.frame_start, h.frame_end, `Rally ${h.rally_no}`, h.rally_id);
                   }}
                 >
                   <Play className="size-4" />

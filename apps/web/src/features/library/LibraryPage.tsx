@@ -429,7 +429,7 @@ function MatchFormatField({
   return (
     <Field
       label="Match format"
-      hint="Unspecified uses singles geometry. Doubles uses wider court boundaries; doubles service and scoring still require review."
+      hint="Choose the format if known. Otherwise it is estimated from court observations. Player identities and scoring may require review."
     >
       <select
         className={inputClass}

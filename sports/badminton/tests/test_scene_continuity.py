@@ -189,7 +189,10 @@ def test_reversible_correspondence_and_appearance_are_independent_hypotheses(mon
             return 80, 1.0, 1.0, 0.0
         return 40, state["consistent"], state["error"], 0.1
 
-    monkeypatch.setattr(module, "_flow", flow)
+    monkeypatch.setattr(
+        module, "_flow_groups",
+        lambda previous, current, masks: [flow(previous, current, mask) for mask in masks],
+    )
     detector = SceneContinuityDetector()
     source = source_pair()
     for frame in range(4):

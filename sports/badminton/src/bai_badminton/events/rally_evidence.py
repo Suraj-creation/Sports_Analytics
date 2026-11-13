@@ -241,7 +241,19 @@ class EvidenceRallyFSM(RallyFSM):
         if segment is not None:
             if update.cancelled_start == segment.start and pair is not None:
                 update.cancelled_start = None
+                update.cancelled_segment = None
                 update.finalized = segment
+            span = self._first_observed_motion_span
+            span_in_interval = span is not None and segment.start <= span[0] <= span[1] <= segment.end
+            short_exchange_status = (
+                "disabled"
+                if not self.use_short_exchange_evidence
+                else "motion_span_unavailable"
+                if not span_in_interval
+                else "qualified_pair"
+                if pair is not None
+                else "independent_pair_unavailable"
+            )
             self.last_exchange_admission = {
                 "start": segment.start,
                 "end": segment.end,
@@ -265,6 +277,20 @@ class EvidenceRallyFSM(RallyFSM):
                     None,
                 ),
                 "identity_semantics": "source-observed opposite episodes; no named/team identity asserted",
+                "short_exchange_evidence": {
+                    "enabled": self.use_short_exchange_evidence,
+                    "status": short_exchange_status,
+                    "observed_motion_span": list(span) if span is not None else None,
+                    "observed_motion_span_in_interval": span_in_interval,
+                    "retained_witness_frames": [
+                        witness.inputs.frame
+                        for witness in self._contact_witnesses
+                        if segment.start <= witness.inputs.frame <= segment.end
+                    ],
+                    # Retention already applies eligibility and history bounds;
+                    # this is not an inventory of every upstream contact cue.
+                    "witness_scope": "retained_eligible_contact_evidence",
+                },
             }
         self._contact_witnesses.clear()
         self._first_observed_motion_span = None

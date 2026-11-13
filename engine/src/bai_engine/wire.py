@@ -38,6 +38,7 @@ def encode_tracks(samples: list[TrackSample], frame_from: int, frame_to: int) ->
     # Temporary visual tracks are deliberately separate from P1/P2 score identities.
     # Doubles and uncertain singles identities still have real boxes and poses.
     anonymous: dict[str, dict[str, list[Any]]] = {}
+    unresolved_counts: dict[tuple[int, str | None, int | None], int] = {}
     cam: dict[str, list[Any]] = {"f": [], "g": [], "h": [], "q": [], "ctx": []}
     rackets: dict[str, list[Any]] = {key: [] for key in ("f", "t", "x", "y", "b", "c", "obs")}
     for s in samples:
@@ -64,6 +65,17 @@ def encode_tracks(samples: list[TrackSample], frame_from: int, frame_to: int) ->
         elif s.obj is TrackObject.PLAYER and s.visible and s.bbox is not None:
             target = players if s.player_id else anonymous
             identity = s.player_id or f"{s.participant_observation_id or 'track'}:{s.track_id}"
+            if not s.player_id and s.track_id < 0:
+                # Several visible bodies can have unresolved canonical ownership.
+                # Grouping every one under track:-1 overwrites same-frame boxes
+                # in browser maps. Raw tracking separates display observations;
+                # it does not establish participant or physical identity.
+                raw = s.raw_track_id if s.raw_track_id is not None and s.raw_track_id >= 0 else None
+                counter_key = (s.frame_idx, s.context_id, raw)
+                occurrence = unresolved_counts.get(counter_key, 0)
+                unresolved_counts[counter_key] = occurrence + 1
+                source = f"raw:{raw}" if raw is not None else f"frame:{s.frame_idx}"
+                identity = f"unresolved:{s.context_id or 'unknown'}:{source}:{occurrence}"
             p = target.setdefault(
                 identity,
                 {key: [] for key in (

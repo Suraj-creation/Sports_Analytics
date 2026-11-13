@@ -22,7 +22,10 @@ def observe_low_feature_pair(monkeypatch, feature_count):
             return feature_count, 0.5, 6.0, 0.1
         return 40, 0.95, 1.0, 0.1
 
-    monkeypatch.setattr(scene, "_flow", flow)
+    monkeypatch.setattr(
+        scene, "_flow_groups",
+        lambda previous, current, masks: [flow(previous, current, mask) for mask in masks],
+    )
     detector = scene.SceneContinuityDetectorV4()
     image = np.random.default_rng(44).integers(20, 220, (240, 600, 3), dtype=np.uint8)
     outputs = []

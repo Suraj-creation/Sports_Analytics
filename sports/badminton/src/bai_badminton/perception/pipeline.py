@@ -24,7 +24,7 @@ from __future__ import annotations
 import hashlib
 import json
 import zlib
-from dataclasses import dataclass, field, replace
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -63,6 +63,7 @@ from bai_engine.decode import DecodedChunk
 from bai_engine.obs import INFERENCE_FPS, get_logger, timed
 from bai_engine.runtime.device import engine_cache_dir, ort_providers, ort_runtime
 from bai_engine.runtime.registry import ModelError, ModelRegistry
+from bai_engine.trace import trace_frames, trace_span
 
 log = get_logger(__name__)
 
@@ -462,6 +463,7 @@ class BadmintonPerception:
             model = OSNetAppearanceEmbedder(
                 checkpoint, device="cuda:0" if choice.backend == "torch-cuda" else "cpu", max_crops=8
             )
+            self._record_runtime("player_reid", model.runtime)
             self.models["player_reid"] = registry.get(choice.model).ref
             return model
         except (ModelError, OSError, ValueError, ImportError, RuntimeError) as exc:
@@ -607,7 +609,9 @@ class BadmintonPerception:
             persons = self.players.process(fidx, img, strides)
         racket_detector = getattr(self, "racket", None)
         if racket_detector is not None and persons and not replay:
-            observed_rackets = racket_detector.detect(img, persons)
+            with trace_frames(fidx, fidx), trace_span("racket", input_count=len(persons)) as details:
+                observed_rackets = racket_detector.detect(img, persons)
+                details["output_count"] = len(observed_rackets)
             for person in persons:
                 person.racket = observed_rackets.get(person.track_id)
                 person.racket_frame_idx = fidx if person.racket is not None else None
@@ -676,7 +680,8 @@ class BadmintonPerception:
 
         # Where the camera is: the pose of every frame relative to the calibration's reference view.  A frame
         # that is not analysed (no court in view, another camera) is treated like a replay.
-        scene = self._scene(chunk, cut_flags)
+        with timed("court_and_camera"):
+            scene = self._scene(chunk, cut_flags)
         if self._calibration_last_frame is None or self._calibration_last_frame != chunk.start - 1:
             self.calibration_lifecycle = CalibrationLifecycle()
         states = []
@@ -744,7 +749,7 @@ class BadmintonPerception:
         content_decisions = [None] * n
         pre_people: list[_PlayerFrame] | None = None
         if content is not None:
-            from bai_badminton.perception.content import scene_change_from_dict, scene_change_to_dict
+            from bai_badminton.perception.content import scene_change_from_dict
 
             pre_people = []
             started = _now()
@@ -752,15 +757,20 @@ class BadmintonPerception:
                 frame = chunk.start + i
                 previous = self._content_previous
                 regions = previous[1].foreground_regions if previous is not None and previous[0] == frame - 1 else []
-                evidence = content.observe(
-                    frame,
-                    image,
-                    previous_regions=regions,
-                    previous_view_valid=bool(previous is not None and previous[0] == frame - 1 and previous[2]),
-                    current_view_valid=not replay[i],
-                    hard_cut=cut_flags[i],
-                )
-                evidence = scene_change_from_dict(scene_change_to_dict(evidence), frame_idx=frame)
+                with trace_frames(frame, frame), trace_span("content_observe", previous_region_count=len(regions)):
+                    evidence = content.observe(
+                        frame,
+                        image,
+                        previous_regions=regions,
+                        previous_view_valid=bool(previous is not None and previous[0] == frame - 1 and previous[2]),
+                        current_view_valid=not replay[i],
+                        hard_cut=cut_flags[i],
+                    )
+                with trace_frames(frame, frame), trace_span("content_validation"):
+                    # Validate the provider boundary once. The public encoder
+                    # also validates, so encoding then decoding here repeats the
+                    # same full geometry/hash proof without adding evidence.
+                    evidence = scene_change_from_dict(asdict(evidence), frame_idx=frame)
                 policy = getattr(content, "barrier_for", None)
                 barrier = policy(evidence) if callable(policy) else content.barrier_enabled and evidence.hypothesis
                 probe = None

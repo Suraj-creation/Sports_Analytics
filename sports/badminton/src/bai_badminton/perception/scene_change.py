@@ -13,6 +13,7 @@ from collections import deque
 from collections.abc import Sequence
 from copy import deepcopy
 from dataclasses import dataclass, replace
+from functools import lru_cache
 from hashlib import sha256
 from math import isfinite
 from numbers import Real
@@ -78,12 +79,8 @@ class FeatureOriginMask:
     sha256: str
 
 
-def exclusive_feature_origin_masks(regions, source_frame_size, analysis_frame_size):
-    """Deterministic disjoint LK feature origins; tracking patches may overlap.
-
-    Every prior full ROI participates, including a static or ineligible region.
-    The separate background mask must continue excluding the full ROI union.
-    """
+def _origin_geometry(regions, source_frame_size, analysis_frame_size):
+    """Detach the complete immutable geometry before any proof-cache lookup."""
     for size in (source_frame_size, analysis_frame_size):
         if not isinstance(size, (tuple, list)) or len(size) != 2 or any(type(v) is not int or v < 2 for v in size):
             raise ValueError("feature-origin dimensions require positive bounded width/height")
@@ -93,9 +90,31 @@ def exclusive_feature_origin_masks(regions, source_frame_size, analysis_frame_si
     scale = width / source_frame_size[0]
     if height != max(2, round(source_frame_size[1] * scale)):
         raise ValueError("feature-origin analysis dimensions differ from source aspect ratio")
-    masks = []
+    geometry = []
     for region in regions:
-        x0, y0, x1, y1 = np.asarray(region.bbox) * scale
+        if (
+            not isinstance(region.key, str) or not 1 <= len(region.key) <= 160
+            or len(region.bbox) != 4
+            or any(isinstance(v, (bool, np.bool_)) or not isinstance(v, Real) or not isfinite(v)
+                   for v in region.bbox)
+            or region.bbox[2] <= region.bbox[0] or region.bbox[3] <= region.bbox[1]
+        ):
+            raise ValueError("feature-origin geometry requires finite positive boxes and bounded keys")
+        geometry.append((region.key, tuple(float(v) for v in region.bbox)))
+        if len(geometry) > 8:
+            raise ValueError("feature-origin geometry exceeds eight bounded regions")
+    if len({key for key, _ in geometry}) != len(geometry):
+        raise ValueError("feature-origin geometry requires distinct region keys")
+    return tuple(geometry), tuple(source_frame_size), tuple(analysis_frame_size)
+
+
+def _raster_origin_geometry(geometry, source_frame_size, analysis_frame_size):
+    """Exact mask rasterization shared by measurement and proof verification."""
+    width, height = analysis_frame_size
+    scale = width / source_frame_size[0]
+    masks = []
+    for _key, box in geometry:
+        x0, y0, x1, y1 = np.asarray(box) * scale
         x0, x1 = np.clip([int(x0), int(np.ceil(x1))], 0, width)
         y0, y1 = np.clip([int(y0), int(np.ceil(y1))], 0, height)
         mask = np.zeros((height, width), dtype=np.uint8)
@@ -106,18 +125,34 @@ def exclusive_feature_origin_masks(regions, source_frame_size, analysis_frame_si
     occupancy = np.sum([mask > 0 for mask in masks], axis=0)
     exclusive = tuple(np.where((mask > 0) & (occupancy == 1), 255, 0).astype(np.uint8) for mask in masks)
     records = tuple(
-        FeatureOriginMask(region.key, int(np.count_nonzero(mask)), sha256(mask.tobytes()).hexdigest())
-        for region, mask in zip(regions, exclusive, strict=True)
+        FeatureOriginMask(key, int(np.count_nonzero(mask)), sha256(mask.tobytes()).hexdigest())
+        for (key, _box), mask in zip(geometry, exclusive, strict=True)
     )
     return exclusive, records
+
+
+@lru_cache(maxsize=128)
+def _expected_origin_records(geometry, source_frame_size, analysis_frame_size):
+    """Cache geometry-derived immutable records only, never images or masks.
+
+    All region boxes/keys and both dimension pairs participate in the key because
+    another ROI changes each exclusive mask. Frame/measurement authority is
+    validated separately and never granted by a matching geometry record.
+    """
+    return _raster_origin_geometry(geometry, source_frame_size, analysis_frame_size)[1]
+
+
+def exclusive_feature_origin_masks(regions, source_frame_size, analysis_frame_size):
+    """Recompute disjoint measurement masks; no cached image/mask is returned."""
+    return _raster_origin_geometry(*_origin_geometry(regions, source_frame_size, analysis_frame_size))
 
 
 def validate_feature_origin_basis(regions, policy, source_frame_size, analysis_frame_size, origin_masks):
     if policy != FEATURE_ORIGIN_POLICY:
         raise ValueError("unknown exclusive feature-origin measurement policy")
-    _, expected = exclusive_feature_origin_masks(
+    expected = _expected_origin_records(*_origin_geometry(
         [region.region for region in regions], source_frame_size, analysis_frame_size
-    )
+    ))
     if tuple(origin_masks) != expected:
         raise ValueError("feature-origin mask keys, areas or digests disagree with all prior ROIs")
     for region, record in zip(regions, expected, strict=True):
@@ -191,6 +226,45 @@ def _flow(previous, current, mask):
         float(np.median(error[good])) if good.any() else None,
         float(np.median(fb[good])) if good.any() else None,
     )
+
+
+def _flow_groups(previous, current, masks):
+    """Independent feature selection with one LK pair for all selected points.
+
+    Group membership changes neither masks, selected points, LK parameters nor
+    per-group statistics. The original single-mask implementation remains the
+    numerical reference and handles unusual missing-output fallback conditions.
+    """
+    groups = [cv2.goodFeaturesToTrack(previous, 80, 0.01, 3, mask=mask) for mask in masks]
+    selected = [points for points in groups if points is not None]
+    if not selected:
+        return [(0, None, None, None) for _ in groups]
+    points = np.concatenate(selected, axis=0)
+    forward, status, error = cv2.calcOpticalFlowPyrLK(previous, current, points, None, winSize=(21, 21), maxLevel=3)
+    if forward is None or status is None or error is None:
+        return [_flow(previous, current, mask) for mask in masks]
+    backward, back_status, _ = cv2.calcOpticalFlowPyrLK(current, previous, forward, None, winSize=(21, 21), maxLevel=3)
+    if backward is None or back_status is None:
+        return [_flow(previous, current, mask) for mask in masks]
+    results, start = [], 0
+    for group in groups:
+        if group is None:
+            results.append((0, None, None, None))
+            continue
+        stop = start + len(group)
+        fwd, back = forward[start:stop], backward[start:stop]
+        patch_error = error[start:stop]
+        finite = np.isfinite(fwd[:, 0]).all(axis=1) & np.isfinite(back[:, 0]).all(axis=1)
+        good = (status[start:stop, 0] > 0) & (back_status[start:stop, 0] > 0) & finite & np.isfinite(patch_error[:, 0])
+        fb = np.linalg.norm(back[:, 0] - group[:, 0], axis=1)
+        consistent = good & (fb <= 1.0)
+        results.append((
+            len(group), float(consistent.mean()),
+            float(np.median(patch_error[good])) if good.any() else None,
+            float(np.median(fb[good])) if good.any() else None,
+        ))
+        start = stop
+    return results
 
 
 class SceneContinuityDetector:
@@ -307,10 +381,11 @@ class SceneContinuityDetector:
             background[mask > 0] = 0
             masks.append(mask)
         masks = self._measurement_masks(masks)
-        bg_features, bg_consistent, bg_error, _ = _flow(previous, normalized, background)
+        flows = _flow_groups(previous, normalized, (background, *masks))
+        bg_features, bg_consistent, bg_error, _ = flows[0]
         regions = []
-        for region, mask in zip(previous_regions, masks, strict=True):
-            features, consistent, error, fb_error = _flow(previous, normalized, mask)
+        for region, flow in zip(previous_regions, flows[1:], strict=True):
+            features, consistent, error, fb_error = flow
             value = error * (1 - consistent) if error is not None and consistent is not None and features >= 6 else None
             history = self._history.get(region.key, deque(maxlen=self.history_pairs))
             baseline = float(np.mean(history)) if len(history) == self.history_pairs else None

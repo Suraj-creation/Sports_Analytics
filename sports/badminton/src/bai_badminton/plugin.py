@@ -923,7 +923,8 @@ class BadmintonSession:
                 "required": required,
                 "reason": reason,
             }
-            runtime = getattr(self.perception, "runtimes", {}).get(stage)
+            runtime_stage = "player_reid" if stage == "player_identity" else stage
+            runtime = getattr(self.perception, "runtimes", {}).get(runtime_stage)
             if runtime is not None:
                 out[stage]["runtime"] = runtime
                 if active and runtime.get("backend_fallback"):

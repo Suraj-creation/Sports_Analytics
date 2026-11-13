@@ -60,7 +60,12 @@ def test_insufficient_or_rejected_contact_cannot_undo_terminal_rest(provider, im
     assert fsm.state is RallyState.ENDING
     previous = fsm.state, fsm.tentative_end, fsm._last_contact_frame, list(fsm._recent)
     result = fsm.on_contact_evidence(87, evidence(87, impact=impact, trajectory=trajectory))
-    assert asdict(result) == {"started": None, "cancelled_start": None, "finalized": None}
+    assert asdict(result) == {
+        "started": None,
+        "cancelled_start": None,
+        "finalized": None,
+        "cancelled_segment": None,
+    }
     assert (fsm.state, fsm.tentative_end, fsm._last_contact_frame, list(fsm._recent)) == previous
     assert not fsm.last_contact_admission.accepted
 

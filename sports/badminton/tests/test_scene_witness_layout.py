@@ -29,7 +29,10 @@ def make_v3_raw(monkeypatch, *, adaptive_ratio=3.0, minimum_discontinuity=15.0):
         changed = pair == 2 and region in (2, 3)
         return 40, 0.1 if changed else 0.95, 100.0 if changed else 3.0, 0.1
 
-    monkeypatch.setattr(scene_change, "_flow", flow)
+    monkeypatch.setattr(
+        scene_change, "_flow_groups",
+        lambda previous, current, masks: [flow(previous, current, mask) for mask in masks],
+    )
     observer = scene_change.SceneContinuityDetectorV3(
         adaptive_ratio=adaptive_ratio, minimum_discontinuity=minimum_discontinuity
     )

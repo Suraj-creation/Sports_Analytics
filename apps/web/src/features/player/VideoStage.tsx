@@ -58,7 +58,7 @@ export function VideoStage({
   const connection = useSession((s) => s.connection);
   const tracksVersion = useSession((s) => s.tracksVersion);
   const eventsVersion = useSession((s) => s.eventsVersion);
-  const liveSession = useSession((s) => s.session?.session_id === session.session_id ? s.session : null);
+  const liveSession = useSession((s) => (s.session?.session_id === session.session_id ? s.session : null));
   const frontier = liveSession?.frontier_frame ?? session.frontier_frame;
   const status = liveSession?.status ?? session.status;
 
@@ -195,6 +195,8 @@ export function VideoStage({
         ]),
       ),
       fps,
+      analysisWidth: session.media?.width,
+      analysisHeight: session.media?.height,
     };
     frameClock.poke();
   }, [video, tracks, events, calibration, layers, hidden, session, tracksVersion, eventsVersion]);
@@ -381,10 +383,15 @@ export function VideoStage({
         {!hidden && <StrokeToast session={session} />}
 
         {failedWithoutMedia && (
-          <div className="absolute inset-0 grid place-items-center bg-mat-deep/90 px-6 text-center" role="status">
+          <div
+            className="absolute inset-0 grid place-items-center bg-mat-deep/90 px-6 text-center"
+            role="status"
+          >
             <div className="space-y-2">
               <p className="text-sm font-medium">Video unavailable</p>
-              <p className="text-sm text-line-2">Analysis stopped. Retry analysis or add another recording.</p>
+              <p className="text-sm text-line-2">
+                Analysis stopped. Retry analysis or add another recording.
+              </p>
             </div>
           </div>
         )}

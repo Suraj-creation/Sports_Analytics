@@ -48,3 +48,41 @@ it("confirms a known winner through the score correction API and shows request f
   expect(await screen.findByText(/Correction requested/)).toBeVisible();
   expect(screen.queryByText(/Correction saved/)).not.toBeInTheDocument();
 });
+
+it("uses stable candidate ordinals for unnumbered exchanges without inventing official rally numbers", () => {
+  const events = new EventLog();
+  events.apply([
+    ev("rally_end", 100, {
+      event_id: "candidate-a",
+      frame_end: 200,
+      payload: { rally_no: 0, official: false, shots: [] },
+    }),
+    ev("rally_end", 300, {
+      event_id: "candidate-b",
+      frame_end: 400,
+      payload: { rally_no: 0, official: false, shots: [] },
+    }),
+    ev("rally_end", 500, {
+      event_id: "official",
+      frame_end: 600,
+      payload: { rally_no: 5, official: true, shots: [] },
+    }),
+  ]);
+  useSession.setState({ session: SESSION, events, eventsVersion: events.version });
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(
+    <QueryClientProvider client={client}>
+      <RalliesTab session={SESSION} selectedRally={0} />
+    </QueryClientProvider>,
+  );
+  expect(screen.getByText("Candidate 1").closest("details")).not.toHaveAttribute("open");
+  expect(screen.getByText("Candidate 2").closest("details")).not.toHaveAttribute("open");
+  expect(screen.getByText("Rally 5")).toBeInTheDocument();
+  expect(screen.queryByText("Rally 0")).not.toBeInTheDocument();
+  expect(screen.getByText("Recorded rally candidates")).toBeVisible();
+  expect(screen.getByText(/3 recorded rally candidates/)).toBeVisible();
+  expect(screen.queryByText(/3 observed rallies/)).not.toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Outcome"), { target: { value: "excluded" } });
+  expect(screen.getByText("Candidate 1")).toBeInTheDocument();
+  expect(screen.getByText("Candidate 2")).toBeInTheDocument();
+});

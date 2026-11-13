@@ -44,7 +44,10 @@ def controlled_observer(monkeypatch, cls=scene.SceneContinuityDetectorV5, boxes=
             10.0 if changed else 0.0,
         )
 
-    monkeypatch.setattr(scene, "_flow", flow)
+    monkeypatch.setattr(
+        scene, "_flow_groups",
+        lambda previous, current, masks: [flow(previous, current, mask) for mask in masks],
+    )
     detector = cls(analysis_width=240)
     image = np.random.default_rng(7).integers(0, 256, (240, 480, 3), dtype=np.uint8)
     raw = None

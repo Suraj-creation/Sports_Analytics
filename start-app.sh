@@ -8,7 +8,7 @@ if [[ -f ../gpu-env.sh ]]; then
     source ../gpu-env.sh
 fi
 
-if [[ ! -x .venv/bin/python || ! -f apps/web/dist/index.html ]]; then
+if [[ ! -x .venv/bin/python || ! -f apps/web/dist/index.html || ! -d apps/web/dist/assets ]]; then
     echo "Install Python dependencies and build apps/web before starting." >&2
     exit 1
 fi

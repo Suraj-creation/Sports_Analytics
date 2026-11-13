@@ -53,6 +53,24 @@ class OSNetAppearanceEmbedder:
     def fingerprint(self) -> str:
         return f"{MODEL_NAME}:{CHECKPOINT_SHA256}:fp32:rgb128x256"
 
+    @property
+    def runtime(self) -> dict[str, Any]:
+        parameter = next(self._embedder.model.parameters())
+        actual = str(parameter.device)
+        backend = "torch-cuda" if parameter.device.type == "cuda" else "torch-cpu"
+        return {
+            "backend": backend,
+            "requested_backend": "torch-cuda" if self.device.split(":", 1)[0] == "cuda" else "torch-cpu",
+            "requested_device": self.device,
+            "parameter_device": actual,
+            "parameter_dtype": str(parameter.dtype),
+            "checkpoint_sha256": CHECKPOINT_SHA256,
+            "preprocessing": "cpu:BGR_to_RGB;128x256;ImageNet_normalization",
+            "output": "cpu:float32;L2_normalized_512D;ephemeral",
+            "placement_evidence": "loaded_parameter_device;operations_not_profiled",
+            "backend_fallback": parameter.device.type != self.device.split(":", 1)[0],
+        }
+
     def embed(self, frame: np.ndarray, boxes: Any) -> np.ndarray:
         frame = np.asarray(frame)
         if (

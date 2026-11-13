@@ -10,6 +10,7 @@ import { api } from "@/lib/api";
 import { COURT_LINES, NET, project } from "@/lib/court";
 import { fps as fpsOf } from "@/lib/format";
 import { fitHomography, reprojectionError } from "@/lib/homography";
+import { analysisPoint, videoViewport } from "@/lib/videoCoordinates";
 
 type P = [number, number];
 
@@ -42,6 +43,7 @@ export function CalibratePage() {
   });
 
   const [video, setVideo] = useState<HTMLVideoElement | null>(null);
+  const [presentation, setPresentation] = useState<{ width: number; height: number } | null>(null);
   const hls = useHls(video, sessionId, session.data?.media != null);
   const fps = fpsOf(session.data?.media);
   const [points, setPoints] = useState<Record<string, P>>({});
@@ -49,13 +51,31 @@ export function CalibratePage() {
   const [active, setActive] = useState<string>("near_left");
   const [drag, setDrag] = useState<string | null>(null);
   const [cursor, setCursor] = useState<{ x: number; y: number; px: number; py: number } | null>(null);
-  const boxRef = useRef<HTMLDivElement>(null);
+  const imageRef = useRef<SVGSVGElement>(null);
   const loupeRef = useRef<HTMLCanvasElement>(null);
   const seeded = useRef<string | null>(null);
 
   const W = prop.data?.width ?? session.data?.media?.width ?? 1280;
   const H = prop.data?.height ?? session.data?.media?.height ?? 720;
   const ref = prop.data?.reference_points ?? {};
+  const viewport = videoViewport(W, H, presentation?.width ?? W, presentation?.height ?? H, W, H);
+
+  useEffect(() => {
+    if (!video) return;
+    const update = () =>
+      setPresentation(
+        video.videoWidth > 0 && video.videoHeight > 0
+          ? { width: video.videoWidth, height: video.videoHeight }
+          : null,
+      );
+    update();
+    video.addEventListener("loadedmetadata", update);
+    video.addEventListener("resize", update);
+    return () => {
+      video.removeEventListener("loadedmetadata", update);
+      video.removeEventListener("resize", update);
+    };
+  }, [video]);
 
   // show the proposal's frame, paused
   useEffect(() => {
@@ -72,8 +92,11 @@ export function CalibratePage() {
     if (seeded.current === seedKey) return;
     seeded.current = seedKey;
     const current = prop.data.current;
-    const applies = current?.H && current.validity !== "invalid" &&
-      (current.mode === "static" || (current.ref_frame == null && current.cam_ref == null) ||
+    const applies =
+      current?.H &&
+      current.validity !== "invalid" &&
+      (current.mode === "static" ||
+        (current.ref_frame == null && current.cam_ref == null) ||
         current.ref_frame === prop.data.frame);
     if (applies) {
       const pts: Record<string, P> = {};
@@ -98,11 +121,8 @@ export function CalibratePage() {
   }, [points, ref]);
 
   const save = useMutation({
-    mutationFn: (request: {
-      sessionId: string;
-      points: Record<string, P>;
-      frame: number | undefined;
-    }) => api.calibrate(request.sessionId, request.points, request.frame),
+    mutationFn: (request: { sessionId: string; points: Record<string, P>; frame: number | undefined }) =>
+      api.calibrate(request.sessionId, request.points, request.frame),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["session", sessionId] });
       navigate({ to: "/sessions/$sessionId", params: { sessionId } });
@@ -119,10 +139,20 @@ export function CalibratePage() {
   const current = prop.data?.current;
 
   const toImage = (clientX: number, clientY: number): P | null => {
-    const el = boxRef.current;
+    const el = imageRef.current;
     if (!el) return null;
     const r = el.getBoundingClientRect();
-    return [((clientX - r.left) / r.width) * W, ((clientY - r.top) / r.height) * H];
+    if (r.width <= 0 || r.height <= 0) return null;
+    // The SVG is the actual painted image rectangle. Its bounds already
+    // include contain/SAR layout and exclude the editor's border and bars.
+    return analysisPoint(clientX - r.left, clientY - r.top, {
+      left: 0,
+      top: 0,
+      width: r.width,
+      height: r.height,
+      scaleX: r.width / W,
+      scaleY: r.height / H,
+    });
   };
   const commit = (next: Record<string, P>) => {
     setHistory((h) => [...h.slice(-30), points]);
@@ -188,12 +218,14 @@ export function CalibratePage() {
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-2">
           <div
-            ref={boxRef}
             className="relative w-full cursor-crosshair touch-none overflow-hidden rounded-[var(--radius-card)] border border-seam bg-black select-none"
             style={{ aspectRatio: `${W} / ${H}` }}
             onPointerMove={(e) => {
               const p = toImage(e.clientX, e.clientY);
-              if (!p) return;
+              if (!p) {
+                setCursor(null);
+                return;
+              }
               const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
               setCursor({ x: p[0], y: p[1], px: e.clientX - r.left, py: e.clientY - r.top });
               if (drag) setPoints((cur) => ({ ...cur, [drag]: p }));
@@ -209,13 +241,31 @@ export function CalibratePage() {
               setActive(nextMissing(next));
             }}
           >
-            <video ref={setVideo} className="absolute inset-0 size-full" muted playsInline preload="auto" />
+            <video
+              ref={setVideo}
+              className="absolute inset-0 size-full object-contain"
+              muted
+              playsInline
+              preload="auto"
+            />
             {(hls !== "ready" || prop.isPending) && (
               <div className="absolute inset-0 grid place-items-center bg-mat-deep/80">
                 <Spinner className="size-6" />
               </div>
             )}
-            <svg viewBox={`0 0 ${W} ${H}`} className="absolute inset-0 size-full" aria-hidden>
+            <svg
+              ref={imageRef}
+              viewBox={`0 0 ${W} ${H}`}
+              preserveAspectRatio="none"
+              className="absolute"
+              aria-hidden
+              style={{
+                left: `${((viewport?.left ?? 0) / W) * 100}%`,
+                top: `${((viewport?.top ?? 0) / H) * 100}%`,
+                width: `${((viewport?.width ?? W) / W) * 100}%`,
+                height: `${((viewport?.height ?? H) / H) * 100}%`,
+              }}
+            >
               {fit && (
                 <g stroke="#3ddc97" strokeWidth={stroke} fill="none" opacity={0.9}>
                   {COURT_LINES.map(([a, b], i) => {

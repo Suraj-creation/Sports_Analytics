@@ -17,9 +17,10 @@ export function useCollection(
     retry: false,
     staleTime: 30_000,
   });
-  const match =
-    overview.data?.matches.find((entry) => entry.session.session_id === sessionId) ??
-    overview.data?.matches[0];
+  const match = sessionId
+    ? overview.data?.matches.find((entry) => entry.session.session_id === sessionId)
+    : overview.data?.matches[0];
+  const missingSession = source === "recordings" && Boolean(sessionId && overview.data && !match);
   const provider = match ? highlightProvider(match.session.sport) : undefined;
   const revision = match?.session.meta.analysis_revision ?? 0;
   const snapshot = useQuery({
@@ -57,10 +58,16 @@ export function useCollection(
     loading:
       source === "recordings" && (overview.isPending || Boolean(match && provider && snapshot.isPending)),
     error:
-      source === "recordings" ? (overview.error?.message ?? snapshot.error?.message ?? result.issue) : null,
+      source === "recordings"
+        ? (overview.error?.message ??
+          (missingSession
+            ? "The selected recording is unavailable in this loaded collection. Choose an available recording."
+            : (snapshot.error?.message ?? result.issue)))
+        : null,
     unsupported: source === "recordings" && Boolean(match && !provider),
     truncated: source === "recordings" && overview.data?.scope.truncated,
-    activeSessionId: match?.session.session_id ?? "",
+    missingSession,
+    activeSessionId: match?.session.session_id ?? sessionId,
     refresh: () => {
       void overview.refetch();
       if (match && provider) void snapshot.refetch();

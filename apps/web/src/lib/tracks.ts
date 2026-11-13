@@ -15,6 +15,7 @@ interface WirePlayer {
   raw?: (number | null)[];
   method?: (string | null)[];
   pf?: (number | null)[];
+  ctx?: (string | null)[];
 }
 
 interface WireWindow {
@@ -35,7 +36,7 @@ interface WireWindow {
   };
   /** camera pose per frame: 3×3 row-major, reference px → frame px; all zeros = court not in view.
    *  `h`: physical camera (0 = main, analysed; -1 = no court); `q`: court-line fit precision */
-  cam?: { f: number[]; g: number[]; h?: number[]; q?: (number | null)[] };
+  cam?: { f: number[]; g: number[]; h?: number[]; q?: (number | null)[]; ctx?: (string | null)[] };
 }
 
 /** What the camera shows at a frame. */
@@ -66,12 +67,14 @@ export interface PlayerFrame {
   identityMethod: string | null;
   /** Canonical pose observation source; absent in legacy callers and null when unknown. */
   poseObservedFrame?: number | null;
+  /** Producer temporal/coordinate epoch; absent in historical wire windows. */
+  contextId?: string | null;
 }
 
 export interface DisplayPose {
   keypoints: Float32Array;
-  observedFrame: number;
-  ageFrames: number;
+  observedFrame: number | null;
+  ageFrames: number | null;
 }
 
 export interface RacketFrame {
@@ -100,6 +103,7 @@ function playerFrame(p: WirePlayer, i: number, playerId: PlayerId | null): Playe
     rawTrack: p.raw?.[i] ?? null,
     identityMethod: p.method?.[i] ?? null,
     poseObservedFrame: p.pf?.[i] ?? null,
+    contextId: p.ctx?.[i] ?? null,
   };
 }
 
@@ -115,6 +119,7 @@ export class TrackBuffer {
   /** per-frame camera pose (null: tracked, but the court is not in view); empty when the camera is untracked */
   private readonly cams = new Map<number, number[][] | null>();
   private readonly views = new Map<number, CameraView>();
+  private readonly contexts = new Map<number, string | null>();
   /** true once any camera pose has arrived: the overlay then follows the camera instead of a fixed court */
   tracksCamera = false;
   /** frame ranges known to be analysed (so "no shuttle" means invisible, not "not yet analysed") */
@@ -125,6 +130,13 @@ export class TrackBuffer {
     if (win.v !== 1 && win.v !== 2) throw new Error("Unsupported track wire version");
     // Validate new provenance before any replacement mutates an existing window.
     for (const p of [...Object.values(win.players), ...Object.values(win.anonymous ?? {})]) {
+      if (
+        p.ctx !== undefined &&
+        (!Array.isArray(p.ctx) ||
+          p.ctx.length !== p.f.length ||
+          p.ctx.some((value) => value !== null && typeof value !== "string"))
+      )
+        throw new Error("Misaligned temporal contexts");
       if (p.pf === undefined) continue;
       if (!Array.isArray(p.pf) || p.pf.length !== p.f.length)
         throw new Error("Misaligned pose source frames");
@@ -142,6 +154,13 @@ export class TrackBuffer {
           throw new Error("Invalid or future pose source frame");
       }
     }
+    if (
+      win.cam?.ctx !== undefined &&
+      (!Array.isArray(win.cam.ctx) ||
+        win.cam.ctx.length !== win.cam.f.length ||
+        win.cam.ctx.some((value) => value !== null && typeof value !== "string"))
+    )
+      throw new Error("Misaligned camera temporal contexts");
     // a window replaces whatever we had for its range (refinement revisions arrive this way)
     for (let f = win.from; f <= win.to; f++) {
       this.shuttle.delete(f);
@@ -204,12 +223,14 @@ export class TrackBuffer {
     for (let f = win.from; f <= win.to; f++) {
       this.cams.delete(f);
       this.views.delete(f);
+      this.contexts.delete(f);
     }
     const c = win.cam;
     if (c) {
       this.tracksCamera = true;
       for (let i = 0; i < c.f.length; i++) {
         const f = c.f[i] as number;
+        this.contexts.set(f, c.ctx?.[i] ?? null);
         const g = c.g.slice(i * 9, i * 9 + 9);
         this.cams.set(f, g[8] ? [g.slice(0, 3), g.slice(3, 6), g.slice(6, 9)] : null);
         if (c.h) {
@@ -232,6 +253,21 @@ export class TrackBuffer {
   /** Which camera shot `frame` (undefined: not analysed yet, or analysed before cameras were identified). */
   view(frame: number): CameraView | undefined {
     return this.views.get(frame);
+  }
+
+  /** Reject continuity over a cut, invalid camera view or changed coordinate epoch. */
+  sameContext(from: number, to: number): boolean {
+    const context = this.contexts.get(to);
+    const camera = this.view(to)?.camera;
+    for (let frame = from; frame <= to; frame++) {
+      if (
+        this.contexts.get(frame) !== context ||
+        this.view(frame)?.camera !== camera ||
+        this.view(frame)?.view === "none"
+      )
+        return false;
+    }
+    return true;
   }
 
   private cover(a: number, b: number): void {
@@ -289,8 +325,13 @@ export class TrackBuffer {
    * never bridges a missing person, camera change, or unassigned episode.
    */
   displayPose(person: PlayerFrame, frame: number, maxAge = 5): DisplayPose | null {
-    if (person.kps) return { keypoints: person.kps, observedFrame: frame, ageFrames: 0 };
-    if (!person.observationId || this.view(frame)?.view === "none") return null;
+    if (person.kps && person.poseObservedFrame === frame)
+      return { keypoints: person.kps, observedFrame: frame, ageFrames: 0 };
+    // Historical raw keypoints remain displayable, with explicitly unknown
+    // provenance. They cannot be propagated as a fresh pose on later frames.
+    if (person.kps && person.poseObservedFrame == null)
+      return { keypoints: person.kps, observedFrame: null, ageFrames: null };
+    if (person.track < 0 || !person.observationId || this.view(frame)?.view === "none") return null;
     const map = person.playerId
       ? this.players[person.playerId]
       : [...this.anonymous.values()].find((values) => values.get(frame) === person);
@@ -301,11 +342,11 @@ export class TrackBuffer {
         !previous ||
         previous.track !== person.track ||
         previous.observationId !== person.observationId ||
-        this.view(frame - age)?.camera !== this.view(frame)?.camera ||
-        this.view(frame - age)?.view === "none"
+        previous.contextId !== person.contextId ||
+        !this.sameContext(frame - age, frame)
       )
         return null;
-      if (!previous.kps) continue;
+      if (!previous.kps || previous.poseObservedFrame !== frame - age) continue;
       const [sx, sy, ex, ey] = previous.bbox;
       const [x, y, right, bottom] = person.bbox;
       if (![sx, sy, ex, ey, x, y, right, bottom].every(Number.isFinite) || ex <= sx || ey <= sy) return null;
@@ -337,10 +378,14 @@ export class TrackBuffer {
       const v = this.players[pid].get(f);
       if (
         !v?.court ||
-        (previous && (previous.track !== v.track || previous.observationId !== v.observationId))
+        v.track < 0 ||
+        (previous &&
+          (previous.track !== v.track ||
+            previous.observationId !== v.observationId ||
+            previous.contextId !== v.contextId))
       )
         out.length = 0;
-      if (v?.court && (frame - f) % step === 0) out.push(v.court);
+      if (v?.court && v.track >= 0 && (frame - f) % step === 0) out.push(v.court);
       previous = v;
     }
     return out;
@@ -354,6 +399,7 @@ export class TrackBuffer {
     this.rackets.clear();
     this.cams.clear();
     this.views.clear();
+    this.contexts.clear();
     this.tracksCamera = false;
     this.covered = [];
     this.version++;

@@ -22,7 +22,10 @@ def measurements(monkeypatch, provider, errors, *, consistency=0.95, count=2):
         call += 1
         return (80, 1.0, 1.0, 0.0) if region == 0 else (40, consistency, errors[frame], 0.1)
 
-    monkeypatch.setattr("bai_badminton.perception.scene_change._flow", flow)
+    monkeypatch.setattr(
+        "bai_badminton.perception.scene_change._flow_groups",
+        lambda previous, current, masks: [flow(previous, current, mask) for mask in masks],
+    )
     image = np.random.default_rng(3).integers(20, 220, (120, 180, 3), dtype=np.uint8)
     results = []
     for frame in range(len(errors) + 1):

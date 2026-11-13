@@ -134,7 +134,11 @@ def test_one_person_cannot_own_two_simultaneous_tracks_and_processing_is_read_on
     assert confirm(client, session, births[2], "person-2").status_code == 409
 
 
-def test_reviewed_four_player_travel_uses_camera_quality_and_exact_episode(client):
+@pytest.mark.parametrize("missing", [
+    None, "unmatched_person", "unknown_person_match", "detector_run", "person_context",
+    "camera_context", "camera_quality"
+])
+def test_reviewed_four_player_travel_uses_camera_quality_and_exact_episode(client, missing):
     from bai_engine.schema import TrackObject, TrackSample
     from bai_engine.schema.tracks import samples_to_table
 
@@ -149,21 +153,40 @@ def test_reviewed_four_player_travel_uses_camera_quality_and_exact_episode(clien
             court_x=-1 + frame * 0.01,
             court_y=-3 + i,
             conf=0.95,
+            detector_observed=True,
             detector_matched=True,
+            context_id="synthetic-court-epoch",
         )
         for frame in range(1, 51)
         for i, birth in enumerate(births)
     ]
     camera = [
-        TrackSample(frame_idx=frame, obj=TrackObject.CAMERA, track_id=0, conf=0.9, cam=(1, 0, 0, 0, 1, 0, 0, 0, 1))
+        TrackSample(frame_idx=frame, obj=TrackObject.CAMERA, track_id=0, conf=0.9,
+                    cam=(1, 0, 0, 0, 1, 0, 0, 0, 1), detector_observed=True, context_id="synthetic-court-epoch")
         for frame in range(1, 51)
     ]
+    if missing in {"unmatched_person", "unknown_person_match", "detector_run", "person_context"}:
+        field, value = {
+            "unmatched_person": ("detector_matched", False),
+            "unknown_person_match": ("detector_matched", None),
+            "detector_run": ("detector_observed", None),
+            "person_context": ("context_id", None),
+        }[missing]
+        rows = [row.model_copy(update={field: value}) if row.track_id == 0 else row for row in rows]
+    elif missing == "camera_context":
+        camera = [row.model_copy(update={"context_id": None}) for row in camera]
+    elif missing == "camera_quality":
+        camera = [row.model_copy(update={"conf": 0.1}) for row in camera]
     tracks.write_chunk(TrackObject.PLAYER, 0, 119, samples_to_table(rows))
     tracks.write_chunk(TrackObject.CAMERA, 0, 119, samples_to_table(camera))
     for i, birth in enumerate(births):
         assert confirm(client, session, birth, f"person-{i}").status_code == 201
     result = client.get(f"/api/sessions/{session.session_id}/individual-analytics").json()
-    for person in result["participants"].values():
+    for person_id, person in result["participants"].items():
+        if missing is not None and (person_id == "person-0" or missing in {"camera_context", "camera_quality"}):
+            assert person["movement"]["distance_m"] is None
+            assert person["movement"]["travel"]["status"] == "unavailable"
+            continue
         assert 0.1 < person["movement"]["distance_m"] < 0.4
         assert person["movement"]["travel"]["latest"]["heading_deg"] == 0
         assert person["movement"]["travel"]["latest"]["frame_end"] <= 30

@@ -54,6 +54,7 @@ from bai_engine.schema import (
 from bai_engine.sources import YouTubeSource, parse_youtube_url
 from bai_engine.sport import SportSession, get_plugin
 from bai_engine.store import SessionRepository
+from bai_engine.trace import trace_frames, trace_session, trace_span
 from bai_engine.wire import encode_tracks
 
 log = get_logger(__name__)
@@ -358,16 +359,30 @@ class SessionRunner(threading.Thread):
                 return self.sport.decode_perception(cp.read_bytes())
             except ValueError as e:  # stale (made against another calibration reference) or unreadable
                 log.info("perception.cache_stale", segment=k, reason=str(e))
-        chunk: DecodedChunk = dec.decode_segment(k)
-        p = self.sport.perceive(chunk)
+        with trace_span("decode", segment=k) as details:
+            chunk: DecodedChunk = dec.decode_segment(k)
+            details.update(
+                frame_start=chunk.start, frame_end=chunk.end, frames=len(chunk.frames),
+                shape=list(chunk.frames[0].shape) if chunk.frames else None,
+            )
+        with trace_frames(chunk.start, chunk.end), trace_span("perception", cache_reused=False) as details:
+            p = self.sport.perceive(chunk)
+            details.update(output_type=type(p).__name__, models=getattr(p, "models", {}))
         # Stateful results are still useful diagnostics, but never substitute
         # for processing every preceding frame with the same live matcher.
         tmp = cp.with_suffix(".tmp")
-        tmp.write_bytes(self.sport.encode_perception(p))
-        tmp.replace(cp)
+        with trace_frames(chunk.start, chunk.end), trace_span("perception_persistence") as details:
+            encoded = self.sport.encode_perception(p)
+            tmp.write_bytes(encoded)
+            tmp.replace(cp)
+            details["bytes"] = len(encoded)
         return p
 
     def _publish_tracks(self, samples: list[Any], start: int, end: int, write: bool = True) -> None:
+        with trace_frames(start, end), trace_span("track_persistence_and_transport", samples=len(samples), write=write):
+            self._publish_tracks_impl(samples, start, end, write)
+
+    def _publish_tracks_impl(self, samples: list[Any], start: int, end: int, write: bool = True) -> None:
         if not samples:
             return
         if write:
@@ -415,8 +430,13 @@ class SessionRunner(threading.Thread):
             )
 
     def run(self) -> None:
+        with trace_session(getattr(self.settings, "trace_dir", None), self.session_id, self.session.source.sha256):
+            self._run_session()
+
+    def _run_session(self) -> None:
         try:
-            self._ensure_media()
+            with trace_span("media_preparation"):
+                self._ensure_media()
             if self._reused_session_id is not None:
                 return
             if self.shared.stop.is_set():
@@ -424,7 +444,8 @@ class SessionRunner(threading.Thread):
             if self.attach:
                 self._attach()
             else:
-                self._analyse()
+                with trace_span("analysis"):
+                    self._analyse()
             self._resident()
         except _SessionGoneError:
             log.info("session.gone", session=self.session_id)
@@ -462,10 +483,12 @@ class SessionRunner(threading.Thread):
         s = self.session
         assert s.media is not None and self.plan is not None
         profile: Profile = load_profile(s.profile, self.settings.profiles_dir)
-        self.sport = self._create_sport()
+        with trace_span("component_initialization", profile=profile.name):
+            self.sport = self._create_sport()
         for d in self.sport.degraded():
             DEGRADED.labels(reason=d["stage"]).inc()
-        self.sport.seed(self._sample_keyframes())
+        with trace_span("warm_start"):
+            self.sport.seed(self._sample_keyframes())
         mp = self.repo.media_paths(s.source.sha256 or "")
         dec = SegmentDecoder(mp, self.plan.frames_per_segment)
         F = self.plan.frames_per_segment
@@ -492,7 +515,8 @@ class SessionRunner(threading.Thread):
                         self._publish_tracks(self.sport.tracks_from_perception(p), pk * F, pk * F + F - 1, write=True)
                         break
             p = self._perceive(dec, k)
-            self.sport.ingest(p)
+            with trace_frames(p.start, p.end), trace_span("temporal_ingest"):
+                self.sport.ingest(p)
             start, planned_end = k * F, k * F + F - 1
             # The final decoded segment can be shorter than the segment plan.
             # Sport plugins with explicit chunk bounds report the actual end.
@@ -624,6 +648,7 @@ class EngineService:
         self._thread = threading.Thread(target=self._loop, name="engine-commands", daemon=True)
 
     def start(self) -> None:
+        cv2.setNumThreads(self.settings.opencv_threads)
         interrupted = self.repo.mark_interrupted()
         if interrupted:
             log.info("engine.interrupted_sessions", count=interrupted)

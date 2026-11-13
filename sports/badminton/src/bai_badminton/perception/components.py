@@ -225,7 +225,7 @@ def _tracking_factory(context: TrackingContext, configuration: dict[str, Any]) -
         reid=context.reid,
         identity_retention_s=float(params.get("identity_retention_s", context.identity_retention_s)),
     )
-    context.record_model("tracking", "court-player-episodes-v1@5")
+    context.record_model("tracking", "court-player-episodes-v1@6")
     return result
 
 
@@ -498,7 +498,7 @@ def register_perception_components(registry: ComponentRegistry) -> None:
         upgraded = choice.implementation == CONTENT_IMPLEMENTATION_V2
         result = (ContentContinuityProviderV2 if upgraded else ContentContinuityProvider)(**choice.params)
         context.record_model(
-            "content_continuity", f"{CONTENT_IMPLEMENTATION_V2}@5" if upgraded else f"{CONTENT_IMPLEMENTATION}@1"
+            "content_continuity", f"{CONTENT_IMPLEMENTATION_V2}@6" if upgraded else f"{CONTENT_IMPLEMENTATION}@1"
         )
         context.record_runtime(
             "content_continuity",
@@ -549,7 +549,7 @@ def register_perception_components(registry: ComponentRegistry) -> None:
         ComponentContract(
             kind="content_continuity",
             implementation=CONTENT_IMPLEMENTATION_V2,
-            version="5",
+            version="6",
             input_schema="badminton-content-continuity-input:v1",
             output_schema="foreground-scene-hypothesis:v2-or-v5",
             interface=ContentContinuityPort,

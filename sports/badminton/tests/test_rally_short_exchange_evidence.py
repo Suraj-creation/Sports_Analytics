@@ -1,5 +1,7 @@
 """Short exchange admission needs independent source witnesses, not duration tuning."""
 
+import pytest
+
 from bai_badminton.events.contact_evidence import (
     ContactEvidence,
     ContactEvidenceInputs,
@@ -93,7 +95,53 @@ def test_independent_contact_hypotheses_and_observed_flight_preserve_short_excha
     assert not cancelled
     assert fsm.last_exchange_admission["reason"] == "independent_contact_and_observed_motion_witnesses"
     assert fsm.last_exchange_admission["witness_frames"] == [5, 20]
+    assert fsm.last_exchange_admission["short_exchange_evidence"] == {
+        "enabled": True,
+        "status": "qualified_pair",
+        "observed_motion_span": [0, 2],
+        "observed_motion_span_in_interval": True,
+        "retained_witness_frames": [5, 20],
+        "witness_scope": "retained_eligible_contact_evidence",
+    }
     assert fsm.params.min_duration_s == 2
+
+
+@pytest.mark.parametrize(
+    "options,status,span",
+    [
+        ({"enabled": False}, "disabled", [0, 2]),
+        ({"moving": False}, "motion_span_unavailable", None),
+        ({"reliable": False}, "independent_pair_unavailable", [0, 2]),
+        ({"witness_motion": False}, "independent_pair_unavailable", [0, 2]),
+        ({"coobserved": False}, "independent_pair_unavailable", [0, 2]),
+    ],
+)
+def test_unqualified_exchange_preserves_policy_inputs_without_claiming_exhaustive_reasons(options, status, span):
+    fsm, segments, cancellations = exchange(("A", "B"), **options)
+    assert not segments and cancellations
+    details = fsm.last_exchange_admission["short_exchange_evidence"]
+    assert details["enabled"] is options.get("enabled", True)
+    assert details["status"] == status
+    assert details["observed_motion_span"] == span
+    assert details["observed_motion_span_in_interval"] is (span is not None)
+    assert details["retained_witness_frames"] == [5, 20]
+    assert fsm.last_exchange_admission["witness_frames"] == []
+
+
+def test_short_exchange_diagnostics_exclude_out_of_interval_retained_witnesses():
+    fsm = EvidenceRallyFSM(RallyParams(fps=30), use_short_exchange_evidence=True)
+    fsm.on_contact(10)
+    fsm._contact_witnesses = [contact(5, "A"), contact(15, "B"), contact(25, "A")]
+    fsm._first_observed_motion_span = (1, 3)
+    for frame in range(10, 21):
+        fsm.step_evidence(RallyObservation(frame, ObservationKind.OBSERVED, 12))
+    result = fsm.flush(20)
+    assert result.cancelled_segment is not None
+    details = fsm.last_exchange_admission["short_exchange_evidence"]
+    assert details["observed_motion_span"] == [1, 3]
+    assert details["observed_motion_span_in_interval"] is False
+    assert details["status"] == "motion_span_unavailable"
+    assert details["retained_witness_frames"] == [15]
 
 
 def test_same_target_walking_or_handling_negative_is_still_cancelled():

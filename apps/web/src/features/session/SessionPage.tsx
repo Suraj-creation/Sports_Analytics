@@ -33,6 +33,7 @@ import { LiveFeed } from "./LiveFeed";
 import { ParticipantRoster } from "./ParticipantRoster";
 import { PlayerSelector } from "./PlayerSelector";
 import { ReanalysisFeedback } from "./ReanalysisFeedback";
+import { RecordingQuality } from "./RecordingQuality";
 import { ExportTab } from "./tabs/ExportTab";
 import { VisualObservations } from "./VisualObservations";
 
@@ -336,31 +337,7 @@ function SessionWorkspace({ session, search }: { session: Session; search: Analy
             className="analysis-panel mt-5"
             aria-labelledby="recording-quality-heading"
           >
-            <h2 id="recording-quality-heading">What this recording can tell us</h2>
-            <dl className="mt-4 grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <dt className="text-line-2">Analysis proxy frames</dt>
-                <dd>{nFrames ? nFrames.toLocaleString() : "Media not prepared"}</dd>
-              </div>
-              <div>
-                <dt className="text-line-2">Analysed frames</dt>
-                <dd>{session.analysed_frames.toLocaleString()}</dd>
-              </div>
-              <div>
-                <dt className="text-line-2">Frame rate</dt>
-                <dd>{session.media ? `${fps.toFixed(3)} fps` : "Unavailable"}</dd>
-              </div>
-              <div>
-                <dt className="text-line-2">Identity capability</dt>
-                <dd>Two court-side identities</dd>
-              </div>
-            </dl>
-            <p className="analysis-panel-hint mt-4">
-              Frame numbers use the fixed-rate analysis proxy timeline. Frame processing is not rally
-              coverage or labelled detection accuracy. Shot labels are
-              heuristic; placement uses receiver positions; measured distance can contain tracking jitter.
-              Four-player doubles attribution requires additional identity evidence.
-            </p>
+            <RecordingQuality session={session} />
             {session.status === "analysed" && (
               <div className="mt-5 border-t border-seam pt-4">
                 <h3 className="font-medium">Apply court or format changes</h3>
@@ -464,8 +441,8 @@ function SessionWorkspace({ session, search }: { session: Session; search: Analy
           </div>
           <footer className="video-workspace-footer">
             <p>
-              Analysis proxy frame <span className="tabular">{frame.toLocaleString()}</span> · Select a moment to
-              inspect its evidence
+              Analysis proxy frame <span className="tabular">{frame.toLocaleString()}</span> · Select a moment
+              to inspect its evidence
             </p>
             <button type="button" onClick={() => setShortcuts(true)}>
               <Keyboard className="size-4" aria-hidden /> Keyboard shortcuts

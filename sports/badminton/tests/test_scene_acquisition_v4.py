@@ -270,7 +270,10 @@ def test_actual_observer_acquires_relative_change_without_lowering_strong_floor(
         calls += 1
         return (80, 1.0, 1.0, 0.0) if region == 0 else (40, 0.0 if pair == 2 else 0.95, 6.0 if pair == 2 else 1.0, 0.1)
 
-    monkeypatch.setattr(scene, "_flow", flow)
+    monkeypatch.setattr(
+        scene, "_flow_groups",
+        lambda previous, current, masks: [flow(previous, current, mask) for mask in masks],
+    )
     observer = scene.SceneContinuityDetectorV4()
     image = np.random.default_rng(44).integers(20, 220, (240, 600, 3), dtype=np.uint8)
     for f in range(4):

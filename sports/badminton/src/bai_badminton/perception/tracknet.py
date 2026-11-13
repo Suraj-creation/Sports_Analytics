@@ -41,6 +41,7 @@ from bai_badminton.perception.diagnostics import (
 )
 from bai_engine.obs import get_logger
 from bai_engine.runtime.device import ort_runtime
+from bai_engine.trace import trace_span
 
 log = get_logger(__name__)
 
@@ -559,7 +560,12 @@ class TrackNetV3:
         h, w = frames_bgr[0].shape[:2]
         sx, sy = w / WIDTH, h / HEIGHT
         self.bg.retain(set(shots))
-        small = self._prep(frames_bgr, shots)
+        with trace_span(
+            "shuttle_preprocess", frame_count=len(frames_bgr), input_shape=list(shape),
+            input_dtype=str(frames_bgr[0].dtype), output_shape=[len(frames_bgr), HEIGHT, WIDTH, 3],
+            color_transform="BGR_to_RGB", spatial_transform="resize_preserve_model_contract",
+        ):
+            small = self._prep(frames_bgr, shots)
         n = len(small)
         acc = np.zeros((n, HEIGHT, WIDTH), np.float32)
         cnt = np.zeros(n, np.float32)
@@ -585,7 +591,13 @@ class TrackNetV3:
                 stack = np.concatenate([bg[None], np.stack([small[i] for i in idx])], axis=0)
                 windows.append(np.moveaxis(stack, -1, 1).reshape(self.in_dim, HEIGHT, WIDTH))
             x = np.stack(windows).astype(np.float32) / 255.0
-            hms = self._forward(x)  # (B, L, H, W)
+            with trace_span(
+                "shuttle_forward", backend=getattr(self, "backend", "unknown"),
+                input_shape=list(x.shape), input_dtype=str(x.dtype), window_count=len(batch_spans),
+                runtime=getattr(self, "runtime", {}),
+            ) as execution:
+                hms = self._forward(x)  # (B, L, H, W)
+                execution.update(output_shape=list(hms.shape), output_dtype=str(hms.dtype))
             expected_shape = (len(batch_spans), L, HEIGHT, WIDTH)
             if hms.shape != expected_shape or not np.isfinite(hms).all():
                 raise ValueError(

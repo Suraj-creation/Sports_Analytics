@@ -36,12 +36,30 @@ def test_descriptor_loading_is_local_and_device_explicit(monkeypatch):
         def get(self, name):
             return SimpleNamespace(ref=name + "@1")
 
-    monkeypatch.setattr(offline_reid, "OSNetAppearanceEmbedder", lambda path, **kw: (path, kw))
+    runtime = {"backend": "torch-cpu", "parameter_device": "cpu", "backend_fallback": False}
+    monkeypatch.setattr(
+        offline_reid, "OSNetAppearanceEmbedder", lambda path, **kw: SimpleNamespace(options=kw, runtime=runtime)
+    )
     p = pipeline()
     result = p._load_reid(ModelChoice(model="osnet_ain_x0_25", backend="torch-cpu"), Registry())
     assert calls == [("osnet_ain_x0_25", False)]
-    assert result[1]["device"] == "cpu"
+    assert result.options["device"] == "cpu"
     assert p.models["player_reid"] == "osnet_ain_x0_25@1"
+    assert p.runtimes["player_reid"] == runtime
+
+
+def test_runtime_metadata_uses_loaded_parameters_not_requested_device():
+    import torch
+
+    model = offline_reid.OSNetAppearanceEmbedder.__new__(offline_reid.OSNetAppearanceEmbedder)
+    model.device = "cuda:0"
+    model._embedder = SimpleNamespace(model=torch.nn.Linear(1, 1))
+    evidence = model.runtime
+    assert evidence["parameter_device"] == "cpu"
+    assert evidence["backend"] == "torch-cpu"
+    assert evidence["parameter_dtype"] == "torch.float32"
+    assert evidence["backend_fallback"] is True
+    assert evidence["placement_evidence"] == "loaded_parameter_device;operations_not_profiled"
 
 
 def test_missing_checkpoint_and_unsupported_precision_degrade_without_download():

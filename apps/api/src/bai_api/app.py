@@ -114,7 +114,7 @@ def create_app(settings: Settings | None = None, bus: Bus | None = None, start_e
     ):
         app.include_router(r)
 
-    if WEB_DIST.exists():
+    if (WEB_DIST / "index.html").is_file() and (WEB_DIST / "assets").is_dir():
         app.mount("/assets", StaticFiles(directory=WEB_DIST / "assets"), name="assets")
 
         @app.get("/{path:path}", include_in_schema=False)
@@ -126,6 +126,9 @@ def create_app(settings: Settings | None = None, bus: Bus | None = None, start_e
             if path and f.is_file() and str(f).startswith(str(WEB_DIST.resolve())):
                 return FileResponse(f)
             return FileResponse(WEB_DIST / "index.html")
+
+    elif WEB_DIST.exists():
+        log.warning("web.bundle_incomplete", directory=str(WEB_DIST), serving="api_only")
 
     return app
 

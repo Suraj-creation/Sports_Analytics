@@ -23,6 +23,66 @@ function drawingContext() {
 }
 
 describe("player observation overlay", () => {
+  it("labels unresolved observations without presenting minus-one as a persistent identity", () => {
+    const tracks = new TrackBuffer();
+    tracks.ingest({
+      v: 2,
+      from: 0,
+      to: 0,
+      shuttle: { f: [], x: [], y: [], c: [] },
+      players: {},
+      anonymous: {
+        raw: { f: [0], t: [-1], raw: [7], b: [10, 20, 30, 80], k: Array(51).fill(0), cx: [null], cy: [null] },
+      },
+    });
+    const context = drawingContext();
+    drawOverlay(
+      {
+        canvas: {
+          clientWidth: 1280,
+          clientHeight: 720,
+          getContext: () => context,
+        } as unknown as HTMLCanvasElement,
+        video: { videoWidth: 1280, videoHeight: 720 } as HTMLVideoElement,
+        tracks,
+        events: new EventLog(),
+        calibration: null,
+        layers: { court: false, players: false, pose: false, shuttle: false, labels: true, scoreBug: false },
+        names: { P1: "1", P2: "2" },
+        colors: { P1: "blue", P2: "red" },
+      },
+      0,
+    );
+    expect(context.fillText).toHaveBeenCalledWith(
+      "Unresolved observation",
+      expect.any(Number),
+      expect.any(Number),
+    );
+  });
+  it("maps coded analysis pixels over sample-aspect-corrected playback", () => {
+    const context = { setTransform: vi.fn(), clearRect: vi.fn() };
+    drawOverlay(
+      {
+        canvas: {
+          clientWidth: 1280,
+          clientHeight: 720,
+          getContext: () => context,
+        } as unknown as HTMLCanvasElement,
+        video: { videoWidth: 763, videoHeight: 720 } as HTMLVideoElement,
+        analysisWidth: 762,
+        analysisHeight: 720,
+        tracks: new TrackBuffer(),
+        events: new EventLog(),
+        calibration: null,
+        layers: { court: false, players: false, pose: false, shuttle: false, labels: false, scoreBug: false },
+        names: { P1: "1", P2: "2" },
+        colors: { P1: "blue", P2: "red" },
+      },
+      0,
+    );
+    const dpr = window.devicePixelRatio || 1;
+    expect(context.setTransform).toHaveBeenLastCalledWith((dpr * 763) / 762, 0, 0, dpr, dpr * 258.5, 0);
+  });
   it("renders real keypoint coordinates while rejecting low-confidence skeleton edges", () => {
     const tracks = new TrackBuffer();
     const keypoints = new Array(51).fill(0);

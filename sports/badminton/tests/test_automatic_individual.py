@@ -9,7 +9,7 @@ import pytest
 from bai_badminton.identity_review import IdentityReviewLedger
 from bai_engine.schema import Actors, Event, EventStatus, Provenance, TrackObject, TrackSample
 from bai_engine.schema.session import ParticipantInfo, ParticipantRoster, TeamInfo
-from bai_engine.schema.tracks import samples_to_table
+from bai_engine.schema.tracks import samples_to_table, table_to_samples
 from bai_engine.store import EventStore, TrackStore
 
 
@@ -38,7 +38,7 @@ def _event(kind, frame, *, payload, model="test", status=EventStatus.CONFIRMED, 
     )
 
 
-def _setup(tmp_path: Path, *, frames=(1, 5, 10), detector_observed=True):
+def _setup(tmp_path: Path, *, frames=(1, 5, 10), detector_observed=True, detector_matched=True):
     store = EventStore(tmp_path / "events.sqlite", "S1")
     tracks = TrackStore(tmp_path / "tracks")
     observations = []
@@ -62,6 +62,10 @@ def _setup(tmp_path: Path, *, frames=(1, 5, 10), detector_observed=True):
         rows.extend(
             TrackSample(
                 detector_observed=detector_observed,
+                # This fixture declares actual person matches; caller-supplied
+                # absent/unknown detector execution retains its own uncertainty.
+                detector_matched=detector_matched if detector_observed is True else detector_observed,
+                context_id="controlled-epoch",
                 frame_idx=f,
                 obj=TrackObject.PLAYER,
                 track_id=i,
@@ -120,6 +124,8 @@ def test_overlap_between_seed_and_shot_abstains_for_involved_people_only(tmp_pat
                     bbox=(x, 1, x + 19, 100),
                     conf=0.9,
                     detector_observed=True,
+                    detector_matched=True,
+                    context_id="controlled-epoch",
                     participant_observation_id=observations[i - 1].event_id,
                 )
             )
@@ -150,6 +156,7 @@ def test_small_box_overlap_does_not_break_continuity():
             "visible": True,
             "participant_observation_id": f"obs{tid}",
             "detector_observed": True,
+            "detector_matched": True,
         }
         for f in (0, 2, 4)
         for tid, x in ((1, 10), (2, 45))
@@ -169,6 +176,7 @@ def test_competing_overlap_guard_includes_seed_and_shot_endpoints():
             "visible": True,
             "participant_observation_id": "obs",
             "detector_observed": True,
+            "detector_matched": True,
         }
         for f in (0, 2, 4)
     ]
@@ -198,6 +206,26 @@ def test_named_seed_cannot_bridge_a_recorded_unmatched_person_on_detector_frame(
     assert not _continuous(rows, "birth", 1, 0, 4, 1280, 720)
 
 
+@pytest.mark.parametrize("person_match", [False, None])
+def test_named_estimates_require_actual_person_matches_not_a_detector_run(tmp_path, person_match):
+    store, tracks, _, _, _ = _setup(tmp_path, detector_matched=person_match)
+    result = _fold(store, tracks)
+    assert result["official"]["accounting"]["estimated_shots"] == 0
+    assert result["episode_profiles"]["official"]["accounting"]["episode_candidate_shots"] == 4
+
+
+@pytest.mark.parametrize("new_context", [None, "different-epoch"])
+def test_named_estimate_cannot_cross_unknown_or_changed_recorded_context(tmp_path, new_context):
+    store, tracks, _, _, _ = _setup(tmp_path)
+    rows = table_to_samples(tracks.read([TrackObject.PLAYER], 1, 10))
+    rows = [row.model_copy(update={"context_id": new_context})
+            if row.track_id == 1 and row.frame_idx == 5 else row for row in rows]
+    tracks.write_chunk(TrackObject.PLAYER, 1, 10, samples_to_table(rows))
+    result = _fold(store, tracks)
+    assert result["official"]["participants"]["U1"]["estimated_shots"] == 0
+    assert result["official"]["accounting"]["estimated_shots"] == 3
+
+
 def test_four_participants_are_separate_estimates_and_not_verified(tmp_path):
     store, tracks, observations, seeds, shots = _setup(tmp_path)
     result = _fold(store, tracks)
@@ -215,7 +243,7 @@ def test_four_participants_are_separate_estimates_and_not_verified(tmp_path):
         assert ev["observation_id"] == observations[i - 1].event_id
         assert ev["event_id"] == shots[i - 1].event_id and ev["status"] == "estimated"
         assert ev["detector_observed"] is True
-        assert ev["detector_observation_scope"] == "frame_only_not_person_match"
+        assert ev["detector_observation_scope"] == "unique_current_person_match"
     assert result["all_linked"]["accounting"]["estimated_shots"] == 4
 
 
@@ -228,6 +256,8 @@ def test_missing_track_sample_gap_and_reset_abstain(tmp_path):
     rows = [
         TrackSample(
             detector_observed=True,
+            detector_matched=True,
+            context_id="controlled-epoch",
             frame_idx=f,
             obj=TrackObject.PLAYER,
             track_id=i,
@@ -321,6 +351,8 @@ def test_invalid_sample_never_infers_an_identity(tmp_path, problem):
             fields = {
                 "frame_idx": f,
                 "detector_observed": True,
+                "detector_matched": True,
+                "context_id": "controlled-epoch",
                 "obj": TrackObject.PLAYER,
                 "track_id": i,
                 "bbox": (i * 50, 1, i * 50 + 19, 30),
@@ -480,6 +512,8 @@ def test_seed_expires_after_bounded_duration(tmp_path):
             [
                 TrackSample(
                     detector_observed=True,
+                    detector_matched=True,
+                    context_id="controlled-epoch",
                     frame_idx=250,
                     obj=TrackObject.PLAYER,
                     track_id=1,
@@ -552,6 +586,8 @@ def test_anonymous_episode_does_not_count_stale_or_invalid_shot_frame_box(tmp_pa
     rows = [
         TrackSample(
             detector_observed=True,
+            detector_matched=True,
+            context_id="controlled-epoch",
             frame_idx=10,
             obj=TrackObject.PLAYER,
             track_id=i,
@@ -626,6 +662,8 @@ def test_offscreen_shot_box_does_not_support_an_episode(tmp_path):
     rows = [
         TrackSample(
             detector_observed=True,
+            detector_matched=True,
+            context_id="controlled-epoch",
             frame_idx=10,
             obj=TrackObject.PLAYER,
             track_id=i,
@@ -701,8 +739,10 @@ def test_carried_boxes_without_detector_evidence_do_not_propagate_identity():
         for frame in range(7)
     ]
     rows[0]["detector_observed"] = True
+    rows[0]["detector_matched"] = True
     assert not _continuous(rows, "obs", 4, 0, 6, 1280, 720)
     rows[-1]["detector_observed"] = True
+    rows[-1]["detector_matched"] = True
     assert _continuous(rows, "obs", 4, 0, 6, 1280, 720)
     rows[0]["detector_observed"] = None
     assert not _continuous(rows, "obs", 4, 0, 6, 1280, 720)
@@ -724,8 +764,10 @@ def test_detector_run_gap_and_unknown_intermediate_provenance_abstain():
         for frame in range(14)
     ]
     rows[0]["detector_observed"] = rows[-1]["detector_observed"] = True
+    rows[0]["detector_matched"] = rows[-1]["detector_matched"] = True
     assert not _continuous(rows, "obs", 4, 0, 13, 1280, 720)
     rows[6]["detector_observed"] = rows[12]["detector_observed"] = True
+    rows[6]["detector_matched"] = rows[12]["detector_matched"] = True
     assert _continuous(rows, "obs", 4, 0, 13, 1280, 720)
     rows[7]["detector_observed"] = None
     assert not _continuous(rows, "obs", 4, 0, 13, 1280, 720)
@@ -755,6 +797,8 @@ def test_carried_shot_sample_abstains_named_but_discloses_anonymous_status(tmp_p
             conf=0.9,
             participant_observation_id=observations[i - 1].event_id,
             detector_observed=(frame != 10),
+            detector_matched=(frame != 10),
+            context_id="controlled-epoch",
         )
         for i in range(1, 5)
         for frame in (1, 5, 10)

@@ -43,6 +43,8 @@ class Settings(BaseSettings):
     ffmpeg: str = "ffmpeg"
     ffprobe: str = "ffprobe"
     ffprobe_timeout_s: float = 30.0
+    trace_dir: Path | None = None  # Optional bounded per-session execution spans; no tensors or images.
+    opencv_threads: int = Field(default=1, ge=1)  # Bound nested native pools across concurrently active stages.
 
     # analysis proxy
     proxy_height: int = 720

@@ -46,8 +46,18 @@ class RallyParams:
     resume_speed: float = 6.0
 
     def __post_init__(self) -> None:
-        if not isfinite(self.fps) or self.fps <= 0:
+        if isinstance(self.fps, bool) or not isfinite(self.fps) or self.fps <= 0:
             raise ValueError("rally FPS must be positive and finite")
+        for name in ("start_visible", "end_gap"):
+            value = getattr(self, name)
+            if type(value) is not int or value < 1:
+                raise ValueError(f"{name} must be a positive integer")
+        if type(self.end_lookahead) is not int or self.end_lookahead < 0:
+            raise ValueError("end_lookahead must be a nonnegative integer")
+        for name in ("start_speed", "stationary_speed", "resume_speed", "min_duration_s", "merge_gap_s"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isfinite(value) or value < 0:
+                raise ValueError(f"{name} must be finite and nonnegative")
         if type(self.stationary_window) is not int or self.stationary_window < 1:
             raise ValueError("stationary_window must be a positive integer")
         if type(self.stationary_count) is not int or not 1 <= self.stationary_count <= self.stationary_window:
@@ -81,6 +91,9 @@ class RallyUpdate:
     started: int | None = None  # provisional rally start (frame)
     cancelled_start: int | None = None  # a provisional start that turned out to be noise / too short
     finalized: RallySegment | None = None
+    # Preserve an actual rejected interval for diagnosis; None means no prior
+    # interval exists (e.g. a boundary at the start frame), never a zero-length rally.
+    cancelled_segment: RallySegment | None = None
 
 
 @dataclass
@@ -293,6 +306,7 @@ class RallyFSM:
             return
         if seg.length < self.params.min_frames:
             upd.cancelled_start = seg.start
+            upd.cancelled_segment = seg
         else:
             upd.finalized = seg
 

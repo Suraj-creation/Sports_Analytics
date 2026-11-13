@@ -3,6 +3,29 @@ import { ev } from "@/test/fixtures";
 import { EventLog } from "./events";
 import { reviewedIdentity } from "./reviewedIdentity";
 
+it("does not name an unresolved id even if legacy metadata claims a matching review", () => {
+  const events = new EventLog();
+  events.apply([
+    ev("participant_observation", 0, {
+      event_id: "birth",
+      status: "provisional",
+      provenance: { model: "participant_tracker_v1" },
+      payload: { track_id: -1, participant_id: "participant-abcd-000004", kind: "PLAYER_ENTERED" },
+    }),
+    ev("identity_review", 0, {
+      event_id: "review",
+      frame_end: 20,
+      status: "human_verified",
+      provenance: { model: "human" },
+      actors: { player_id: "person", track_id: -1, opponent_id: null },
+      payload: { observation_id: "birth", participant_id: "participant-abcd-000004" },
+    }),
+  ]);
+  expect(
+    reviewedIdentity(events, { track: -1, observationId: "birth" }, 10, { person: "Known name" }),
+  ).toBeNull();
+});
+
 it("labels an exact reviewed episode and removes the name on revoke, missing evidence or reset", () => {
   const events = new EventLog();
   const birth = ev("participant_observation", 1, {

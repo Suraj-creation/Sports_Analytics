@@ -59,9 +59,12 @@ def get_logger(name: str) -> structlog.stdlib.BoundLogger:
 
 @contextmanager
 def timed(stage: str) -> Iterator[None]:
+    from bai_engine.trace import trace_span
+
     t0 = time.perf_counter()
     try:
-        yield
+        with trace_span(stage):
+            yield
     finally:
         STAGE_LATENCY.labels(stage=stage).observe(time.perf_counter() - t0)
 

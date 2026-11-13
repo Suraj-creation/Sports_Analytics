@@ -254,6 +254,9 @@ CONTRACT_DETAILS = {
         "timeline": "canonical_cfr_frame_index",
         "coordinates": "analysis_image_pixels_and_ground_foot_metres_with_provenance",
         "devices": ["cpu"],
+        **({
+            "cancellation_evidence": "optional_source_interval:RallyUpdate.cancelled_segment"
+        } if kind == "rally" else {}),
         "required_evidence": {
             "identity": ["provisional_track_episodes"],
             "contact": ["observed_shuttle_motion_or_equipment_support"],
@@ -637,7 +640,7 @@ def register_domain_components(registry: ComponentRegistry) -> None:
                 kind=kind,
                 implementation=BASELINE_IMPLEMENTATIONS[kind],
                 version=(
-                    "3" if kind in {"rally", "contact"}
+                    "4" if kind == "rally" else "3" if kind == "contact"
                     else "2" if kind in {"identity", "stroke", "analytics"} else "1"
                 ),
                 input_schema=f"badminton-{kind}-input:v1",
@@ -727,7 +730,7 @@ def register_domain_components(registry: ComponentRegistry) -> None:
         ComponentContract(
             kind="rally",
             implementation="rally-evidence-tracklets-v1",
-            version="3",
+            version="4",
             input_schema="badminton-rally-evidence:v2",
             output_schema="badminton-rally-output:v1",
             interface=AssociatedExitRallySegmentation,
@@ -757,7 +760,7 @@ def register_domain_components(registry: ComponentRegistry) -> None:
         ComponentContract(
             kind="rally",
             implementation="rally-evidence-v2",
-            version="4",
+            version="5",
             input_schema="badminton-rally-evidence:v2",
             output_schema="badminton-rally-output:v1",
             interface=EvidenceRallySegmentation,

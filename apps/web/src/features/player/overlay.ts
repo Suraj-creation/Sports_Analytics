@@ -3,6 +3,7 @@ import type { EventLog } from "@/lib/events";
 import { reviewedIdentity } from "@/lib/reviewedIdentity";
 import type { TrackBuffer } from "@/lib/tracks";
 import type { Calibration, PlayerId } from "@/lib/types";
+import { videoViewport } from "@/lib/videoCoordinates";
 import type { Layers } from "@/stores/playback";
 
 const SKELETON: [number, number][] = [
@@ -32,16 +33,8 @@ export interface OverlayCtx {
   names: Record<PlayerId, string>;
   participantNames?: Record<string, string>;
   fps?: number;
-}
-
-/** Map video intrinsic pixels → canvas pixels for an object-fit: contain video. */
-function viewport(video: HTMLVideoElement, canvas: HTMLCanvasElement) {
-  const vw = video.videoWidth || 1280;
-  const vh = video.videoHeight || 720;
-  const cw = canvas.clientWidth;
-  const ch = canvas.clientHeight;
-  const s = Math.min(cw / vw, ch / vh);
-  return { s, ox: (cw - vw * s) / 2, oy: (ch - vh * s) / 2 };
+  analysisWidth?: number;
+  analysisHeight?: number;
 }
 
 /** Draw every overlay layer for exactly `frame` (called from requestVideoFrameCallback). */
@@ -58,9 +51,17 @@ export function drawOverlay(o: OverlayCtx, frame: number): void {
   if (!g) return;
   g.setTransform(1, 0, 0, 1, 0, 0);
   g.clearRect(0, 0, w, h);
-  const { s, ox, oy } = viewport(video, canvas);
-  g.setTransform(dpr * s, 0, 0, dpr * s, dpr * ox, dpr * oy);
-  const px = 1 / s; // one CSS pixel in video units
+  const viewport = videoViewport(
+    canvas.clientWidth,
+    canvas.clientHeight,
+    video.videoWidth || 1280,
+    video.videoHeight || 720,
+    o.analysisWidth ?? (video.videoWidth || 1280),
+    o.analysisHeight ?? (video.videoHeight || 720),
+  );
+  if (!viewport) return;
+  g.setTransform(dpr * viewport.scaleX, 0, 0, dpr * viewport.scaleY, dpr * viewport.left, dpr * viewport.top);
+  const px = 1 / Math.min(viewport.scaleX, viewport.scaleY);
 
   const view = tracks.view(frame);
   if (layers.court && o.calibration?.H) {
@@ -72,7 +73,7 @@ export function drawOverlay(o: OverlayCtx, frame: number): void {
     if (pose === undefined) drawCourt(g, o.calibration.H, px);
     else if (pose) drawCourt(g, mul3(pose, o.calibration.H), px, view?.view === "alt");
   }
-  if (layers.labels && view) drawSceneChip(g, view.view, px, video.videoHeight || 720);
+  if (layers.labels && view) drawSceneChip(g, view.view, px, o.analysisHeight ?? (video.videoHeight || 720));
 
   if (layers.players || layers.pose || layers.labels) {
     for (const p of tracks.playersAt(frame)) {
@@ -86,14 +87,24 @@ export function drawOverlay(o: OverlayCtx, frame: number): void {
       const pose = layers.pose
         ? tracks.displayPose(p, frame, Math.min(5, Math.floor((o.fps ?? 30) * 0.2)))
         : null;
-      if (pose) drawSkeleton(g, pose.keypoints, color, px, pose.ageFrames > 0);
+      if (pose) drawSkeleton(g, pose.keypoints, color, px, pose.ageFrames !== 0);
       const reviewed = reviewedIdentity(o.events, p, frame, o.participantNames ?? {});
-      const name = reviewed
-        ? `${reviewed.name} · reviewed interval`
-        : p.playerId
-          ? o.names[p.playerId]
-          : `Track ${p.track} · identity unassigned`;
-      const qualification = `${carried ? " · tracked estimate" : ""}${pose?.ageFrames ? " · pose estimate" : ""}`;
+      const name =
+        p.track < 0
+          ? "Unresolved observation"
+          : reviewed
+            ? `${reviewed.name} · reviewed interval`
+            : p.playerId
+              ? o.names[p.playerId]
+              : `Track ${p.track} · identity unassigned`;
+      const poseQualification = !pose
+        ? ""
+        : pose.ageFrames == null
+          ? " · pose source unknown"
+          : pose.ageFrames > 0
+            ? " · pose estimate"
+            : "";
+      const qualification = `${carried ? " · tracked estimate" : ""}${poseQualification}`;
       if (layers.labels) drawLabel(g, p.bbox, `${name}${qualification}`, color, px);
     }
   }
@@ -252,7 +263,7 @@ function drawShuttle(g: CanvasRenderingContext2D, tracks: TrackBuffer, frame: nu
     const a = trail[i - 1];
     const b = trail[i];
     if (!a || !b || b.f - a.f > 2) continue;
-    if (tracks.view(a.f)?.camera !== tracks.view(b.f)?.camera) continue;
+    if (!tracks.sameContext(a.f, b.f)) continue;
     const t = i / trail.length;
     const confidence = Math.max(0.15, Math.min(1, Math.min(a.p.c, b.p.c)));
     g.strokeStyle = `rgba(255,255,255,${(0.12 + 0.75 * t) * confidence})`;

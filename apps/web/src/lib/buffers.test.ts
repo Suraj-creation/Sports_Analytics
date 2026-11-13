@@ -150,6 +150,7 @@ describe("TrackBuffer", () => {
         k: frames.flatMap((f) => (f === 0 ? [15, 25, 0.9, ...new Array(48).fill(0)] : new Array(51).fill(0))),
         cx: frames.map(() => 0),
         cy: frames.map(() => 0),
+        pf: frames.map((f) => (f === 0 ? 0 : null)),
       },
     },
   });
@@ -165,6 +166,37 @@ describe("TrackBuffer", () => {
     expect(display?.keypoints[0]).toBe(17); // bbox translated +2; pose is an estimate
     expect(current?.kps).toBeNull();
     expect(t.playersAt(0)[0]?.kps?.[0]).toBe(15);
+  });
+
+  it("does not turn an unresolved canonical id into a pose or movement identity", () => {
+    const t = new TrackBuffer();
+    const unresolved = sampledPoses([0, 1]);
+    unresolved.anonymous.a.t = [-1, -1];
+    t.ingest(unresolved);
+    const current = t.playersAt(1)[0];
+    expect(current ? t.displayPose(current, 1) : null).toBeNull();
+    const observed = t.playersAt(0)[0];
+    expect(observed ? t.displayPose(observed, 0)?.observedFrame : null).toBe(0);
+    const named = win(0, 1, []);
+    named.players.P1.t = [-1];
+    t.ingest(named);
+    expect(t.playerCourtTrail("P1", 0, 1, 1)).toEqual([]);
+  });
+
+  it("preserves distinct unresolved wire groups without merging their canonical minus-one ids", () => {
+    const t = new TrackBuffer();
+    const raw = (rawTrack: number) => ({
+      f: [0],
+      t: [-1],
+      raw: [rawTrack],
+      b: [rawTrack * 10, 0, rawTrack * 10 + 10, 20],
+      k: Array(51).fill(0),
+      cx: [null],
+      cy: [null],
+    });
+    t.ingest({ ...win(0, 0, []), players: {}, anonymous: { "raw:1": raw(1), "raw:2": raw(2) } });
+    expect(t.playersAt(0).map((p) => p.rawTrack)).toEqual([1, 2]);
+    expect(t.playersAt(0).map((p) => p.track)).toEqual([-1, -1]);
   });
 
   it("never holds a pose across a missing body, changed episode or expired age", () => {
@@ -210,6 +242,24 @@ describe("TrackBuffer camera poses", () => {
   const withCam = (from: number, to: number, frames: number[], g: number[][]) => ({
     ...win(from, to, []),
     cam: { f: frames, g: g.flat() },
+  });
+
+  it("does not join observations across a same-camera epoch or invalid intermediate view", () => {
+    const tb = new TrackBuffer();
+    tb.ingest({
+      ...win(0, 3, []),
+      cam: {
+        f: [0, 1, 2, 3],
+        g: [eye, eye, new Array(9).fill(0), eye].flat(),
+        h: [0, 0, -1, 0],
+        ctx: ["before", "after", "after", "after"],
+      },
+    });
+    expect(tb.sameContext(0, 1)).toBe(false);
+    expect(tb.sameContext(1, 3)).toBe(false);
+    expect(tb.sameContext(3, 3)).toBe(true);
+    tb.clear();
+    expect(tb.sameContext(0, 1)).toBe(true); // legacy unknowns do not claim a new boundary
   });
 
   it("is untracked until a pose arrives (the overlay then keeps the fixed court)", () => {

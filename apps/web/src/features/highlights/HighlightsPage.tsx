@@ -26,7 +26,7 @@ export function HighlightsPage() {
   return (
     <Page title="Highlights" lead="The parts you'll want to play again." className="hl-page">
       <div className="hl-source-toolbar">
-        <div className="hl-source-switch" role="group" aria-label="Highlight source">
+        <fieldset className="hl-source-switch" aria-label="Highlight source">
           <button type="button" aria-pressed={source === "example"} onClick={() => setSource("example")}>
             Example session
           </button>
@@ -37,7 +37,7 @@ export function HighlightsPage() {
           >
             Your recordings
           </button>
-        </div>
+        </fieldset>
         <div className="hl-scope-controls">
           {source === "example" ? (
             <label htmlFor={`${id}-format`}>
@@ -61,6 +61,11 @@ export function HighlightsPage() {
                 onChange={(event) => setSession(event.target.value)}
               >
                 {!data.matches.length && <option value="">No recordings loaded</option>}
+                {data.missingSession && (
+                  <option value={sessionId} disabled>
+                    Selected recording unavailable
+                  </option>
+                )}
                 {data.matches.map(({ session }) => (
                   <option key={session.session_id} value={session.session_id}>
                     {session.title}

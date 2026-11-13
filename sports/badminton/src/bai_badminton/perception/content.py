@@ -33,6 +33,7 @@ from bai_badminton.perception.scene_change import (
 
 CONTENT_IMPLEMENTATION = "foreground-content-continuity-v1"
 CONTENT_IMPLEMENTATION_V2 = "foreground-content-continuity-v2"
+AMBIGUOUS_POSITIVE_LAYOUT = "ambiguous_layout_with_supported_witnesses"
 MAX_CONTENT_REGIONS = 8
 MAX_CONTENT_REASONS = 8
 MAX_CONTENT_TEXT = 160
@@ -412,6 +413,24 @@ def validate_scene_decision_binding(decision: SceneDecisionEvidence, raw: SceneC
     ):
         raise ValueError("relative decision witnesses differ from their raw image evidence")
     if decision.decision == "unknown":
+        if decision.reason == AMBIGUOUS_POSITIVE_LAYOUT:
+            from bai_badminton.perception.players import _box_iou
+
+            indices = (
+                [i for i, item in enumerate(raw.regions) if item.region.key in decision.supporting_region_keys]
+                if modern else list(range(len(raw.regions)))
+            )
+            candidates = decision.layout_indices if modern else decision.admitted_indices
+            if not raw.hypothesis or not 2 <= len(indices) <= 8 or not candidates:
+                raise ValueError("ambiguous positive layout requires current source-bound witness support")
+            previous = np.asarray([raw.regions[i].region.bbox for i in indices], dtype=np.float64)
+            current = np.asarray([decision.detector_boxes[i] for i in candidates], dtype=np.float64)
+            overlap = _box_iou(previous, current) >= decision.iou_threshold
+            if not (
+                overlap.any(axis=1).all()
+                and ((overlap.sum(axis=0) > 1).any() or (overlap.sum(axis=1) > 1).any())
+            ):
+                raise ValueError("ambiguous positive layout contradicts its recorded source-region geometry")
         return
     if (
         decision.version in {"detector-layout-scene-decision:v3", "detector-layout-scene-decision:v4"}
@@ -1129,7 +1148,10 @@ class ContentContinuityProviderV2(ContentContinuityProvider):
         overlap = _box_iou(previous, current) >= 0.3
         if (overlap.sum(axis=0) > 1).any() or (overlap.sum(axis=1) > 1).any():
             return SceneDecisionEvidence(
-                decision="unknown", reason="ambiguous_layout_correspondence_raw_barrier_fallback", **metadata
+                decision="unknown",
+                reason=AMBIGUOUS_POSITIVE_LAYOUT if overlap.any(axis=1).all()
+                else "ambiguous_layout_correspondence_raw_barrier_fallback",
+                **metadata,
             )
         metadata["matched_pairs"] = tuple(
             (indices[a], int(candidates[b])) for a, b in zip(*np.nonzero(overlap), strict=True)
@@ -1160,13 +1182,15 @@ class ContentContinuityProviderV2(ContentContinuityProvider):
         )
 
     def tracking_barrier_for_decision(self, decision: SceneDecisionEvidence) -> bool:
-        """Suppress only positive complete correspondence; retain raw fallback.
+        """Retain raw fallback except when all witnesses still have observed support.
 
-        An unresolved detector layout does not confirm an edit. It preserves the
-        existing experimental raw-hypothesis reset rather than silently losing
-        previously detected edits. The explicit reason and content epoch retain
-        both the uncertainty and the actual tracking action.
+        Duplicate proposals cannot establish an edit when every previous witness
+        still overlaps a current proposal. This remains unknown, without claiming
+        unique correspondence or physical identity. Missing witnesses/geometry and
+        disjoint layouts retain the existing explicitly uncertain fallback.
         """
+        if decision.decision == "unknown" and decision.reason == AMBIGUOUS_POSITIVE_LAYOUT:
+            return False
         if decision.feature_origin_overlap_dependent:
             return self.requires_detector_layout and decision.decision == "barrier"
         return self.requires_detector_layout and (

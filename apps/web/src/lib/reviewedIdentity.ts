@@ -7,10 +7,10 @@ export function reviewedIdentity(
   frame: number,
   names: Record<string, string>,
 ): { id: string; name: string } | null {
+  if (!Number.isInteger(person.track) || person.track < 0) return null;
   const birth = person.observationId ? events.get(person.observationId) : undefined;
   if (
-    !birth ||
-    birth.type !== "participant_observation" ||
+    birth?.type !== "participant_observation" ||
     birth.provenance.model !== "participant_tracker_v1" ||
     birth.status !== "provisional" ||
     birth.payload.track_id !== person.track

@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Empty, ErrorNote } from "@/components/ui";
+import { Empty, ErrorNote, Spinner } from "@/components/ui";
 import { CourtView, prepareCanvas } from "@/features/court/geometry";
 import { useAnalysisQueryKey } from "@/lib/analysisQuery";
 import { api } from "@/lib/api";
@@ -10,8 +10,12 @@ import type { Heatmap, PlayerId, Session } from "@/lib/types";
 import { useSession } from "@/stores/session";
 
 const KINDS: { id: string; label: string; hint: string }[] = [
-  { id: "presence", label: "Where they stand", hint: "Time spent in each part of the court during rallies" },
-  { id: "movement", label: "Movement", hint: "Distance covered, by area" },
+  {
+    id: "presence",
+    label: "Where they stand",
+    hint: "Sampled feet positions during qualified rally intervals",
+  },
+  { id: "movement", label: "Movement", hint: "Estimated travel distance, by area" },
   { id: "origin", label: "Where they hit from", hint: "Position at each shot" },
   {
     id: "landing",
@@ -103,10 +107,19 @@ function HeatmapCard({
         <span className="size-2 rounded-full" style={{ background: PLAYER_HEX[pid] }} aria-hidden />
         {shortName(session, pid)}
         {q.data && (
-          <span className="text-xs font-normal text-line-3">{Math.round(q.data.total)} samples</span>
+          <span className="text-xs font-normal text-line-3">
+            {kind === "movement"
+              ? `${q.data.total.toFixed(1)} m of estimated travel`
+              : `${Math.round(q.data.total)} samples`}
+          </span>
         )}
       </figcaption>
       <ErrorNote error={q.error} />
+      {q.isPending && (
+        <p className="flex items-center gap-2 text-sm text-line-2" role="status">
+          <Spinner /> Loading heatmap
+        </p>
+      )}
       {q.data && q.data.total > 0 ? (
         <>
           <HeatCanvas h={q.data} color={PLAYER_HEX[pid]} />

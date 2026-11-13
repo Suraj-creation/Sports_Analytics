@@ -138,6 +138,7 @@ from bai_engine.schema import (
 )
 from bai_engine.store import EventStore
 from bai_engine.timeline import Timeline
+from bai_engine.trace import trace_frames, trace_span
 
 EmitFn = Callable[[list[Event]], None]
 
@@ -1539,18 +1540,25 @@ class BadmintonMatchEngine:
                 for i, snapshots in enumerate(frames)
             ]
         episode_window = participant_window(w, frames, restrict_target_court=True)
-        if episode_window.players or self.match_cfg.discipline == "doubles":
+        use_episodes = bool(episode_window.players) or self.match_cfg.discipline == "doubles"
+        contact_window = episode_window if use_episodes else w
+        with trace_frames(start, upto), trace_span(
+            "contact_candidates", provider=type(self.contact_inference).__name__,
+            window_start=w.frame0, window_frames=w.n, selection_start=i0, selection_stop=i1,
+            person_series=len(contact_window.players),
+            observed_shuttle_samples=int(np.count_nonzero(contact_window.shuttle.vis & ~contact_window.shuttle.interp)),
+        ) as execution:
+            detected = list(self.contact_inference.detect(
+                contact_window, start=i0, stop=i1,
+                enforce_alternation=False, proximity_split=ATTRIBUTION_MIN_PROXIMITY,
+            ))
+            execution.update(output_count=len(detected))
+        if use_episodes:
             # Contact evidence depends on visible bodies/poses, not whether a
             # human has assigned durable names. Singles previously discarded
             # these cues until AFTER selecting trajectory-only candidates.
             contacts = {}
-            for candidate in self.contact_inference.detect(
-                episode_window,
-                start=i0,
-                stop=i1,
-                enforce_alternation=False,
-                proximity_split=ATTRIBUTION_MIN_PROXIMITY,
-            ):
+            for candidate in detected:
                 candidate = self._contact_with_observation_evidence(candidate, episode_window, frames)
                 snapshot = frames[candidate.frame - w.frame0].get(candidate.player_id)
                 idx = candidate.frame - self._buf0
@@ -1569,13 +1577,7 @@ class BadmintonMatchEngine:
             # Legacy/synthetic named observations without participant episodes.
             contacts = {
                 c.frame: self._contact_with_observation_evidence(c, w, frames)
-                for c in self.contact_inference.detect(
-                    w,
-                    start=i0,
-                    stop=i1,
-                    enforce_alternation=False,
-                    proximity_split=ATTRIBUTION_MIN_PROXIMITY,
-                )
+                for c in detected
             }
         t = w.shuttle
         observed = t.vis & ~t.interp
@@ -1689,7 +1691,32 @@ class BadmintonMatchEngine:
         # short-rally cancellation attach to the wrong exchange.
         if upd.cancelled_start is not None:
             if self._rally_start_event is not None:
-                self._emit([self._rally_start_event.retract(self._prov("rally_fsm_v1"), "rally shorter than minimum")])
+                segment = getattr(upd, "cancelled_segment", None)
+                admission = getattr(self.fsm, "last_exchange_admission", None)
+                if segment is None or admission is None or (
+                    admission.get("start"), admission.get("end")
+                ) != (segment.start, segment.end):
+                    admission = None
+                details = {
+                    "schema": "rally-cancellation:v1",
+                    "candidate_start": upd.cancelled_start,
+                    "candidate_end": segment.end if segment is not None else None,
+                    "duration_frames": segment.length if segment is not None else None,
+                    "minimum_duration_frames": self.fsm.params.min_frames,
+                    "terminal_reason": segment.reason if segment is not None else None,
+                    "interval_status": "available" if segment is not None else "unavailable",
+                    "admission": deepcopy(admission),
+                    "semantics": "rejected_numerical_candidate;not_verified_physical_rally",
+                }
+                note = "rally shorter than minimum" if segment is not None else "rally cancelled; interval unavailable"
+                retraction = self._rally_start_event.retract(self._prov("rally_fsm_v1"), note)
+                evidence = retraction.evidence
+                if segment is not None:
+                    evidence += (Evidence(
+                        kind=EvidenceKind.TRACK_WINDOW, frames=(segment.start, segment.end), obj="shuttle",
+                        note="Rejected candidate interval; inspect observed gaps and independent contact witnesses.",
+                    ),)
+                self._emit([retraction.model_copy(update={"payload": {"cancellation": details}, "evidence": evidence})])
             for c in self._open_contacts:
                 self._retract_contact(c, "rally cancelled")
             self._open_contacts, self._rally_start_event = [], None
@@ -2112,7 +2139,13 @@ class BadmintonMatchEngine:
                 "semantics": "supported_endpoint_estimate;not_verified_flight",
             }},
         )
-        pred = self.stroke_clf.predict(ctx)
+        with trace_frames(c.cand.frame, c.cand.frame), trace_span(
+            "stroke_classification", provider=type(self.stroke_clf).__name__,
+            contact_event_id=c.event.event_id, endpoint_event_id=endpoint_event,
+            endpoint_status=endpoint.reliability.value, supported_endpoint_frame=next_frame,
+        ) as execution:
+            pred = self.stroke_clf.predict(ctx)
+            execution.update(model=pred.model, top_class=pred.top[0], scores=pred.probs)
         stroke, p = pred.top
         payload: dict[str, Any] = {
             "stroke": stroke,
@@ -2769,6 +2802,14 @@ class BadmintonMatchEngine:
         )
 
     def _outcome(self, seg: RallySegment) -> tuple[str, str, str, float]:
+        with trace_frames(seg.start, seg.end), trace_span(
+            "rally_outcome", provider=type(self.outcome_inference).__name__, terminal_reason=seg.reason,
+        ) as execution:
+            result = self._infer_outcome(seg)
+            execution.update(outcome=result[0], fault=result[1], reason=result[2], heuristic_support=result[3])
+            return result
+
+    def _infer_outcome(self, seg: RallySegment) -> tuple[str, str, str, float]:
         if not self._format_known_for(seg):
             return Outcome.UNKNOWN.value, "unknown", "match_format_unknown", 0.2
         # A camera cut or EOF closes our observation interval, not the rally.

@@ -29,6 +29,7 @@ from bai_badminton.perception.foreground import CourtForegroundMemory
 from bai_badminton.perception.player_association import PersistentPlayerAssociator
 from bai_badminton.perception.scene_change import ForegroundRegion
 from bai_badminton.perception_types import PersonObs
+from bai_engine.trace import trace_frames, trace_span
 
 PERSON = 0
 TRACKER_ACTIVATION_POLICY = "initial_observation_counts_v2"
@@ -185,9 +186,17 @@ class PlayerDetector:
 
     def __call__(self, img: NDArray[np.uint8]) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
         """Person boxes (N,4) xyxy and scores (N,) in ``img`` coordinates."""
-        if self.kind == "rfdetr":
-            return self._rfdetr(img)
-        return self._yolox(img)
+        with trace_span(
+            "player_detector", implementation=self.kind,
+            input_shape=list(img.shape), input_dtype=str(img.dtype), coordinate_space="input_image_xyxy_px",
+        ) as execution:
+            result = self._rfdetr(img) if self.kind == "rfdetr" else self._yolox(img)
+            execution.update(
+                output_count=len(result[0]), boxes_shape=list(result[0].shape),
+                scores_shape=list(result[1].shape), output_dtype=str(result[0].dtype),
+                output_finite=bool(np.isfinite(result[0]).all() and np.isfinite(result[1]).all()),
+            )
+            return result
 
     def _yolox(self, img: NDArray[np.uint8]) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
         # rtmlib's human-mode postprocessor discards scores. Decode the existing
@@ -330,9 +339,9 @@ class PoseEstimator:
         _swap_session(self.tool, onnx_path, providers)
 
     def __call__(
-        self, img: NDArray[np.uint8], boxes: list[NDArray[np.float64]]
+        self, img: NDArray[np.uint8], boxes: list[NDArray[np.float64]] | NDArray[np.float64]
     ) -> list[NDArray[np.float64] | None]:
-        if not boxes:
+        if len(boxes) == 0:
             return []
         # Keep person order even when one upstream box is unusable. Never let a
         # malformed crop shift the poses onto another doubles participant.
@@ -504,7 +513,8 @@ class PlayerPerception:
         h, w = img.shape[:2]
         crop = self.roi.crop_box(w, h) if self.roi is not None else (0, 0, w, h)
         x0, y0, x1, y1 = crop
-        boxes, scores = self.detector(img[y0:y1, x0:x1])
+        with trace_frames(frame_idx, frame_idx):
+            boxes, scores = self.detector(img[y0:y1, x0:x1])
         boxes = np.asarray(boxes, dtype=np.float64).reshape(-1, 4)
         scores = np.asarray(scores, dtype=np.float64).reshape(-1)
         if len(boxes):
@@ -588,7 +598,8 @@ class PlayerPerception:
             # Probe boxes already use full-image coordinates.
             boxes = boxes - [x0, y0, x0, y0]
         else:
-            boxes, scores = self.detector(view)
+            with trace_frames(frame_idx, frame_idx):
+                boxes, scores = self.detector(view)
         self.last_detector_observed = True
         self._last_detection_frame = frame_idx
         self._force_detection = False
@@ -634,7 +645,12 @@ class PlayerPerception:
             self.last_diagnostic["post_roi_count"] = len(boxes)
         if self.tracker is None:
             self.tracker = PlayerTracker(self.fps)
-        tracks = self.tracker.update(boxes, scores, frame_idx)
+        with trace_frames(frame_idx, frame_idx), trace_span(
+            "tracking", implementation="bytetrack", input_count=len(boxes),
+            canonical_frame=frame_idx, timeline_fps=self.fps,
+        ) as execution:
+            tracks = self.tracker.update(boxes, scores, frame_idx)
+            execution.update(output_count=len(tracks), track_ids=[track[0] for track in tracks])
         if self.last_diagnostic is not None:
             self.last_diagnostic["tracker_count"] = len(tracks)
         self._admitted = {tid: last for tid, last in self._admitted.items() if frame_idx - last <= 2 * self.fps}
@@ -686,7 +702,18 @@ class PlayerPerception:
             if self.reid is not None and selected:
                 try:
                     features = np.zeros((len(tracks), 512), dtype=np.float32)
-                    features[selected] = self.reid.embed(img, [tracks[i][1] for i in selected])
+                    with trace_frames(frame_idx, frame_idx), trace_span(
+                        "appearance", model=self._reid_fingerprint, person_count=len(selected),
+                        input_shape=list(img.shape), input_dtype=str(img.dtype),
+                        runtime=getattr(self.reid, "runtime", None),
+                    ) as execution:
+                        descriptors = self.reid.embed(img, [tracks[i][1] for i in selected])
+                        execution.update(
+                            output_shape=list(descriptors.shape), output_dtype=str(descriptors.dtype),
+                            finite=bool(np.isfinite(descriptors).all()),
+                            consumer="persistent_player_associator", descriptors_stored=False,
+                        )
+                        features[selected] = descriptors
                 except (OSError, ValueError, RuntimeError, ImportError) as exc:
                     # Keep the canonical namespace after failure. Reverting to raw
                     # ByteTrack IDs could silently re-use another person's identity.
@@ -768,7 +795,17 @@ class PlayerPerception:
         for p in persons:
             p.pose_frame_idx = None
         if self.pose is not None and pose_stride > 0 and frame_idx % pose_stride == 0 and persons:
-            for p, k in zip(persons, self.pose(img, [p.bbox for p in persons]), strict=True):
+            with trace_frames(frame_idx, frame_idx), trace_span(
+                "pose", input_shape=list(img.shape), input_dtype=str(img.dtype),
+                person_count=len(persons), current_detector_matches=sum(p.detector_matched is True for p in persons),
+                canonical_frame=frame_idx,
+            ) as execution:
+                poses = self.pose(img, [p.bbox for p in persons])
+                execution.update(
+                    output_count=len(poses), missing_count=sum(pose is None for pose in poses),
+                    output_shapes=[list(pose.shape) if isinstance(pose, np.ndarray) else None for pose in poses],
+                )
+            for p, k in zip(persons, poses, strict=True):
                 p.kps = k.copy() if isinstance(k, np.ndarray) else k
                 if k is not None:
                     values = np.asarray(k)

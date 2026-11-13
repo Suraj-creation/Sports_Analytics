@@ -14,7 +14,7 @@ from synthetic_support import bind_labelled_synthetic_singles
 from bai_badminton.engine import BadmintonMatchEngine, EngineConfig
 from bai_badminton.events.match_phase import PhaseParams
 from bai_badminton.perception.camera import project
-from bai_badminton.perception_types import ChunkPerception, PersonObs
+from bai_badminton.perception_types import ChunkPerception
 from bai_badminton.testing.synth import SynthMatch, make_match
 from bai_engine.schema import TrackObject
 from bai_engine.store import EventStore
@@ -48,10 +48,9 @@ def move(m: SynthMatch, roll: float = 0.0) -> list[ChunkPerception]:
                 if kps is not None:
                     kps[:, :2] = project(G, kps[:, :2])
                 persons.append(
-                    PersonObs(
-                        track_id=p.track_id,
+                    replace(
+                        p,
                         bbox=np.array([q[:, 0].min(), q[:, 1].min(), q[:, 0].max(), q[:, 1].max()]),
-                        conf=p.conf,
                         kps=kps,
                     )
                 )
@@ -59,6 +58,17 @@ def move(m: SynthMatch, roll: float = 0.0) -> list[ChunkPerception]:
             frames.append(replace(fp, shuttle_xy=xy, persons=persons, cam=G))
         out.append(replace(ch, frames=frames, cam_ref=CAM_REF))
     return out
+
+
+def test_camera_transform_preserves_observation_freshness_and_source_ownership():
+    match = make_match(["P1"])
+    original = [person for chunk in match.chunks for frame in chunk.frames for person in frame.persons]
+    transformed = [person for chunk in move(match) for frame in chunk.frames for person in frame.persons]
+    assert original and len(transformed) == len(original)
+    for before, after in zip(original, transformed, strict=True):
+        assert after.detector_matched is before.detector_matched is True
+        assert after.pose_frame_idx == before.pose_frame_idx
+        assert after.raw_track_id == before.raw_track_id
 
 
 def run(tmp_path: Path, name: str, chunks: list[ChunkPerception], m: SynthMatch, *, tracked: bool):
